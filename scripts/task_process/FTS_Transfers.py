@@ -7,7 +7,6 @@ from __future__ import division
 from __future__ import print_function
 import json
 import logging
-import threading
 import os
 import subprocess
 from datetime import timedelta
@@ -15,9 +14,11 @@ from httplib import HTTPException
 
 import fts3.rest.client.easy as fts3
 
+from rucio.client import Client as rucioclient
+from rucio.rse.rsemanager import find_matching_scheme
+
 from RESTInteractions import CRABRest
 from ServerUtilities import encodeRequest
-from TransferInterface import CRABDataInjector
 
 FTS_ENDPOINT = "https://fts3-cms.cern.ch:8446/"
 FTS_MONITORING = "https://fts3-cms.cern.ch:8449/"
@@ -28,7 +29,7 @@ if not os.path.exists('task_process/transfers'):
 logging.basicConfig(
     filename='task_process/transfers/transfer_inject.log',
     level=logging.INFO,
-    format='%(asctime)s[%(relativeCreated)6d]%(threadName)s: %(message)s'
+    format='%(asctime)s: %(message)s'
 )
 
 if os.path.exists('task_process/RestInfoForFileTransfers.json'):
@@ -64,7 +65,6 @@ def chunks(l, n):
     for i in range(0, len(l), n):
         yield l[i:i + n]
 
-
 def mark_transferred(ids, crabserver):
     """
     Mark the list of files as tranferred
@@ -87,7 +87,6 @@ def mark_transferred(ids, crabserver):
         logging.exception("Error updating documents")
         return False
     return True
-
 
 def mark_failed(ids, failures_reasons, crabserver):
     """
@@ -113,7 +112,6 @@ def mark_failed(ids, failures_reasons, crabserver):
         return False
     return True
 
-
 def remove_files_in_bkg(pfns, logFile, timeout=None):
     """
     fork a process to remove the indicated PFN's without
@@ -136,229 +134,187 @@ def remove_files_in_bkg(pfns, logFile, timeout=None):
 
     return
 
-
-class check_states_thread(threading.Thread):
+def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, failed_id, failed_reasons):
     """
     get transfers state per jobid
+
+    INPUT PARAMS
+    :param logger: a logging object
+    :param ftsContext:
+    :param jobid:
+    OUTPUT PARAMS
+    :prarm jobsEnded:
+    :param jobs_ongoing:
+    :param done_id:
+    :param failed_id:
+    :param failed_reasons:
+    - check if the fts job is in final state (FINISHED, FINISHEDDIRTY, CANCELED, FAILED)
+    - get file transfers states and get corresponding oracle ID from FTS file metadata
+    - update states on oracle
     """
-    def __init__(self, threadLock, log, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, failed_id, failed_reasons):
-        """
 
-        :param threadLock:
-        :param log:
-        :param ftsContext:
-        :param jobid:
-        :prarm jobsEnded:
-        :param jobs_ongoing:
-        :param done_id:
-        :param failed_id:
-        :param failed_reasons:
-        """
-        threading.Thread.__init__(self)
-        self.ftsContext = ftsContext
-        self.jobid = jobid
-        self.jobsEnded = jobsEnded
-        self.jobs_ongoing = jobs_ongoing
-        self.log = log
-        self.threadLock = threadLock
-        self.done_id = done_id
-        self.failed_id = failed_id
-        self.failed_reasons = failed_reasons
+    logger.info("Getting state of job %s" % jobid)
 
-    def run(self):
-        """
-        - check if the fts job is in final state (FINISHED, FINISHEDDIRTY, CANCELED, FAILED)
-        - get file transfers states and get corresponding oracle ID from FTS file metadata
-        - update states on oracle
-        """
+    jobs_ongoing.append(jobid)
 
-        self.threadLock.acquire()
-        self.log.info("Getting state of job %s" % self.jobid)
+    try:
+        status = fts3.get_job_status(ftsContext, jobid, list_files=False)
+    except HTTPException as hte:
+        logger.exception("failed to retrieve status for %s " % jobid)
+        logger.exception("httpExeption headers %s " % hte.headers)
+        if hte.status == 404:
+            logger.exception("%s not found in FTS3 DB" % jobid)
+            jobs_ongoing.remove(jobid)
+        return
+    except Exception:
+        logger.exception("failed to retrieve status for %s " % jobid)
+        return
 
-        self.jobs_ongoing.append(self.jobid)
+    logger.info("State of job %s: %s" % (jobid, status["job_state"]))
 
-        try:
-            status = fts3.get_job_status(self.ftsContext, self.jobid, list_files=False)
-        except HTTPException as hte:
-            self.log.exception("failed to retrieve status for %s " % self.jobid)
-            self.log.exception("httpExeption headers %s " % hte.headers)
-            if hte.status == 404:
-                self.log.exception("%s not found in FTS3 DB" % self.jobid)
-                self.jobs_ongoing.remove(self.jobid)
-            return
-        except Exception:
-            self.log.exception("failed to retrieve status for %s " % self.jobid)
-            self.threadLock.release()
-            return
+    if status["job_state"] in ['FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"]:
+        jobsEnded.append(jobid)
+    if status["job_state"] in ['ACTIVE', 'FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"]:
+        file_statuses = fts3.get_job_status(ftsContext, jobid, list_files=True)['files']
+        done_id[jobid] = []
+        failed_id[jobid] = []
+        failed_reasons[jobid] = []
+        files_to_remove = []
 
-        self.log.info("State of job %s: %s" % (self.jobid, status["job_state"]))
+        for file_status in file_statuses:
+            _id = file_status['file_metadata']['oracleId']
+            tx_state = file_status['file_state']
 
-        if status["job_state"] in ['FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"]:
-            self.jobsEnded.append(self.jobid)
-        if status["job_state"] in ['ACTIVE', 'FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"]:
-            file_statuses = fts3.get_job_status(self.ftsContext, self.jobid, list_files=True)['files']
-            self.done_id[self.jobid] = []
-            self.failed_id[self.jobid] = []
-            self.failed_reasons[self.jobid] = []
-            files_to_remove = []
-
-            for file_status in file_statuses:
-                _id = file_status['file_metadata']['oracleId']
-                tx_state = file_status['file_state']
-
-                # xfers have only 3 terminal states: FINISHED, FAILED, and CANCELED see
-                # https://fts3-docs.web.cern.ch/fts3-docs/docs/state_machine.html
-                if tx_state == 'FINISHED':
-                    self.done_id[self.jobid].append(_id)
-                    files_to_remove.append(file_status['source_surl'])
-                elif tx_state == 'FAILED' or tx_state == 'CANCELED':
-                    self.failed_id[self.jobid].append(_id)
-                    if file_status['reason']:
-                        self.log.info('Failure reason: ' + file_status['reason'])
-                        self.failed_reasons[self.jobid].append(file_status['reason'])
-                    else:
-                        self.log.exception('Failure reason not found')
-                        self.failed_reasons[self.jobid].append('unable to get failure reason')
-                    files_to_remove.append(file_status['source_surl'])
+            # xfers have only 3 terminal states: FINISHED, FAILED, and CANCELED see
+            # https://fts3-docs.web.cern.ch/fts3-docs/docs/state_machine.html
+            if tx_state == 'FINISHED':
+                done_id[jobid].append(_id)
+                files_to_remove.append(file_status['source_surl'])
+            elif tx_state == 'FAILED' or tx_state == 'CANCELED':
+                failed_id[jobid].append(_id)
+                if file_status['reason']:
+                    logger.info('Failure reason: ' + file_status['reason'])
+                    failed_reasons[jobid].append(file_status['reason'])
                 else:
-                    # file transfer is not terminal:
-                    if status["job_state"] == 'ACTIVE':
-                        # if job is still ACTIVE file status will be updated in future run. See:
-                        # https://fts3-docs.web.cern.ch/fts3-docs/docs/state_machine.html
-                        pass
-                    else:
-                        # job status is terminal but file xfer status is not.
-                        # something went wrong inside FTS and a stuck transfers is waiting to be
-                        # removed by the reapStalledTransfers https://its.cern.ch/jira/browse/FTS-1714
-                        # mark as failed
-                        self.failed_id[self.jobid].append(_id)
-                        self.log.info('Failure reason: stuck inside FTS')
-                        self.failed_reasons[self.jobid].append(file_status['reason'])
-            try:
-                list_of_surls = ''   # gfal commands take list of SURL as a list of blank-separated strings
-                for f in files_to_remove:
-                    list_of_surls += str(f) + ' '  # convert JSON u'srm://....' to plain srm://...
-                removeLogFile = './task_process/transfers/remove_files.log'
-                remove_files_in_bkg(list_of_surls, removeLogFile)
-            except Exception:
-                self.log.exception('Failed to remove temp files')
+                    logger.exception('Failure reason not found')
+                    failed_reasons[jobid].append('unable to get failure reason')
+                files_to_remove.append(file_status['source_surl'])
+            else:
+                # file transfer is not terminal:
+                if status["job_state"] == 'ACTIVE':
+                    # if job is still ACTIVE file status will be updated in future run. See:
+                    # https://fts3-docs.web.cern.ch/fts3-docs/docs/state_machine.html
+                    pass
+                else:
+                    # job status is terminal but file xfer status is not.
+                    # something went wrong inside FTS and a stuck transfers is waiting to be
+                    # removed by the reapStalledTransfers https://its.cern.ch/jira/browse/FTS-1714
+                    # mark as failed
+                    failed_id[jobid].append(_id)
+                    logger.info('Failure reason: stuck inside FTS')
+                    failed_reasons[jobid].append(file_status['reason'])
+        try:
+            list_of_surls = ''   # gfal commands take list of SURL as a list of blank-separated strings
+            for f in files_to_remove:
+                list_of_surls += str(f) + ' '  # convert JSON u'srm://....' to plain srm://...
+            removeLogFile = './task_process/transfers/remove_files.log'
+            remove_files_in_bkg(list_of_surls, removeLogFile)
+        except Exception:
+            logger.exception('Failed to remove temp files')
 
-        self.threadLock.release()
-
-
-class submit_thread(threading.Thread):
-    """Thread for actual FTS job submission
-
+def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
+    """
+    actual FTS job submission
+    INPUT PARAMS:
+    :param logger: logging object
+    :param ftsContext: FTS context
+    :param files: [
+           [source_pfn,
+            dest_pfn,
+            file oracle id,
+            source site,
+            username,
+            taskname,
+            file size,
+            checksum],
+           ...]
+    OUTPUT PARAMS:
+    :param jobids: collect the list of job ids when submitted
+    :param toUpdate: list of oracle ids to update
     """
 
-    def __init__(self, threadLock, log, ftsContext, files, source, jobids, toUpdate):
-        """
-        :param threadLock: lock for the thread
-        :param log: log object
-        :param ftsContext: FTS context
-        :param files: [
-               [source_pfn,
-                dest_pfn,
-                file oracle id,
-                source site,
-                username,
-                taskname,
-                file size],
-               ...]
-        :param source: source site name
-        :param jobids: collect the list of job ids when submitted
-        :param toUpdate: list of oracle ids to update
-        """
-        threading.Thread.__init__(self)
-        self.log = log
-        self.threadLock = threadLock
-        self.files = files
-        self.source = source
-        self.jobids = jobids
-        self.ftsContext = ftsContext
-        self.toUpdate = toUpdate
+    transfers = []
+    for lfn in files:
+        transfers.append(fts3.new_transfer(lfn[0],
+                                           lfn[1],
+                                           filesize=lfn[6],
+                                           metadata={'oracleId': lfn[2]}
+                                           )
+                         )
+    logger.info("Submitting %s transfers to FTS server" % len(files))
+    #SB#
+    for lfn in files:
+        logger.info("%s %s %s %s", lfn[0],lfn[1],lfn[6],{'oracleId': lfn[2]})
+    #SB#
 
+    # Submit fts job
+    job = fts3.new_job(transfers,
+                       overwrite=True,
+                       verify_checksum=True,
+                       metadata={"issuer": "ASO",
+                                 "userDN": files[0][4],
+                                 "taskname": files[0][5]},
+                       copy_pin_lifetime=-1,
+                       bring_online=None,
+                       source_spacetoken=None,
+                       spacetoken=None,
+                       # max time for job in the FTS queue in hours. From FTS experts in
+                       # https://cern.service-now.com/service-portal?id=ticket&table=incident&n=INC2776329
+                       # The max_time_in_queue applies per job, not per retry.
+                       # The max_time_in_queue is a timeout for how much the job can stay in
+                       # a SUBMITTED, ACTIVE or STAGING state.
+                       # When a job's max_time_in_queue is reached, the job and all of its
+                       # transfers not yet in a terminal state are marked as CANCELED
+                       # StefanoB: I see that we hit this at times with 6h, causing job resubmissions,
+                       # so will try to make it longer to give FTS maximum chances within our
+                       # 24h overall limit (which takes care also of non-FTS related issues !)
+                       # ASO transfers never require STAGING so jobs can spend max_time_in_queue only
+                       # as SUBMITTED (aka queued) or ACTIVE (at least one transfer has been activated)
+                       max_time_in_queue=10,
+                       # from same cern.service-now.com ticket as above:
+                       # The number of retries applies to each transfer within that job.
+                       # A transfer is granted the first execution + number_of_retries.
+                       # E.g.: retry=3 --> first execution + 3 retries
+                       # so retry=3 means each transfer has 4 chances at most during the 6h
+                       # max_time_in_queue
+                       retry=3,
+                       reuse=ftsReuse,
+                       # seconds after which the transfer is retried
+                       # this is a transfer that fails, gets put to SUBMITTED right away,
+                       # but the scheduler will avoid it until NOW() > last_retry_finish_time + retry_delay
+                       # reduced under FTS suggestion w.r.t. the 3hrs of asov1
+                       # StefanoB: indeed 10 minutes makes much more sense for storage server glitches
+                       retry_delay=600
+                       # timeout on the single transfer process
+                       # TODO: not clear if we may need it
+                       # timeout = 1300
+                       )
 
-    def run(self):
-        """
+    jobid = fts3.submit(ftsContext, job)
 
-        """
+    jobids.append(jobid)
 
-        self.threadLock.acquire()
-        self.log.info("Processing transfers from: %s" % self.source)
+    fileDoc = dict()
+    fileDoc['asoworker'] = asoworker
+    fileDoc['subresource'] = 'updateTransfers'
+    fileDoc['list_of_ids'] = [x[2] for x in files]
+    fileDoc['list_of_transfer_state'] = ["SUBMITTED" for _ in files]
+    fileDoc['list_of_fts_instance'] = [FTS_ENDPOINT for _ in files]
+    fileDoc['list_of_fts_id'] = [jobid for _ in files]
 
-        # create destination and source pfns for job
-        transfers = []
-        for lfn in self.files:
-            transfers.append(fts3.new_transfer(lfn[0],
-                                               lfn[1],
-                                               filesize=lfn[6],
-                                               metadata={'oracleId': lfn[2]}
-                                               )
-                             )
-        self.log.info("Submitting %s transfers to FTS server" % len(self.files))
+    logger.info("Marking submitted %s files" % (len(fileDoc['list_of_ids'])))
 
-        # Submit fts job
-        job = fts3.new_job(transfers,
-                           overwrite=True,
-                           verify_checksum=True,
-                           metadata={"issuer": "ASO",
-                                     "userDN": self.files[0][4],
-                                     "taskname": self.files[0][5]},
-                           copy_pin_lifetime=-1,
-                           bring_online=None,
-                           source_spacetoken=None,
-                           spacetoken=None,
-                           # max time for job in the FTS queue in hours. From FTS experts in
-                           # https://cern.service-now.com/service-portal?id=ticket&table=incident&n=INC2776329
-                           # The max_time_in_queue applies per job, not per retry.
-                           # The max_time_in_queue is a timeout for how much the job can stay in
-                           # a SUBMITTED, ACTIVE or STAGING state.
-                           # When a job's max_time_in_queue is reached, the job and all of its
-                           # transfers not yet in a terminal state are marked as CANCELED
-                           # StefanoB: I see that we hit this at times with 6h, causing job resubmissions,
-                           # so will try to make it longer to give FTS maximum chances within our
-                           # 24h overall limit (which takes care also of non-FTS related issues !)
-                           # ASO transfers never require STAGING so jobs can spend max_time_in_queue only
-                           # as SUBMITTED (aka queued) or ACTIVE (at least one transfer has been activated)
-                           max_time_in_queue=10,
-                           # from same cern.service-now.com ticket as above:
-                           # The number of retries applies to each transfer within that job.
-                           # A transfer is granted the first execution + number_of_retries.
-                           # E.g.: retry=3 --> first execution + 3 retries
-                           # so retry=3 means each transfer has 4 chances at most during the 6h
-                           # max_time_in_queue
-                           retry=3,
-                           reuse=ftsReuse,
-                           # seconds after which the transfer is retried
-                           # this is a transfer that fails, gets put to SUBMITTED right away,
-                           # but the scheduler will avoid it until NOW() > last_retry_finish_time + retry_delay
-                           # reduced under FTS suggestion w.r.t. the 3hrs of asov1
-                           # StefanoB: indeed 10 minutes makes much more sense for storage server glitches
-                           retry_delay=600
-                           # timeout on the single transfer process
-                           # TODO: not clear if we may need it
-                           # timeout = 1300
-                           )
-
-        jobid = fts3.submit(self.ftsContext, job)
-
-        self.jobids.append(jobid)
-
-        # TODO: manage exception here, what we should do?
-        fileDoc = dict()
-        fileDoc['asoworker'] = asoworker
-        fileDoc['subresource'] = 'updateTransfers'
-        fileDoc['list_of_ids'] = [x[2] for x in self.files]
-        fileDoc['list_of_transfer_state'] = ["SUBMITTED" for _ in self.files]
-        fileDoc['list_of_fts_instance'] = [FTS_ENDPOINT for _ in self.files]
-        fileDoc['list_of_fts_id'] = [jobid for _ in self.files]
-
-        self.log.info("Marking submitted %s files" % (len(fileDoc['list_of_ids'])))
-
-        self.toUpdate.append(fileDoc)
-        self.threadLock.release()
-
+    toUpdate.append(fileDoc)
 
 def submit(rucioClient, ftsContext, toTrans, crabserver):
     """
@@ -380,79 +336,83 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
     :param crabserver: an CRABRest object for doing POST to CRAB server REST
     :return: list of jobids submitted
     """
-    threadLock = threading.Lock()
-    threads = []
     jobids = []
     to_update = []
 
-    sources = list(set([x[3] for x in toTrans]))
+    # some things are the same for all files, pick them from the first one
+    username = toTrans[0][5]
+    scope = "user."+username
+    taskname = toTrans[0][6]
+    dst_rse = toTrans[0][4]
+    a_dst_lfn = toTrans[0][1]
+    a_src_lfn = toTrans[0][0]
 
-    for source in sources:
+    # this is not ols ASO anymore. All files here have same destination
+    # and LFN's and PFN's can only differ from each other in the directory counter and actual file name
+    # no reason to lookup lfn2pfn by individual file
+    # remember that src and dst LFN's are in general different (/store/user vs. /store/temp/user)
+    # so we assume: (P/L)FN = (P/L)FN_PREFIX/FILEID
+    # where: FILEID = xxxx/filename.filetype and xxxx is a 0000, 0001, 0002 etc.
 
-        ids = [x[2] for x in toTrans if x[3] == source]
-        sizes = [x[7] for x in toTrans if x[3] == source]
-        checksums = [x[8] for x in toTrans if x[3] == source]
-        username = toTrans[0][5]
-        scope = "user."+username
-        taskname = toTrans[0][6]
-        src_lfns = [x[0] for x in toTrans if x[3] == source]
-        dst_lfns = [x[1] for x in toTrans if x[3] == source]
+    dst_lfn_prefix = '/'.join(a_dst_lfn.split("/")[:-2])
+    dst_did = scope + ':' + dst_lfn_prefix + '/0000/file.root'
 
-        sorted_source_pfns = []
-        sorted_dest_pfns = []
+    src_lfn_prefix = '/'.join(a_src_lfn.split("/")[:-2])
+    src_did = scope + ':' + src_lfn_prefix + '/0000/file.root'
 
+    sourceSites = list(set([x[3] for x in toTrans]))
+
+    for source in sourceSites:
+        logging.info("Processing transfers from: %s" % source)
+
+        # find all files for this source
+        toTransFromThisSource = [x for x in toTrans if x[3] == source]
+        # find matching transfer protocol and proper PFN prefixes
+        src_rse = source
         try:
-            for chunk in chunks(src_lfns, 10):
-                rucio_chunk = [scope+":"+x for x in chunk]
-                # 'read' operation should better work here !
-                unsorted_source_pfns = [[k.split(scope+":")[1], str(x)] for k, x in \
-                                        rucioClient.cli.lfns2pfns(source, rucio_chunk, operation='read').items()]
-                #logging.info(unsorted_source_pfns)
-                for order_lfn in chunk:
-                    for lfn, pfn in unsorted_source_pfns:
-                        if order_lfn == lfn:
-                            sorted_source_pfns.append(pfn)
-                            break
-
-            for chunk in chunks(dst_lfns, 10):
-                rucio_chunk = [scope+":"+x for x in chunk]
-                # try 'write' but fall back to 'read' if the site only implemented one
-                try:
-                    unsorted_dest_pfns = [[k.split(scope+":")[1], str(x)] for k, x in \
-                                      rucioClient.cli.lfns2pfns(toTrans[0][4], rucio_chunk, operation='write').items()]
-                except Exception as ex:
-                    unsorted_dest_pfns = [[k.split(scope+":")[1], str(x)] for k, x in \
-                                      rucioClient.cli.lfns2pfns(toTrans[0][4], rucio_chunk, operation='read').items()]
-                #logging.info(unsorted_dest_pfns)
-                for order_lfn in chunk:
-                    for lfn, pfn in unsorted_dest_pfns:
-                        if order_lfn == lfn:
-                            sorted_dest_pfns.append(pfn)
-                            break
+            dst_scheme, src_scheme, _, _ = find_matching_scheme(
+                {"protocols": rucioClient.get_protocols(dst_rse)},
+                {"protocols": rucioClient.get_protocols(src_rse)},
+                "third_party_copy",
+                "third_party_copy",
+            )
+            dst_pfn_template = rucioClient.lfns2pfns(dst_rse, [dst_did],
+                                                     operation="third_party_copy", scheme=dst_scheme)
+            src_pfn_template = rucioClient.lfns2pfns(src_rse, [src_did],
+                                                     operation="third_party_copy", scheme=src_scheme)
+            dst_pfn_prefix = '/'.join(dst_pfn_template[dst_did].split("/")[:-2])
+            src_pfn_prefix = '/'.join(src_pfn_template[src_did].split("/")[:-2])
         except Exception as ex:
             logging.error("Failed to map lfns to pfns: %s", ex)
+            ids = [x[2] for x in toTransFromThisSource]
             mark_failed(ids, ["Failed to map lfn to pfn: " + str(ex) for _ in ids], crabserver)
+            # try next source
+            continue
 
-        source_pfns = sorted_source_pfns
-        dest_pfns = sorted_dest_pfns
+        # OK, have good protocols and PFNs, build info for FTS
+        tx_from_source = []
+        for f in toTransFromThisSource:
+            id = f[2]
+            size = f[7]
+            checksums = f[8]
+            src_lfn = f[0]
+            dst_lfn = f[1]
+            fileid = '/'.join(src_lfn.split('/')[-2:])
+            src_pfn = src_pfn_prefix + '/' + fileid
+            dst_pfn = dst_pfn_prefix + '/' + fileid
 
-        tx_from_source = [[x[0], x[1], x[2], source, username, taskname, x[3], x[4]['adler32'].rjust(8, '0')] for x in zip(source_pfns, dest_pfns, ids, sizes, checksums)]
+            xfer = [src_pfn, dst_pfn, id, source, username, taskname, size, checksums['adler32'].rjust(8, '0')]
+            tx_from_source.append(xfer)
 
         xfersPerFTSJob = 50 if ftsReuse else 200
         for files in chunks(tx_from_source, xfersPerFTSJob):
-            thread = submit_thread(threadLock, logging, ftsContext, files, source, jobids, to_update)
-            thread.start()
-            threads.append(thread)
-
-    for t in threads:
-        t.join()
+            submitToFTS(logging, ftsContext, files, jobids, to_update)
 
     for fileDoc in to_update:
         _ = crabserver.post('/filetransfers', data=encodeRequest(fileDoc))
         logging.info("Marked submitted %s files", fileDoc['list_of_ids'])
 
     return jobids
-
 
 def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient, crabserver):
     """
@@ -499,13 +459,10 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient, c
 
     return transfers, jobids
 
-
 def state_manager(ftsContext, crabserver):
     """
 
     """
-    threadLock = threading.Lock()
-    threads = []
     jobs_done = []
     jobs_ongoing = []
     jobsEnded = []
@@ -522,15 +479,11 @@ def state_manager(ftsContext, crabserver):
                 if line:
                     jobid = line.split('\n')[0]
                 if jobid:
-                    thread = check_states_thread(threadLock, logging, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, failed_id, failed_reasons)
-                    thread.start()
-                    threads.append(thread)
+                    check_FTSJob(logging, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, failed_id, failed_reasons)
             _jobids.close()
 
-        for t in threads:
-            t.join()
 
-        # the threads above have filled:
+        # the loop above has filled:
         # job_ongoing: list of FTS jobs processed
         # done_id: a dictionary {jobId:[list_of_tnasfers_id_done in that job]}  the list may be empty
         # failed_id, failed_reasons: dictionaries with same format as above containing list of failed xfers and reasons
@@ -555,7 +508,7 @@ def state_manager(ftsContext, crabserver):
                         jobs_done.append(jobID)
                         jobs_ongoing.remove(jobID)
                     else:
-                        jobs_ongoing.append(jobID)   # SB is this necessary ? AFAIU check_states_thread has filled it
+                        jobs_ongoing.append(jobID)   # SB is this necessary ? AFAIU check_FTSJob has filled it
                 else:
                     jobs_ongoing.append(jobID)  # should not be necessary.. but for consistency with above
         except Exception:
@@ -571,7 +524,6 @@ def state_manager(ftsContext, crabserver):
     os.rename("task_process/transfers/fts_jobids_new.txt", "task_process/transfers/fts_jobids.txt")
 
     return jobs_ongoing
-
 
 def submission_manager(rucioClient, ftsContext, crabserver):
     """
@@ -598,10 +550,8 @@ def submission_manager(rucioClient, ftsContext, crabserver):
 
     return jobids
 
-
 def algorithm():
     """
-
     script algorithm
     - instantiates FTS3 python easy client
     - delegate user proxy to fts if needed
@@ -648,9 +598,8 @@ def algorithm():
     try:
         logging.info("Initializing Rucio client")
         os.environ["X509_USER_PROXY"] = proxy
-        logging.info("Initializing Rucio client for %s", taskname)
-        rucioClient = CRABDataInjector(taskname, destination, account=username,
-                                       scope="user."+username, auth_type='x509_proxy')
+        os.environ["X509_USER_PROXY"] = proxy
+        rucioClient = rucioclient(account=username, auth_type='x509_proxy')
     except Exception as exc:
         msg = "Rucio initialization failed with\n%s" % str(exc)
         logging.warn(msg)
