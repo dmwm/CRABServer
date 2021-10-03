@@ -9,7 +9,7 @@ import json
 import logging
 import os
 import subprocess
-from datetime import timedelta
+from datetime import datetime, timedelta
 from httplib import HTTPException
 
 import fts3.rest.client.easy as fts3
@@ -188,9 +188,11 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
             # xfers have only 3 terminal states: FINISHED, FAILED, and CANCELED see
             # https://fts3-docs.web.cern.ch/fts3-docs/docs/state_machine.html
             if tx_state == 'FINISHED':
+                logger.info('file XFER OK will remove %s', file_status['source_surl'])
                 done_id[jobid].append(_id)
                 files_to_remove.append(file_status['source_surl'])
             elif tx_state == 'FAILED' or tx_state == 'CANCELED':
+                logger.info('file XFER FAIL will remove %s', file_status['source_surl'])
                 failed_id[jobid].append(_id)
                 if file_status['reason']:
                     logger.info('Failure reason: ' + file_status['reason'])
@@ -218,6 +220,9 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
             for f in files_to_remove:
                 list_of_surls += str(f) + ' '  # convert JSON u'srm://....' to plain srm://...
             removeLogFile = './task_process/transfers/remove_files.log'
+            msg = str(datetime.now()) + ': Will remove: %s' % list_of_surls
+            with open(removeLogFile, 'a') as removeLog:
+                removeLog.write(msg)
             remove_files_in_bkg(list_of_surls, removeLogFile)
         except Exception:
             logger.exception('Failed to remove temp files')
