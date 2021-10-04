@@ -222,8 +222,8 @@ def createScriptLines(opts, pklIn):
         procScript, pklIn, pklOut, psetTweakJson)
     commandLines = createTweakingCommandLines(cmd, pklIn, pklOut)
 
-    # there a couple more things to do which require running different EDM/CMSSW commands
-    # enable LazyDownload of LHE files (if needed) and make sure random seeds are initialized
+    # there a few more things to do which require running different EDM/CMSSW commands
+    #1. enable LazyDownload of LHE files (if needed)
     if opts.lheInputFiles:
         pklOut = pklIn + '-lazy'
         procScript = "cmssw_enable_lazy_download.py"
@@ -231,10 +231,19 @@ def createScriptLines(opts, pklIn):
         moreLines = createTweakingCommandLines(cmd, pklIn, pklOut)
         commandLines += moreLines
 
+    #2. make sure random seeds are initialized
     pklOut = pklIn + '-seeds'
     procScript = "cmssw_handle_random_seeds.py"
     cmd = "%s --input_pkl %s --output_pkl %s --seeding dummy" % (procScript, pklIn, pklOut)
     moreLines += createTweakingCommandLines(cmd, pklIn, pklOut)
+    commandLines += moreLines
+
+    #3. make sure that process.maxEvents.input is propagated to Producers, see:
+    # https://github.com/dmwm/WMCore/blob/85d6d423f0a85fdedf78b65ca8b7b81af9263789/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L448-L465
+    pklOut = pklIn + '-nEvents'
+    procScript = 'cmssw_handle_nEvents.py'
+    cmd = "%s --input_pkl %s --output_pkl %s" % (procScript, pklIn, pklOut)
+    moreLines = createTweakingCommandLines(cmd, pklIn, pklOut)
     commandLines += moreLines
 
     return commandLines
