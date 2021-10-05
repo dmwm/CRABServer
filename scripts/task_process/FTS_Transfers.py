@@ -180,9 +180,20 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
         failed_id[jobid] = []
         failed_reasons[jobid] = []
         files_to_remove = []
+        fileIds_to_remove = []
+
+        # get the job content from local file
+        jobContentFileName = 'task_process/transfers/' + jobid + '.json'
+        with open(jobContentFileName, 'r') as fp:
+            fileIds = json.load(fp)
 
         for file_status in file_statuses:
             _id = file_status['file_metadata']['oracleId']
+            if not _id in fileIds:
+                # this file xfer has been handled already in a previous iteration
+                # nothing to do
+                continue
+
             tx_state = file_status['file_state']
 
             # xfers have only 3 terminal states: FINISHED, FAILED, and CANCELED see
@@ -190,6 +201,7 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
             if tx_state == 'FINISHED':
                 done_id[jobid].append(_id)
                 files_to_remove.append(file_status['source_surl'])
+                fileIds_to_remove.append(_id)
             elif tx_state == 'FAILED' or tx_state == 'CANCELED':
                 failed_id[jobid].append(_id)
                 if file_status['reason']:
@@ -199,6 +211,7 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
                     logger.exception('Failure reason not found')
                     failed_reasons[jobid].append('unable to get failure reason')
                 files_to_remove.append(file_status['source_surl'])
+                fileIds_to_remove.append(_id)
             else:
                 # file transfer is not terminal:
                 if status["job_state"] == 'ACTIVE':
@@ -219,6 +232,13 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
                 list_of_surls += str(f) + ' '  # convert JSON u'srm://....' to plain srm://...
             removeLogFile = './task_process/transfers/remove_files.log'
             remove_files_in_bkg(list_of_surls, removeLogFile)
+            # remove those file Id's from the list and update the json disk file
+            fileIds = list(set(fileIds)-set(fileIds_to_remove))
+            jobContentTmp = jobContentFileName + '.tmp'
+            with open(jobContentTmp, 'w') as fp:
+                json.dump(fileIds, fp)
+            os.rename(jobContentTmp, jobContentFileName)
+
         except Exception:
             logger.exception('Failed to remove temp files')
 
@@ -241,6 +261,8 @@ def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
     OUTPUT PARAMS:
     :param jobids: collect the list of job ids when submitted
     :param toUpdate: list of oracle ids to update
+
+    RETURNS: the submitted jobid (a string)
     """
 
     transfers = []
@@ -312,9 +334,10 @@ def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
     fileDoc['list_of_fts_instance'] = [FTS_ENDPOINT for _ in files]
     fileDoc['list_of_fts_id'] = [jobid for _ in files]
 
-    logger.info("Marking submitted %s files" % (len(fileDoc['list_of_ids'])))
-
+    logger.info("Will mark as submitted %s files" % (len(fileDoc['list_of_ids'])))
     toUpdate.append(fileDoc)
+
+    return jobid
 
 def submit(rucioClient, ftsContext, toTrans, crabserver):
     """
@@ -406,7 +429,13 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
 
         xfersPerFTSJob = 50 if ftsReuse else 200
         for files in chunks(tx_from_source, xfersPerFTSJob):
-            submitToFTS(logging, ftsContext, files, jobids, to_update)
+            ftsJobId = submitToFTS(logging, ftsContext, files, jobids, to_update)
+            # save oracleIds of files in this job in a local file
+            jobContentFileName = 'task_process/transfers/' + ftsJobId + '.json'
+            with open(jobContentFileName, 'w') as fp:
+                json.dump([f[2] for f in files], fp)
+                #for f in files:
+                #    jobContent.write(str(f[0]))  # save the list of src_lfn's in this job
 
     for fileDoc in to_update:
         _ = crabserver.post('/filetransfers', data=encodeRequest(fileDoc))
