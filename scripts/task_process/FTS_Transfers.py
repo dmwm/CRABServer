@@ -226,7 +226,7 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
                     failed_id[jobid].append(_id)
                     logger.info('Failure reason: stuck inside FTS')
                     failed_reasons[jobid].append(file_status['reason'])
-        try:
+        if files_to_remove:
             list_of_surls = ''   # gfal commands take list of SURL as a list of blank-separated strings
             for f in files_to_remove:
                 list_of_surls += str(f) + ' '  # convert JSON u'srm://....' to plain srm://...
@@ -238,9 +238,6 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
             with open(jobContentTmp, 'w') as fp:
                 json.dump(fileIds, fp)
             os.rename(jobContentTmp, jobContentFileName)
-
-        except Exception:
-            logger.exception('Failed to remove temp files')
 
 def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
     """
@@ -370,17 +367,25 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
     a_dst_lfn = toTrans[0][1]
     a_src_lfn = toTrans[0][0]
 
-    # this is not ols ASO anymore. All files here have same destination
+    # this is not old ASO anymore. All files here have same destination
     # and LFN's and PFN's can only differ from each other in the directory counter and actual file name
     # no reason to lookup lfn2pfn by individual file
     # remember that src and dst LFN's are in general different (/store/user vs. /store/temp/user)
     # so we assume: (P/L)FN = (P/L)FN_PREFIX/FILEID
-    # where: FILEID = xxxx/filename.filetype and xxxx is a 0000, 0001, 0002 etc.
+    # where: FILEID = xxxx/filename.filetype and xxxx is a 0000, 0001, 0002 etc. for output or
+    # xxxx is 0000/log, 00001/log etc. for log if user selected TransferLogs=True i.e. LFN's are like
+    # /store/temp/user/.../0000/output_1.root or /store/temp/user/.../0000/log/cmsRun_1.log.tar.gz
 
-    dst_lfn_prefix = '/'.join(a_dst_lfn.split("/")[:-2])
+    if a_dst_lfn.split("/")[-2] == 'log' :
+        dst_lfn_prefix = '/'.join(a_dst_lfn.split("/")[:-3])
+    else:
+        dst_lfn_prefix = '/'.join(a_dst_lfn.split("/")[:-2])
     dst_did = scope + ':' + dst_lfn_prefix + '/0000/file.root'
 
-    src_lfn_prefix = '/'.join(a_src_lfn.split("/")[:-2])
+    if a_src_lfn.split("/")[-2] == 'log' :
+        src_lfn_prefix = '/'.join(a_src_lfn.split("/")[:-3])
+    else:
+        src_lfn_prefix = '/'.join(a_src_lfn.split("/")[:-2])
     src_did = scope + ':' + src_lfn_prefix + '/0000/file.root'
 
     sourceSites = list(set([x[3] for x in toTrans]))
@@ -420,7 +425,10 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
             checksums = f[8]
             src_lfn = f[0]
             dst_lfn = f[1]
-            fileid = '/'.join(src_lfn.split('/')[-2:])
+            if dst_lfn.split("/")[-2] == 'log' :
+                fileid = '/'.join(dst_lfn.split("/")[-3:])
+            else:
+                fileid = '/'.join(dst_lfn.split("/")[-2:])
             src_pfn = src_pfn_prefix + '/' + fileid
             dst_pfn = dst_pfn_prefix + '/' + fileid
 
