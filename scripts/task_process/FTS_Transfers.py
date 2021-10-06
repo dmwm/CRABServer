@@ -226,7 +226,7 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
                     failed_id[jobid].append(_id)
                     logger.info('Failure reason: stuck inside FTS')
                     failed_reasons[jobid].append(file_status['reason'])
-        try:
+        if files_to_remove:
             list_of_surls = ''   # gfal commands take list of SURL as a list of blank-separated strings
             for f in files_to_remove:
                 list_of_surls += str(f) + ' '  # convert JSON u'srm://....' to plain srm://...
@@ -238,9 +238,6 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
             with open(jobContentTmp, 'w') as fp:
                 json.dump(fileIds, fp)
             os.rename(jobContentTmp, jobContentFileName)
-
-        except Exception:
-            logger.exception('Failed to remove temp files')
 
 def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
     """
