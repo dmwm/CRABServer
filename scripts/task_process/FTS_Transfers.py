@@ -512,17 +512,13 @@ def state_manager(ftsContext, crabserver):
                     if markDone and markFailed:
                         jobs_done.append(jobID)
                         jobs_ongoing.remove(jobID)
-                    else:
-                        jobs_ongoing.append(jobID)   # SB is this necessary ? AFAIU check_FTSJob has filled it
-                else:
-                    jobs_ongoing.append(jobID)  # should not be necessary.. but for consistency with above
         except Exception:
             logging.exception('Failed to update states')
     else:
         logging.warning('No FTS job ID to monitor yet')
 
     with open("task_process/transfers/fts_jobids_new.txt", "w+") as _jobids:
-        for line in list(set(jobs_ongoing)):  # SB if we remove the un-necessary append above, non eed for a set here
+        for line in jobs_ongoing:
             logging.info("Writing: %s", line)
             _jobids.write(line+"\n")
 
