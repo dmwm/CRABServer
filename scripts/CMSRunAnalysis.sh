@@ -110,6 +110,9 @@ fi
 
 echo "==== Python discovery FINISHED at $(TZ=GMT date) ===="
 
+echo "==== Make sure $HOME is defined ===="
+export HOME=${HOME:-$PWD}
+
 echo "======== Current environment dump STARTING ========"
 for i in `env`; do
   echo "== ENV: $i"
