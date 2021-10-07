@@ -88,7 +88,7 @@ class FileTransfersTest(unittest.TestCase):
                 print(self.fileDoc)
                 self.server.put('/crabserver/dev/fileusertransfers', data=encodeRequest(self.fileDoc))
                 # if I will put the same doc twice, it should raise an error.
-                # self.server.put('/crabserver/dev/fileusertransfers', data=urllib.urlencode(self.fileDoc))
+                # self.server.put('/crabserver/dev/fileusertransfers', data=urlencode(self.fileDoc))
                 # This tasks are for the future and next calls
                 if user not in self.tasks:
                     self.tasks[user] = {'workflowName': workflowName, 'taskname': taskname, 'listOfIds': [],

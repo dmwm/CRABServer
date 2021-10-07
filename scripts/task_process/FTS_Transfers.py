@@ -10,7 +10,7 @@ import logging
 import os
 import subprocess
 from datetime import timedelta
-from httplib import HTTPException
+from http.client import HTTPException
 
 import fts3.rest.client.easy as fts3
 

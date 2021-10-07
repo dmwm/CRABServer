@@ -3,9 +3,14 @@ Upload an archive containing all files needed to run the a to the UserFileCache 
 """
 import os
 import json
-import urllib
 import tarfile
 import time
+
+import sys
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
+if sys.version_info < (3, 0):
+    from urllib import urlencode
 
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
@@ -79,7 +84,7 @@ class DryRunUploader(TaskAction):
                     time.sleep(5)
             update = {'workflow': kw['task']['tm_taskname'], 'subresource': 'state', 'status': 'UPLOADED'}
             self.logger.debug('Updating task status: %s', str(update))
-            self.crabserver.post(api='workflowdb', data=urllib.urlencode(update))
+            self.crabserver.post(api='workflowdb', data=urlencode(update))
 
         finally:
             os.chdir(cwd)

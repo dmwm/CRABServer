@@ -118,7 +118,7 @@ class DataFileMetadata(object):
         """
         self.logger.debug("Changing state of file %(outlfn)s in task %(taskname)s to %(filestate)s" % kwargs)
 
-        self.api.modify(self.FileMetaData.ChangeFileState_sql, **dict((k, [v]) for k, v in kwargs.iteritems()))
+        self.api.modify(self.FileMetaData.ChangeFileState_sql, **dict((k, [v]) for k, v in kwargs.items()))
 
     def delete(self, taskname, hours):
         """ UNUSED method that deletes record from the FILEMETADATA table

@@ -103,7 +103,7 @@ class _Curl:
         # data
         strData = ''
         for key in data.keys():
-            strData += 'data="%s"\n' % urllib.urlencode({key:data[key]})
+            strData += 'data="%s"\n' % urlencode({key:data[key]})
         # write data to temporary config file
         if globalTmpDir != '':
             tmpFD, tmpName = tempfile.mkstemp(dir=globalTmpDir)
@@ -156,7 +156,7 @@ class _Curl:
         # data
         strData = ''
         for key in data.keys():
-            strData += 'data="%s"\n' % urllib.urlencode({key:data[key]})
+            strData += 'data="%s"\n' % urlencode({key:data[key]})
         # write data to temporary config file
         if globalTmpDir != '':
             tmpFD, tmpName = tempfile.mkstemp(dir=globalTmpDir)

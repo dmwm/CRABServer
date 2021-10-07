@@ -1,8 +1,12 @@
 import re
 import socket
-import urllib
+import sys
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
+if sys.version_info < (3, 0):
+    from urllib import urlencode
 
-from httplib import HTTPException
+from http.client import HTTPException
 
 import htcondor
 
@@ -123,7 +127,7 @@ class DagmanKiller(TaskAction):
                          'workflow': kwargs['task']['tm_taskname'],
                          'status': 'KILLED'}
             self.logger.debug("Setting the task as successfully killed with %s", str(configreq))
-            self.crabserver.post(api='workflowdb', data=urllib.urlencode(configreq))
+            self.crabserver.post(api='workflowdb', data=urlencode(configreq))
         except HTTPException as hte:
             self.logger.error(hte.headers)
             msg = "The CRAB server successfully killed the task,"

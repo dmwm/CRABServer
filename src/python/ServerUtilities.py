@@ -404,8 +404,7 @@ def getLock(name):
 def getHashLfn(lfn):
     """ Provide a hashed lfn from an lfn.
     """
-    return hashlib.sha224(lfn).hexdigest()
-
+    return hashlib.sha224(lfn.encode('utf-8')).hexdigest()
 
 def generateTaskName(username, requestname, timestamp=None):
     """ Generate a taskName which is saved in database

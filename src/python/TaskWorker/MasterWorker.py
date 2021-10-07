@@ -7,13 +7,17 @@ import os
 import shutil
 import sys
 import time
-import urllib
 import signal
 import logging
 from base64 import b64encode
 
-from httplib import HTTPException
+from http.client import HTTPException
 from MultiProcessingLog import MultiProcessingLog
+
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
+if sys.version_info < (3, 0):
+    from urllib import urlencode
 
 #WMcore dependencies
 from WMCore.Configuration import loadConfigurationFile
@@ -255,8 +259,8 @@ class MasterWorker(object):
 
         configreq = {'subresource': 'process', 'workername': self.config.TaskWorker.name, 'getstatus': getstatus, 'limit': limit, 'status': setstatus}
         try:
-            #self.server.post(self.restURInoAPI + '/workflowdb', data=urllib.urlencode(configreq))
-            self.crabserver.post(api='workflowdb', data=urllib.urlencode(configreq))
+            #self.server.post(self.restURInoAPI + '/workflowdb', data=urlencode(configreq))
+            self.crabserver.post(api='workflowdb', data=urlencode(configreq))
         except HTTPException as hte:
             msg = "HTTP Error during _lockWork: %s\n" % str(hte)
             msg += "HTTP Headers are %s: " % hte.headers
@@ -299,8 +303,8 @@ class MasterWorker(object):
 
         configreq = {'workflow': taskname, 'command': command, 'status': status, 'subresource': 'state'}
         try:
-            #self.server.post(self.restURInoAPI + '/workflowdb', data=urllib.urlencode(configreq))
-            self.crabserver.post(api='workflowdb', data=urllib.urlencode(configreq))
+            #self.server.post(self.restURInoAPI + '/workflowdb', data=urlencode(configreq))
+            self.crabserver.post(api='workflowdb', data=urlencode(configreq))
         except HTTPException as hte:
             msg = "HTTP Error during updateWork: %s\n" % str(hte)
             msg += "HTTP Headers are %s: " % hte.headers
@@ -354,7 +358,7 @@ class MasterWorker(object):
             warning = 'username %s banned in CRAB TaskWorker configuration' % task['tm_username']
             configreq = {'subresource': 'addwarning', 'workflow': taskname, 'warning': warning}
             try:
-                self.crabserver.post(api='task', data=urllib.urlencode(configreq))
+                self.crabserver.post(api='task', data=urlencode(configreq))
             except Exception as e:
                 self.logger.error("Error uploading warning: %s", str(e))
                 self.logger.warning("Cannot add a warning to REST interface. Warning message: %s", warning)
@@ -382,7 +386,7 @@ class MasterWorker(object):
             warning = 'command %s disabled in CRAB TaskWorker configuration' % command
             configreq = {'subresource': 'addwarning', 'workflow': taskname, 'warning': b64encode(warning)}
             try:
-                self.crabserver.post(api='task', data=urllib.urlencode(configreq))
+                self.crabserver.post(api='task', data=urlencode(configreq))
             except Exception as e:
                 self.logger.error("Error uploading warning: %s", str(e))
                 self.logger.warning("Cannot add a warning to REST interface. Warning message: %s", warning)

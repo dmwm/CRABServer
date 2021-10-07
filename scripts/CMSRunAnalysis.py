@@ -761,7 +761,7 @@ if __name__ == "__main__":
         try:
             oldName = 'UNKNOWN'
             newName = 'UNKNOWN'
-            for oldName, newName in literal_eval(options.outFiles).iteritems():
+            for oldName, newName in literal_eval(options.outFiles).items():
                 os.rename(oldName, newName)
         except Exception as ex:
             handleException("FAILED", EC_MoveOutErr, "Exception while moving file %s to %s." %(oldName, newName))

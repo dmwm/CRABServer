@@ -13,6 +13,7 @@ import glob
 import copy
 from shutil import move
 import pickle
+import json
 import htcondor
 import classad
 
@@ -211,16 +212,18 @@ def parseJobLog(jel, nodes, nodeMap):
 def parseErrorReport(data, nodes):
     """
     iterate over the jobs and set the error dict for those which are failed
-    :param data:
-    :param nodes:
-    :return:
+    :param data: a dictionary as returned by summarizeFjrParseResults() : {jobid:errdict}
+                 errdict is {crab_retry:error_summary} from PostJob/prepareErrorSummary
+                 which writes one line for PostJoun run: {job_id : {crab_retry : error_summary}}
+                 where crab_retry is a string and error_summary a list [exitcode, errorMsg, {}]
+    :param nodes: a dictionary with format {jobid:statedict}
+    :return: nothing, modifies nodes in place
     """
-    for jobid, statedict in nodes.iteritems():
+    for jobid, statedict in nodes.items():
         if 'State' in statedict and statedict['State'] == 'failed' and jobid in data:
-            # data[jobid] is a dictionary with the retry number as a key and error summary information as a value.
-            # Here we want to get the error summary information, and since values() returns a list
-            # (even if there's only a single value) it has to be indexed to zero.
-            statedict['Error'] = data[jobid].values()[0] #data[jobid] contains all retries. take the last one
+            # pick error info from last retry (SB: AFAICT only last retry is listed anyhow)
+            for key in data[jobid]:
+                statedict['Error'] = data[jobid][key]
 
 def parseNodeStateV2(fp, nodes, level):
     """
@@ -323,7 +326,7 @@ def storeNodesInfoInFile():
 
     if jobLogCheckpoint:
         # resume log parsing where we left
-        with open((LOG_PARSING_POINTERS_DIR+jobLogCheckpoint), 'r') as f:
+        with open((LOG_PARSING_POINTERS_DIR+jobLogCheckpoint), 'rb') as f:
             jel = pickle.load(f)
     else:
         # parse log from beginning
@@ -336,7 +339,7 @@ def storeNodesInfoInFile():
     newJelPickleName = 'jel-%d.pkl' % int(time.time())
     if not os.path.exists(LOG_PARSING_POINTERS_DIR):
         os.mkdir(LOG_PARSING_POINTERS_DIR)
-    with open((LOG_PARSING_POINTERS_DIR+newJelPickleName), 'w') as f:
+    with open((LOG_PARSING_POINTERS_DIR+newJelPickleName), 'wb') as f:
         pickle.dump(jel, f)
     newJobLogCheckpoint = newJelPickleName
 
@@ -382,7 +385,7 @@ def readOldStatusCacheFile():
     if os.path.exists(PKL_STATUS_CACHE_FILE) and os.stat(PKL_STATUS_CACHE_FILE).st_size > 0:
         logging.debug("cache file found, opening")
         try:
-            with open(PKL_STATUS_CACHE_FILE, "r") as fp:
+            with open(PKL_STATUS_CACHE_FILE, "rb") as fp:
                 cacheDoc = pickle.load(fp)
             # protect against fake file with just bootstrapTime created by AdjustSites.py
             jobLogCheckpoint = getattr(cacheDoc, 'jobLogCheckpoint', None)
@@ -421,7 +424,7 @@ def parseCondorLog(cacheDoc):
     nodeMap = cacheDoc['nodeMap']
     if jobLogCheckpoint:
         # resume log parsing where we left
-        with open((LOG_PARSING_POINTERS_DIR+jobLogCheckpoint), 'r') as f:
+        with open((LOG_PARSING_POINTERS_DIR+jobLogCheckpoint), 'rb') as f:
             jel = pickle.load(f)
     else:
         # parse log from beginning
@@ -432,7 +435,7 @@ def parseCondorLog(cacheDoc):
     newJelPickleName = 'jel-%d.pkl' % int(time.time())
     if not os.path.exists(LOG_PARSING_POINTERS_DIR):
         os.mkdir(LOG_PARSING_POINTERS_DIR)
-    with open((LOG_PARSING_POINTERS_DIR+newJelPickleName), 'w') as f:
+    with open((LOG_PARSING_POINTERS_DIR+newJelPickleName), 'wb') as f:
         pickle.dump(jel, f)
     newJobLogCheckpoint = newJelPickleName
 
@@ -466,7 +469,7 @@ def storeNodesInfoInPklFile(cacheDoc):
     tempFilename = (PKL_STATUS_CACHE_FILE + ".%s") % os.getpid()
 
     # persist cache info in py2-compatible pickle format
-    with open(tempFilename, "w") as fp:
+    with open(tempFilename, "wb") as fp:
         pickle.dump(cacheDoc, fp, protocol=2)
     move(tempFilename, PKL_STATUS_CACHE_FILE)
 
@@ -501,6 +504,14 @@ def summarizeFjrParseResults(checkpoint):
     Return the updated error dictionary and also the location until which the
     fjr_parse_results file was read so that we can store it and
     don't have t re-read the same information next time the cache_status.py runs.
+
+    SB: what this does is to convert a JSON file with a list of dictionaries [{job:msg},...] which
+    may have the same jobId as key, into a single dictionay with for each jobId key contains only the
+    last value of msg
+    for d in content:
+      for k,v in d.items():
+        errDict[k] = v
+
     '''
 
     if os.path.exists(FJR_PARSE_RES_FILE):
@@ -508,12 +519,11 @@ def summarizeFjrParseResults(checkpoint):
             f.seek(checkpoint)
             content = f.readlines()
             newCheckpoint = f.tell()
-
         errDict = {}
         for line in content:
-            fjrResult = ast.literal_eval(line)
-            jobId = fjrResult.keys()[0]
-            errDict[jobId] = fjrResult[jobId]
+            fjrResult = json.loads(line)
+            for jobId,msg in fjrResult.items():
+                errDict[jobId] = msg
         return errDict, newCheckpoint
     else:
         return None, 0

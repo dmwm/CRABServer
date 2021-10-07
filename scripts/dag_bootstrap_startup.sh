@@ -14,10 +14,13 @@ done
 export PATH="/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
 export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
 
-os_ver=$(source /etc/os-release;echo $VERSION_ID)
-curl_path="/cvmfs/cms.cern.ch/slc${os_ver}_amd64_gcc700/external/curl/7.59.0"
-libcurl_path="${curl_path}/lib"
-source ${curl_path}/etc/profile.d/init.sh
+export PYTHONPATH=$PYTHONPATH:/data/srv/pycurl3/7.44.1
+#os_ver=$(source /etc/os-release;echo $VERSION_ID)
+#curl_path="/cvmfs/cms.cern.ch/slc${os_ver}_amd64_gcc700/external/curl/7.59.0"
+#libcurl_path="${curl_path}/lib"
+#source ${curl_path}/etc/profile.d/init.sh
+source /cvmfs/cms.cern.ch/slc7_amd64_gcc900/external/curl/7.59.0/etc/profile.d/init.sh
+
 
 srcname=$0
 env > ${srcname%.sh}.env
@@ -85,16 +88,16 @@ fi
 # Bootstrap the runtime - we want to do this before DAG is submitted
 # so all the children don't try this at once.
 if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]; then
-    command -v python > /dev/null
+    command -v python3 > /dev/null
     rc=$?
     if [[ $rc != 0 ]]; then
         echo "Error: Python isn't available on `hostname`." >&2
-        echo "Error: Bootstrap execution requires python" >&2
-        condor_qedit $CONDOR_ID DagmanHoldReason "'Error: Bootstrap execution requires python.'"
+        echo "Error: Bootstrap execution requires python3" >&2
+        condor_qedit $CONDOR_ID DagmanHoldReason "'Error: Bootstrap execution requires python3.'"
         exit 1
     else
-        echo "I found python at.."
-        echo `which python`
+        echo "I found python3 at.."
+        echo `which python3`
     fi
 
     if [[ "X$CRAB_TASKMANAGER_TARBALL" == "X" ]]; then
@@ -138,7 +141,7 @@ cp $_CONDOR_JOB_AD  ./_CONDOR_JOB_AD
 if [ -e AdjustSites.py ]; then
     export schedd_name=`condor_config_val schedd_name`
     echo "Execute AdjustSites.py ..."
-    python AdjustSites.py
+    python3 AdjustSites.py
     ret=$?
     if [ $ret -eq 1 ]; then
         echo "Error: AdjustSites.py failed to update the webdir." >&2

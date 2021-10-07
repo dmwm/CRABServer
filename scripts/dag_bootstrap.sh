@@ -13,30 +13,27 @@ set -o pipefail
 set -x
 echo "Beginning dag_bootstrap.sh (stdout)"
 echo "Beginning dag_bootstrap.sh (stderr)" 1>&2
-export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/current/lib/python2.7/site-packages
+export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/
+export PYTHONPATH=$PYTHONPATH:/data/srv/pycurl3/7.44.1
 if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]
 then
 
-	command -v python > /dev/null
+	command -v python3 > /dev/null
 	rc=$?
 	if [[ $rc != 0 ]]
 	then
-		echo "Error: Python isn't available on `hostname`." >&2
-		echo "Error: bootstrap execution requires python" >&2
+		echo "Error: Python3 isn't available on `hostname`." >&2
+		echo "Error: bootstrap execution requires python3" >&2
 		exit 1
 	else
-		echo "I found python at.."
-		echo `which python`
+		echo "I found python3 at.."
+		echo `which python3`
 	fi
 
 	if [ "x$CRAB3_VERSION" = "x" ]; then
 		TARBALL_NAME=TaskManagerRun.tar.gz
 	else
 		TARBALL_NAME=TaskManagerRun-$CRAB3_VERSION.tar.gz
-	fi
-
-	if [[ "X$CRAB_TASKMANAGER_TARBALL" == "X" ]]; then
-		CRAB_TASKMANAGER_TARBALL="http://hcc-briantest.unl.edu/$TARBALL_NAME"
 	fi
     
 	if [[ "X$CRAB_TASKMANAGER_TARBALL" != "Xlocal" ]]; then
@@ -96,7 +93,6 @@ export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
 
 os_ver=$(source /etc/os-release;echo $VERSION_ID)
 curl_path="/cvmfs/cms.cern.ch/slc${os_ver}_amd64_gcc700/external/curl/7.59.0"
-libcurl_path="${curl_path}/lib"
 source ${curl_path}/etc/profile.d/init.sh
 
 export PYTHONUNBUFFERED=1
@@ -111,5 +107,5 @@ if [ "X$_CONDOR_JOB_AD" != "X" ]; then
   cat $_CONDOR_JOB_AD
 fi
 echo "Now running the job in `pwd`..."
-exec nice -n 19 python -m TaskWorker.TaskManagerBootstrap "$@"
+exec nice -n 19 python3 -m TaskWorker.TaskManagerBootstrap "$@"
 } 2>&1 | tee dag_bootstrap.out

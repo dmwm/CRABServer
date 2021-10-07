@@ -8,9 +8,14 @@ import copy
 import json
 import time
 import pickle
-import urllib
 
-from httplib import HTTPException
+import sys
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
+if sys.version_info < (3, 0):
+    from urllib import urlencode
+
+from http.client import HTTPException
 
 import HTCondorUtils
 import CMSGroupMapper
@@ -203,7 +208,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         configreq = {'workflow':task['tm_taskname'],
                      'subresource':'updateschedd', 'scheddname':schedd}
         try:
-            self.crabserver.post(api='task', data=urllib.urlencode(configreq))
+            self.crabserver.post(api='task', data=urlencode(configreq))
         except HTTPException as hte:
             msg = "Unable to contact cmsweb and update scheduler on which task will be submitted. Error msg: %s" % hte.headers
             self.logger.warning(msg)
@@ -364,7 +369,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                      'clusterid': results[0]['ClusterId']
                     }
         self.logger.warning("Task %s already submitted to HTCondor; pushing information centrally: %s", workflow, str(configreq))
-        data = urllib.urlencode(configreq)
+        data = urlencode(configreq)
         self.crabserver.post(api='workflowdb', data=data)
 
         # Note that we don't re-send Dashboard jobs; we assume this is a rare occurrance and
@@ -455,7 +460,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                      'subresource': 'success',
                      'clusterid' : self.clusterId} #that's the condor cluster id of the dag_bootstrap.sh
         self.logger.debug("Pushing information centrally %s", configreq)
-        data = urllib.urlencode(configreq)
+        data = urlencode(configreq)
         self.crabserver.post(api='workflowdb', data=data)
 
         return Result.Result(task=kwargs['task'], result='OK')
