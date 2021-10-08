@@ -795,6 +795,8 @@ if __name__ == "__main__":
         applicationName = 'CMSSW JOB' if not options.scriptExe else 'ScriptEXE'
         # no matter what we run, it is very likely to need proxy location
         preCmd = 'export X509_USER_PROXY=%s; ' % os.getenv('X509_USER_PROXY')
+        # needed for root problem with $HOME/.root.mimes, #6801
+        preCmd += 'export HOME=${HOME:-$PWD}; '
         print("==== %s Execution started at %s ====" % (applicationName, time.asctime(time.gmtime())))
         if not options.scriptExe :
             cmd = 'cmsRun -p PSet.py -j FrameworkJobReport.xml'
