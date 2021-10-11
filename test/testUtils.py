@@ -78,6 +78,7 @@ standardConfig = """
 # a simple configuration which is customized for each test
 #
 import time
+import os
 from WMCore.Configuration import Configuration
 from CRABClient.UserUtilities import getUsername
 
