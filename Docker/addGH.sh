@@ -22,11 +22,13 @@ cd CRABServer
 git checkout $CRABServerTag
 git remote add stefano https://github.com/belforte/CRABServer.git
 git remote add daina https://github.com/ddaina/CRABServer.git
+git remote add mapellidario https://github.com/mapellidario/CRABServer.git
 cd ..
 cd WMCore
 git checkout $WMCoreTag
 git remote add stefano https://github.com/belforte/WMCore.git
 git remote add daina https://github.com/ddaina/WMCore.git
+git remote add mapellidario https://github.com/mapellidario/WMCore.git
 
 # 4. create .gitconfig
 cat > ~/.gitconfig << EOF
