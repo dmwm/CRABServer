@@ -1,10 +1,12 @@
 from __future__ import division
 import time
 from WMCore.Configuration import Configuration
+import os
+
 config = Configuration()
 
 config.section_("General")
-config.General.instance = 'test2'
+config.General.instance = os.getenv('REST_Instance','test2')
 config.General.restHost = ''
 config.General.dbInstance = ''
 config.General.workArea = '/tmp/crabStatusTracking'
@@ -14,7 +16,7 @@ config.JobType.pluginName = 'Analysis'
 config.JobType.psetName = 'pset.py'
 
 config.section_("Data")
-config.Data.inputDataset = '/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM'
+config.Data.inputDataset = os.getenv('inputDataset','/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM')
 
 config.Data.splitting = 'FileBased'
 config.Data.unitsPerJob = 1

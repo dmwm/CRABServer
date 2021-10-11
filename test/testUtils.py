@@ -94,7 +94,7 @@ config.JobType.psetName = 'PSET.py'
 config.JobType.maxJobRuntimeMin = 60
 
 config.section_('Data')
-config.Data.inputDataset = '/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM'
+config.Data.inputDataset = os.getenv('inputDataset','/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM')
 config.Data.splitting = 'LumiBased'
 config.Data.unitsPerJob = 1
 config.Data.totalUnits = 1
@@ -142,7 +142,7 @@ if not os.getenv('REST_Instance'):
     print("Please set REST_Instance env.var. before running")
     exit(1)
 
-restInstance = os.getenv('REST_Instance')
+restInstance = os.getenv('REST_Instance', 'test2')
 commonBashFunctions = commonBashFunctions.replace('REST_Instance', restInstance)
 standardConfig = standardConfig.replace('REST_Instance', restInstance)
 
