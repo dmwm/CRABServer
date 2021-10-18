@@ -910,6 +910,39 @@ def main():
     stageout_policy = split_re.split(G_JOB_AD['CRAB_StageoutPolicy'])
     print("Stageout policy: %s" % (", ".join(stageout_policy)))
 
+    # check that source and destination can use 3rd Party Copy via FTS.
+    # Do this in a rough way just to catch known most-likely pitfalls
+    # Do now worry about things like a protocol listed in storage.json
+    # but not enabled in Rucio which  will be dealt with as errors/exceptions.
+    # In any case this is a transient situation waiting for all sites to have
+    # a davs: endpoint, so I do not worry about being really general, nor
+    # replicating the more refined way which Rucio may have to pick best protocol.
+    # Simply make sure that source and destination list one compatible protocol in their
+    # storage.json as reported in SITECONF and leave it to Rucio to resolve PFN's properly.
+    # Only force direct stageout to remote site when match is clearly impossible
+    try:
+        #localStorageJson = open(os.getenv('SITECONFIG_PATH','/cvmfs/cms.cern.ch/SITECONF/local')+'/storage.json', 'r').read()
+        src_site = G_JOB_AD['JOB_CMSSite']
+        localStorageJson = open('/cvmfs/cms.cern.ch/SITECONF/%s/storage.json' % src_site, 'r').read()
+        destStorageJson = open('/cvmfs/cms.cern.ch/SITECONF/%s/storage.json' % dest_site, 'r').read()
+        destHasDavs = 'davs://' in destStorageJson
+        destHasGsiftp = 'gsiftp://' in destStorageJson or 'srm://' in destStorageJson
+        srcHasDavs = 'davs://' in localStorageJson
+        srcHasGsiftp = 'gsiftp://' in localStorageJson or 'srm://' in localStorageJson
+        print('SRC site %s has davs ? %s. Has gsiftp ? %s.' % (src_site, srcHasDavs, srcHasGsiftp))
+        print('DST site %s has davs ? %s. Has gsiftp ? %s.' % (dest_site, destHasDavs, destHasGsiftp))
+        if not srcHasGsiftp and not destHasDavs:
+            print('Execution site has no gsiftp but destination is not davs-capable')
+            print('Stageout policy overwritten to be "remote"')
+            stageout_policy = ['remote']
+        if not srcHasDavs and not destHasGsiftp:
+            print('Execution site has no davs but destination is not gsiftp-capable')
+            print('Stageout policy overwritten to be "remote"')
+            stageout_policy = ['remote']
+    except Exception as ex:
+        print('Failed to check protocol compatibility for stageout:\n%s' % str(ex))
+        print('Will stick with above stageout policy')
+
     ##--------------------------------------------------------------------------
     ## Finish PARSE JOB AD
     ##--------------------------------------------------------------------------
