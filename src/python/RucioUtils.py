@@ -43,21 +43,25 @@ def getWritePFN(rucioClient=None, siteName='', lfn='', logger=None):
 
     # add a scope to turn LFN into Rucio DID syntax
     did = 'cms:' + lfn
-    try:
-        didDict = rucioClient.lfns2pfns(siteName, [did], operation='write')
-    except Exception as ex:
-        logger.warning('Rucio lfn2pfn resolution for Write failed with:\n%s', ex)
-        logger.warning("Will try with operation='read'")
+    # we prefer to do ASO via FTS which uses 3rd party copy, fall back to protocols defined
+    # for other operations in case that fails, order matters here !
+    for operation in ['third_party_copy', 'write', 'read']:
         try:
-            didDict = rucioClient.lfns2pfns(siteName, [did], operation='read')
+            logger.warning('Try Rucio lfn2pn with operation %s', operation)
+            didDict = rucioClient.lfns2pfns(siteName, [did], operation=operation)
+            break
         except Exception as ex:
-            msg = 'lfn2pfn resolution with Rucio failed for site: %s  LFN: %s' % (siteName, lfn)
-            msg += ' with exception :\n%s' % str(ex)
-            raise TaskWorkerException(msg)
+            msg = 'Rucio lfn2pfn resolution for %s failed with:\n%s\nTry next one.'
+            logger.warning(msg, operation, str(ex))
+    if not didDict:
+        msg = 'lfn2pfn resolution with Rucio failed for site: %s  LFN: %s' % (siteName, lfn)
+        msg += ' with exception :\n%s' % str(ex)
+        raise TaskWorkerException(msg)
 
     # lfns2pfns returns a dictionary with did as key and pfn as value:
     #  https://rucio.readthedocs.io/en/latest/api/rse.html
     # {u'cms:/store/user/rucio': u'gsiftp://eoscmsftp.cern.ch:2811/eos/cms/store/user/rucio'}
     pfn = didDict[did]
+    logger.info('Will use %s as stageout location', pfn)
 
     return pfn
