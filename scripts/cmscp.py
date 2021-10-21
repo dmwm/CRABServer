@@ -921,11 +921,15 @@ def main():
     # storage.json as reported in SITECONF and leave it to Rucio to resolve PFN's properly.
     # Only force direct stageout to remote site when match is clearly impossible
     try:
-        localStorageJson = open(os.getenv('SITECONFIG_PATH','/cvmfs/cms.cern.ch/SITECONF/local')+'/storage.json', 'r').read()
-        # following two lines are a fall back in case $SITECONF_PATH is not defined
-        # but SAM tests say that now it is
-        #src_site = G_JOB_AD['JOB_CMSSite']
-        #localStorageJson = open('/cvmfs/cms.cern.ch/SITECONF/%s/storage.json' % src_site, 'r').read()
+        src_site = G_JOB_AD['JOB_CMSSite']
+        srcJsonFile = os.getenv('SITECONFIG_PATH','/cvmfs/cms.cern.ch/SITECONF/local')+'/storage.json'
+        try:
+            localStorageJson = open(srcJsonFile, 'r').read()
+        except Exception:
+            print("Lookup of %s failed" % srcJsonFile)
+            src_storageJson = '/cvmfs/cms.cern.ch/SITECONF/%s/storage.json' % src_site
+            print("Fall back to %s" % srcJsonFile)
+            localStorageJson = open(srcJsonFile, 'r').read()
         destStorageJson = open('/cvmfs/cms.cern.ch/SITECONF/%s/storage.json' % dest_site, 'r').read()
         destHasDavs = 'davs://' in destStorageJson
         destHasGsiftp = 'gsiftp://' in destStorageJson or 'srm://' in destStorageJson
