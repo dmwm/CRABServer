@@ -9,8 +9,6 @@ import logging
 import htcondor
 from ast import literal_eval
 
-from ApmonIf import ApmonIf
-
 from ServerUtilities import getWebdirForDb, insertJobIdSid
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
@@ -164,11 +162,6 @@ class PreJob:
         self.logger.info("User web dir: %s", self.userWebDirPrx)
 
         insertJobIdSid(params, self.job_id, self.task_ad['CRAB_ReqName'], crab_retry)
-        apmon = ApmonIf()
-        self.logger.debug("Dashboard task info: %s", str(params))
-        apmon.sendToML(params)
-        apmon.free()
-
 
     def get_task_ad(self):
         """

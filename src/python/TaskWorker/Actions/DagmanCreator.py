@@ -34,8 +34,6 @@ try:
 except ImportError:
     UserFileCache = None
 
-from ApmonIf import ApmonIf
-
 DAG_HEADER = """
 
 NODE_STATUS_FILE node_state{nodestate} 30 ALWAYS-UPDATE
@@ -386,17 +384,6 @@ class DagmanCreator(TaskAction):
                   'datasetFull': task['tm_input_dataset'],
                   'resubmitter': task['tm_username'],
                   'exe': 'cmsRun'}
-        return params
-
-
-    def sendDashboardTask(self, task):
-        apmon = ApmonIf()
-        params = self.buildDashboardInfo(task)
-        params_copy = dict(params)
-        params_copy['jobId'] = 'TaskMeta'
-        self.logger.debug("Dashboard task info: %s", str(params_copy))
-        apmon.sendToML(params_copy)
-        apmon.free()
         return params
 
     def populateGlideinMatching(self, info):
@@ -1246,8 +1233,6 @@ class DagmanCreator(TaskAction):
         kw['task']['resthost'] = self.crabserver.server['host']
         kw['task']['dbinstance'] = self.crabserver.getDbInstance()
         params = {}
-        if kw['task']['tm_dry_run'] == 'F':
-            params = self.sendDashboardTask(kw['task'])
 
         inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh',
                       'AdjustSites.py', 'site.ad', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.pkl', 'taskworkerconfig.pkl',
