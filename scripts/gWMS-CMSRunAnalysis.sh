@@ -37,14 +37,6 @@ function finish {
 # Trap all exits and execute finish function
 trap finish EXIT
 
-function DashboardFailure {
-    if [ -f ./DashboardFailure.sh ]; then
-        exec sh ./DashboardFailure.sh $1
-    else
-        exit $1
-    fi
-}
-
 function chirp_exit_code {
     #Get the long exit code and set a classad using condor_chirp
     #The long exit code is taken from jobReport.json file if it exist
@@ -261,7 +253,6 @@ if [ ! -e wmcore_initialized ];
 then
     echo "======== ERROR: Unable to initialize WMCore at $(TZ=GMT date) ========"
     EXIT_STATUS=10043
-    DashboardFailure $EXIT_STATUS
 fi
 
 if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
