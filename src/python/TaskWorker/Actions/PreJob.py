@@ -11,7 +11,7 @@ from ast import literal_eval
 
 from ApmonIf import ApmonIf
 
-from ServerUtilities import getWebdirForDb, insertJobIdSid, setDashboardLogs
+from ServerUtilities import getWebdirForDb, insertJobIdSid
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
 import CMSGroupMapper
@@ -162,10 +162,6 @@ class PreJob:
             self.userWebDirPrx = getWebdirForDb(str(self.task_ad.get('CRAB_ReqName')), storage_rules)
 
         self.logger.info("User web dir: %s", self.userWebDirPrx)
-        if self.userWebDirPrx:
-            setDashboardLogs(params, self.userWebDirPrx, self.job_id, crab_retry)
-        else:
-            print("Not setting dashboard logfiles as I cannot find a web dir.")
 
         insertJobIdSid(params, self.job_id, self.task_ad['CRAB_ReqName'], crab_retry)
         apmon = ApmonIf()
