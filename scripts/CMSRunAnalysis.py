@@ -261,8 +261,6 @@ def handleException(exitAcronym, exitCode, exitMsg):
 
     with open('jobReport.json', 'w') as rf:
         json.dump(report, rf)
-    if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
-        stopDashboardMonitoring(ad)
 
 def parseArgs():
     parser = PassThroughOptionParser()
@@ -570,13 +568,9 @@ if __name__ == "__main__":
         print("==== FAILURE WHEN PARSING HTCONDOR CLASSAD AT %s ====" % time.asctime(time.gmtime()))
         print(traceback.format_exc())
         ad = {}
-    if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
-        dashboardId = earlyDashboardMonitoring(ad)
-        if dashboardId:
-            os.environ['DashboardJobId'] = dashboardId
 
     #WMCore import here
-    # Note that we may fail in the imports - hence we try to report to Dashboard first
+    # Note that we may fail in the imports
     try:
         options = parseArgs()
         prepSandbox(options)
@@ -588,8 +582,6 @@ if __name__ == "__main__":
     except Exception:
         # We may not even be able to create a FJR at this point.  Record
         # error and exit.
-        if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
-            earlyDashboardFailure(ad)
         print("==== FAILURE WHEN LOADING WMCORE AT %s ====" % time.asctime(time.gmtime()))
         print(traceback.format_exc())
         mintime()
@@ -598,15 +590,13 @@ if __name__ == "__main__":
     # At this point, all our dependent libraries have been loaded; it's quite
     # unlikely python will see a segfault.  Drop a marker file in the working
     # directory; if we encounter a python segfault, the wrapper will look to see if
-    # this file exists and report to Dashboard accordingly.
+    # this file exists and report accordingly.
     with open("wmcore_initialized", "w") as mf:
         mf.write("wmcore initialized.\n")
 
     try:
         setupLogging('.')
 
-        if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
-            startDashboardMonitoring(ad)
         print("==== CMSSW Stack Execution STARTING at %s ====" % time.asctime(time.gmtime()))
         scram = Scram(
             version=options.cmsswVersion,
@@ -754,8 +744,6 @@ if __name__ == "__main__":
             json.dump(rep, of)
         with open('jobReportExtract.pickle', 'w') as of:
             pickle.dump(rep, of)
-        if ad and not "CRAB3_RUNTIME_DEBUG" in os.environ:
-            stopDashboardMonitoring(ad)
         print("==== Report file creation FINISHED at %s ====" % time.asctime(time.gmtime()))
     except FwkJobReportException as FJRex:
         extype = "BadFWJRXML"

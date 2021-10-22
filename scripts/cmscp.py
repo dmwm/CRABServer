@@ -508,12 +508,6 @@ def perform_direct_stageout(direct_stageout_impl, \
                             'is_log'    : is_log,
                             'removed'   : False
                            }
-    stageoutDashboardReport = {'LFN': dest_pfn,
-                               'PNN': dest_site,
-                               'PSN': source_site,
-                               'StageOutCommand': direct_stageout_command,
-                               'StageOutType': 'DIRECT',
-                              }
     G_DIRECT_STAGEOUTS.append(direct_stageout_info)
     retval, retmsg = 0, None
     try:
@@ -1543,7 +1537,6 @@ if __name__ == '__main__':
                            ('exitAcronym', JOB_STGOUT_WRAPPER_EXIT_INFO['exit_acronym']), \
                            ('exitMsg',     JOB_STGOUT_WRAPPER_EXIT_INFO['exit_msg'])])
     ## Now we have to exit with the appropriate exit code, and report failures
-    ## to dashboard.
     if G_JOB_WRAPPER_EXIT_CODE == None:
         MSG = "Cannot retrieve the job exit code from the job report (does %s exist?)." % (G_JOB_REPORT_NAME)
         print(MSG)

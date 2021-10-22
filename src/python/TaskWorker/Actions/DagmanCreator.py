@@ -366,26 +366,6 @@ class DagmanCreator(TaskAction):
         TaskAction.__init__(self, config, crabserver, procnum)
         self.rucioClient = rucioClient
 
-    def buildDashboardInfo(self, task):
-        taskType = self.getDashboardTaskType(task)
-
-        params = {'tool': 'crab3',
-                  'SubmissionType':'crab3',
-                  'JSToolVersion': '3.3.0',
-                  'tool_ui': os.environ.get('HOSTNAME', ''),
-                  'scheduler': 'GLIDEIN',
-                  'GridName': task['tm_user_dn'],
-                  'ApplicationVersion': task['tm_job_sw'],
-                  'taskType': taskType,
-                  'vo': 'cms',
-                  'CMSUser': task['tm_username'],
-                  'user': task['tm_username'],
-                  'taskId': task['tm_taskname'],
-                  'datasetFull': task['tm_input_dataset'],
-                  'resubmitter': task['tm_username'],
-                  'exe': 'cmsRun'}
-        return params
-
     def populateGlideinMatching(self, info):
         scram_arch = info['tm_job_arch']
         # Set defaults
