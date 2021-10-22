@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-__DashboardAPI_t__
 Unit tests for the FileTransfer API.
 Created on Tue Mar 23 13:30:04 2016
 
@@ -22,8 +21,6 @@ from ServerUtilities import getHashLfn, generateTaskName, PUBLICATIONDB_STATUSES
 
 class FileTransfersTest(unittest.TestCase):
     """
-    _DashboardAPITest_
-
     Unit tests for the FileTransfers API
     """
     def setUp(self):

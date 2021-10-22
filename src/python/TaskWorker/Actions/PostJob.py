@@ -91,7 +91,6 @@ from httplib import HTTPException
 
 import htcondor
 import classad
-import DashboardAPI
 import WMCore.Database.CMSCouch as CMSCouch
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.WMArchive.DataMap import createArchiverDoc
@@ -1692,8 +1691,6 @@ class PostJob():
                 return retval
         except Exception:
             self.logger.exception(retmsg)
-        finally:
-            DashboardAPI.apmonFree()
 
         ## Add the post-job exit code and error message to the job report.
         job_report = {}
@@ -2784,7 +2781,7 @@ class PostJob():
                        'FINISHED'     : 'Done'
                       }
         state = states_dict.get(state, state)
-        msg = "Setting Dashboard state to %s." % (state)
+        msg = "Setting state for monitor reporting to %s." % (state)
         params = {'MonitorID': self.reqname,
                   'MonitorJobID': "%s_https://glidein.cern.ch/%s/%s_%d" \
                                    % (self.job_id, self.job_id, \
@@ -2795,13 +2792,6 @@ class PostJob():
         if reason:
             params['StatusValueReason'] = reason
         self.monitoringExitCode(params, exitCode)
-        ## Unfortunately, Dashboard only has 1-second resolution; we must separate all
-        ## updates by at least 1s in order for it to get the correct ordering.
-        time.sleep(1)
-        msg += " Dashboard parameters: %s" % (str(params))
-        self.logger.info(msg)
-        DashboardAPI.apmonSend(params['MonitorID'], params['MonitorJobID'], params)
-        self.logger.info("====== Finished to prepare/send report to dashboard.")
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
