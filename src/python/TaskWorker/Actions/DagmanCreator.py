@@ -1083,29 +1083,6 @@ class DagmanCreator(TaskAction):
         elif info.get('faillimit') < 0:
             info['faillimit'] = -1
 
-        # Info for ML:
-        target_se = ''
-        max_len_target_se = 900
-        for site in (str(s) for s in availablesites):
-            if len(target_se) > max_len_target_se:
-                target_se += ',Many_More'
-                break
-            if len(target_se):
-                target_se += ','
-            target_se += site
-        ml_info = info.setdefault('apmon', [])
-        shift = 0 if stage == 'probe' else 1
-        for idx in range(shift, info['jobcount']+shift):
-            taskid = kwargs['task']['tm_taskname']
-            jinfo = {'broker': os.environ.get('HOSTNAME', ''),
-                     'bossId': str(idx),
-                     'TargetSE': target_se,
-                     'localId': '',
-                     'StatusValue': 'pending',
-                    }
-            insertJobIdSid(jinfo, idx, taskid, 0)
-            ml_info.append(jinfo)
-
         return info, splitterResult, subdags, dagSpecs
 
 
