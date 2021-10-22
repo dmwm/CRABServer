@@ -107,29 +107,28 @@ class DagmanKiller(TaskAction):
         """
         The execute method of the DagmanKiller class.
         """
+        self.executeInternal(*args, **kwargs)
         try:
-            self.executeInternal(*args, **kwargs)
-            try:
-                ## AndresT: If a task was in FAILED status before the kill, then the new status
-                ## after killing some jobs should be FAILED again, not SUBMITTED. However, in
-                ## the long term we would like to introduce a final node in the DAG, and I think
-                ## the idea would be that the final node will put the task status into FAILED or
-                ## COMPLETED (in the TaskDB) once all jobs are finished. In that case I think
-                ## also the status method from HTCondorDataWorkflow would not have to return any
-                ## adhoc task status anymore (it would just return what is in the TaskDB) and
-                ## that also means that FAILED task status would only be a terminal status that
-                ## I guess should not accept a kill (because it doesn't make sense to kill a
-                ## task for which all jobs have already finished -successfully or not-).
-                configreq = {'subresource': 'state',
-                             'workflow': kwargs['task']['tm_taskname'],
-                             'status': 'KILLED'}
-                self.logger.debug("Setting the task as successfully killed with %s", str(configreq))
-                self.crabserver.post(api='workflowdb', data=urllib.urlencode(configreq))
-            except HTTPException as hte:
-                self.logger.error(hte.headers)
-                msg = "The CRAB server successfully killed the task,"
-                msg += " but was unable to update the task status to %s in the database." % (configreq['status'])
-                msg += " This should be a harmless (temporary) error."
-                raise TaskWorkerException(msg)
+            ## AndresT: If a task was in FAILED status before the kill, then the new status
+            ## after killing some jobs should be FAILED again, not SUBMITTED. However, in
+            ## the long term we would like to introduce a final node in the DAG, and I think
+            ## the idea would be that the final node will put the task status into FAILED or
+            ## COMPLETED (in the TaskDB) once all jobs are finished. In that case I think
+            ## also the status method from HTCondorDataWorkflow would not have to return any
+            ## adhoc task status anymore (it would just return what is in the TaskDB) and
+            ## that also means that FAILED task status would only be a terminal status that
+            ## I guess should not accept a kill (because it doesn't make sense to kill a
+            ## task for which all jobs have already finished -successfully or not-).
+            configreq = {'subresource': 'state',
+                         'workflow': kwargs['task']['tm_taskname'],
+                         'status': 'KILLED'}
+            self.logger.debug("Setting the task as successfully killed with %s", str(configreq))
+            self.crabserver.post(api='workflowdb', data=urllib.urlencode(configreq))
+        except HTTPException as hte:
+            self.logger.error(hte.headers)
+            msg = "The CRAB server successfully killed the task,"
+            msg += " but was unable to update the task status to %s in the database." % (configreq['status'])
+            msg += " This should be a harmless (temporary) error."
+            raise TaskWorkerException(msg)
 
         return Result.Result(task=kwargs['task'], result='OK')
