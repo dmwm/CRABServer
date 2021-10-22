@@ -215,22 +215,6 @@ def getProxiedWebDir(crabserver=None, task=None, logFunction=print):
 
     return res
 
-
-#setDashboardLogs function is shared between the postjob and the job wrapper. Sharing it here
-def setDashboardLogs(params, webdir, jobid, retry):
-    """ Method to prepare some common dictionary keys for dashboard reporting
-    """
-    log_files = [("job_out", "txt"), ("postjob", "txt")]
-    for i, log_file in enumerate(log_files):
-        log_file_basename, log_file_extension = log_file
-        log_file_name = "%s/%s.%s.%d.%s" % (webdir, \
-                                            log_file_basename, jobid, \
-                                            retry, \
-                                            log_file_extension)
-        log_files[i] = log_file_name
-    params['StatusLogFile'] = ",".join(log_files)
-
-
 def insertJobIdSid(jinfo, jobid, workflow, jobretry):
     """ Modifies passed dictionary (jinfo) to contain jobId and sid keys and values.
         Used when creating dashboard reports.
