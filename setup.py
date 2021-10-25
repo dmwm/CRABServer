@@ -39,8 +39,8 @@ systems = \
     },
     'TaskWorker':
     {
-        'py_modules': ['PandaServerInterface', 'RESTInteractions', 'ApmonIf',
-                       'apmon', 'DashboardAPI', 'Logger', 'ProcInfo',
+        'py_modules': ['PandaServerInterface', 'RESTInteractions',
+                       'apmon', 'Logger', 'ProcInfo',
                        'CRABQuality', 'HTCondorUtils', 'HTCondorLocator',
                        'ServerUtilities', 'MultiProcessingLog', 'CMSGroupMapper',
                        'RucioUtils', 'cache_status'],
