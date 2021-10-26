@@ -586,7 +586,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         """
         transfers = {}
         data = json.load(fp)
-        for docid, result in data['results'].iteritems():
+        for docid, result in data['results'].items():
             #Oracle has an improved structure in aso_status
             if isCouchDBURL(self.asoDBURL):
                 result = result['value']
@@ -618,7 +618,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         fp.seek(0)
         data = json.load(fp)
         #iterate over the jobs and set the error dict for those which are failed
-        for jobid, statedict in nodes.iteritems():
+        for jobid, statedict in nodes.items():
             if 'State' in statedict and statedict['State'] == 'failed' and jobid in data:
                 statedict['Error'] = last(data[jobid]) #data[jobid] contains all retries. take the last one
 

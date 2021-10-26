@@ -1,6 +1,11 @@
 import time
-import urllib
 import datetime
+
+import sys
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
+if sys.version_info < (3, 0):
+    from urllib import urlencode
 
 import classad
 import htcondor
@@ -16,7 +21,7 @@ from TaskWorker.Actions.DagmanSubmitter import checkMemoryWalltime
 from TaskWorker.WorkerExceptions import TaskWorkerException
 import TaskWorker.DataObjects.Result as Result
 
-from httplib import HTTPException
+from http.client import HTTPException
 
 
 class DagmanResubmitter(TaskAction):
@@ -126,7 +131,7 @@ class DagmanResubmitter(TaskAction):
                     ## all the jobs, not only the ones we want to resubmit. That's why the pre-job
                     ## is saving the values of the parameters for each job retry in text files (the
                     ## files are in the directory resubmit_info in the schedd).
-                    for adparam, taskparam in params.iteritems():
+                    for adparam, taskparam in params.items():
                         if taskparam in ad:
                             schedd.edit(rootConst, adparam, ad.lookup(taskparam))
                         elif task['resubmit_'+taskparam] != None:
@@ -138,7 +143,7 @@ class DagmanResubmitter(TaskAction):
             self.logger.debug("Resubmitting under condition overwrite = True")
             with HTCondorUtils.AuthenticatedSubprocess(proxy, logger=self.logger) as (parent, rpipe):
                 if not parent:
-                    for adparam, taskparam in params.iteritems():
+                    for adparam, taskparam in params.items():
                         if taskparam in ad:
                             if taskparam == 'jobids' and len(list(ad[taskparam])) == 0:
                                 self.logger.debug("Setting %s = True in the task ad.", adparam)
@@ -183,7 +188,7 @@ class DagmanResubmitter(TaskAction):
                          'workflow': kwargs['task']['tm_taskname'],
                          'status': 'SUBMITTED'}
             self.logger.debug("Setting the task as successfully resubmitted with %s", str(configreq))
-            self.crabserver.post(api='workflowdb', data=urllib.urlencode(configreq))
+            self.crabserver.post(api='workflowdb', data=urlencode(configreq))
         except HTTPException as hte:
             self.logger.error(hte.headers)
             msg  = "The CRAB server successfully resubmitted the task to the Grid scheduler,"

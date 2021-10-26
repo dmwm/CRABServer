@@ -40,7 +40,7 @@ class DataDiscovery(TaskAction):  # pylint: disable=abstract-method
             resourceCatalog = CRIC(logger=self.logger, configDict=configDict)
         # can't affort one message from CRIC per file, unless critical !
         with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
-            for lfn, infos in datasetfiles.iteritems():
+            for lfn, infos in datasetfiles.items():
                 ## Skip the file if it is not in VALID state.
                 if not infos.get('ValidFile', True):
                     self.logger.warning("Skipping invalid file %s", lfn)
@@ -67,7 +67,7 @@ class DataDiscovery(TaskAction):  # pylint: disable=abstract-method
                     raise
                 wmfile['workflow'] = requestname
                 event_counter += infos['NumberOfEvents']
-                for run, lumis in infos['Lumis'].iteritems():
+                for run, lumis in infos['Lumis'].items():
                     datasetLumis.setdefault(run, []).extend(lumis)
                     wmfile.addRun(Run(run, *lumis))
                     for lumi in lumis:

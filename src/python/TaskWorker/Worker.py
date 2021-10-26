@@ -1,15 +1,20 @@
 from __future__ import print_function
 import os
 import time
-import urllib
 import logging
 import traceback
 import multiprocessing
 from Queue import Empty
 from base64 import b64encode
 from logging import FileHandler
-from httplib import HTTPException
+from http.client import HTTPException
 from logging.handlers import TimedRotatingFileHandler
+
+import sys
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
+if sys.version_info < (3, 0):
+    from urllib import urlencode
 
 from RESTInteractions import CRABRest
 from TaskWorker.DataObjects.Result import Result
@@ -49,7 +54,7 @@ def failTask(taskName, crabserver, msg, log, failstatus='FAILED'):
                      'subresource': 'failure',
                      # Limit the message to 7500 chars, which means no more than 10000 once encoded. That's the limit in the REST
                      'failure': b64encode(truncMsg)}
-        crabserver.post(api='workflowdb', data = urllib.urlencode(configreq))
+        crabserver.post(api='workflowdb', data = urlencode(configreq))
         log.info("Failure message successfully uploaded to the REST")
     except HTTPException as hte:
         log.warning("Cannot upload failure message to the REST for task %s. HTTP exception headers follows:", taskName)

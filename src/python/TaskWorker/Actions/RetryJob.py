@@ -134,7 +134,7 @@ class RetryJob(object):
         Need a doc string here.
         """
         job_status_name = None
-        for name, code in JOB_RETURN_CODES._asdict().iteritems():
+        for name, code in JOB_RETURN_CODES._asdict().items():
             if code == job_status:
                 job_status_name = name
         try:

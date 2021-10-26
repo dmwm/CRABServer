@@ -78,7 +78,6 @@ import tarfile
 import hashlib
 import logging
 import logging.handlers
-import commands
 import subprocess
 import unittest
 import datetime
@@ -87,7 +86,7 @@ import traceback
 import random
 import shutil
 from shutil import move
-from httplib import HTTPException
+from http.client import HTTPException
 
 import htcondor
 import classad
@@ -99,7 +98,7 @@ from TaskWorker import __version__
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 from ServerUtilities import isFailurePermanent, parseJobAd, mostCommon, TRANSFERDB_STATES, PUBLICATIONDB_STATES, encodeRequest, isCouchDBURL, oracleOutputMapping
-from ServerUtilities import getLock
+from ServerUtilities import getLock, getHashLfn
 from RESTInteractions import CRABRest
 
 ASO_JOB = None
@@ -233,6 +232,7 @@ def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
     if error_summary_changed:
         with getLock(G_FJR_PARSE_RESULTS_FILE_NAME):
             with open(G_FJR_PARSE_RESULTS_FILE_NAME, "a+") as fjr_parse_results:
+                # make sure the "json file" is written as multiple lines
                 fjr_parse_results.write(json.dumps({job_id : {crab_retry : error_summary}}) + "\n")
 
     # Read, update and re-write the error_summary.json file
@@ -596,7 +596,7 @@ class ASOServerJob(object):
                 ## from the worker node directly to the permanent storage.
                 needs_transfer = self.log_needs_transfer
             self.logger.info("Working on file %s" % (filename))
-            doc_id = hashlib.sha224(source_lfn).hexdigest()
+            doc_id = getHashLfn(source_lfn)
             doc_new_info = {'state': 'new',
                             'source': fixUpTempStorageSite(logger=self.logger, siteName=source_site),
                             'destination': self.dest_site,
@@ -1206,7 +1206,7 @@ class ASOServerJob(object):
                 time.sleep(3*60)
                 msg = "This is cancellation retry number %d." % (retry)
                 self.logger.info(msg)
-            for doc_id, reason in doc_ids_reasons.iteritems():
+            for doc_id, reason in doc_ids_reasons.items():
                 if doc_id in cancelled:
                     continue
                 msg = "Cancelling ASO transfer %s" % (doc_id)
@@ -1445,7 +1445,7 @@ class PostJob():
         try:
             #open in rb+ mode instead of w so if the schedd crashes between the open and the write
             #we do not end up with an empty (corrupted) file. (Well, this can only happens the first try)
-            with open(DEFER_INFO_FILE, 'rb+') as fd:
+            with open(DEFER_INFO_FILE, 'r+') as fd:
                 #put some spaces to overwrite possibly longer numbers (should never happen, but..)
                 fd.write(str(defer_num + 1) + ' '*10)
         except IOError as e:
@@ -2424,12 +2424,16 @@ class PostJob():
                          "outdatasetname"  : "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER",
                          "directstageout"  : direct_stageout
                         }
-            configreq = configreq.items()
+            #TODO: there could be a better py3 way to get lists of outfileruns/lumis
             outfileruns = []
             outfilelumis = []
-            for run, lumis in ifile[u'runs'].iteritems():
+            for run, lumis in ifile[u'runs'].items():
                 outfileruns.append(str(run))
                 outfilelumis.append(','.join(map(str, lumis)))
+
+            configreq = [item for item in configreq.items()]  # make a real list of (k,v) pairs as rest_api requires
+            #configreq['outfileruns'] = [run for run in outfileruns]
+            #configreq['outfilelumis'] = [lumis for lumis in outfilelumis]
             for run in outfileruns:
                 configreq.append(("outfileruns", run))
             for lumis in outfilelumis:
@@ -2498,7 +2502,8 @@ class PostJob():
                          'directstageout'  : int(file_info['direct_stageout']),
                          'globalTag'       : 'None'
                         }
-            configreq = configreq.items()
+            configreq = [item for item in configreq.items()]  # make a real list of (k,v) pairs as rest_api requires
+            #configreq = configreq.items()
             if 'outfileruns' in file_info:
                 for run in file_info['outfileruns']:
                     configreq.append(("outfileruns", run))
@@ -2760,7 +2765,8 @@ class PostJob():
                     # Creating a string like '100:20,101:21,105:20...'
                     # where the lumi is followed by a colon and number of events in that lumi.
                     # Note that the events per lumi information is provided by WMCore version >=1.1.2 when parsing FWJR.
-                    lumisAndEvents = ','.join(['{0}:{1}'.format(str(lumi), str(numEvents)) for lumi, numEvents in lumis.iteritems()])
+                    lumisAndEvents = ','.join(['{0}:{1}'.format(str(lumi), str(numEvents))
+                                               for lumi, numEvents in lumis.items()])
                     file_info['outfilelumis'].append(lumisAndEvents)
             else:
                 msg = "Output file info for %s not found in job report." % (orig_file_name)
@@ -3131,23 +3137,6 @@ class testServer(unittest.TestCase):
         open(self.json_name, 'w').write(json.dumps(self.generateJobJson()))
 
 
-    def makeTempFile(self, size, pfn):
-        fh, path = tempfile.mkstemp()
-        try:
-            inputString = "CRAB3POSTJOBUNITTEST"
-            os.write(fh, (inputString * ((size/len(inputString))+1))[:size])
-            os.close(fh)
-            cmd = "env -u LD_LIBRAY_PATH lcg-cp -b -D srmv2 -v file://%s %s" % (path, pfn)
-            print(cmd)
-            status, res = commands.getstatusoutput(cmd)
-            if status:
-                exmsg = "Couldn't make file: %s" % (res)
-                raise RuntimeError(exmsg)
-        finally:
-            if os.path.exists(path):
-                os.unlink(path)
-
-
     def getLevelOneDir(self):
         return datetime.datetime.now().strftime("%Y-%m")
 
@@ -3157,22 +3146,6 @@ class testServer(unittest.TestCase):
     def getUniqueFilename(self):
         return "%s-postjob.txt" % (uuid.uuid4())
 
-    def testNonexistent(self):
-        self.full_args.extend(['/store/temp/user/meloam/CRAB3-UNITTEST-NONEXISTENT/b/c/',
-                               '/store/user/meloam/CRAB3-UNITTEST-NONEXISTENT/b/c',
-                               self.getUniqueFilename()])
-        self.assertNotEqual(self.postjob.execute(*self.full_args), 0)
-
-    source_prefix = "srm://dcache07.unl.edu:8443/srm/v2/server?SFN=/mnt/hadoop/user/uscms01/pnfs/unl.edu/data4/cms"
-    def testExistent(self):
-        source_dir = "/store/temp/user/meloam/CRAB3-UnitTest/%s/%s" % \
-                     (self.getLevelOneDir(), self.getLevelTwoDir())
-        source_file = self.getUniqueFilename()
-        source_lfn = "%s/%s" % (source_dir, source_file)
-        dest_dir = source_dir.replace("temp/user", "user")
-        self.makeTempFile(200, "%s/%s" %(self.source_prefix, source_lfn))
-        self.full_args.extend([source_dir, dest_dir, source_file])
-        self.assertEqual(self.postjob.execute(*self.full_args), 0)
 
     def tearDown(self):
         if os.path.exists(self.json_name):
