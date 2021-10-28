@@ -800,7 +800,7 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
     # CRAB_useGoCurl env. variable is used to define how upload to S3 command should be executed.
     # If variable is set, then goCurl is used for command execution: https://github.com/vkuznet/gocurl
     if os.getenv('CRAB_useGoCurl'):
-        uploadCommand += '/afs/cern.ch/user/v/valya/public/gocurl -verbose 2 -method POST'
+        uploadCommand += '/cvmfs/cms.cern.ch/cmsmon/gocurl -verbose 2 -method POST'
         uploadCommand += ' -header "User-Agent:%s"' % userAgent
         uploadCommand += ' -form "key=%s"' % key
         uploadCommand += ' -form "AWSAccessKeyId=%s"' % AWSAccessKeyId
@@ -859,7 +859,7 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
     # CRAB_useGoCurl env. variable is used to define how download from S3 command should be executed.
     # If variable is set, then goCurl is used for command execution: https://github.com/vkuznet/gocurl
     if os.getenv('CRAB_useGoCurl'):
-        downloadCommand += '/afs/cern.ch/user/v/valya/public/gocurl -verbose 2 -method GET'
+        downloadCommand += '/cvmfs/cms.cern.ch/cmsmon/gocurl -verbose 2 -method GET'
         downloadCommand += ' -out "%s"' % filepath
         downloadCommand += ' -url "%s"' % preSignedUrl
     else:
