@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 import logging
 import cherrypy
-from commands import getstatusoutput
+from subprocess import getstatusoutput
 from time import mktime, gmtime
 
 # WMCore dependecies here
