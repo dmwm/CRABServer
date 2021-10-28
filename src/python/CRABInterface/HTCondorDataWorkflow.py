@@ -5,7 +5,7 @@ import json
 import time
 import copy
 import tarfile
-import StringIO
+import io
 import tempfile
 import calendar
 from ast import literal_eval
@@ -52,7 +52,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             backend_urls['htcondorPool'] = row.collector
 
             # need to make sure to pass a simply quoted string, not a byte-array to HTCondor
-            taskName = str(workflow.decode("utf-8")) if isinstance(workflow, bytes) else workflow
+            taskName = workflow.decode("utf-8") if isinstance(workflow, bytes) else workflow
             self.logger.debug("Running condor query for task %s." % taskName)
             try:
                 locator = HTCondorLocator.HTCondorLocator(backend_urls)
@@ -421,7 +421,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         curl = self.prepareCurl()
         fp = tempfile.TemporaryFile()
         curl.setopt(pycurl.WRITEFUNCTION, fp.write)
-        hbuf = StringIO.StringIO()
+        hbuf = io.BytesIO()
         curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
         try:
             self.logger.debug("Retrieving task status from schedd via http")

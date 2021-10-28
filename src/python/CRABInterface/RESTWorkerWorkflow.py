@@ -1,6 +1,7 @@
 """ Interface used by the TaskWorker to ucquire tasks and change their state
 """
 # WMCore dependecies here
+from builtins import str
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
 from WMCore.REST.Error import InvalidParameter
@@ -81,7 +82,7 @@ class RESTWorkerWorkflow(RESTEntity):
 
         if subresource is None:
             subresource = 'state'
-        if not subresource in methodmap.keys():
+        if not subresource in list(methodmap.keys()):
             raise InvalidParameter("Subresource of workflowdb has not been found")
         methodmap[subresource]['method'](*methodmap[subresource]['args'], **methodmap[subresource]['kwargs'])
         return []
