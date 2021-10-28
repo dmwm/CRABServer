@@ -67,13 +67,15 @@ class PreDAG(object):
     def readJobStatus(self):
         """Read the job status(es) from the cache_status file and save the relevant info into self.statusCacheInfo"""
         #XXX Maybe the status_cache filname should be in a variable in ServerUtilities?
-        if not os.path.exists("task_process/status_cache.txt"):
+        if not os.path.exists("task_process/status_cache.pkl"):
             return
-        with open("task_process/status_cache.txt") as fd:
-            fileContent = fd.read()
-            #TODO Splitting '\n' and accessing the second element is really fragile.
-            #It is what it is done in the client though, but we should change it
-            self.statusCacheInfo = literal_eval(fileContent.split('\n')[2])
+        with open("task_process/status_cache.pkl",'rb') as fd:
+            statusCache = pickle.load(fd)
+            if not 'nodes' in statusCache:
+                return
+            self.statusCacheInfo = statusCache['nodes']
+            if 'DagStatus' in self.statusCacheInfo:
+                del self.statusCacheInfo['DagStatus']
 
     def readProcessedJobs(self):
         """Read processed job ids"""
