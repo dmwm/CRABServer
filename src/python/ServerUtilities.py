@@ -1,5 +1,8 @@
 """
 This contains some utility methods to share between the server and the client, or by the server components themself
+IMPORTANT : SINCE THIS NEEDS TO RUN IN THE CLIENT, CODE NEEDS TO WORK
+IN BOTH PYTHON2 AND PYTHON3 WITHOUT CALLS TO FUTURIZE OR OTHER UTILITIES NOT
+PRESENT IN EARLIER CMSSW RELEASES
 """
 # this is a weird and unclear message from pylint, better to ignore it
 # pylint: disable=W0715
