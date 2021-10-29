@@ -31,7 +31,6 @@ systems = \
                    'Databases/FileMetaDataDB', 'Databases/FileMetaDataDB/Oracle',
                    'Databases/FileMetaDataDB/Oracle/FileMetaData',
                    'Databases/TaskDB', 'Databases/TaskDB/Oracle',
-                   'Databases/TaskDB/Oracle/JobGroup',
                    'Databases/TaskDB/Oracle/Task',
                    'Databases/FileTransfersDB',
                    'Databases/FileTransfersDB/Oracle/',
