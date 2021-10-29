@@ -6,13 +6,12 @@ from ast import literal_eval
 
 ## WMCore dependecies
 from WMCore.REST.Error import ExecutionError
-from WMCore.Database.CMSCouch import CouchServer
 
 ## CRAB dependencies
 from ServerUtilities import checkTaskLifetime
 from ServerUtilities import PUBLICATIONDB_STATUSES
 from ServerUtilities import NUM_DAYS_FOR_RESUBMITDRAIN
-from ServerUtilities import isCouchDBURL, getEpochFromDBTime
+from ServerUtilities import getEpochFromDBTime
 
 from CRABInterface.Utilities import CMSSitesCache, conn_handler, getDBinstance
 
@@ -62,17 +61,6 @@ class DataWorkflow(object):
                           (this should probably have a default!)
            :arg int limit: limit on the workflow age
            :return: a list of workflows"""
-        # convert the workflow age in something eatable by a couch view
-        # in practice it's convenient that the timestamp is on a fixed format: latest 1 or 3 days, latest 1 week, latest 1 month
-        # and that it's a list (probably it can be converted into it): [year, month-num, day, hh, mm, ss]
-        # this will allow to query as it's described here: http://guide.couchdb.org/draft/views.html#many
-
-        # example:
-        # return self.monitordb.conn.loadView('WMStats', 'byUser',
-        #                              options = { "startkey": user,
-        #                                          "endkey": user,
-        #                                          "limit": limit, })
-        #raise NotImplementedError
         return self.api.query(None, None, self.Task.GetTasksFromUser_sql, username=username, timestamp=timestamp)
 
     def report(self, workflow):
@@ -333,9 +321,6 @@ class DataWorkflow(object):
                     msg  = "Cannot resubmit publication."
                     msg += " Error in publication status: %s" % (publicationInfo['error'])
                     raise ExecutionError(msg)
-                if isCouchDBURL(asourl) and publicationInfo['status'].get('publication_failed', 0) == 0:
-                    msg = "There are no failed publications to resubmit."
-                    raise ExecutionError(msg)
                 ## Here we can add a check on the publication status of the documents
                 ## corresponding to the job ids in resubmitjobids and jobids. So far the
                 ## publication resubmission will resubmit all the failed publications.
@@ -468,9 +453,6 @@ class DataWorkflow(object):
                     msg  = "Cannot resubmit publication."
                     msg += " Error in publication status: %s" % (statusRes['publication']['error'])
                     raise ExecutionError(msg)
-                if isCouchDBURL(statusRes['ASOURL']) and statusRes['publication'].get('publication_failed', 0) == 0:
-                    msg = "There are no failed publications to resubmit."
-                    raise ExecutionError(msg)
                 ## Here we can add a check on the publication status of the documents
                 ## corresponding to the job ids in resubmitjobids and jobids. So far the
                 ## publication resubmission will resubmit all the failed publications.
@@ -596,45 +578,8 @@ class DataWorkflow(object):
         return [{'result': 'ok'}]
 
     def resubmitPublication(self, asourl, asodb, proxy, taskname):
-        if isCouchDBURL(asourl):
-            return self.resubmitCouchPublication(asourl, asodb, proxy, taskname)
-        else:
-            return self.resubmitOraclePublication(taskname)
 
-    def resubmitCouchPublication(self, asourl, asodb, proxy, taskname):
-        """
-        Resubmit failed publications by resetting the publication
-        status in the CouchDB documents.
-        """
-        server = CouchServer(dburl=asourl, ckey=proxy, cert=proxy)
-        try:
-            database = server.connectDatabase(asodb)
-        except Exception as ex:
-            msg = "Error while trying to connect to CouchDB: %s" % (str(ex))
-            raise Exception(msg)
-        try:
-            failedPublications = database.loadView('DBSPublisher', 'PublicationFailedByWorkflow', {'reduce': False, 'startkey': [taskname], 'endkey': [taskname, {}]})['rows']
-        except Exception as ex:
-            msg = "Error while trying to load view 'DBSPublisher.PublicationFailedByWorkflow' from CouchDB: %s" % (str(ex))
-            raise Exception(msg)
-        msg = "There are %d failed publications to resubmit: %s" % (len(failedPublications), failedPublications)
-        self.logger.info(msg)
-        for doc in failedPublications:
-            docid = doc['id']
-            if doc['key'][0] != taskname: # this should never happen...
-                msg = "Skipping document %s as it seems to correspond to another task: %s" % (docid, doc['key'][0])
-                self.logger.warning(msg)
-                continue
-            data = {'last_update': time.time(),
-                    'retry': str(datetime.datetime.now()),
-                    'publication_state': 'not_published',
-                   }
-            try:
-                database.updateDocument(docid, 'DBSPublisher', 'updateFile', data)
-                self.logger.info("updating document %s ", docid)
-            except Exception as ex:
-                self.logger.error("Error updating document %s in CouchDB: %s", docid, str(ex))
-        return
+        return self.resubmitOraclePublication(taskname)
 
     def resubmitOraclePublication(self, taskname):
         binds = {}
