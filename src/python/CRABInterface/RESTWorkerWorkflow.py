@@ -22,7 +22,6 @@ class RESTWorkerWorkflow(RESTEntity):
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
-        self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
 
     @staticmethod
     def validate(apiobj, method, api, param, safe): #pylint: disable=unused-argument

@@ -44,7 +44,6 @@ class DataWorkflow(object):
                         "EventAwareLumiBased": "events_per_job"}
 
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
-        self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
         self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
         self.transferDB = getDBinstance(config, 'FileTransfersDB', 'FileTransfers')
 
