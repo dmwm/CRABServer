@@ -36,8 +36,6 @@ class DataFileMetadata(object):
                 yield json.dumps({
                     'taskname': taskname,
                     'filetype': filetype,
-                    #TODO pandajobid should not be used. Let's wait a "quiet release" and remove it
-                    'pandajobid': row.pandajobid,
                     'jobid': row.jobid,
                      'outdataset': row.outdataset,
                      'acquisitionera': row.acquisitionera,
