@@ -1,5 +1,5 @@
 """
-Upload an archive containing all files needed to run the a to the UserFileCache (necessary for crab submit --dryrun.)
+Upload an archive containing all files needed to run the task to the Cache (necessary for crab submit --dryrun.)
 """
 import os
 import json
@@ -13,7 +13,6 @@ if sys.version_info < (3, 0):
     from urllib import urlencode
 
 from WMCore.DataStructs.LumiList import LumiList
-from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
 
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.TaskAction import TaskAction
@@ -22,7 +21,7 @@ from ServerUtilities import uploadToS3, downloadFromS3
 
 class DryRunUploader(TaskAction):
     """
-    Upload an archive containing all files needed to run the task to the UserFileCache (necessary for crab submit --dryrun.)
+    Upload an archive containing all files needed to run the task to the Cache (necessary for crab submit --dryrun.)
     """
 
     def packSandbox(self, inputFiles):
@@ -51,17 +50,9 @@ class DryRunUploader(TaskAction):
 
             self.logger.info('Uploading dry run tarball to the user file cache')
             t0 = time.time()
-            if 'S3' in kw['task']['tm_cache_url'].upper():
-                uploadToS3(crabserver=self.crabserver, filepath='dry-run-sandbox.tar.gz',
-                           objecttype='runtimefiles', taskname=kw['task']['tm_taskname'], logger=self.logger)
-                result = {'hashkey':'ok'}  # a dummy one to keep same semantics as when using UserFileCache
-                os.remove('dry-run-sandbox.tar.gz')
-            else:
-                ufc = UserFileCache(mydict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy'], 'endpoint': kw['task']['tm_cache_url']})
-                result = ufc.uploadLog('dry-run-sandbox.tar.gz')
-                os.remove('dry-run-sandbox.tar.gz')
-            if 'hashkey' not in result:
-                raise TaskWorkerException('Failed to upload dry-run-sandbox.tar.gz to the user file cache: ' + str(result))
+            uploadToS3(crabserver=self.crabserver, filepath='dry-run-sandbox.tar.gz',
+                       objecttype='runtimefiles', taskname=kw['task']['tm_taskname'], logger=self.logger)
+            os.remove('dry-run-sandbox.tar.gz')
             self.logger.info('Uploaded dry run tarball to the user file cache: %s', str(result))
             # wait until tarball is available, S3 may take a few seconds for this (ref. issue #6706 )
             t1 = time.time()
@@ -147,4 +138,3 @@ class SplittingSummary(object):
 
         with open(outname, 'wb') as f:
             json.dump(summary, f)
-
