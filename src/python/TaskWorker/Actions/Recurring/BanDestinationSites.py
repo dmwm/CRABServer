@@ -3,7 +3,7 @@ import os
 import sys
 import json
 import shutil
-import urllib2
+import urllib3
 import logging
 import traceback
 
@@ -41,7 +41,7 @@ class CRAB3BanDestinationSites(object):
     def execute(self):
         blacklistedSites = []
         try:
-            usableSites = urllib2.urlopen(self.config.Sites.DashboardURL).read()
+            usableSites = urllib3.urlopen(self.config.Sites.DashboardURL).read()
         except Exception as e:
             # If exception is got, don`t change anything and previous data will be used
             self.logger.error("Got exception in retrieving usable sites list from %s. Exception: %s",
