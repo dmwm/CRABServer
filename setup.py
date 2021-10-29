@@ -47,11 +47,6 @@ systems = \
         'python': ['TaskWorker', 'TaskWorker/Actions', 'TaskWorker/DataObjects',
                    'TaskWorker/Actions/Recurring', 'taskbuffer', 'Publisher', 'TransferInterface']
     },
-    'UserFileCache':
-    {
-        'py_modules' : ['ServerUtilities'],
-        'python': ['UserFileCache']
-    },
     'Publisher':
     {
         'py_modules': ['ServerUtilities', 'MultiProcessingLog', 'RESTInteractions', 'utils'],
@@ -60,7 +55,7 @@ systems = \
     'All':
     {
         'py_modules': [''],
-        'python': ['TaskWorker', 'CRABInterface', 'UserFileCache', 'CRABClient', 'Publisher']
+        'python': ['TaskWorker', 'CRABInterface', 'CRABClient', 'Publisher']
     }
 }
 
@@ -146,8 +141,8 @@ def define_the_build(dist, system_name, patch_x=''):
 class BuildCommand(Command):
     """Build python modules for a specific system."""
     description = \
-        "Build python modules for the specified system. The two supported systems\n" + \
-        "\t\t   at the moment are 'CRABInterface' and 'UserFileCache'. Use with --force \n" + \
+        "Build python modules for the specified system. The supported system(s)\n" + \
+        "\t\t   at the moment are 'CRABInterface' . Use with --force \n" + \
         "\t\t   to ensure a clean build of only the requested parts.\n"
     user_options = build.user_options
     user_options.append(('system=', 's', 'build the specified system (default: CRABInterface)'))
