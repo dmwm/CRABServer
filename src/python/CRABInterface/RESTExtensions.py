@@ -3,8 +3,6 @@ This module aims to contain the method specific to the REST interface.
 These are extensions which are not directly contained in WMCore.REST module
 and it shouldn't have any other dependencies a part of that and cherrypy.
 
-Currently authz_owner_match uses a WMCore.Database.CMSCouch method
-but in next versions it should be dropped, as from the CRABInterface.
 """
 from WMCore.REST.Error import MissingObject
 

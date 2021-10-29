@@ -23,10 +23,6 @@ class DataUserWorkflow(object):
                           (this should probably have a default!)
            :arg int limit: limit on the workflow age
            :return: a list of workflows"""
-        # convert the workflow age in something eatable by a couch view
-        # in practice it's convenient that the timestamp is on a fixed format: latest 1 or 3 days, latest 1 week, latest 1 month
-        # and that it's a list (probably it can be converted into it): [year, month-num, day, hh, mm, ss]
-        # this will allow to query as it's described here: http://guide.couchdb.org/draft/views.html#many
         return self.workflow.getLatests(username, timestamp)
 
     def errors(self, workflow, shortformat):
