@@ -319,7 +319,6 @@ def transform_strings(data):
     for var in ["cacheurl", "jobsw", "jobarch", "cachefilename", "asyncdest", "requestname"]:
         info[var+"_flatten"] = data[var]
 
-    # TODO: PanDA wrapper wants some sort of dictionary.
     info["addoutputfiles_flatten"] = '{}'
 
     temp_dest, dest = makeLFNPrefixes(data)
@@ -1121,7 +1120,6 @@ class DagmanCreator(TaskAction):
 
 
     def executeInternal(self, *args, **kw):
-        # FIXME: In PanDA, we provided the executable as a URL.
         # So, the filename becomes http:// -- and doesn't really work.  Hardcoding the analysis wrapper.
         #transform_location = getLocation(kw['task']['tm_transformation'], 'CAFUtilities/src/python/transformation/CMSRunAnalysis/')
         transform_location = getLocation('CMSRunAnalysis.sh', 'CRABServer/scripts/')

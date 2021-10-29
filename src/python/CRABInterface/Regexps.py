@@ -106,7 +106,7 @@ RX_SUBPOSTWORKER = re.compile(r"^(state|start|failure|success|process|lumimask)$
 RX_SUBGETWORKER = re.compile(r"jobgroup")
 
 # Schedulers
-RX_SCHEDULER = re.compile(r"^(panda|condor)$")
+RX_SCHEDULER = re.compile(r"^(condor)$")
 
 
 
