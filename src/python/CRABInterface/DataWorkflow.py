@@ -188,7 +188,6 @@ class DataWorkflow(object):
         self.api.modify(self.Task.New_sql,
                             task_name       = [workflow],
                             task_activity   = [activity],
-                            jobset_id       = [None],
                             task_status     = ['NEW'],
                             task_command    = ['SUBMIT'],
                             task_failure    = [''],

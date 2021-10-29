@@ -43,7 +43,7 @@ class RESTWorkerWorkflow(RESTEntity):
             # possible combinations to check
             # 1) taskname + status
             # 2) taskname + status + failure
-            # 3) taskname + status + resubmitted + jobsetid
+            # 3) taskname + status + resubmitted
             # 4) taskname + status == (1)
             # 5)            status + limit + getstatus + workername
             # 6) taskname + runs + lumis
