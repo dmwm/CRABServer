@@ -25,7 +25,6 @@ class RESTTask(RESTEntity):
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
-        self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
         self.logger = logging.getLogger("CRABLogger.RESTTask")
 
     def validate(self, apiobj, method, api, param, safe):

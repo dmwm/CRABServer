@@ -22,7 +22,6 @@ class RESTWorkerWorkflow(RESTEntity):
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
-        self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
 
     @staticmethod
     def validate(apiobj, method, api, param, safe): #pylint: disable=unused-argument
@@ -44,7 +43,7 @@ class RESTWorkerWorkflow(RESTEntity):
             # possible combinations to check
             # 1) taskname + status
             # 2) taskname + status + failure
-            # 3) taskname + status + resubmitted + jobsetid
+            # 3) taskname + status + resubmitted
             # 4) taskname + status == (1)
             # 5)            status + limit + getstatus + workername
             # 6) taskname + runs + lumis
@@ -118,14 +117,14 @@ def fixupTask(task):
 
     #fixup CLOBS values by calling read (only for Oracle)
     for field in ['tm_task_failure', 'tm_split_args', 'tm_outfiles', 'tm_tfile_outfiles', 'tm_edm_outfiles',
-                  'panda_resubmitted_jobs', 'tm_arguments', 'tm_scriptargs', 'tm_user_files', 'tm_arguments']:
+                  'tm_arguments', 'tm_scriptargs', 'tm_user_files', 'tm_arguments']:
         current = result[field]
         fixedCurr = current if (current is None or isinstance(current, str)) else current.read()
         result[field] = fixedCurr
 
     #liter_evaluate values
     for field in ['tm_site_whitelist', 'tm_site_blacklist', 'tm_split_args', 'tm_outfiles', 'tm_tfile_outfiles',
-                  'tm_edm_outfiles', 'panda_resubmitted_jobs', 'tm_user_infiles', 'tm_arguments', 'tm_scriptargs',
+                  'tm_edm_outfiles', 'tm_user_infiles', 'tm_arguments', 'tm_scriptargs',
                   'tm_user_files']:
         current = result[field]
         result[field] = literal_eval(current)

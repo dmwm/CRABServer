@@ -44,7 +44,6 @@ class DataWorkflow(object):
                         "EventAwareLumiBased": "events_per_job"}
 
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
-        self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
         self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
         self.transferDB = getDBinstance(config, 'FileTransfersDB', 'FileTransfers')
 
@@ -189,7 +188,6 @@ class DataWorkflow(object):
         self.api.modify(self.Task.New_sql,
                             task_name       = [workflow],
                             task_activity   = [activity],
-                            jobset_id       = [None],
                             task_status     = ['NEW'],
                             task_command    = ['SUBMIT'],
                             task_failure    = [''],
