@@ -292,8 +292,6 @@ class ASOServerJob(object):
         self.docs_in_transfer = None
         self.crab_retry = crab_retry
         self.retry_timeout = retry_timeout
-        self.couch_server = None
-        self.couch_database = None
         self.job_id = job_id
         self.dest_site = dest_site
         self.source_dir = source_dir
