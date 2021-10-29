@@ -118,14 +118,14 @@ def fixupTask(task):
 
     #fixup CLOBS values by calling read (only for Oracle)
     for field in ['tm_task_failure', 'tm_split_args', 'tm_outfiles', 'tm_tfile_outfiles', 'tm_edm_outfiles',
-                  'panda_resubmitted_jobs', 'tm_arguments', 'tm_scriptargs', 'tm_user_files', 'tm_arguments']:
+                  'tm_arguments', 'tm_scriptargs', 'tm_user_files', 'tm_arguments']:
         current = result[field]
         fixedCurr = current if (current is None or isinstance(current, str)) else current.read()
         result[field] = fixedCurr
 
     #liter_evaluate values
     for field in ['tm_site_whitelist', 'tm_site_blacklist', 'tm_split_args', 'tm_outfiles', 'tm_tfile_outfiles',
-                  'tm_edm_outfiles', 'panda_resubmitted_jobs', 'tm_user_infiles', 'tm_arguments', 'tm_scriptargs',
+                  'tm_edm_outfiles', 'tm_user_infiles', 'tm_arguments', 'tm_scriptargs',
                   'tm_user_files']:
         current = result[field]
         result[field] = literal_eval(current)
