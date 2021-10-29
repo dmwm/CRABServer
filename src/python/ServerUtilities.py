@@ -156,12 +156,6 @@ def getTestDataDirectory():
     testdirList = __file__.split(os.sep)[:-3] + ["test", "data"]
     return os.sep.join(testdirList)
 
-def isCouchDBURL(url):
-    """ Return True if the url proviced is a couchdb one
-    """
-    return 'couchdb' in url
-
-
 def truncateError(msg):
     """Truncate the error message to the first 7400 chars if needed, and add a message if we truncate it.
        See https://github.com/dmwm/CRABServer/pull/4867#commitcomment-12086393
