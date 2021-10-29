@@ -316,10 +316,6 @@ class ASOServerJob(object):
         self.db_instance = db_instance
         self.rest_url = rest_host + '/crabserver/' + db_instance + '/'  # used in logging
         self.found_doc_in_db = False
-        #I don't think it is necessary to default to asynctransfer here, we are taking care of it
-        #in dagman creator and if CRAB_ASODB is not there it means it's old task executing old code
-        #But just to make sure...
-        self.aso_db_name = self.job_ad.get('CRAB_ASODB', 'asynctransfer') or 'asynctransfer'
         try:
             if first_pj_execution():
                 self.logger.info("Will use ASO server at %s." % (self.aso_db_url))
