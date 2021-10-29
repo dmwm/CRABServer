@@ -1,7 +1,5 @@
 #!/usr/bin/python
 # TODO: This is a long term issue and to maintain ~3k lines of code in one file is hard.
-# Would be nice to separate all files and have one for Couch another for RDBMS and maybe
-# in the future someone will want to use Mongo or ES...
 # ANOTHER TODO:
 # In the code it is hard to read: workflow, taskname, reqname. All are the same....
 
@@ -90,14 +88,13 @@ from http.client import HTTPException
 
 import htcondor
 import classad
-import WMCore.Database.CMSCouch as CMSCouch
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.WMArchive.DataMap import createArchiverDoc
 
 from TaskWorker import __version__
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
-from ServerUtilities import isFailurePermanent, parseJobAd, mostCommon, TRANSFERDB_STATES, PUBLICATIONDB_STATES, encodeRequest, isCouchDBURL, oracleOutputMapping
+from ServerUtilities import isFailurePermanent, parseJobAd, mostCommon, TRANSFERDB_STATES, PUBLICATIONDB_STATES, encodeRequest, oracleOutputMapping
 from ServerUtilities import getLock, getHashLfn
 from RESTInteractions import CRABRest
 
@@ -295,8 +292,6 @@ class ASOServerJob(object):
         self.docs_in_transfer = None
         self.crab_retry = crab_retry
         self.retry_timeout = retry_timeout
-        self.couch_server = None
-        self.couch_database = None
         self.job_id = job_id
         self.dest_site = dest_site
         self.source_dir = source_dir
@@ -321,19 +316,11 @@ class ASOServerJob(object):
         self.db_instance = db_instance
         self.rest_url = rest_host + '/crabserver/' + db_instance + '/'  # used in logging
         self.found_doc_in_db = False
-        #I don't think it is necessary to default to asynctransfer here, we are taking care of it
-        #in dagman creator and if CRAB_ASODB is not there it means it's old task executing old code
-        #But just to make sure...
-        self.aso_db_name = self.job_ad.get('CRAB_ASODB', 'asynctransfer') or 'asynctransfer'
         try:
             if first_pj_execution():
                 self.logger.info("Will use ASO server at %s." % (self.aso_db_url))
-            if isCouchDBURL(self.aso_db_url):
-                self.couch_server = CMSCouch.CouchServer(dburl=self.aso_db_url, ckey=proxy, cert=proxy)
-                self.couch_database = self.couch_server.connectDatabase(self.aso_db_name, create=False)
-            else:
-                self.crabserver = CRABRest(self.rest_host, proxy, proxy, retry=2, userAgent='CRABSchedd')
-                self.crabserver.setDbInstance(self.db_instance)
+            self.crabserver = CRABRest(self.rest_host, proxy, proxy, retry=2, userAgent='CRABSchedd')
+            self.crabserver.setDbInstance(self.db_instance)
         except Exception as ex:
             msg = "Failed to connect to ASO database via CRABRest: %s" % (str(ex))
             self.logger.exception(msg)
@@ -343,7 +330,7 @@ class ASOServerJob(object):
 
     def save_docs_in_transfer(self):
         """ The function is used to save into a file the documents we are transfering so
-            we do not have to query couch to get this list every time the postjob is restarted.
+            we do not have to query the DB to get this list every time the postjob is restarted.
         """
         try:
             filename = 'transfer_info/docs_in_transfer.%s.%d.json' % (self.job_id, self.crab_retry)
@@ -713,54 +700,6 @@ class ASOServerJob(object):
                             self.logger.info(msg)
                             msg = "Previous document: %s" % (pprint.pformat(doc))
                             self.logger.debug(msg)
-                except (CMSCouch.CouchNotFoundError, NotFound):
-                    ## The document was not yet uploaded to ASO database (if this is the first job
-                    ## retry, then either the upload from the WN failed, or cmscp did a direct
-                    ## stageout and here we need to inject for publication only). In any case we
-                    ## have to inject a new document.
-                    msg = "LFN %s (id %s) is not in ASO database."
-                    msg += " Will inject a new %s request."
-                    msg = msg % (source_lfn, doc_id, ' and '.join(aso_tasks))
-                    self.logger.info(msg)
-                    if publication_msg:
-                        self.logger.info(publication_msg)
-                    input_dataset = str(self.job_ad['DESIRED_CMSDataset'])
-                    if str(self.job_ad['DESIRED_CMSDataset']).lower() == 'undefined':
-                        input_dataset = ''
-                    primary_dataset = str(self.job_ad['CRAB_PrimaryDataset'])
-                    if input_dataset:
-                        input_dataset_or_primary_dataset = input_dataset
-                    elif primary_dataset:
-                        input_dataset_or_primary_dataset = '/'+primary_dataset # Adding the '/' until we fix ASO
-                    else:
-                        input_dataset_or_primary_dataset = '/'+'NotDefined' # Adding the '/' until we fix ASO
-                    doc = {'_id': doc_id,
-                           'inputdataset': input_dataset_or_primary_dataset,
-                           'rest_host': str(self.job_ad['CRAB_RestHost']),
-                           'rest_uri': str('/crabserver/'+self.job_ad['CRAB_DbInstance']),
-                           'lfn': source_lfn,
-                           'source_lfn': source_lfn,
-                           'destination_lfn': dest_lfn,
-                           'checksums': checksums,
-                           'user': str(self.job_ad['CRAB_UserHN']),
-                           'group': group,
-                           'role': role,
-                           'dbs_url': str(self.job_ad['CRAB_DBSURL']),
-                           'workflow': self.reqname,
-                           'jobid': self.job_id,
-                           'publication_state': 'not_published',
-                           'publication_retry_count': [],
-                           'type': file_type,
-                          }
-                    ## TODO: We do the following, only because that's what ASO does when a file has
-                    ## been successfully transferred. But this modified LFN makes no sence when it
-                    ## starts with /store/temp/user/, because the modified LFN is then
-                    ## /store/user/<username>.<hash>/bla/blabla, i.e. it contains the <hash>, which
-                    ## is never part of a destination LFN, but only of temp source LFNs.
-                    ## Once ASO uses the source_lfn and the destination_lfn instead of only the lfn,
-                    ## this should not be needed anymore.
-                    if not needs_transfer:
-                        doc['lfn'] = source_lfn.replace('/store/temp', '/store', 1)
                 except Exception as ex:
                     msg = "Error loading document from ASO database: %s" % (str(ex))
                     try:
@@ -798,169 +737,162 @@ class ASOServerJob(object):
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def getDocByID(self, doc_id):
-        if not isCouchDBURL(self.aso_db_url):
-            docInfo = self.crabserver.get(api='fileusertransfers', data=encodeRequest({'subresource': 'getById', "id": doc_id}))
-            if docInfo and len(docInfo[0]['result']) == 1:
-                # Means that we have already a document in database!
-                docInfo = oracleOutputMapping(docInfo)
-                # Just to be 100% sure not to break after the mapping been added
-                if not docInfo:
-                    self.found_doc_in_db = False
-                    raise NotFound('Document not found in database')
-                # transfer_state and publication_state is a number in database. Lets change
-                # it to lowercase until we will end up support for CouchDB.
-                docInfo[0]['transfer_state'] = TRANSFERDB_STATES[docInfo[0]['transfer_state']].lower()
-                docInfo[0]['publication_state'] = PUBLICATIONDB_STATES[docInfo[0]['publication_state']].lower()
-                # Also change id to doc_id
-                docInfo[0]['job_id'] = docInfo[0]['id']
-                self.found_doc_in_db = True  # This is needed for further if there is a need to update doc info in DB
-                return docInfo[0]
-            else:
+        docInfo = self.crabserver.get(api='fileusertransfers', data=encodeRequest({'subresource': 'getById', "id": doc_id}))
+        if docInfo and len(docInfo[0]['result']) == 1:
+            # Means that we have already a document in database!
+            docInfo = oracleOutputMapping(docInfo)
+            # Just to be 100% sure not to break after the mapping been added
+            if not docInfo:
                 self.found_doc_in_db = False
-                raise NotFound('Document not found in database!')
+                raise NotFound('Document not found in database')
+            # transfer_state and publication_state is a number in database.
+            docInfo[0]['transfer_state'] = TRANSFERDB_STATES[docInfo[0]['transfer_state']]
+            docInfo[0]['publication_state'] = PUBLICATIONDB_STATES[docInfo[0]['publication_state']]
+            # Also change id to doc_id
+            docInfo[0]['job_id'] = docInfo[0]['id']
+            self.found_doc_in_db = True  # This is needed for further if there is a need to update doc info in DB
+            return docInfo[0]
         else:
-            return self.couch_database.document(doc_id)
+            self.found_doc_in_db = False
+            raise NotFound('Document not found in database!')
 
     def updateOrInsertDoc(self, doc, toTransfer):
         """"""
         returnMsg = {}
-        if not isCouchDBURL(self.aso_db_url):
-            if not self.found_doc_in_db:
-                # This means that it was not founded in DB and we will have to insert new doc
-                newDoc = {'id': doc['_id'],
-                          'username': doc['user'],
-                          'taskname': doc['workflow'],
-                          'start_time': self.aso_start_timestamp,
-                          'destination': doc['destination'],
-                          'destination_lfn': doc['destination_lfn'],
-                          'source': doc['source'],
-                          'source_lfn': doc['source_lfn'],
-                          'filesize': doc['size'],
-                          'publish': doc['publish'],
-                          'transfer_state': doc['state'].upper(),
-                          'publication_state': 'NEW' if doc['publish'] else 'NOT_REQUIRED',
-                          'job_id': doc['jobid'],
-                          'job_retry_count': doc['job_retry_count'],
-                          'type': doc['type'],
-                          'rest_host': doc['rest_host'],
-                          'rest_uri': doc['rest_uri']}
-                try:
-                    self.crabserver.put(api='fileusertransfers', data=encodeRequest(newDoc))
-                except HTTPException as hte:
-                    msg = "Error uploading document to database."
-                    msg += " Transfer submission failed."
-                    msg += "\n%s" % (str(hte.headers))
-                    returnMsg['error'] = msg
-                updateDoc={'subresource':'updateTransfers', 'list_of_ids':[doc['_id']]}
-                updateDoc['list_of_transfer_state'] = [newDoc['transfer_state']]
-                # make sure that asoworker field in transfersdb is always filled, since
-                # otherwise whichever Publisher process looks first for things to do, grabs them
-                # https://github.com/dmwm/CRABServer/blob/8012e1297759bab620d89c8cb253f1832b4eb466/src/python/Databases/FileTransfersDB/Oracle/FileTransfers/FileTransfers.py#L27-L33
-                # but since PUT API ignores an asoworker argument when inserting
-                # https://github.com/dmwm/CRABServer/blob/43f6377447922d46353072e86d960e3c78967a17/src/python/CRABInterface/RESTFileUserTransfers.py#L122-L125
-                # we need to update the record after insetion with a POST, which requires list of ids and states
-                # https://github.com/dmwm/CRABServer/blob/43f6377447922d46353072e86d960e3c78967a17/src/python/CRABInterface/RESTFileTransfers.py#L131-L133
-                if os.path.exists('USE_NEW_PUBLISHER'):
-                    self.logger.info("USE_NEW_PUBLISHER: set asoworker=schedd in transferdb")
-                    updateDoc['asoworker'] = 'schedd'
-                else:
-                    self.logger.info("OLD Publisher: set asoworker=asoless in transferdb")
-                    updateDoc['asoworker'] = 'asoless'
-                try:
-                    self.crabserver.post(api='filetransfers', data=encodeRequest(updateDoc))
-                except HTTPException as hte:
-                    msg = "Error uploading document to database."
-                    msg += " Transfer submission failed."
-                    msg += "\n%s" % (str(hte.headers))
-                    returnMsg['error'] = msg
+        if not self.found_doc_in_db:
+            # This means that it was not founded in DB and we will have to insert new doc
+            newDoc = {'id': doc['_id'],
+                      'username': doc['user'],
+                      'taskname': doc['workflow'],
+                      'start_time': self.aso_start_timestamp,
+                      'destination': doc['destination'],
+                      'destination_lfn': doc['destination_lfn'],
+                      'source': doc['source'],
+                      'source_lfn': doc['source_lfn'],
+                      'filesize': doc['size'],
+                      'publish': doc['publish'],
+                      'transfer_state': doc['state'].upper(),
+                      'publication_state': 'NEW' if doc['publish'] else 'NOT_REQUIRED',
+                      'job_id': doc['jobid'],
+                      'job_retry_count': doc['job_retry_count'],
+                      'type': doc['type'],
+                      'rest_host': doc['rest_host'],
+                      'rest_uri': doc['rest_uri']}
+            try:
+                self.crabserver.put(api='fileusertransfers', data=encodeRequest(newDoc))
+            except HTTPException as hte:
+                msg = "Error uploading document to database."
+                msg += " Transfer submission failed."
+                msg += "\n%s" % (str(hte.headers))
+                returnMsg['error'] = msg
+            updateDoc={'subresource':'updateTransfers', 'list_of_ids':[doc['_id']]}
+            updateDoc['list_of_transfer_state'] = [newDoc['transfer_state']]
+            # make sure that asoworker field in transfersdb is always filled, since
+            # otherwise whichever Publisher process looks first for things to do, grabs them
+            # https://github.com/dmwm/CRABServer/blob/8012e1297759bab620d89c8cb253f1832b4eb466/src/python/Databases/FileTransfersDB/Oracle/FileTransfers/FileTransfers.py#L27-L33
+            # but since PUT API ignores an asoworker argument when inserting
+            # https://github.com/dmwm/CRABServer/blob/43f6377447922d46353072e86d960e3c78967a17/src/python/CRABInterface/RESTFileUserTransfers.py#L122-L125
+            # we need to update the record after insetion with a POST, which requires list of ids and states
+            # https://github.com/dmwm/CRABServer/blob/43f6377447922d46353072e86d960e3c78967a17/src/python/CRABInterface/RESTFileTransfers.py#L131-L133
+            if os.path.exists('USE_NEW_PUBLISHER'):
+                self.logger.info("USE_NEW_PUBLISHER: set asoworker=schedd in transferdb")
+                updateDoc['asoworker'] = 'schedd'
             else:
-                # This means it is in database and we need only update specific fields.
-                newDoc = {'id': doc['id'],
-                          'username': doc['username'],
-                          'taskname': doc['taskname'],
-                          'start_time': self.aso_start_timestamp,
-                          'source': doc['source'],
-                          'source_lfn': doc['source_lfn'],
-                          'filesize': doc['filesize'],
-                          'transfer_state': doc.get('state', 'NEW').upper(),
-                          'publish': doc['publish'],
-                          'publication_state': 'NEW' if doc['publish'] else 'NOT_REQUIRED',
-                          'job_id': doc['jobid'],
-                          'job_retry_count': doc['job_retry_count'],
-                          'transfer_retry_count': 0,
-                          'subresource': 'updateDoc'}
-                try:
-                    self.crabserver.post(api='fileusertransfers', data=encodeRequest(newDoc))
-                except HTTPException as hte:
-                    msg = "Error updating document in database."
-                    msg += " Transfer submission failed."
-                    msg += "\n%s" % (str(hte.headers))
-                    returnMsg['error'] = msg
-                # Previous post resets asoworker to NULL. This is not good, so we set it again
-                # using a different API to update the transfersDB record
-                updateDoc = {}
-                updateDoc['list_of_ids'] = [newDoc['id']]
-                updateDoc['list_of_transfer_state'] = [newDoc['transfer_state']]
-                updateDoc['subresource'] = 'updateTransfers'
-                if os.path.exists('USE_NEW_PUBLISHER'):
-                    self.logger.info("USE_NEW_PUBLISHER: set asoworker=schedd in transferdb")
-                    updateDoc['asoworker'] = 'schedd'
-                else:
-                    self.logger.info("OLD Publisher: set asoworker=asoless in transferdb")
-                    updateDoc['asoworker'] = 'asoless'
-                try:
-                    self.crabserver.post(api='filetransfers', data=encodeRequest(updateDoc))
-                except HTTPException as hte:
-                    msg = "Error uploading document to database."
-                    msg += " Transfer submission failed."
-                    msg += "\n%s" % (str(hte.headers))
-                    returnMsg['error'] = msg
-            if toTransfer:
-                if not 'publishname' in newDoc:
-                    newDoc['publishname'] = self.publishname
-                if not 'checksums' in newDoc:
-                    newDoc['checksums'] = doc['checksums']
-                if not 'destination_lfn' in newDoc:
-                    newDoc['destination_lfn'] = doc['destination_lfn']
-                if not 'destination' in newDoc:
-                    newDoc['destination'] = doc['destination']
-                with open('task_process/transfers.txt', 'a+') as transfers_file:
-                    transfer_dump = json.dumps(newDoc)
-                    transfers_file.write(transfer_dump+"\n")
-                if not os.path.exists('task_process/RestInfoForFileTransfers.json'):
-                #if not os.path.exists('task_process/rest_filetransfers.txt'):
-                    restInfo = {'host':self.rest_host,
-                                'dbInstance': self.db_instance,
-                                'proxyfile': self.proxy}
-                    with open('task_process/RestInfoForFileTransfers.json', 'w') as fp:
-                        json.dump(restInfo, fp)
-                    #with open('task_process/rest_filetransfers.txt', 'w+') as rest_file:
-                    #    rest_file.write(self.rest_url + '\n')
-                    #    rest_file.write(self.proxy)
-            else:
-                if not 'publishname' in newDoc:
-                    newDoc['publishname'] = self.publishname
-                if not 'checksums' in newDoc:
-                    newDoc['checksums'] = doc['checksums']
-                if not 'destination_lfn' in newDoc:
-                    newDoc['destination_lfn'] = doc['destination_lfn']
-                if not 'destination' in newDoc:
-                    newDoc['destination'] = doc['destination']
-                with open('task_process/transfers_direct.txt', 'a+') as transfers_file:
-                    transfer_dump = json.dumps(newDoc)
-                    transfers_file.write(transfer_dump+"\n")
-                if not os.path.exists('task_process/RestInfoForFileTransfers.json'):
-                #if not os.path.exists('task_process/rest_filetransfers.txt'):
-                    restInfo = {'host':self.rest_host,
-                                'dbInstance': self.db_instance,
-                                'proxyfile': self.proxy}
-                    with open('task_process/RestInfoForFileTransfers.json','w') as fp:
-                        json.dump(restInfo, fp)
-                    #with open('task_process/rest_filetransfers.txt', 'w+') as rest_file:
-                    #    rest_file.write(self.rest_host + self.rest_url + '\n')
-                    #    rest_file.write(self.proxy)
+                self.logger.info("OLD Publisher: set asoworker=asoless in transferdb")
+                updateDoc['asoworker'] = 'asoless'
+            try:
+                self.crabserver.post(api='filetransfers', data=encodeRequest(updateDoc))
+            except HTTPException as hte:
+                msg = "Error uploading document to database."
+                msg += " Transfer submission failed."
+                msg += "\n%s" % (str(hte.headers))
+                returnMsg['error'] = msg
         else:
-            returnMsg = self.couch_database.commitOne(doc)[0]
+            # This means it is in database and we need only update specific fields.
+            newDoc = {'id': doc['id'],
+                      'username': doc['username'],
+                      'taskname': doc['taskname'],
+                      'start_time': self.aso_start_timestamp,
+                      'source': doc['source'],
+                      'source_lfn': doc['source_lfn'],
+                      'filesize': doc['filesize'],
+                      'transfer_state': doc.get('state', 'NEW').upper(),
+                      'publish': doc['publish'],
+                      'publication_state': 'NEW' if doc['publish'] else 'NOT_REQUIRED',
+                      'job_id': doc['jobid'],
+                      'job_retry_count': doc['job_retry_count'],
+                      'transfer_retry_count': 0,
+                      'subresource': 'updateDoc'}
+            try:
+                self.crabserver.post(api='fileusertransfers', data=encodeRequest(newDoc))
+            except HTTPException as hte:
+                msg = "Error updating document in database."
+                msg += " Transfer submission failed."
+                msg += "\n%s" % (str(hte.headers))
+                returnMsg['error'] = msg
+            # Previous post resets asoworker to NULL. This is not good, so we set it again
+            # using a different API to update the transfersDB record
+            updateDoc = {}
+            updateDoc['list_of_ids'] = [newDoc['id']]
+            updateDoc['list_of_transfer_state'] = [newDoc['transfer_state']]
+            updateDoc['subresource'] = 'updateTransfers'
+            if os.path.exists('USE_NEW_PUBLISHER'):
+                self.logger.info("USE_NEW_PUBLISHER: set asoworker=schedd in transferdb")
+                updateDoc['asoworker'] = 'schedd'
+            else:
+                self.logger.info("OLD Publisher: set asoworker=asoless in transferdb")
+                updateDoc['asoworker'] = 'asoless'
+            try:
+                self.crabserver.post(api='filetransfers', data=encodeRequest(updateDoc))
+            except HTTPException as hte:
+                msg = "Error uploading document to database."
+                msg += " Transfer submission failed."
+                msg += "\n%s" % (str(hte.headers))
+                returnMsg['error'] = msg
+        if toTransfer:
+            if not 'publishname' in newDoc:
+                newDoc['publishname'] = self.publishname
+            if not 'checksums' in newDoc:
+                newDoc['checksums'] = doc['checksums']
+            if not 'destination_lfn' in newDoc:
+                newDoc['destination_lfn'] = doc['destination_lfn']
+            if not 'destination' in newDoc:
+                newDoc['destination'] = doc['destination']
+            with open('task_process/transfers.txt', 'a+') as transfers_file:
+                transfer_dump = json.dumps(newDoc)
+                transfers_file.write(transfer_dump+"\n")
+            if not os.path.exists('task_process/RestInfoForFileTransfers.json'):
+            #if not os.path.exists('task_process/rest_filetransfers.txt'):
+                restInfo = {'host':self.rest_host,
+                            'dbInstance': self.db_instance,
+                            'proxyfile': self.proxy}
+                with open('task_process/RestInfoForFileTransfers.json', 'w') as fp:
+                    json.dump(restInfo, fp)
+                #with open('task_process/rest_filetransfers.txt', 'w+') as rest_file:
+                #    rest_file.write(self.rest_url + '\n')
+                #    rest_file.write(self.proxy)
+        else:
+            if not 'publishname' in newDoc:
+                newDoc['publishname'] = self.publishname
+            if not 'checksums' in newDoc:
+                newDoc['checksums'] = doc['checksums']
+            if not 'destination_lfn' in newDoc:
+                newDoc['destination_lfn'] = doc['destination_lfn']
+            if not 'destination' in newDoc:
+                newDoc['destination'] = doc['destination']
+            with open('task_process/transfers_direct.txt', 'a+') as transfers_file:
+                transfer_dump = json.dumps(newDoc)
+                transfers_file.write(transfer_dump+"\n")
+            if not os.path.exists('task_process/RestInfoForFileTransfers.json'):
+            #if not os.path.exists('task_process/rest_filetransfers.txt'):
+                restInfo = {'host':self.rest_host,
+                            'dbInstance': self.db_instance,
+                            'proxyfile': self.proxy}
+                with open('task_process/RestInfoForFileTransfers.json','w') as fp:
+                    json.dump(restInfo, fp)
+                #with open('task_process/rest_filetransfers.txt', 'w+') as rest_file:
+                #    rest_file.write(self.rest_host + self.rest_url + '\n')
+                #    rest_file.write(self.proxy)
         return returnMsg
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -983,9 +915,7 @@ class ASOServerJob(object):
         """
         Retrieve the status of all transfers from the cached file 'aso_status.json'
         or by querying an ASO database view if the file is more than 5 minutes old
-        or if we injected a document after the file was last updated. Calls to
-        get_transfers_statuses_fallback() have been removed to not generate load
-        on couch.
+        or if we injected a document after the file was last updated.
         """
         statuses = []
         query_view = False
@@ -1024,127 +954,57 @@ class ASOServerJob(object):
                     self.logger.debug("Changing query_view back to true")
                     query_view = True
                     break
-        if isCouchDBURL(self.aso_db_url):
-            if query_view:
-                query = {'reduce': False, 'key': self.reqname, 'stale': 'update_after'}
-                self.logger.debug("Querying ASO view.")
-                try:
-                    view_results = self.couch_database.loadView('AsyncTransfer', 'JobsIdsStatesByWorkflow', query)['rows']
-                    view_results_dict = {}
-                    for view_result in view_results:
-                        view_results_dict[view_result['id']] = view_result
-                except:
-                    msg = "Error while querying the NoSQL (Couch) database."
-                    self.logger.exception(msg)
-                    self.build_failed_cache()
-                    raise TransferCacheLoadError(msg)
-                aso_info = {
-                    "query_timestamp": time.time(),
-                    "query_succeded": True,
-                    "query_jobid": self.job_id,
-                    "results": view_results_dict,
-                }
-                tmp_fname = "aso_status.%d.json" % (os.getpid())
-                with open(tmp_fname, 'w') as fd:
-                    json.dump(aso_info, fd)
-                os.rename(tmp_fname, "aso_status.json")
-            else:
-                self.logger.debug("Using cached ASO results.")
-            #Is this ever happening?
-            if not aso_info:
-                raise TransferCacheLoadError("Unexpected error. aso_info is not set. Deferring postjob")
-            for doc_info in self.docs_in_transfer:
-                doc_id = doc_info['doc_id']
-                if doc_id not in aso_info.get("results", {}):
-                    ## This is a legitimate use case. It can happen if the document has just been injected
-                    ## (e.g.: transfer injected in the PJ and not in the WN). In this case the cache does not
-                    ## have the document yet, so we defer the postjob.
-                    msg = "Document with id %s not found in the transfer cache." % doc_id
-                    raise TransferCacheLoadError(msg)
-                ## Use the start_time parameter to check whether the transfer state in aso_info
-                ## corresponds to the document we have to monitor. The reason why we have to do
-                ## this check is because the information in aso_info might have been obtained by
-                ## querying an ASO CouchDB view, which can return stale results. We don't mind
-                ## having stale results as long as they correspond to the documents we have to
-                ## monitor (the worst that can happen is that we will wait more than necessary
-                ## to see the transfers in a terminal state). But it could be that some results
-                ## returned by the view correspond to documents injected in a previous job retry
-                ## (or restart), and this is not what we want. If the start_time in aso_info is
-                ## not the same as in the document (we saved the start_time from the documents
-                ## in self.docs_in_transfer), then the view result corresponds to a previous job
-                ## retry. In that case, return transfer state = 'unknown'.
-                transfer_status = aso_info['results'][doc_id]['value']['state']
-                if 'start_time' in aso_info['results'][doc_id]['value']:
-                    start_time = aso_info['results'][doc_id]['value']['start_time']
-                    if start_time == doc_info['start_time']:
-                        statuses.append(transfer_status)
-                    else:
-                        msg = "Got stale transfer state '%s' for document %s" % (transfer_status, doc_id)
-                        msg += " (got start_time = %s, while in the document is start_time = %s)." % (start_time, doc_info['start_time'])
-                        msg += " Transfer state may correspond to a document from a previous job retry."
-                        msg += " Returning transfer state = 'unknown'."
-                        self.logger.info(msg)
-                        statuses.append('unknown')
-                else:
-                    statuses.append(transfer_status)
-        elif not isCouchDBURL(self.aso_db_url):
-            if query_view:
-                self.logger.debug("Querying ASO RDBMS database.")
-                try:
-                    view_results = self.crabserver.get(api='fileusertransfers', data=encodeRequest({'subresource': 'getTransferStatus',
-                                                                                                          'username': str(self.job_ad['CRAB_UserHN']),
-                                                                                                          'taskname': self.reqname}))
-                    view_results_dict = oracleOutputMapping(view_results, 'id')
-                    # There is so much noise values in aso_status.json file. So lets provide a new file structure.
-                    # We will not run ever for one task which can use also RDBMS and CouchDB
-                    # New Structure for view_results_dict is
-                    # {"DocumentHASHID": [{"id": "DocumentHASHID", "start_time": timestamp, "transfer_state": NUMBER!, "last_update": timestamp}]}
-                    for document in view_results_dict:
-                        view_results_dict[document][0]['state'] = TRANSFERDB_STATES[view_results_dict[document][0]['transfer_state']].lower()
-                except:
-                    msg = "Error while querying the RDBMS (Oracle) database."
-                    self.logger.exception(msg)
-                    self.build_failed_cache()
-                    raise TransferCacheLoadError(msg)
-                aso_info = {
-                    "query_timestamp": time.time(),
-                    "query_succeded": True,
-                    "query_jobid": self.job_id,
-                    "results": view_results_dict,
-                }
-                tmp_fname = "aso_status.%d.json" % (os.getpid())
-                with open(tmp_fname, 'w') as fd:
-                    json.dump(aso_info, fd)
-                os.rename(tmp_fname, "aso_status.json")
-            else:
-                self.logger.debug("Using cached ASO results.")
-            if not aso_info:
-                raise TransferCacheLoadError("Unexpected error. aso_info is not set. Deferring postjob")
-            for doc_info in self.docs_in_transfer:
-                doc_id = doc_info['doc_id']
-                if doc_id not in aso_info.get("results", {}):
-                    msg = "Document with id %s not found in the transfer cache. Deferring PJ." % doc_id
-                    raise TransferCacheLoadError(msg)                ## Not checking timestamps for oracle since we are not injecting from WN
-                ## and it cannot happen that condor restarts screw up things.
-                transfer_status = aso_info['results'][doc_id][0]['state']
-                statuses.append(transfer_status)
+        if query_view:
+            self.logger.debug("Querying ASO RDBMS database.")
+            try:
+                view_results = self.crabserver.get(api='fileusertransfers', data=encodeRequest({'subresource': 'getTransferStatus',
+                                                                                                      'username': str(self.job_ad['CRAB_UserHN']),
+                                                                                                      'taskname': self.reqname}))
+                view_results_dict = oracleOutputMapping(view_results, 'id')
+                # There is so much noise values in aso_status.json file. So lets provide a new file structure.
+                # We will not run ever for one task which can use also RDBMS
+                # New Structure for view_results_dict is
+                # {"DocumentHASHID": [{"id": "DocumentHASHID", "start_time": timestamp, "transfer_state": NUMBER!, "last_update": timestamp}]}
+                for document in view_results_dict:
+                    view_results_dict[document][0]['state'] = TRANSFERDB_STATES[view_results_dict[document][0]['transfer_state']].lower()
+            except:
+                msg = "Error while querying the RDBMS (Oracle) database."
+                self.logger.exception(msg)
+                self.build_failed_cache()
+                raise TransferCacheLoadError(msg)
+            aso_info = {
+                "query_timestamp": time.time(),
+                "query_succeded": True,
+                "query_jobid": self.job_id,
+                "results": view_results_dict,
+            }
+            tmp_fname = "aso_status.%d.json" % (os.getpid())
+            with open(tmp_fname, 'w') as fd:
+                json.dump(aso_info, fd)
+            os.rename(tmp_fname, "aso_status.json")
+        else:
+            self.logger.debug("Using cached ASO results.")
+        if not aso_info:
+            raise TransferCacheLoadError("Unexpected error. aso_info is not set. Deferring postjob")
+        for doc_info in self.docs_in_transfer:
+            doc_id = doc_info['doc_id']
+            if doc_id not in aso_info.get("results", {}):
+                msg = "Document with id %s not found in the transfer cache. Deferring PJ." % doc_id
+                raise TransferCacheLoadError(msg)                ## Not checking timestamps for oracle since we are not injecting from WN
+            ## and it cannot happen that condor restarts screw up things.
+            transfer_status = aso_info['results'][doc_id][0]['state']
+            statuses.append(transfer_status)
         return statuses
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def load_transfer_document(self, doc_id):
         """
-        Wrapper to load a document from CouchDB or RDBMS, catching exceptions.
+        Wrapper to load a document from RDBMS, catching exceptions.
         """
         doc = None
         try:
-            if not isCouchDBURL(self.aso_db_url):
-                doc = self.getDocByID(doc_id)
-            else:
-                doc = self.couch_database.document(doc_id)
-        except CMSCouch.CouchError as cee:
-            msg = "Error retrieving document from ASO database for ID %s: %s" % (doc_id, str(cee))
-            self.logger.error(msg)
+            doc = self.getDocByID(doc_id)
         except HTTPException as hte:
             msg = "Error retrieving document from ASO database for ID %s: %s" % (doc_id, str(hte.headers))
             self.logger.error(msg)
@@ -1169,10 +1029,7 @@ class ASOServerJob(object):
         for doc_info in self.docs_in_transfer:
             doc_id = doc_info['doc_id']
             doc = self.load_transfer_document(doc_id)
-            if isCouchDBURL(self.aso_db_url):
-                status = doc['state'] if doc else 'unknown'
-            else:
-                status = doc['transfer_state'] if doc else 'unknown'
+            status = doc['transfer_state'] if doc else 'unknown'
             statuses.append(status)
         return statuses
 
@@ -1223,57 +1080,33 @@ class ASOServerJob(object):
                 doc['state'] = 'killed'
                 doc['end_time'] = now
                 username = doc['username']
-                if isCouchDBURL(self.aso_db_url):
-                    # In case it is still CouchDB leave this in this loop and for RDBMS add
-                    # everything to a list and update this with one call for multiple files.
-                    # One bad thing that we are not saving failure reason. It should not be a big deal
-                    # to implement, but I leave it so far to discuss how it is best to do it.
-                    # I think best is to show the last reason and not all.
-                    if reason:
-                        if doc['failure_reason']:
-                            if isinstance(doc['failure_reason'], list):
-                                doc['failure_reason'].append(reason)
-                            elif isinstance(doc['failure_reason'], str):
-                                doc['failure_reason'] = [doc['failure_reason'], reason]
-                        else:
-                            doc['failure_reason'] = reason
-                    res = self.couch_database.commitOne(doc)[0]
-                    if 'error' in res:
-                        msg = "Error cancelling ASO transfer %s: %s" % (doc_id, res)
-                        self.logger.warning(msg)
-                        if retry == max_retries:
-                            not_cancelled.append((doc_id, msg))
-                    else:
-                        cancelled.append(doc_id)
-                else:
-                    transfersToKill.append(doc_id)
+                transfersToKill.append(doc_id)
 
-            if not isCouchDBURL(self.aso_db_url):
-                # Now this means that we have a list of ids which needs to be killed
-                # First try to kill ALL in one API call
-                newDoc = {'listOfIds': transfersToKill,
-                          'publish' : 0,
-                          'username': username,
-                          'subresource': 'killTransfersById'}
-                try:
-                    killedFiles = self.crabserver.post(api='fileusertransfers', data=encodeRequest(newDoc, ['listOfIds']))
-                    not_cancelled = killedFiles[0]['result'][0]['failedKill']
-                    cancelled = killedFiles[0]['result'][0]['killed']
-                    break  # no need to retry
-                except HTTPException as hte:
-                    msg = "Error setting KILL status in database."
-                    msg += " Transfer KILL failed."
-                    msg += "\n%s" % (str(hte.headers))
-                    self.logger.warning(msg)
-                    not_cancelled = transfersToKill
-                    cancelled = []
-                except Exception as ex:
-                    msg = "Unknown error setting KILL status in database."
-                    msg += " Transfer KILL failed."
-                    msg += "\n%s" % (str(ex))
-                    self.logger.error(msg)
-                    not_cancelled = transfersToKill
-                    cancelled = []
+            # Now this means that we have a list of ids which needs to be killed
+            # First try to kill ALL in one API call
+            newDoc = {'listOfIds': transfersToKill,
+                      'publish' : 0,
+                      'username': username,
+                      'subresource': 'killTransfersById'}
+            try:
+                killedFiles = self.crabserver.post(api='fileusertransfers', data=encodeRequest(newDoc, ['listOfIds']))
+                not_cancelled = killedFiles[0]['result'][0]['failedKill']
+                cancelled = killedFiles[0]['result'][0]['killed']
+                break  # no need to retry
+            except HTTPException as hte:
+                msg = "Error setting KILL status in database."
+                msg += " Transfer KILL failed."
+                msg += "\n%s" % (str(hte.headers))
+                self.logger.warning(msg)
+                not_cancelled = transfersToKill
+                cancelled = []
+            except Exception as ex:
+                msg = "Unknown error setting KILL status in database."
+                msg += " Transfer KILL failed."
+                msg += "\n%s" % (str(ex))
+                self.logger.error(msg)
+                not_cancelled = transfersToKill
+                cancelled = []
 
 
             # Ok Now lets do a double check on doc_ids which failed to update one by one.
