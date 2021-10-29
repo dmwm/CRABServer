@@ -203,6 +203,7 @@ def makeLFNPrefixes(task):
     if 'tm_user_role' in task and task['tm_user_role']:
         hash_input += "," + task['tm_user_role']
     lfn = task['tm_output_lfn']
+    hash_input = hash_input.encode('utf-8')
     pset_hash = hashlib.sha1(hash_input).hexdigest()
     user = task['tm_username']
     tmp_user = "%s.%s" % (user, pset_hash)
