@@ -700,6 +700,55 @@ class ASOServerJob(object):
                             self.logger.info(msg)
                             msg = "Previous document: %s" % (pprint.pformat(doc))
                             self.logger.debug(msg)
+
+                except (NotFound):
+                    ## The document was not yet uploaded to ASO database (if this is the first job
+                    ## retry, then either the upload from the WN failed, or cmscp did a direct
+                    ## stageout and here we need to inject for publication only). In any case we
+                    ## have to inject a new document.
+                    msg = "LFN %s (id %s) is not in ASO database."
+                    msg += " Will inject a new %s request."
+                    msg = msg % (source_lfn, doc_id, ' and '.join(aso_tasks))
+                    self.logger.info(msg)
+                    if publication_msg:
+                        self.logger.info(publication_msg)
+                    input_dataset = str(self.job_ad['DESIRED_CMSDataset'])
+                    if str(self.job_ad['DESIRED_CMSDataset']).lower() == 'undefined':
+                        input_dataset = ''
+                    primary_dataset = str(self.job_ad['CRAB_PrimaryDataset'])
+                    if input_dataset:
+                        input_dataset_or_primary_dataset = input_dataset
+                    elif primary_dataset:
+                        input_dataset_or_primary_dataset = '/'+primary_dataset # Adding the '/' until we fix ASO
+                    else:
+                        input_dataset_or_primary_dataset = '/'+'NotDefined' # Adding the '/' until we fix ASO
+                    doc = {'_id': doc_id,
+                           'inputdataset': input_dataset_or_primary_dataset,
+                           'rest_host': str(self.job_ad['CRAB_RestHost']),
+                           'rest_uri': str('/crabserver/'+self.job_ad['CRAB_DbInstance']),
+                           'lfn': source_lfn,
+                           'source_lfn': source_lfn,
+                           'destination_lfn': dest_lfn,
+                           'checksums': checksums,
+                           'user': str(self.job_ad['CRAB_UserHN']),
+                           'group': group,
+                           'role': role,
+                           'dbs_url': str(self.job_ad['CRAB_DBSURL']),
+                           'workflow': self.reqname,
+                           'jobid': self.job_id,
+                           'publication_state': 'not_published',
+                           'publication_retry_count': [],
+                           'type': file_type,
+                          }
+                    ## TODO: We do the following, only because that's what ASO does when a file has
+                    ## been successfully transferred. But this modified LFN makes no sence when it
+                    ## starts with /store/temp/user/, because the modified LFN is then
+                    ## /store/user/<username>.<hash>/bla/blabla, i.e. it contains the <hash>, which
+                    ## is never part of a destination LFN, but only of temp source LFNs.
+                    ## Once ASO uses the source_lfn and the destination_lfn instead of only the lfn,
+                    ## this should not be needed anymore.
+                    if not needs_transfer:
+                        doc['lfn'] = source_lfn.replace('/store/temp', '/store', 1)
                 except Exception as ex:
                     msg = "Error loading document from ASO database: %s" % (str(ex))
                     try:
