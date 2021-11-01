@@ -213,7 +213,6 @@ class DataWorkflow(object):
                             edm_outfiles    = [dbSerializer(edmoutfiles)],
                             job_type        = [jobtype],
                             arguments       = [dbSerializer(arguments)],
-                            resubmitted_jobs= [dbSerializer([])],
                             save_logs       = ['T' if savelogsflag else 'F'],
                             user_infiles    = [dbSerializer(adduserfiles)],
                             maxjobruntime   = [maxjobruntime],

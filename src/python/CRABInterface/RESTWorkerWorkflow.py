@@ -10,7 +10,7 @@ from ServerUtilities import getEpochFromDBTime
 from CRABInterface.Utilities import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import (RX_TASKNAME, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_SUBPOSTWORKER,
-                                  RX_SUBGETWORKER, RX_JOBID)
+                                  RX_JOBID)
 
 # external dependecies here
 from ast import literal_eval
@@ -52,7 +52,6 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
             validate_str("getstatus", param, safe, RX_STATUS, optional=True)
             validate_num("limit", param, safe, optional=True)
-            validate_str("subresource", param, safe, RX_SUBGETWORKER, optional=True)
             # possible combinations to check
             # 1) workername + getstatus + limit
             # 2) subresource + subjobdef + subuser
@@ -75,7 +74,7 @@ class RESTWorkerWorkflow(RESTEntity):
                                  "failure": [failure], "tm_taskname": [workflow]}},
                   #Used in DagmanSubmitter?
                      "success": {"args": (self.Task.SetInjectedTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
-                                 "tm_taskname": [workflow], "clusterid": [clusterid], "resubmitted_jobs": [str(resubmittedjobs)]}},
+                                 "tm_taskname": [workflow], "clusterid": [clusterid]}},
                      "process": {"args": (self.Task.UpdateWorker_sql,), "method": self.api.modifynocheck, "kwargs": {"tw_name": [workername],
                                   "get_status": [getstatus], "limit": [limit], "set_status": [status]}},
         }
@@ -88,7 +87,7 @@ class RESTWorkerWorkflow(RESTEntity):
         return []
 
     @restcall
-    def get(self, workername, getstatus, limit, subresource):
+    def get(self, workername, getstatus, limit):
         """ Retrieve all columns for a specified task or
             tasks which are in a particular status with
             particular conditions """

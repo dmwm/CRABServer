@@ -52,7 +52,7 @@ class Task(object):
               :split_algo, :split_args, :total_units, :user_sandbox, :debug_files, :cache_url, :username, :user_dn, \
               :user_vo, :user_role, :user_group, :publish_name, :publish_groupname, :asyncdest, :dbs_url, :publish_dbs_url, \
               :publication, :outfiles, :tfile_outfiles, :edm_outfiles, :job_type, :generator, :arguments, \
-              :resubmitted_jobs, :save_logs, :user_infiles, :maxjobruntime, :numcores, :maxmemory, :priority, \
+              :save_logs, :user_infiles, :maxjobruntime, :numcores, :maxmemory, :priority, \
               :scriptexe, :scriptargs, :extrajdl, :asourl, :asodb, :events_per_lumi, :collector, :schedd_name, :dry_run, \
               :user_files, :transfer_outputs, :output_lfn, :ignore_locality, :fail_limit, :one_event_mode, :submitter_ip_addr, :ignore_global_blacklist)"
 
