@@ -8,7 +8,7 @@ import re
 from hashlib import sha1
 import cherrypy
 import pycurl
-import StringIO
+import io
 import json
 
 from WMCore.WMFactory import WMFactory
@@ -96,8 +96,8 @@ def getCentralConfig(extconfigurl, mode):
 
     def retrieveConfig(externalLink):
 
-        hbuf = StringIO.StringIO()
-        bbuf = StringIO.StringIO()
+        hbuf = io.BytesIO()
+        bbuf = io.BytesIO()
 
         curl = pycurl.Curl()
         curl.setopt(pycurl.URL, externalLink)

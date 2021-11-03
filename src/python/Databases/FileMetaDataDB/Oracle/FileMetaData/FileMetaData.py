@@ -8,7 +8,7 @@ class GetFromTaskAndType():
         Order of parameters must be the same as it is in query GetFromTaskAndType_sql
     """
     JOBID, OUTDS, ACQERA, SWVER, INEVENTS, GLOBALTAG, PUBLISHNAME, LOCATION, TMPLOCATION, RUNLUMI, ADLER32, CKSUM, MD5, LFN, SIZE, PARENTS, STATE,\
-    CREATIONTIME, TMPLFN, TYPE, DIRECTSTAGEOUT = range(22)
+    CREATIONTIME, TMPLFN, TYPE, DIRECTSTAGEOUT = range(21)
 
 class FileMetaData(object):
     """
