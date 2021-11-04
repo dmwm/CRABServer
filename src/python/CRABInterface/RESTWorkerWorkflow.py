@@ -120,6 +120,10 @@ def fixupTask(task):
                   'tm_arguments', 'tm_scriptargs', 'tm_user_files', 'tm_arguments']:
         current = result[field]
         fixedCurr = current if (current is None or isinstance(current, str)) else current.read()
+        # SB horrible hack start
+        if fixedCurr and "[b'" in fixedCurr:
+            fixedCurr = fixedCurr.replace("[b'", "['", 1)
+        # SB horrible hack end
         result[field] = fixedCurr
 
     #liter_evaluate values
