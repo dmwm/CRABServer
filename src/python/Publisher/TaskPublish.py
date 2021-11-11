@@ -838,6 +838,18 @@ def publishInDBS3(config, taskname, verbose):
     if '2018UL' in taskname or 'UL2018' in taskname:
         max_files_per_block = 10
 
+    # make sure that a block never has too many lumis, see
+    # https://github.com/dmwm/CRABServer/issues/6670#issuecomment-965837566
+    maxLumisPerBlock = 1.e6  # 1 Million
+    nBlocks = float(len(dbsFiles))/float(max_files_per_block)
+    if nLumis > maxLumisPerBlock * nBlocks :
+        logger.info('Trying to publish %d lumis in %d blocks', nLumis, nBlocks)
+        reduction = (nLumis/maxLumisPerBlock)/nBlocks
+        max_files_per_block = int(max_files_per_block/reduction)
+        max_files_per_block = max(max_files_per_block, 1)  # sanity check
+        logger.info('Reducing to %d files per block to keep nLumis/block below %s',
+                    max_files_per_block, maxLumisPerBlock)
+
     dumpList = []   # keep a list of files where blocks which fail publication are dumped
     while True:
         nIter += 1
@@ -859,10 +871,10 @@ def publishInDBS3(config, taskname, verbose):
             else:
                 blockSize = '%dKB' % blockSizeKBytes
 
+            t1 = time.time()
             if dryRun:
                 logger.info("DryRun: skip insertBulkBlock")
             else:
-                t1 = time.time()
                 destApi.insertBulkBlock(blockDump)
                 didPublish = 'OK'
             block_count += 1
