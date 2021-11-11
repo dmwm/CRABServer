@@ -871,10 +871,10 @@ def publishInDBS3(config, taskname, verbose):
             else:
                 blockSize = '%dKB' % blockSizeKBytes
 
+            t1 = time.time()
             if dryRun:
                 logger.info("DryRun: skip insertBulkBlock")
             else:
-                t1 = time.time()
                 destApi.insertBulkBlock(blockDump)
                 didPublish = 'OK'
             block_count += 1
