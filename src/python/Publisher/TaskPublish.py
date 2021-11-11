@@ -297,17 +297,19 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir):
                 line = "%d,%s,%s\n" % (reqid, migCreation, migInput)
                 fp.write(line)
             # in May 2019 has a storm of failed migration which needed the following cleanup
-            # keep the code in case we ever need to do the same again
-            migTime = time.gmtime(result['migration_details']['creation_date'])
-            if migTime.tm_year == 2019 and migTime.tm_mon == 5 and migTime.tm_mday < 21:
-                logger.debug("Failed migration %s requested on %s. Remove it",
-                             reqid, time.ctime(result['migration_details']['creation_date']))
-                mdic = {'migration_rqst_id': reqid} # pylint: disable=unused-variable
-                migrateApi.removeMigration({'migration_rqst_id': reqid})
-                logger.debug("  and submit again")
-                result = migrateApi.submitMigration(data)
-                reqid = result.get('migration_details', {}).get('migration_request_id')
-                report = result.get('migration_report')
+            # keep the code in case we ever need to do the same again, but do not activate it
+            # since DN of publisher changed and current one can not act on those created
+            # 2.5 years ago by long gone vocms0105.cern.ch
+            #migTime = time.gmtime(result['migration_details']['creation_date'])
+            #if migTime.tm_year == 2019 and migTime.tm_mon == 5 and migTime.tm_mday < 21:
+            #    logger.debug("Failed migration %s requested on %s. Remove it",
+            #                 reqid, time.ctime(result['migration_details']['creation_date']))
+            #    mdic = {'migration_rqst_id': reqid} # pylint: disable=unused-variable
+            #    migrateApi.removeMigration({'migration_rqst_id': reqid})
+            #    logger.debug("  and submit again")
+            #    result = migrateApi.submitMigration(data)
+            #    reqid = result.get('migration_details', {}).get('migration_request_id')
+            #    report = result.get('migration_report')
         if reqid is None:
             msg = "Migration request failed to submit."
             msg += "\nMigration request results: %s" % str(result)
