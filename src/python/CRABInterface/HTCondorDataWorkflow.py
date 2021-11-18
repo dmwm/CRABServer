@@ -225,7 +225,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         ## Apply taskWarning flag to output.
         taskWarnings = literal_eval(row.task_warnings if isinstance(row.task_warnings, str) else row.task_warnings.read())
-        result["taskWarningMsg"] = taskWarnings
+        result["taskWarningMsg"] = taskWarnings.decode("utf8") if isinstance(taskWarnings, bytes) else taskWarnings
 
         ## Helper function to add the task status and the failure message (both as taken
         ## from the Task DB) to the result dictionary.
