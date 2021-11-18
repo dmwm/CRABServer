@@ -53,7 +53,7 @@ class DryRunUploader(TaskAction):
             uploadToS3(crabserver=self.crabserver, filepath='dry-run-sandbox.tar.gz',
                        objecttype='runtimefiles', taskname=kw['task']['tm_taskname'], logger=self.logger)
             os.remove('dry-run-sandbox.tar.gz')
-            self.logger.info('Uploaded dry run tarball to the user file cache: %s', str(result))
+            self.logger.info('Uploaded dry run tarball to the user file cache')
             # wait until tarball is available, S3 may take a few seconds for this (ref. issue #6706 )
             t1 = time.time()
             lt1 = time.strftime("%H:%M:%S", time.localtime(t1))
