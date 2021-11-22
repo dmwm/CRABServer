@@ -313,7 +313,8 @@ class Master(object):
             """Translate from DAGMan internal integer status to a string.
 
             Uses parameter `dbstatus` to clarify if the state is due to the
-            user killing the task.
+            user killing the task. See:
+            https://htcondor.readthedocs.io/en/latest/users-manual/dagman-workflows.html#capturing-the-status-of-nodes-in-a-file
             """
             status = {0:'PENDING', 1: 'SUBMITTED', 2: 'SUBMITTED', 3: 'SUBMITTED',
                       4: 'SUBMITTED', 5: 'COMPLETED', 6: 'FAILED'}[statusToTr]
@@ -333,7 +334,8 @@ class Master(object):
                 return translateStatus(dagInfo['DagStatus'])
 
             def check_queued(statusOrSUBMITTED):
-                # 99 is the status to expect a submitted DAG. If there are less
+                # 99 is the status for a subDAG still to be submitted. An ad-hoc value
+                # introduced in cache_status.py. If there are less
                 # actual DAG status informations than expected DAGs, at least one
                 # DAG has to be queued.
                 if len(subDagInfos) < len([k for k in subDagStatus if subDagStatus[k] == 99]):
