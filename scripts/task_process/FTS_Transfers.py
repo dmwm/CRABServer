@@ -9,8 +9,11 @@ import json
 import logging
 import os
 import subprocess
-from datetime import timedelta
-from http.client import HTTPException
+from datetime import datetime, timedelta
+try:
+    from httplib import HTTPException
+except:
+    from http.client import HTTPException
 
 import fts3.rest.client.easy as fts3
 
@@ -199,10 +202,12 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
             # xfers have only 3 terminal states: FINISHED, FAILED, and CANCELED see
             # https://fts3-docs.web.cern.ch/fts3-docs/docs/state_machine.html
             if tx_state == 'FINISHED':
+                logger.info('file XFER OK will remove %s', file_status['source_surl'])
                 done_id[jobid].append(_id)
                 files_to_remove.append(file_status['source_surl'])
                 fileIds_to_remove.append(_id)
             elif tx_state == 'FAILED' or tx_state == 'CANCELED':
+                logger.info('file XFER FAIL will remove %s', file_status['source_surl'])
                 failed_id[jobid].append(_id)
                 if file_status['reason']:
                     logger.info('Failure reason: ' + file_status['reason'])
@@ -231,6 +236,9 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
             for f in files_to_remove:
                 list_of_surls += str(f) + ' '  # convert JSON u'srm://....' to plain srm://...
             removeLogFile = './task_process/transfers/remove_files.log'
+            msg = str(datetime.now()) + ': Will remove: %s' % list_of_surls
+            with open(removeLogFile, 'a') as removeLog:
+                removeLog.write(msg)
             remove_files_in_bkg(list_of_surls, removeLogFile)
             # remove those file Id's from the list and update the json disk file
             fileIds = list(set(fileIds)-set(fileIds_to_remove))
@@ -544,17 +552,13 @@ def state_manager(ftsContext, crabserver):
                     if markDone and markFailed:
                         jobs_done.append(jobID)
                         jobs_ongoing.remove(jobID)
-                    else:
-                        jobs_ongoing.append(jobID)   # SB is this necessary ? AFAIU check_FTSJob has filled it
-                else:
-                    jobs_ongoing.append(jobID)  # should not be necessary.. but for consistency with above
         except Exception:
             logging.exception('Failed to update states')
     else:
         logging.warning('No FTS job ID to monitor yet')
 
     with open("task_process/transfers/fts_jobids_new.txt", "w+") as _jobids:
-        for line in list(set(jobs_ongoing)):  # SB if we remove the un-necessary append above, non eed for a set here
+        for line in jobs_ongoing:
             logging.info("Writing: %s", line)
             _jobids.write(line+"\n")
 
