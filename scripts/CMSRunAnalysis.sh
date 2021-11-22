@@ -1,14 +1,6 @@
 #!/bin/bash
 exec 2>&1
 
-function DashboardFailure {
-    if [ -f ./DashboardFailure.sh ]; then
-        exec sh ./DashboardFailure.sh $1
-    else
-        exit $1
-    fi
-}
-
 sigterm() {
   echo "ERROR: Job was killed. Logging ulimits:"
   ulimit -a
@@ -20,7 +12,6 @@ sigterm() {
   du -h
   echo "Logging work directory file sizes:"
   ls -lnh
-  DashboardFailure 50669
   if [ ! -e logCMSSWSaved.txt ];
   then
     python -c "import CMSRunAnalysis; logCMSSW()"
@@ -110,6 +101,9 @@ fi
 
 echo "==== Python discovery FINISHED at $(TZ=GMT date) ===="
 
+echo "==== Make sure $HOME is defined ===="
+export HOME=${HOME:-$PWD}
+
 echo "======== Current environment dump STARTING ========"
 for i in `env`; do
   echo "== ENV: $i"
@@ -163,7 +157,6 @@ fi
 if [ ! -e wmcore_initialized ];
 then
     echo "======== ERROR: Unable to initialize WMCore at $(TZ=GMT date) ========"
-    DashboardFailure 10043
 fi
 
 exit $jobrc

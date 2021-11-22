@@ -32,9 +32,6 @@ class RESTFileUserTransfers(RESTEntity):
         # documents
         authz_login_valid()
         if method in ['PUT']:
-            # Do we want to validate everything?
-            # Now what is put in CouchDB is not validated
-            # And all put are prepared by us in JOB wrappers, so it should already be correct.
             # P.S. Validation is done in function and it double check if all required keys are available
             print (param, safe)
             validate_str("id", param, safe, RX_ANYTHING, optional=False)

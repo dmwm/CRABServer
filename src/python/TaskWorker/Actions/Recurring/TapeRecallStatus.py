@@ -19,33 +19,6 @@ class TapeRecallStatus(BaseRecurringAction):
     pollingTime = 60*4 # minutes
     rucioClient = None
 
-    def refreshSandbox(self, task):
-
-        from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
-        ufc = UserFileCache({'cert': task['user_proxy'], 'key': task['user_proxy'],
-                             'endpoint': task['tm_cache_url'], "pycurl": True})
-        sandbox = task['tm_user_sandbox'].replace(".tar.gz", "")
-        debugFiles = task['tm_debug_files'].replace(".tar.gz", "")
-        sandboxPath = os.path.join("/tmp", sandbox)
-        debugFilesPath = os.path.join("/tmp", debugFiles)
-        try:
-            ufc.download(sandbox, sandboxPath, task['tm_username'])
-            ufc.download(debugFiles, debugFilesPath, task['tm_username'])
-            self.logger.info(
-                "Successfully touched input and debug sandboxes (%s and %s) of task %s (frontend: %s) using the '%s' username (request_id = %s).",
-                sandbox, debugFiles, task['tm_taskname'], task['tm_cache_url'], task['tm_username'], task['tm_DDM_reqid'])
-        except Exception as ex:
-            msg = "The CRAB3 server backend could not download the input and/or debug sandbox (%s and/or %s) " % (
-            sandbox, debugFiles)
-            msg += "of task %s from the frontend (%s) using the '%s' username (request_id = %s). " % \
-                   (task['tm_taskname'], task['tm_cache_url'], task['tm_username'], task['tm_DDM_reqid'])
-            msg += "\nThis could be a temporary glitch, will try again in next occurrence of the recurring action."
-            msg += "Error reason:\n%s" % str(ex)
-            self.logger.info(msg)
-        finally:
-            if os.path.exists(sandboxPath): os.remove(sandboxPath)
-            if os.path.exists(debugFilesPath): os.remove(debugFilesPath)
-
     def _execute(self, config, task):
 
         # setup logger
@@ -109,12 +82,6 @@ class TapeRecallStatus(BaseRecurringAction):
             except TaskWorkerException as twe:
                 user_proxy = False
                 self.logger.exception(twe)
-
-            if not 'S3' in recallingTask['tm_cache_url'].upper():
-                # when using old crabcache had to worry about sandbox purging after 3 days
-                # Make sure the task sandbox in the crabcache is not deleted until the tape recall is completed
-                if user_proxy:
-                    self.refreshSandbox(recallingTask)
 
             # Retrieve status of recall request
             if not self.rucioClient:

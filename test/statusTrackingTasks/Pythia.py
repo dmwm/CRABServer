@@ -1,10 +1,12 @@
 from __future__ import division
 import time
 from WMCore.Configuration import Configuration
+import os
+
 config = Configuration()
 
 config.section_("General")
-config.General.instance = 'test2'
+config.General.instance = os.getenv('REST_Instance','test2')
 config.General.restHost = ''
 config.General.dbInstance = ''
 config.General.workArea = '/tmp/crabStatusTracking'

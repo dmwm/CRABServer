@@ -10,7 +10,10 @@ import logging
 import os
 import subprocess
 from datetime import datetime, timedelta
-from httplib import HTTPException
+try:
+    from httplib import HTTPException
+except:
+    from http.client import HTTPException
 
 import fts3.rest.client.easy as fts3
 
@@ -180,9 +183,20 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
         failed_id[jobid] = []
         failed_reasons[jobid] = []
         files_to_remove = []
+        fileIds_to_remove = []
+
+        # get the job content from local file
+        jobContentFileName = 'task_process/transfers/' + jobid + '.json'
+        with open(jobContentFileName, 'r') as fp:
+            fileIds = json.load(fp)
 
         for file_status in file_statuses:
             _id = file_status['file_metadata']['oracleId']
+            if not _id in fileIds:
+                # this file xfer has been handled already in a previous iteration
+                # nothing to do
+                continue
+
             tx_state = file_status['file_state']
 
             # xfers have only 3 terminal states: FINISHED, FAILED, and CANCELED see
@@ -191,6 +205,7 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
                 logger.info('file XFER OK will remove %s', file_status['source_surl'])
                 done_id[jobid].append(_id)
                 files_to_remove.append(file_status['source_surl'])
+                fileIds_to_remove.append(_id)
             elif tx_state == 'FAILED' or tx_state == 'CANCELED':
                 logger.info('file XFER FAIL will remove %s', file_status['source_surl'])
                 failed_id[jobid].append(_id)
@@ -201,6 +216,7 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
                     logger.exception('Failure reason not found')
                     failed_reasons[jobid].append('unable to get failure reason')
                 files_to_remove.append(file_status['source_surl'])
+                fileIds_to_remove.append(_id)
             else:
                 # file transfer is not terminal:
                 if status["job_state"] == 'ACTIVE':
@@ -215,7 +231,7 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
                     failed_id[jobid].append(_id)
                     logger.info('Failure reason: stuck inside FTS')
                     failed_reasons[jobid].append(file_status['reason'])
-        try:
+        if files_to_remove:
             list_of_surls = ''   # gfal commands take list of SURL as a list of blank-separated strings
             for f in files_to_remove:
                 list_of_surls += str(f) + ' '  # convert JSON u'srm://....' to plain srm://...
@@ -224,8 +240,12 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
             with open(removeLogFile, 'a') as removeLog:
                 removeLog.write(msg)
             remove_files_in_bkg(list_of_surls, removeLogFile)
-        except Exception:
-            logger.exception('Failed to remove temp files')
+            # remove those file Id's from the list and update the json disk file
+            fileIds = list(set(fileIds)-set(fileIds_to_remove))
+            jobContentTmp = jobContentFileName + '.tmp'
+            with open(jobContentTmp, 'w') as fp:
+                json.dump(fileIds, fp)
+            os.rename(jobContentTmp, jobContentFileName)
 
 def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
     """
@@ -246,6 +266,8 @@ def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
     OUTPUT PARAMS:
     :param jobids: collect the list of job ids when submitted
     :param toUpdate: list of oracle ids to update
+
+    RETURNS: the submitted jobid (a string)
     """
 
     transfers = []
@@ -317,9 +339,10 @@ def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
     fileDoc['list_of_fts_instance'] = [FTS_ENDPOINT for _ in files]
     fileDoc['list_of_fts_id'] = [jobid for _ in files]
 
-    logger.info("Marking submitted %s files" % (len(fileDoc['list_of_ids'])))
-
+    logger.info("Will mark as submitted %s files" % (len(fileDoc['list_of_ids'])))
     toUpdate.append(fileDoc)
+
+    return jobid
 
 def submit(rucioClient, ftsContext, toTrans, crabserver):
     """
@@ -352,17 +375,25 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
     a_dst_lfn = toTrans[0][1]
     a_src_lfn = toTrans[0][0]
 
-    # this is not ols ASO anymore. All files here have same destination
+    # this is not old ASO anymore. All files here have same destination
     # and LFN's and PFN's can only differ from each other in the directory counter and actual file name
     # no reason to lookup lfn2pfn by individual file
     # remember that src and dst LFN's are in general different (/store/user vs. /store/temp/user)
     # so we assume: (P/L)FN = (P/L)FN_PREFIX/FILEID
-    # where: FILEID = xxxx/filename.filetype and xxxx is a 0000, 0001, 0002 etc.
+    # where: FILEID = xxxx/filename.filetype and xxxx is a 0000, 0001, 0002 etc. for output or
+    # xxxx is 0000/log, 00001/log etc. for log if user selected TransferLogs=True i.e. LFN's are like
+    # /store/temp/user/.../0000/output_1.root or /store/temp/user/.../0000/log/cmsRun_1.log.tar.gz
 
-    dst_lfn_prefix = '/'.join(a_dst_lfn.split("/")[:-2])
+    if a_dst_lfn.split("/")[-2] == 'log' :
+        dst_lfn_prefix = '/'.join(a_dst_lfn.split("/")[:-3])
+    else:
+        dst_lfn_prefix = '/'.join(a_dst_lfn.split("/")[:-2])
     dst_did = scope + ':' + dst_lfn_prefix + '/0000/file.root'
 
-    src_lfn_prefix = '/'.join(a_src_lfn.split("/")[:-2])
+    if a_src_lfn.split("/")[-2] == 'log' :
+        src_lfn_prefix = '/'.join(a_src_lfn.split("/")[:-3])
+    else:
+        src_lfn_prefix = '/'.join(a_src_lfn.split("/")[:-2])
     src_did = scope + ':' + src_lfn_prefix + '/0000/file.root'
 
     sourceSites = list(set([x[3] for x in toTrans]))
@@ -402,7 +433,10 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
             checksums = f[8]
             src_lfn = f[0]
             dst_lfn = f[1]
-            fileid = '/'.join(src_lfn.split('/')[-2:])
+            if dst_lfn.split("/")[-2] == 'log' :
+                fileid = '/'.join(dst_lfn.split("/")[-3:])
+            else:
+                fileid = '/'.join(dst_lfn.split("/")[-2:])
             src_pfn = src_pfn_prefix + '/' + fileid
             dst_pfn = dst_pfn_prefix + '/' + fileid
 
@@ -411,7 +445,13 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
 
         xfersPerFTSJob = 50 if ftsReuse else 200
         for files in chunks(tx_from_source, xfersPerFTSJob):
-            submitToFTS(logging, ftsContext, files, jobids, to_update)
+            ftsJobId = submitToFTS(logging, ftsContext, files, jobids, to_update)
+            # save oracleIds of files in this job in a local file
+            jobContentFileName = 'task_process/transfers/' + ftsJobId + '.json'
+            with open(jobContentFileName, 'w') as fp:
+                json.dump([f[2] for f in files], fp)
+                #for f in files:
+                #    jobContent.write(str(f[0]))  # save the list of src_lfn's in this job
 
     for fileDoc in to_update:
         _ = crabserver.post('/filetransfers', data=encodeRequest(fileDoc))

@@ -27,7 +27,6 @@ import WMCore.Storage.StageOutError as StageOutError
 from WMCore.Storage.Registry import retrieveStageOutImpl
 from WMCore.Algorithms.Alarm import Alarm, alarmHandler
 import WMCore.WMException as WMException
-import DashboardAPI
 
 ## See the explanation of this sentry file in CMSRunAnalysis.py.
 with open('wmcore_initialized', 'w') as fd_wmcore:
@@ -473,8 +472,6 @@ def perform_local_stageout(local_stageout_mgr, \
                                   'inject'             : True
                                  }
             G_ASO_TRANSFER_REQUESTS.append(file_transfer_info)
-    if stageout_info.get('StageOutReport'):
-        DashboardAPI.reportFailureToDashboard(G_JOB_WRAPPER_EXIT_CODE, G_JOB_AD, stageout_info['StageOutReport'])
     return retval, retmsg
 
 ## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -511,12 +508,6 @@ def perform_direct_stageout(direct_stageout_impl, \
                             'is_log'    : is_log,
                             'removed'   : False
                            }
-    stageoutDashboardReport = {'LFN': dest_pfn,
-                               'PNN': dest_site,
-                               'PSN': source_site,
-                               'StageOutCommand': direct_stageout_command,
-                               'StageOutType': 'DIRECT',
-                              }
     G_DIRECT_STAGEOUTS.append(direct_stageout_info)
     retval, retmsg = 0, None
     try:
@@ -545,9 +536,6 @@ def perform_direct_stageout(direct_stageout_impl, \
                 msg += "\n%s" % (traceback.format_exc())
             except AttributeError as ex:
                 msg += "\nTraceback unavailable\n"
-            ## StageOutError.StageOutFailure has error code 60311.
-            stageoutDashboardReport['StageOutExit'] = 60311
-            DashboardAPI.reportFailureToDashboard(60311, G_JOB_AD, [stageoutDashboardReport])
             raise StageOutError.StageOutFailure(msg, Command = direct_stageout_command, Protocol = direct_stageout_protocol, \
                                                 LFN = dest_pfn, InputPFN = source_file, TargetPFN = dest_pfn)
         finally:
@@ -566,8 +554,6 @@ def perform_direct_stageout(direct_stageout_impl, \
         if not sites_added_ok:
             msg = "WARNING: Ignoring failure in adding the above information to the job report."
             print(msg)
-    stageoutDashboardReport['StageOutExit'] = retval
-    DashboardAPI.reportFailureToDashboard(retval, G_JOB_AD, [stageoutDashboardReport])
     return retval, retmsg
 
 ## = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -909,6 +895,45 @@ def main():
     dest_site = G_JOB_AD['CRAB_AsyncDest']
     stageout_policy = split_re.split(G_JOB_AD['CRAB_StageoutPolicy'])
     print("Stageout policy: %s" % (", ".join(stageout_policy)))
+
+    # check that source and destination can use 3rd Party Copy via FTS.
+    # Do this in a rough way just to catch known most-likely pitfalls
+    # Do now worry about things like a protocol listed in storage.json
+    # but not enabled in Rucio which  will be dealt with as errors/exceptions.
+    # In any case this is a transient situation waiting for all sites to have
+    # a davs: endpoint, so I do not worry about being really general, nor
+    # replicating the more refined way which Rucio may have to pick best protocol.
+    # Simply make sure that source and destination list one compatible protocol in their
+    # storage.json as reported in SITECONF and leave it to Rucio to resolve PFN's properly.
+    # Only force direct stageout to remote site when match is clearly impossible
+    try:
+        src_site = G_JOB_AD['JOB_CMSSite']
+        srcJsonFile = os.getenv('SITECONFIG_PATH','/cvmfs/cms.cern.ch/SITECONF/local')+'/storage.json'
+        try:
+            localStorageJson = open(srcJsonFile, 'r').read()
+        except Exception:
+            print("Lookup of %s failed" % srcJsonFile)
+            src_storageJson = '/cvmfs/cms.cern.ch/SITECONF/%s/storage.json' % src_site
+            print("Fall back to %s" % srcJsonFile)
+            localStorageJson = open(srcJsonFile, 'r').read()
+        destStorageJson = open('/cvmfs/cms.cern.ch/SITECONF/%s/storage.json' % dest_site, 'r').read()
+        destHasDavs = 'davs://' in destStorageJson
+        destHasGsiftp = 'gsiftp://' in destStorageJson or 'srm://' in destStorageJson
+        srcHasDavs = 'davs://' in localStorageJson
+        srcHasGsiftp = 'gsiftp://' in localStorageJson or 'srm://' in localStorageJson
+        print('SRC site %s has davs ? %s. Has gsiftp ? %s.' % (src_site, srcHasDavs, srcHasGsiftp))
+        print('DST site %s has davs ? %s. Has gsiftp ? %s.' % (dest_site, destHasDavs, destHasGsiftp))
+        if not srcHasGsiftp and not destHasDavs:
+            print('Execution site has no gsiftp but destination is not davs-capable')
+            print('Stageout policy overwritten to be "remote"')
+            stageout_policy = ['remote']
+        if not srcHasDavs and not destHasGsiftp:
+            print('Execution site has no davs but destination is not gsiftp-capable')
+            print('Stageout policy overwritten to be "remote"')
+            stageout_policy = ['remote']
+    except Exception as ex:
+        print('Failed to check protocol compatibility for stageout:\n%s' % str(ex))
+        print('Will stick with above stageout policy')
 
     ##--------------------------------------------------------------------------
     ## Finish PARSE JOB AD
@@ -1512,7 +1537,6 @@ if __name__ == '__main__':
                            ('exitAcronym', JOB_STGOUT_WRAPPER_EXIT_INFO['exit_acronym']), \
                            ('exitMsg',     JOB_STGOUT_WRAPPER_EXIT_INFO['exit_msg'])])
     ## Now we have to exit with the appropriate exit code, and report failures
-    ## to dashboard.
     if G_JOB_WRAPPER_EXIT_CODE == None:
         MSG = "Cannot retrieve the job exit code from the job report (does %s exist?)." % (G_JOB_REPORT_NAME)
         print(MSG)
@@ -1526,21 +1550,11 @@ if __name__ == '__main__':
     if CMSCP_EXIT_CODE != 0:
         if os.environ.get('TEST_CMSCP_NO_STATUS_UPDATE', False):
             MSG  = "Environment flag TEST_CMSCP_NO_STATUS_UPDATE is set."
-            MSG += " Will not send report to dashbaord."
             print(MSG)
         elif G_JOB_AD:
-            try:
-                MSG  = "Stageout wrapper finished with exit code %s." % (CMSCP_EXIT_CODE)
-                MSG += " Will report failure to Dashboard."
-                print(MSG)
-                DashboardAPI.reportFailureToDashboard(CMSCP_EXIT_CODE, G_JOB_AD)
-            except Exception:
-                MSG  = "ERROR: Unhandled exception when reporting failure to dashboard."
-                MSG += "\n%s" % (traceback.format_exc())
-                print(MSG)
+            MSG  = "Stageout wrapper finished with exit code %s." % (CMSCP_EXIT_CODE)
         else:
             MSG  = "ERROR: Job's HTCondor ClassAd was not read."
-            MSG += " Will not report failure to Dashboard."
             print(MSG)
     MSG  = "====== %s: " % (time.asctime(time.gmtime()))
     MSG += "cmscp.py FINISHING"

@@ -11,7 +11,7 @@ import pycurl
 import signal
 import logging
 import subprocess
-from httplib import HTTPException
+from http.client import HTTPException
 from logging.handlers import TimedRotatingFileHandler
 
 from WMCore.WMException import WMException

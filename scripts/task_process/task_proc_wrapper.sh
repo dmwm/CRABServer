@@ -11,7 +11,7 @@ function cache_status {
 
 function cache_status_jel {
     log "Running cache_status_jel.py"
-    python task_process/cache_status_jel.py
+    python3 task_process/cache_status_jel.py
 }
 
 function manage_transfers {
@@ -101,9 +101,11 @@ TIME_OF_LAST_QUERY=$(date +"%s")
 # submission is most likely pointless and relatively expensive, the script will run normally and perform the query later.
 DAG_INFO="init"
 
+export PYTHONPATH=$PYTHONPATH:/data/srv/pycurl3/7.44.1
+
 export PYTHONPATH=`pwd`/task_process:`pwd`/CRAB3.zip:`pwd`/WMCore.zip:$PYTHONPATH
 
-export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/current/lib/python2.7/site-packages
+export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/
 
 log "Starting task daemon wrapper"
 while true

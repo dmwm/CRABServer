@@ -1,5 +1,8 @@
 """
 This contains some utility methods to share between the server and the client, or by the server components themself
+IMPORTANT : SINCE THIS NEEDS TO RUN IN THE CLIENT, CODE NEEDS TO WORK
+IN BOTH PYTHON2 AND PYTHON3 WITHOUT CALLS TO FUTURIZE OR OTHER UTILITIES NOT
+PRESENT IN EARLIER CMSSW RELEASES
 """
 # this is a weird and unclear message from pylint, better to ignore it
 # pylint: disable=W0715
@@ -153,12 +156,6 @@ def getTestDataDirectory():
     testdirList = __file__.split(os.sep)[:-3] + ["test", "data"]
     return os.sep.join(testdirList)
 
-def isCouchDBURL(url):
-    """ Return True if the url proviced is a couchdb one
-    """
-    return 'couchdb' in url
-
-
 def truncateError(msg):
     """Truncate the error message to the first 7400 chars if needed, and add a message if we truncate it.
        See https://github.com/dmwm/CRABServer/pull/4867#commitcomment-12086393
@@ -214,22 +211,6 @@ def getProxiedWebDir(crabserver=None, task=None, logFunction=print):
         logFunction(hte.result)
 
     return res
-
-
-#setDashboardLogs function is shared between the postjob and the job wrapper. Sharing it here
-def setDashboardLogs(params, webdir, jobid, retry):
-    """ Method to prepare some common dictionary keys for dashboard reporting
-    """
-    log_files = [("job_out", "txt"), ("postjob", "txt")]
-    for i, log_file in enumerate(log_files):
-        log_file_basename, log_file_extension = log_file
-        log_file_name = "%s/%s.%s.%d.%s" % (webdir, \
-                                            log_file_basename, jobid, \
-                                            retry, \
-                                            log_file_extension)
-        log_files[i] = log_file_name
-    params['StatusLogFile'] = ",".join(log_files)
-
 
 def insertJobIdSid(jinfo, jobid, workflow, jobretry):
     """ Modifies passed dictionary (jinfo) to contain jobId and sid keys and values.
@@ -420,8 +401,7 @@ def getLock(name):
 def getHashLfn(lfn):
     """ Provide a hashed lfn from an lfn.
     """
-    return hashlib.sha224(lfn).hexdigest()
-
+    return hashlib.sha224(lfn.encode('utf-8')).hexdigest()
 
 def generateTaskName(username, requestname, timestamp=None):
     """ Generate a taskName which is saved in database
@@ -816,7 +796,7 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
     # CRAB_useGoCurl env. variable is used to define how upload to S3 command should be executed.
     # If variable is set, then goCurl is used for command execution: https://github.com/vkuznet/gocurl
     if os.getenv('CRAB_useGoCurl'):
-        uploadCommand += '/afs/cern.ch/user/v/valya/public/gocurl -verbose 2 -method POST'
+        uploadCommand += '/cvmfs/cms.cern.ch/cmsmon/gocurl -verbose 2 -method POST'
         uploadCommand += ' -header "User-Agent:%s"' % userAgent
         uploadCommand += ' -form "key=%s"' % key
         uploadCommand += ' -form "AWSAccessKeyId=%s"' % AWSAccessKeyId
@@ -875,7 +855,7 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
     # CRAB_useGoCurl env. variable is used to define how download from S3 command should be executed.
     # If variable is set, then goCurl is used for command execution: https://github.com/vkuznet/gocurl
     if os.getenv('CRAB_useGoCurl'):
-        downloadCommand += '/afs/cern.ch/user/v/valya/public/gocurl -verbose 2 -method GET'
+        downloadCommand += '/cvmfs/cms.cern.ch/cmsmon/gocurl -verbose 2 -method GET'
         downloadCommand += ' -out "%s"' % filepath
         downloadCommand += ' -url "%s"' % preSignedUrl
     else:

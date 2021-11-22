@@ -8,7 +8,7 @@ import re
 from hashlib import sha1
 import cherrypy
 import pycurl
-import StringIO
+import io
 import json
 
 from WMCore.WMFactory import WMFactory
@@ -96,8 +96,8 @@ def getCentralConfig(extconfigurl, mode):
 
     def retrieveConfig(externalLink):
 
-        hbuf = StringIO.StringIO()
-        bbuf = StringIO.StringIO()
+        hbuf = io.BytesIO()
+        bbuf = io.BytesIO()
 
         curl = pycurl.Curl()
         curl.setopt(pycurl.URL, externalLink)
@@ -162,7 +162,7 @@ def getCentralConfig(extconfigurl, mode):
 def conn_handler(services):
     """
     Decorator to be used among REST resources to optimize connections to other services
-    as CouchDB and CRIC, WMStats monitoring
+    as CRIC, WMStats monitoring
 
     arg str list services: list of string telling which service connections
                            should be started; currently availables are

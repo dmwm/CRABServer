@@ -21,7 +21,6 @@ class RESTServerInfo(RESTEntity):
         self.serverdn = serverdn
         self.logger = logging.getLogger("CRABLogger:RESTServerInfo")
         #used by the client to get the url where to update the cache (cacheSSL)
-        #and by the taskworker Panda plugin to get panda urls
 
     def validate(self, apiobj, method, api, param, safe ):
         """Validating all the input parameter as enforced by the WMCore.REST module"""

@@ -29,12 +29,6 @@ import classad
 
 import WMCore.WMSpec.WMTask
 from WMCore.Services.CRIC.CRIC import CRIC
-try:
-    from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
-except ImportError:
-    UserFileCache = None
-
-from ApmonIf import ApmonIf
 
 DAG_HEADER = """
 
@@ -209,6 +203,7 @@ def makeLFNPrefixes(task):
     if 'tm_user_role' in task and task['tm_user_role']:
         hash_input += "," + task['tm_user_role']
     lfn = task['tm_output_lfn']
+    hash_input = hash_input.encode('utf-8')
     pset_hash = hashlib.sha1(hash_input).hexdigest()
     user = task['tm_username']
     tmp_user = "%s.%s" % (user, pset_hash)
@@ -321,7 +316,6 @@ def transform_strings(data):
     for var in ["cacheurl", "jobsw", "jobarch", "cachefilename", "asyncdest", "requestname"]:
         info[var+"_flatten"] = data[var]
 
-    # TODO: PanDA wrapper wants some sort of dictionary.
     info["addoutputfiles_flatten"] = '{}'
 
     temp_dest, dest = makeLFNPrefixes(data)
@@ -367,37 +361,6 @@ class DagmanCreator(TaskAction):
     def __init__(self, config, crabserver, procnum=-1, rucioClient=None):
         TaskAction.__init__(self, config, crabserver, procnum)
         self.rucioClient = rucioClient
-
-    def buildDashboardInfo(self, task):
-        taskType = self.getDashboardTaskType(task)
-
-        params = {'tool': 'crab3',
-                  'SubmissionType':'crab3',
-                  'JSToolVersion': '3.3.0',
-                  'tool_ui': os.environ.get('HOSTNAME', ''),
-                  'scheduler': 'GLIDEIN',
-                  'GridName': task['tm_user_dn'],
-                  'ApplicationVersion': task['tm_job_sw'],
-                  'taskType': taskType,
-                  'vo': 'cms',
-                  'CMSUser': task['tm_username'],
-                  'user': task['tm_username'],
-                  'taskId': task['tm_taskname'],
-                  'datasetFull': task['tm_input_dataset'],
-                  'resubmitter': task['tm_username'],
-                  'exe': 'cmsRun'}
-        return params
-
-
-    def sendDashboardTask(self, task):
-        apmon = ApmonIf()
-        params = self.buildDashboardInfo(task)
-        params_copy = dict(params)
-        params_copy['jobId'] = 'TaskMeta'
-        self.logger.debug("Dashboard task info: %s", str(params_copy))
-        apmon.sendToML(params_copy)
-        apmon.free()
-        return params
 
     def populateGlideinMatching(self, info):
         scram_arch = info['tm_job_arch']
@@ -1096,29 +1059,6 @@ class DagmanCreator(TaskAction):
         elif info.get('faillimit') < 0:
             info['faillimit'] = -1
 
-        # Info for ML:
-        target_se = ''
-        max_len_target_se = 900
-        for site in (str(s) for s in availablesites):
-            if len(target_se) > max_len_target_se:
-                target_se += ',Many_More'
-                break
-            if len(target_se):
-                target_se += ','
-            target_se += site
-        ml_info = info.setdefault('apmon', [])
-        shift = 0 if stage == 'probe' else 1
-        for idx in range(shift, info['jobcount']+shift):
-            taskid = kwargs['task']['tm_taskname']
-            jinfo = {'broker': os.environ.get('HOSTNAME', ''),
-                     'bossId': str(idx),
-                     'TargetSE': target_se,
-                     'localId': '',
-                     'StatusValue': 'pending',
-                    }
-            insertJobIdSid(jinfo, idx, taskid, 0)
-            ml_info.append(jinfo)
-
         return info, splitterResult, subdags, dagSpecs
 
 
@@ -1177,7 +1117,6 @@ class DagmanCreator(TaskAction):
 
 
     def executeInternal(self, *args, **kw):
-        # FIXME: In PanDA, we provided the executable as a URL.
         # So, the filename becomes http:// -- and doesn't really work.  Hardcoding the analysis wrapper.
         #transform_location = getLocation(kw['task']['tm_transformation'], 'CAFUtilities/src/python/transformation/CMSRunAnalysis/')
         transform_location = getLocation('CMSRunAnalysis.sh', 'CRABServer/scripts/')
@@ -1198,8 +1137,8 @@ class DagmanCreator(TaskAction):
         sandboxTarBall = 'sandbox.tar.gz'
         debugTarBall = 'debug_files.tar.gz'
 
-        # Bootstrap the ISB if we are using S3 and running in the TW
-        if self.crabserver and 'S3' in kw['task']['tm_cache_url'].upper():
+        # Bootstrap the ISB if we are running in the TW
+        if self.crabserver:
             username = kw['task']['tm_username']
             sandboxName = kw['task']['tm_user_sandbox']
             dbgFilesName = kw['task']['tm_debug_files']
@@ -1217,26 +1156,6 @@ class DagmanCreator(TaskAction):
             except Exception as ex:
                 self.logger.exception(ex)
 
-        # Bootstrap the ISB if we are using UFC
-        else:
-            if UserFileCache and kw['task']['tm_cache_url'].find('/crabcache') != -1:
-                ufc = UserFileCache(mydict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy'], 'endpoint' : kw['task']['tm_cache_url']})
-                try:
-                    ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output=sandboxTarBall)
-                except Exception as ex:
-                    self.logger.exception(ex)
-                    raise TaskWorkerException("The CRAB3 server backend could not download the input sandbox with your code "+\
-                                        "from the frontend (crabcache component).\nThis could be a temporary glitch; please try to submit a new task later "+\
-                                        "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO url!?
-                kw['task']['tm_user_sandbox'] = sandboxTarBall
-
-                # For an older client (<3.3.1607) this field will be empty and the file will not exist.
-                if kw['task']['tm_debug_files']:
-                    try:
-                        ufc.download(hashkey=kw['task']['tm_debug_files'].split(".")[0], output=debugTarBall)
-                    except Exception as ex:
-                        self.logger.exception(ex)
-
         # Bootstrap the runtime if it is available.
         job_runtime = getLocation('CMSRunAnalysis.tar.gz', 'CRABServer/')
         shutil.copy(job_runtime, '.')
@@ -1246,8 +1165,6 @@ class DagmanCreator(TaskAction):
         kw['task']['resthost'] = self.crabserver.server['host']
         kw['task']['dbinstance'] = self.crabserver.getDbInstance()
         params = {}
-        if kw['task']['tm_dry_run'] == 'F':
-            params = self.sendDashboardTask(kw['task'])
 
         inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh',
                       'AdjustSites.py', 'site.ad', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.pkl', 'taskworkerconfig.pkl',

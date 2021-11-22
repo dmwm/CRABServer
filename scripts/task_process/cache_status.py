@@ -196,7 +196,7 @@ def parseJobLog(fp, nodes, nodeMap):
 
 def parseErrorReport(data, nodes):
     #iterate over the jobs and set the error dict for those which are failed
-    for jobid, statedict in nodes.iteritems():
+    for jobid, statedict in nodes.items():
         if 'State' in statedict and statedict['State'] == 'failed' and jobid in data:
             # data[jobid] is a dictionary with the retry number as a key and error summary information as a value.
             # Here we want to get the error summary information, and since values() returns a list

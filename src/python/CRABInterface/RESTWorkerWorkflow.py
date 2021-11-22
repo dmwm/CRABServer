@@ -1,6 +1,7 @@
 """ Interface used by the TaskWorker to ucquire tasks and change their state
 """
 # WMCore dependecies here
+from builtins import str
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
 from WMCore.REST.Error import InvalidParameter
@@ -9,7 +10,7 @@ from ServerUtilities import getEpochFromDBTime
 from CRABInterface.Utilities import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import (RX_TASKNAME, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_SUBPOSTWORKER,
-                                  RX_SUBGETWORKER, RX_JOBID)
+                                  RX_JOBID)
 
 # external dependecies here
 from ast import literal_eval
@@ -22,7 +23,6 @@ class RESTWorkerWorkflow(RESTEntity):
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
-        self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
 
     @staticmethod
     def validate(apiobj, method, api, param, safe): #pylint: disable=unused-argument
@@ -44,7 +44,7 @@ class RESTWorkerWorkflow(RESTEntity):
             # possible combinations to check
             # 1) taskname + status
             # 2) taskname + status + failure
-            # 3) taskname + status + resubmitted + jobsetid
+            # 3) taskname + status + resubmitted
             # 4) taskname + status == (1)
             # 5)            status + limit + getstatus + workername
             # 6) taskname + runs + lumis
@@ -52,7 +52,6 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
             validate_str("getstatus", param, safe, RX_STATUS, optional=True)
             validate_num("limit", param, safe, optional=True)
-            validate_str("subresource", param, safe, RX_SUBGETWORKER, optional=True)
             # possible combinations to check
             # 1) workername + getstatus + limit
             # 2) subresource + subjobdef + subuser
@@ -75,20 +74,20 @@ class RESTWorkerWorkflow(RESTEntity):
                                  "failure": [failure], "tm_taskname": [workflow]}},
                   #Used in DagmanSubmitter?
                      "success": {"args": (self.Task.SetInjectedTasks_sql,), "method": self.api.modify, "kwargs": {"tm_task_status": [status],
-                                 "tm_taskname": [workflow], "clusterid": [clusterid], "resubmitted_jobs": [str(resubmittedjobs)]}},
+                                 "tm_taskname": [workflow], "clusterid": [clusterid]}},
                      "process": {"args": (self.Task.UpdateWorker_sql,), "method": self.api.modifynocheck, "kwargs": {"tw_name": [workername],
                                   "get_status": [getstatus], "limit": [limit], "set_status": [status]}},
         }
 
         if subresource is None:
             subresource = 'state'
-        if not subresource in methodmap.keys():
+        if not subresource in list(methodmap.keys()):
             raise InvalidParameter("Subresource of workflowdb has not been found")
         methodmap[subresource]['method'](*methodmap[subresource]['args'], **methodmap[subresource]['kwargs'])
         return []
 
     @restcall
-    def get(self, workername, getstatus, limit, subresource):
+    def get(self, workername, getstatus, limit):
         """ Retrieve all columns for a specified task or
             tasks which are in a particular status with
             particular conditions """
@@ -118,17 +117,20 @@ def fixupTask(task):
 
     #fixup CLOBS values by calling read (only for Oracle)
     for field in ['tm_task_failure', 'tm_split_args', 'tm_outfiles', 'tm_tfile_outfiles', 'tm_edm_outfiles',
-                  'panda_resubmitted_jobs', 'tm_arguments', 'tm_scriptargs', 'tm_user_files', 'tm_arguments']:
+                  'tm_arguments', 'tm_scriptargs', 'tm_user_files']:
         current = result[field]
         fixedCurr = current if (current is None or isinstance(current, str)) else current.read()
         result[field] = fixedCurr
 
     #liter_evaluate values
     for field in ['tm_site_whitelist', 'tm_site_blacklist', 'tm_split_args', 'tm_outfiles', 'tm_tfile_outfiles',
-                  'tm_edm_outfiles', 'panda_resubmitted_jobs', 'tm_user_infiles', 'tm_arguments', 'tm_scriptargs',
+                  'tm_edm_outfiles', 'tm_user_infiles', 'tm_arguments', 'tm_scriptargs',
                   'tm_user_files']:
         current = result[field]
         result[field] = literal_eval(current)
+        for idx, value in enumerate(result[field]):
+            if isinstance(value, bytes):
+                result[field][idx] = value.decode("utf8")
 
     #convert tm_arguments to the desired values
     extraargs = result['tm_arguments']

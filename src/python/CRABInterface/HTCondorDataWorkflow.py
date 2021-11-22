@@ -5,7 +5,7 @@ import json
 import time
 import copy
 import tarfile
-import StringIO
+import io
 import tempfile
 import calendar
 from ast import literal_eval
@@ -13,7 +13,6 @@ from ast import literal_eval
 import pycurl
 import classad
 
-import WMCore.Database.CMSCouch as CMSCouch
 from WMCore.WMSpec.WMTask import buildLumiMask
 from WMCore.DataStructs.LumiList import LumiList
 from CRABInterface.DataWorkflow import DataWorkflow
@@ -25,7 +24,7 @@ from Utils.Throttled import UserThrottle
 throttle = UserThrottle(limit=3)
 
 from CRABInterface.Utilities import conn_handler
-from ServerUtilities import FEEDBACKMAIL, PUBLICATIONDB_STATES, isCouchDBURL, getEpochFromDBTime
+from ServerUtilities import FEEDBACKMAIL, PUBLICATIONDB_STATES, getEpochFromDBTime
 from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 
 import HTCondorUtils
@@ -53,7 +52,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             backend_urls['htcondorPool'] = row.collector
 
             # need to make sure to pass a simply quoted string, not a byte-array to HTCondor
-            taskName = str(workflow.decode("utf-8")) if isinstance(workflow, bytes) else workflow
+            taskName = workflow.decode("utf-8") if isinstance(workflow, bytes) else workflow
             self.logger.debug("Running condor query for task %s." % taskName)
             try:
                 locator = HTCondorLocator.HTCondorLocator(backend_urls)
@@ -226,7 +225,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         ## Apply taskWarning flag to output.
         taskWarnings = literal_eval(row.task_warnings if isinstance(row.task_warnings, str) else row.task_warnings.read())
-        result["taskWarningMsg"] = taskWarnings
+        result["taskWarningMsg"] = taskWarnings.decode("utf8") if isinstance(taskWarnings, bytes) else taskWarnings
 
         ## Helper function to add the task status and the failure message (both as taken
         ## from the Task DB) to the result dictionary.
@@ -317,7 +316,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 else:
                     self.logger.info("Node state file is too old or does not have an update time. Stale info is shown")
             except Exception as ee:
-                addStatusAndFailure(result, status = 'UNKNOWN', failure = ee.info)
+                addStatusAndFailure(result, status = 'UNKNOWN', failure = str(ee))
                 return [result]
 
         if 'DagStatus' in taskStatus:
@@ -422,7 +421,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         curl = self.prepareCurl()
         fp = tempfile.TemporaryFile()
         curl.setopt(pycurl.WRITEFUNCTION, fp.write)
-        hbuf = StringIO.StringIO()
+        hbuf = io.BytesIO()
         curl.setopt(pycurl.HEADERFUNCTION, hbuf.write)
         try:
             self.logger.debug("Retrieving task status from schedd via http")
@@ -483,66 +482,11 @@ class HTCondorDataWorkflow(DataWorkflow):
         """Here is what basically the function return, a dict called publicationInfo in the subcalls:
                 publicationInfo['status']: something like {'publishing': 0, 'publication_failed': 0, 'not_published': 0, 'published': 5}.
                                            Later on goes into dictresult['publication'] before being returned to the client
-                publicationInfo['status']['error']: String containing the error message if not able to contact couch or oracle
+                publicationInfo['status']['error']: String containing the error message if not able to contact oracle
                                                     Later on goes into dictresult['publication']['error']
                 publicationInfo['failure_reasons']: errors of single files (not yet implemented for oracle..)
         """
-        if isCouchDBURL(asourl):
-            return self.publicationStatusCouch(workflow, asourl, asodb)
-        else:
-            return self.publicationStatusOracle(workflow, user)
-
-    def publicationStatusCouch(self, workflow, asourl, asodb):
-        publicationInfo = {'status': {}, 'failure_reasons': {}}
-        if not asourl:
-            raise ExecutionError("This CRAB server is not configured to publish; no publication status is available.")
-        server = CMSCouch.CouchServer(dburl=asourl, ckey=self.serverKey, cert=self.serverCert)
-        try:
-            db = server.connectDatabase(asodb)
-        except Exception:
-            msg = "Error while connecting to asynctransfer CouchDB for workflow %s " % workflow
-            msg += "\n asourl=%s asodb=%s" % (asourl, asodb)
-            self.logger.exception(msg)
-            publicationInfo['status'] = {'error': msg}
-            return publicationInfo
-        # Get the publication status for the given workflow. The next query to the
-        # CouchDB view returns a list of 1 dictionary (row) with:
-        # 'key'   : workflow,
-        # 'value' : a dictionary with possible publication statuses as keys and the
-        #           counts as values.
-        query = {'reduce': True, 'key': workflow, 'stale': 'update_after'}
-        try:
-            publicationList = db.loadView('AsyncTransfer', 'PublicationStateByWorkflow', query)['rows']
-        except Exception:
-            msg = "Error while querying CouchDB for publication status information for workflow %s " % workflow
-            self.logger.exception(msg)
-            publicationInfo['status'] = {'error': msg}
-            return publicationInfo
-        if publicationList:
-            publicationStatusDict = publicationList[0]['value']
-            publicationInfo['status'] = publicationStatusDict
-            # Get the publication failure reasons for the given workflow. The next query to
-            # the CouchDB view returns a list of N_different_publication_failures
-            # dictionaries (rows) with:
-            # 'key'   : [workflow, publication failure],
-            # 'value' : count.
-            numFailedPublications = publicationStatusDict['publication_failed']
-            if numFailedPublications:
-                query = {'group': True, 'startkey': [workflow], 'endkey': [workflow, {}], 'stale': 'update_after'}
-                try:
-                    publicationFailedList = db.loadView('DBSPublisher', 'PublicationFailedByWorkflow', query)['rows']
-                except Exception:
-                    msg = "Error while querying CouchDB for publication failures information for workflow %s " % workflow
-                    self.logger.exception(msg)
-                    publicationInfo['failure_reasons']['error'] = msg
-                    return publicationInfo
-                publicationInfo['failure_reasons']['result'] = []
-                for publicationFailed in publicationFailedList:
-                    failureReason = publicationFailed['key'][1]
-                    numFailedFiles = publicationFailed['value']
-                    publicationInfo['failure_reasons']['result'].append((failureReason, numFailedFiles))
-
-        return publicationInfo
+        return self.publicationStatusOracle(workflow, user)
 
     def publicationStatusOracle(self, workflow, user):
         publicationInfo = {}
@@ -586,12 +530,8 @@ class HTCondorDataWorkflow(DataWorkflow):
         """
         transfers = {}
         data = json.load(fp)
-        for docid, result in data['results'].iteritems():
-            #Oracle has an improved structure in aso_status
-            if isCouchDBURL(self.asoDBURL):
-                result = result['value']
-            else:
-                result = result[0]
+        for docid, result in data['results'].items():
+            result = result[0]
             jobid = str(result['jobid'])
             if jobid not in nodes:
                 msg = ("It seems one or more jobs are missing from the node_state file."
@@ -618,7 +558,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         fp.seek(0)
         data = json.load(fp)
         #iterate over the jobs and set the error dict for those which are failed
-        for jobid, statedict in nodes.iteritems():
+        for jobid, statedict in nodes.items():
             if 'State' in statedict and statedict['State'] == 'failed' and jobid in data:
                 statedict['Error'] = last(data[jobid]) #data[jobid] contains all retries. take the last one
 
@@ -631,7 +571,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         if first_char == "[":
             return self.parseNodeStateV2(fp, nodes)
         for line in fp.readlines():
-            m = self.job_re.match(line)
+            m = self.job_re.match(line.decode("utf8") if isinstance(line, bytes) else line)
             if not m:
                 continue
             nodeid, status, msg = m.groups()

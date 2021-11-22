@@ -36,8 +36,6 @@ class DataFileMetadata(object):
                 yield json.dumps({
                     'taskname': taskname,
                     'filetype': filetype,
-                    #TODO pandajobid should not be used. Let's wait a "quiet release" and remove it
-                    'pandajobid': row.pandajobid,
                     'jobid': row.jobid,
                      'outdataset': row.outdataset,
                      'acquisitionera': row.acquisitionera,
@@ -118,7 +116,7 @@ class DataFileMetadata(object):
         """
         self.logger.debug("Changing state of file %(outlfn)s in task %(taskname)s to %(filestate)s" % kwargs)
 
-        self.api.modify(self.FileMetaData.ChangeFileState_sql, **dict((k, [v]) for k, v in kwargs.iteritems()))
+        self.api.modify(self.FileMetaData.ChangeFileState_sql, **dict((k, [v]) for k, v in kwargs.items()))
 
     def delete(self, taskname, hours):
         """ UNUSED method that deletes record from the FILEMETADATA table

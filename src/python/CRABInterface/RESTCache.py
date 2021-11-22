@@ -17,16 +17,6 @@ from CRABInterface.Regexps import RX_SUBRES_CACHE, RX_CACHE_OBJECTTYPE, RX_TASKN
 from ServerUtilities import getUsernameFromTaskname
 
 
-def fromNewBytesToString(inString):
-    # since taskname and objecttype come from WMCore validate_str they are newbytes objects
-    # of type <class 'future.types.newbytes.newbytes'> which breaks
-    # python2 S3 transfer code with a keyError
-    # here's an awful hack to turn those newbytes into an old-fashioned py2 string
-    outString = ''  # a string
-    for i in inString:  # subscripting a newbytes string gets tha ASCII value of the char !
-        outString += chr(i)  # from ASCII numerical value to python2 string
-    return outString
-
 class RESTCache(RESTEntity):
     """
     REST entity for accessing CRAB Cache on S3
@@ -132,7 +122,7 @@ class RESTCache(RESTEntity):
                 ownerName = getUsernameFromTaskname(taskname)
                 # task related files go in bucket/username/taskname/
                 objectPath = ownerName + '/' + taskname + '/' + objecttype
-            s3_objectKey = fromNewBytesToString(objectPath)
+            s3_objectKey = objectPath
 
         if subresource == 'upload':
             # returns a dictionary with the information to upload a file with a POST
@@ -213,13 +203,12 @@ class RESTCache(RESTEntity):
             #
             fileNames = []
             paginator = self.s3_client.get_paginator('list_objects_v2')
-            user = fromNewBytesToString(username)
             operation_parameters = {'Bucket': self.s3_bucket,
-                                    'Prefix': user}
+                                    'Prefix': username}
             page_iterator = paginator.paginate(**operation_parameters)
             for page in page_iterator:
                 # strip the initial "username/" from the S3 key name
-                namesInPage = [item['Key'].replace(user+'/', '', 1) for item in page['Contents']]
+                namesInPage = [item['Key'].replace(username+'/', '', 1) for item in page['Contents']]
                 fileNames += namesInPage
             if objecttype:
                 filteredFileNames = [f for f in fileNames if objecttype in f]
@@ -231,9 +220,8 @@ class RESTCache(RESTEntity):
             if not username:
                 raise MissingParameter('username is missing')
             paginator = self.s3_client.get_paginator('list_objects_v2')
-            user = fromNewBytesToString(username)
             operation_parameters = {'Bucket': self.s3_bucket,
-                                    'Prefix': user}
+                                    'Prefix': username}
             page_iterator = paginator.paginate(**operation_parameters)
             # S3 records object size in bytes, see:
             # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.list_objects_v2

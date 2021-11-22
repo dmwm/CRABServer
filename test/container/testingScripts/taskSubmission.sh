@@ -9,6 +9,8 @@
 
 #setup CRABClient
 source setupCRABClient.sh
+export inputDataset=${inputDataset}
+export REST_Instance=${REST_Instance}
 
 submitTasks(){
 #Submit tasks and based on the exit code add task name / file name respectively to submitted_tasks or failed_tasks file
@@ -16,7 +18,6 @@ submitTasks(){
   for file_name in ${filesToSubmit};
   do
       echo -e "\nSubmitting file: ${file_name}"
-      sed -i -e "/config.General.instance*/c\config.General.instance = \"${REST_Instance}\"" ${file_name}
       output=$(crab submit -c ${file_name} 2>&1)
       submitExitCode=$?
       echo ${output}

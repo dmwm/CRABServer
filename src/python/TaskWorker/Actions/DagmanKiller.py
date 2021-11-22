@@ -1,8 +1,12 @@
 import re
 import socket
-import urllib
+import sys
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
+if sys.version_info < (3, 0):
+    from urllib import urlencode
 
-from httplib import HTTPException
+from http.client import HTTPException
 
 import htcondor
 
@@ -15,8 +19,6 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 import HTCondorLocator
 import HTCondorUtils
 
-import ApmonIf
-
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
 
 class DagmanKiller(TaskAction):
@@ -26,7 +28,7 @@ class DagmanKiller(TaskAction):
     We do not actually "kill" the task off, but put the DAG on hold.
     """
 
-    def executeInternal(self, apmon, *args, **kwargs):  # pylint: disable=unused-argument
+    def executeInternal(self, *args, **kwargs):  # pylint: disable=unused-argument
         #Marco: I guess these value errors only happens for development instances
         if 'task' not in kwargs:
             raise ValueError("No task specified.")
@@ -65,21 +67,6 @@ class DagmanKiller(TaskAction):
             hostname = ''
 
         const = 'CRAB_ReqName =?= %s && TaskType=?="Job"' % HTCondorUtils.quote(self.workflow)
-        try:
-            for ad in list(self.schedd.xquery(const, ['CRAB_Id', 'CRAB_Retry'])):
-                if ('CRAB_Id' not in ad) or ('CRAB_Retry' not in ad):
-                    continue
-                jobid = str(ad.eval('CRAB_Id'))
-                jobretry = str(ad.eval('CRAB_Retry'))
-                jinfo = {'broker': hostname,
-                         'bossId': jobid,
-                         'StatusValue': 'killed',
-                        }
-                insertJobIdSid(jinfo, jobid, self.workflow, jobretry)
-                self.logger.info("Sending kill info to Dashboard: %s", str(jinfo))
-                apmon.sendToML(jinfo)
-        except Exception:
-            self.logger.exception("Failed to notify Dashboard of job kills") #warning
 
         # Note that we can not send kills for jobs not in queue at this time; we'll need the
         # DAG FINAL node to be fixed and the node status to include retry number.
@@ -124,32 +111,28 @@ class DagmanKiller(TaskAction):
         """
         The execute method of the DagmanKiller class.
         """
-        apmon = ApmonIf.ApmonIf()
+        self.executeInternal(*args, **kwargs)
         try:
-            self.executeInternal(apmon, *args, **kwargs)
-            try:
-                ## AndresT: If a task was in FAILED status before the kill, then the new status
-                ## after killing some jobs should be FAILED again, not SUBMITTED. However, in
-                ## the long term we would like to introduce a final node in the DAG, and I think
-                ## the idea would be that the final node will put the task status into FAILED or
-                ## COMPLETED (in the TaskDB) once all jobs are finished. In that case I think
-                ## also the status method from HTCondorDataWorkflow would not have to return any
-                ## adhoc task status anymore (it would just return what is in the TaskDB) and
-                ## that also means that FAILED task status would only be a terminal status that
-                ## I guess should not accept a kill (because it doesn't make sense to kill a
-                ## task for which all jobs have already finished -successfully or not-).
-                configreq = {'subresource': 'state',
-                             'workflow': kwargs['task']['tm_taskname'],
-                             'status': 'KILLED'}
-                self.logger.debug("Setting the task as successfully killed with %s", str(configreq))
-                self.crabserver.post(api='workflowdb', data=urllib.urlencode(configreq))
-            except HTTPException as hte:
-                self.logger.error(hte.headers)
-                msg = "The CRAB server successfully killed the task,"
-                msg += " but was unable to update the task status to %s in the database." % (configreq['status'])
-                msg += " This should be a harmless (temporary) error."
-                raise TaskWorkerException(msg)
-        finally:
-            apmon.free()
+            ## AndresT: If a task was in FAILED status before the kill, then the new status
+            ## after killing some jobs should be FAILED again, not SUBMITTED. However, in
+            ## the long term we would like to introduce a final node in the DAG, and I think
+            ## the idea would be that the final node will put the task status into FAILED or
+            ## COMPLETED (in the TaskDB) once all jobs are finished. In that case I think
+            ## also the status method from HTCondorDataWorkflow would not have to return any
+            ## adhoc task status anymore (it would just return what is in the TaskDB) and
+            ## that also means that FAILED task status would only be a terminal status that
+            ## I guess should not accept a kill (because it doesn't make sense to kill a
+            ## task for which all jobs have already finished -successfully or not-).
+            configreq = {'subresource': 'state',
+                         'workflow': kwargs['task']['tm_taskname'],
+                         'status': 'KILLED'}
+            self.logger.debug("Setting the task as successfully killed with %s", str(configreq))
+            self.crabserver.post(api='workflowdb', data=urlencode(configreq))
+        except HTTPException as hte:
+            self.logger.error(hte.headers)
+            msg = "The CRAB server successfully killed the task,"
+            msg += " but was unable to update the task status to %s in the database." % (configreq['status'])
+            msg += " This should be a harmless (temporary) error."
+            raise TaskWorkerException(msg)
 
         return Result.Result(task=kwargs['task'], result='OK')

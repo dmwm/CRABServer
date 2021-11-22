@@ -25,13 +25,12 @@ systems = \
     },
     'CRABInterface':
     {
-        'py_modules': ['PandaServerInterface', 'CRABQuality', 'HTCondorUtils', 'HTCondorLocator', 'ServerUtilities'],
+        'py_modules': ['CRABQuality', 'HTCondorUtils', 'HTCondorLocator', 'ServerUtilities'],
         'python': ['CRABInterface', 'CRABInterface/Pages',
                    'Databases',
                    'Databases/FileMetaDataDB', 'Databases/FileMetaDataDB/Oracle',
                    'Databases/FileMetaDataDB/Oracle/FileMetaData',
                    'Databases/TaskDB', 'Databases/TaskDB/Oracle',
-                   'Databases/TaskDB/Oracle/JobGroup',
                    'Databases/TaskDB/Oracle/Task',
                    'Databases/FileTransfersDB',
                    'Databases/FileTransfersDB/Oracle/',
@@ -39,18 +38,13 @@ systems = \
     },
     'TaskWorker':
     {
-        'py_modules': ['PandaServerInterface', 'RESTInteractions', 'ApmonIf',
-                       'apmon', 'DashboardAPI', 'Logger', 'ProcInfo',
+        'py_modules': ['RESTInteractions',
+                       'apmon', 'Logger', 'ProcInfo',
                        'CRABQuality', 'HTCondorUtils', 'HTCondorLocator',
                        'ServerUtilities', 'MultiProcessingLog', 'CMSGroupMapper',
                        'RucioUtils', 'cache_status'],
         'python': ['TaskWorker', 'TaskWorker/Actions', 'TaskWorker/DataObjects',
-                   'TaskWorker/Actions/Recurring', 'taskbuffer', 'Publisher', 'TransferInterface']
-    },
-    'UserFileCache':
-    {
-        'py_modules' : ['ServerUtilities'],
-        'python': ['UserFileCache']
+                   'TaskWorker/Actions/Recurring', 'Publisher', 'TransferInterface']
     },
     'Publisher':
     {
@@ -60,7 +54,7 @@ systems = \
     'All':
     {
         'py_modules': [''],
-        'python': ['TaskWorker', 'CRABInterface', 'UserFileCache', 'CRABClient', 'Publisher']
+        'python': ['TaskWorker', 'CRABInterface', 'CRABClient', 'Publisher']
     }
 }
 
@@ -146,8 +140,8 @@ def define_the_build(dist, system_name, patch_x=''):
 class BuildCommand(Command):
     """Build python modules for a specific system."""
     description = \
-        "Build python modules for the specified system. The two supported systems\n" + \
-        "\t\t   at the moment are 'CRABInterface' and 'UserFileCache'. Use with --force \n" + \
+        "Build python modules for the specified system. The supported system(s)\n" + \
+        "\t\t   at the moment are 'CRABInterface' . Use with --force \n" + \
         "\t\t   to ensure a clean build of only the requested parts.\n"
     user_options = build.user_options
     user_options.append(('system=', 's', 'build the specified system (default: CRABInterface)'))

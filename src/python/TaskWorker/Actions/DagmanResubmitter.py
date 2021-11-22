@@ -1,6 +1,11 @@
 import time
-import urllib
 import datetime
+
+import sys
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
+if sys.version_info < (3, 0):
+    from urllib import urlencode
 
 import classad
 import htcondor
@@ -8,15 +13,13 @@ import htcondor
 import HTCondorLocator
 import HTCondorUtils
 
-from WMCore.Database.CMSCouch import CouchServer
-
 from ServerUtilities import FEEDBACKMAIL
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.Actions.DagmanSubmitter import checkMemoryWalltime
 from TaskWorker.WorkerExceptions import TaskWorkerException
 import TaskWorker.DataObjects.Result as Result
 
-from httplib import HTTPException
+from http.client import HTTPException
 
 
 class DagmanResubmitter(TaskAction):
@@ -38,26 +41,8 @@ class DagmanResubmitter(TaskAction):
             raise ValueError("No proxy provided")
         proxy = task['user_proxy']
 
-        if task.get('resubmit_publication', False):
-            resubmitWhat = "publications"
-        else:
-            resubmitWhat = "jobs"
-
-        self.logger.info("About to resubmit %s for workflow: %s.", resubmitWhat, workflow)
+        self.logger.info("About to resubmit failed jobs for workflow: %s.", workflow)
         self.logger.debug("Task info: %s", str(task))
-
-        if task.get('resubmit_publication', False):
-            asourl = task.get('tm_asourl', None)
-            #Let's not assume the db has been updated (mostly for devs), let's default asodb to asynctransfer!
-            #Also the "or" takes care of the case were the new code is executed on old task
-            #i.e.: tm_asodb is there but empty.
-            asodb = task.get('tm_asodb', 'asynctransfer') or 'asynctransfer'
-            if not asourl:
-                msg = "ASO URL not set. Can not resubmit publication."
-                raise TaskWorkerException(msg)
-            self.logger.info("Will resubmit failed publications")
-            self.resubmitPublication(asourl, asodb, proxy, workflow)
-            return
 
         if task['tm_collector']:
             self.backendurls['htcondorPool'] = task['tm_collector']
@@ -126,7 +111,7 @@ class DagmanResubmitter(TaskAction):
                     ## all the jobs, not only the ones we want to resubmit. That's why the pre-job
                     ## is saving the values of the parameters for each job retry in text files (the
                     ## files are in the directory resubmit_info in the schedd).
-                    for adparam, taskparam in params.iteritems():
+                    for adparam, taskparam in params.items():
                         if taskparam in ad:
                             schedd.edit(rootConst, adparam, ad.lookup(taskparam))
                         elif task['resubmit_'+taskparam] != None:
@@ -138,7 +123,7 @@ class DagmanResubmitter(TaskAction):
             self.logger.debug("Resubmitting under condition overwrite = True")
             with HTCondorUtils.AuthenticatedSubprocess(proxy, logger=self.logger) as (parent, rpipe):
                 if not parent:
-                    for adparam, taskparam in params.iteritems():
+                    for adparam, taskparam in params.items():
                         if taskparam in ad:
                             if taskparam == 'jobids' and len(list(ad[taskparam])) == 0:
                                 self.logger.debug("Setting %s = True in the task ad.", adparam)
@@ -183,7 +168,7 @@ class DagmanResubmitter(TaskAction):
                          'workflow': kwargs['task']['tm_taskname'],
                          'status': 'SUBMITTED'}
             self.logger.debug("Setting the task as successfully resubmitted with %s", str(configreq))
-            self.crabserver.post(api='workflowdb', data=urllib.urlencode(configreq))
+            self.crabserver.post(api='workflowdb', data=urlencode(configreq))
         except HTTPException as hte:
             self.logger.error(hte.headers)
             msg  = "The CRAB server successfully resubmitted the task to the Grid scheduler,"
@@ -191,44 +176,6 @@ class DagmanResubmitter(TaskAction):
             msg += " This should be a harmless (temporary) error."
             raise TaskWorkerException(msg)
         return Result.Result(task=kwargs['task'], result='OK')
-
-
-    def resubmitPublication(self, asourl, asodb, proxy, taskname):
-        """
-        Resubmit failed publications by resetting the publication
-        status in the CouchDB documents.
-        """
-        server = CouchServer(dburl=asourl, ckey=proxy, cert=proxy)
-        try:
-            database = server.connectDatabase(asodb)
-        except Exception as ex:
-            msg = "Error while trying to connect to CouchDB: %s" % (str(ex))
-            raise TaskWorkerException(msg)
-        try:
-            failedPublications = database.loadView('DBSPublisher', 'PublicationFailedByWorkflow',\
-                    {'reduce': False, 'startkey': [taskname], 'endkey': [taskname, {}]})['rows']
-        except Exception as ex:
-            msg = "Error while trying to load view 'DBSPublisher.PublicationFailedByWorkflow' from CouchDB: %s" % (str(ex))
-            raise TaskWorkerException(msg)
-        msg = "There are %d failed publications to resubmit: %s" % (len(failedPublications), failedPublications)
-        self.logger.info(msg)
-        for doc in failedPublications:
-            docid = doc['id']
-            if doc['key'][0] != taskname: # this should never happen...
-                msg = "Skipping document %s as it seems to correspond to another task: %s" % (docid, doc['key'][0])
-                self.logger.warning(msg)
-                continue
-            data = {'last_update': time.time(),
-                    'retry': str(datetime.datetime.now()),
-                    'publication_state': 'not_published',
-                   }
-            try:
-                database.updateDocument(docid, 'DBSPublisher', 'updateFile', data)
-            except Exception as ex:
-                msg = "Error updating document %s in CouchDB: %s" % (docid, str(ex))
-                self.logger.error(msg)
-        return
-
 
 if __name__ == "__main__":
     import os
