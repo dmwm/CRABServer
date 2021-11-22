@@ -1,24 +1,36 @@
 #!/usr/bin/python
 """
 Script algorithm
-    - check for file reports from post-job on a local file
-    - if present register Rucio dataset and rule for this task
-    - Start from the last file processed (stored on last_transfer.txt)
-    - gather list of file to transfers
-        + register temp and direct staged files
-        + update info in oracle
-    - monitor the Rucio replica locks for the datasets
-        + update info in oracle accordingly
+    - 
 """
 from __future__ import absolute_import, division, print_function
 import json
 import logging
 import os
 
+from rucio.client.client import Client
+
 from RESTInteractions import CRABRest
 
-from TransferInterface.RegisterFiles import submit
-from TransferInterface.MonitorTransfers import monitor
+CRABSERVER = None
+
+REPLICAS_CHUNK_SIZE = 100
+
+RUCIO_SCOPE = "user."
+RUCIO_CLIENT = Client()
+RUCIO_CLIENT_CONFIGURED = False
+
+CURRENT_DATASETS = None
+
+PUBLISHNAME = None
+
+# TODO: try
+with open("task_process/transfers/last_transfer.txt", "r") as _last:
+    LAST_LINE = _last.readline
+
+# TODO: try
+with open("task_process/transfers/last_transfer_direct.txt", "r") as _last:
+    LAST_LINE_DIRECT = _last.readline
 
 
 if not os.path.exists('task_process/transfers'):
@@ -27,8 +39,189 @@ if not os.path.exists('task_process/transfers'):
 logging.basicConfig(
     filename='task_process/transfers/transfer_inject.log',
     level=logging.DEBUG,
-    format='%(asctime)s[%(relativeCreated)6d]%(threadName)s: %(message)s'
+    format='[%(asctime)s] [%(levelname)s] %(message)s'
 )
+
+def init_crabrest_client():
+    try:
+       if os.path.exists('task_process/RestInfoForFileTransfers.json'):
+        with open('task_process/RestInfoForFileTransfers.json') as fp:
+            restInfo = json.load(fp)
+            proxy = os.getcwd() + "/" + restInfo['proxyfile']
+            #rest_filetransfers = restInfo['host'] + '/crabserver/' + restInfo['dbInstance']
+            os.environ["X509_USER_PROXY"] = proxy
+
+    # If there are no user proxy yet, just wait for the first pj of the task to finish
+    if not proxy:
+        logging.info('No proxy available yet - waiting for first post-job')
+        return None
+
+    try:
+        CRABSERVER = CRABRest(restInfo['host'], localcert=proxy, localkey=proxy,
+                              userAgent='CRABSchedd')
+        CRABSERVER.setDbInstance(restInfo['dbInstamce'])
+    except Exception:
+        logging.exception("Failed to set connection to crabserver")
+        return
+
+def init_rucio_client ():
+    """
+    Initiate the Rucio client if not already set:
+        - check if RUCIO_CLIENT is already initialized
+            - if not try to instantiate now
+                - get username from ask_process/transfers.txt
+                - get the proxy location
+                - instatiate client
+    """
+        logging.info("Checking if there are any files in task_process/transfers.txt")
+        try:
+            with open("task_process/transfers.txt") as _list:
+                doc = json.loads(_list.readlines()[0])
+                user = doc['username']
+        except Exception as ex:
+            logging.exception("task_process/transfers.txt does not exist. Probably no completed jobs in the task yet.", ex)    
+            return
+
+        # TODO: logging and try
+        logging.info("Checking if task_process/RestInfoForFileTransfers.json")
+        try:
+            if os.path.exists('task_process/RestInfoForFileTransfers.json'):
+                with open('task_process/RestInfoForFileTransfers.json') as fp:
+                    restInfo = json.load(fp)
+                    proxy = os.getcwd() + "/" + restInfo['proxyfile']
+                    os.environ["X509_USER_PROXY"] = proxy
+        except Exception as ex:
+            logging.exception("task_process/RestInfoForFileTransfers.json can't be read. Probably no completed jobs in the task yet.", ex)    
+            return
+
+        if not RUCIO_CLIENT_CONFIGURED:
+            logging.warning("Rucio client not configured, I'm initiating it right now")
+            logging.info("I'm going to configure Rucio client for %s", user)
+
+            RUCIO_SCOPE += user
+            logging.debug("Account %s scope: %s with creds %s" % (user, RUCIO_SCOPE, proxy))
+            try:
+                RUCIO_CLIENT = Client(account=user, auth_type="x509_proxy")
+                RUCIO_CLIENT_CONFIGURED = True
+            except Exception as ex:
+                logging.error("Something went wrong when initializing rucio client: %s", ex)
+                return
+
+def generate_container_name():
+    # generate DBS name
+
+    PUBLISHNAME = 
+
+    return    
+
+def create_container():
+    """
+    - one rule with lifetime (1m) for replicas on TEMP RSE
+    - one rule with no lifetime (1m) for replicas on DEST RSE
+    """
+
+    return
+
+def create_datasets():
+
+    CURRENT_DATASETS = dataset
+
+    return
+
+def create_transfer_dicts(input_dict={}):
+
+    xdict = {
+        "source_lfn": input_dict["source_lfn"],
+        "destination_lfn": input_dict["destination_lfn"],
+        "id": input_dict["id"],
+        "source": input_dict["source"],
+        "destination": input_dict["destination"],
+        "checksum": input_dict["checksums"]["adler32"].rjust(8,'0'),
+        "filesize": input_dict["filesize"],
+        "publishname":     PUBLISHNAME
+
+    }
+
+    return xdict
+
+def register_replicas(input_replicas=[]):
+    # TODO: collect by SOURCE --> one dict per source
+    # TODO: exclude direct files!
+    replicas = []
+    for chunk in chunks(input_replicas, REPLICAS_CHUNK_SIZE):
+        for data in chunk:
+            # add_replicas(rse, files, ignore_availability=True)
+            #     Bulk add file replicas to a RSE.
+            #     Parameters
+            #             rse – the RSE name.
+            #             files – The list of files. This is a list of DIDs like : [{‘scope’: <scope1>, ‘name’: <name1>}, {‘scope’: <scope2>, ‘name’: <name2>}, …]
+            #             ignore_availability – Ignore the RSE blacklisting.
+            #     Returns
+            #             True if files were created successfully.
+
+            replicas.apped(
+                {
+
+                }
+            )
+
+    # add to CURRENT_DATASET
+
+    # TODO: close CURRENT_DATASET if needed
+    # -if everything full create new one
+    return
+
+def register_direct_files():
+
+    DIRECT_FILES = []
+
+    return
+
+def monitor_locks_status():
+
+    return
+
+def main():
+    """
+    Script algorithm
+    - check if rucio client is good
+        - that means that at least a file report from post-job is there
+    - register Rucio datasets and containers + container rule for this task
+        - one rule with lifetime (1m) for replicas on TEMP RSE
+        - one rule with no lifetime (1m) for replicas on DEST RSE
+    - Start from the last file processed (stored on last_transfer.txt)
+    - gather list of file to transfers
+        + register temp files (no direct stageout should be used for RUCIO)
+        + fill the first dataset not closed
+        + update info in oracle
+    - monitor the Rucio replica locks by the datasets
+        + update info in oracle accordingly
+    """
+    transfers_dict = []
+
+    with open("task_process/transfers.txt") as _list:
+        for _data in _list.readlines()[int(LAST_LINE):]:
+            file_to_submit = []
+            try:
+                LAST_LINE += 1
+                doc = json.loads(_data)
+                transfers_dict.append(create_transfer_dict(dict=doc))
+
+        direct_files = []
+        if os.path.exists('task_process/transfers/registered_direct_files.txt'):
+            with open("task_process/transfers/registered_direct_files.txt", "r") as list_file:
+                direct_files = [x.split('\n')[0] for x in list_file.readlines()]
+
+        generate_container_name()
+        create_container()
+        create_datasets()
+
+        register_direct_files(direct_files)
+        register_replicas(transfers_dict)
+
+        monitor_locks_status()
+
+    return
 
 
 def perform_transfers(inputFile, lastLine, direct=False):
@@ -250,40 +443,12 @@ def submission_manager():
     return r
 
 
-def algorithm():
-    """
-    Script algorithm
-    - check for file reports from post-job on a local file
-    - if present register Rucio dataset and rule for this task
-    - Start from the last file processed (stored on last_transfer.txt)
-    - gather list of file to transfers
-        + register temp and direct staged files
-        + update info in oracle
-    - monitor the Rucio replica locks for the datasets
-        + update info in oracle accordingly
-    """
-
-    user = None
-    try:
-        user, taskname = submission_manager()
-    except Exception:
-        logging.exception('Submission proccess failed.')
-
-    if not user:
-        logging.info('Nothing to monitor yet.')
-        return
-    try:
-        monitor_manager(user, taskname)
-    except Exception:
-        logging.exception('Monitor proccess failed.')
-
-    return
 
 
 if __name__ == "__main__":
     logging.info(">>>> New process started  <<<<")
     try:
-        algorithm()
+        main()
     except Exception:
         logging.exception("error during main loop")
     logging.debug("transfers.py exiting")
