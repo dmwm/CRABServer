@@ -117,13 +117,9 @@ def fixupTask(task):
 
     #fixup CLOBS values by calling read (only for Oracle)
     for field in ['tm_task_failure', 'tm_split_args', 'tm_outfiles', 'tm_tfile_outfiles', 'tm_edm_outfiles',
-                  'tm_arguments', 'tm_scriptargs', 'tm_user_files', 'tm_arguments']:
+                  'tm_arguments', 'tm_scriptargs', 'tm_user_files']:
         current = result[field]
         fixedCurr = current if (current is None or isinstance(current, str)) else current.read()
-        # SB horrible hack start
-        if fixedCurr and "[b'" in fixedCurr:
-            fixedCurr = fixedCurr.replace("[b'", "['", 1)
-        # SB horrible hack end
         result[field] = fixedCurr
 
     #liter_evaluate values
@@ -132,6 +128,9 @@ def fixupTask(task):
                   'tm_user_files']:
         current = result[field]
         result[field] = literal_eval(current)
+        for idx, value in enumerate(result[field]):
+            if isinstance(value, bytes):
+                result[field][idx] = value.decode("utf8")
 
     #convert tm_arguments to the desired values
     extraargs = result['tm_arguments']

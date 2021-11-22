@@ -225,7 +225,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         ## Apply taskWarning flag to output.
         taskWarnings = literal_eval(row.task_warnings if isinstance(row.task_warnings, str) else row.task_warnings.read())
-        result["taskWarningMsg"] = taskWarnings
+        result["taskWarningMsg"] = taskWarnings.decode("utf8") if isinstance(taskWarnings, bytes) else taskWarnings
 
         ## Helper function to add the task status and the failure message (both as taken
         ## from the Task DB) to the result dictionary.
@@ -316,7 +316,7 @@ class HTCondorDataWorkflow(DataWorkflow):
                 else:
                     self.logger.info("Node state file is too old or does not have an update time. Stale info is shown")
             except Exception as ee:
-                addStatusAndFailure(result, status = 'UNKNOWN', failure = ee.info)
+                addStatusAndFailure(result, status = 'UNKNOWN', failure = str(ee))
                 return [result]
 
         if 'DagStatus' in taskStatus:
@@ -571,7 +571,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         if first_char == "[":
             return self.parseNodeStateV2(fp, nodes)
         for line in fp.readlines():
-            m = self.job_re.match(line)
+            m = self.job_re.match(line.decode("utf8") if isinstance(line, bytes) else line)
             if not m:
                 continue
             nodeid, status, msg = m.groups()
