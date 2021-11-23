@@ -9,11 +9,6 @@ function cache_status {
     python task_process/cache_status.py
 }
 
-function cache_status_jel {
-    log "Running cache_status_jel.py"
-    python3 task_process/cache_status_jel.py
-}
-
 function manage_transfers {
     log "Running transfers.py"
 
@@ -122,11 +117,7 @@ do
     fi
 
     # Run the parsing script
-    if [ -f USE_JEL ] ; then
-        cache_status_jel
-    else
-        cache_status
-    fi
+    cache_status
     manage_transfers
     sleep 300s
 
