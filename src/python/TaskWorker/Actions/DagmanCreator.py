@@ -558,10 +558,12 @@ class DagmanCreator(TaskAction):
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
         try:
-            # use temp_dest since it the longest path and overall LFN has a length limit to fit in DataBase
+            # validate LFN's. Check both dest and temp_dest. See https://github.com/dmwm/CRABServer/issues/6871
             if task['tm_publication'] == 'T':
+                validateLFNs(dest, outfiles)
                 validateLFNs(temp_dest, outfiles)
             else:
+                validateUserLFNs(dest, outfiles)
                 validateUserLFNs(temp_dest, outfiles)
         except AssertionError as ex:
             msg = "\nYour task speficies an output LFN which fails validation in"
