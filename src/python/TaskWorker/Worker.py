@@ -21,6 +21,8 @@ from TaskWorker.DataObjects.Result import Result
 from ServerUtilities import truncateError, executeCommand
 from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException
 
+from Utils.Utilities import encodeUnicodeToBytes
+
 ## Creating configuration globals to avoid passing these around at every request
 ## and tell pylink to bare with this :-)
 # pylint: disable=W0604, W0601
@@ -53,7 +55,7 @@ def failTask(taskName, crabserver, msg, log, failstatus='FAILED'):
                      'status': failstatus,
                      'subresource': 'failure',
                      # Limit the message to 7500 chars, which means no more than 10000 once encoded. That's the limit in the REST
-                     'failure': b64encode(truncMsg)}
+                     'failure': b64encode(encodeUnicodeToBytes(truncMsg))}
         crabserver.post(api='workflowdb', data = urlencode(configreq))
         log.info("Failure message successfully uploaded to the REST")
     except HTTPException as hte:

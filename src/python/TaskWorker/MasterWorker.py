@@ -20,6 +20,7 @@ if sys.version_info < (3, 0):
     from urllib import urlencode
 
 #WMcore dependencies
+from Utils.Utilities import encodeUnicodeToBytes
 from WMCore.Configuration import loadConfigurationFile
 
 #CRAB dependencies
@@ -384,7 +385,7 @@ class MasterWorker(object):
             if command == 'KILL':  # ignore, i.e. leave in status 'SUBMITTED'
                 self.updateWork(taskname, command, 'SUBMITTED')
             warning = 'command %s disabled in CRAB TaskWorker configuration' % command
-            configreq = {'subresource': 'addwarning', 'workflow': taskname, 'warning': b64encode(warning)}
+            configreq = {'subresource': 'addwarning', 'workflow': taskname, 'warning': b64encode(encodeUnicodeToBytes(warning))}
             try:
                 self.crabserver.post(api='task', data=urlencode(configreq))
             except Exception as e:
