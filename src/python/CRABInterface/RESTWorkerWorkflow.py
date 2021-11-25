@@ -2,6 +2,7 @@
 """
 # WMCore dependecies here
 from builtins import str
+from Utils.Utilities import decodeBytesToUnicode
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
 from WMCore.REST.Error import InvalidParameter
@@ -62,7 +63,7 @@ class RESTWorkerWorkflow(RESTEntity):
         """ Updates task information """
         if failure is not None:
             try:
-                failure = b64decode(failure)
+                failure = decodeBytesToUnicode(b64decode(failure))
             except TypeError:
                 raise InvalidParameter("Failure message is not in the accepted format")
         methodmap = {"state": {"args": (self.Task.SetStatusTask_sql,), "method": self.api.modify, "kwargs": {"status": [status],

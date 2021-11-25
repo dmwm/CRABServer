@@ -8,6 +8,7 @@ import logging
 import cherrypy
 from base64 import b64decode
 # WMCore dependecies here
+from Utils.Utilities import decodeBytesToUnicode
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_real
@@ -549,7 +550,7 @@ class RESTUserWorkflow(RESTEntity):
             #decode killwarning message if present
             if safe.kwargs['killwarning']:
                 try:
-                    safe.kwargs['killwarning'] = b64decode(safe.kwargs['killwarning'])
+                    safe.kwargs['killwarning'] = decodeBytesToUnicode(b64decode(safe.kwargs['killwarning']))
                 except TypeError:
                     raise InvalidParameter("Failure message is not in the accepted format")
 
