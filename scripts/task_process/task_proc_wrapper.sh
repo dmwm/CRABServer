@@ -6,7 +6,7 @@ function log {
 
 function cache_status {
     log "Running cache_status.py"
-    python task_process/cache_status.py
+    python3 task_process/cache_status.py
 }
 
 function manage_transfers {
