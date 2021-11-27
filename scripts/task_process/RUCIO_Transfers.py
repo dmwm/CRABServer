@@ -29,6 +29,28 @@ DESTINATION = None
 
 REPLICAS = []
 
+os.environ["X509_CERT_DIR"] = os.getcwd()
+
+proxy = None
+if os.path.exists('task_process/RestInfoForFileTransfers.json'):
+    with open('task_process/RestInfoForFileTransfers.json') as fp:
+        restInfo = json.load(fp)
+        proxy = os.getcwd() + "/" + restInfo['proxyfile']
+        log.info("Proxy: %s", proxy)
+        os.environ["X509_USER_PROXY"] = proxy
+
+if not proxy:
+    log.info('No proxy available yet - waiting for first post-job')
+    raise
+
+try:
+    crabserver = CRABRest(restInfo['host'], localcert=proxy, localkey=proxy,
+                            userAgent='CRABSchedd')
+    crabserver.setDbInstance(restInfo['dbInstamce'])
+except Exception:
+    log.exception("Failed to set connection to crabserver")
+    raise
+
 
 # TODO: try
 with open("task_process/transfers/last_transfer.txt", "r") as _last:
@@ -123,13 +145,11 @@ def check_or_create_container():
 
     # TODO: try and explicit excption. go on only if alreadyExists error
     try:
-        RUCIO_CLIENT.get_did(RUCIO_SCOPE, PUBLISHNAME)
+        RUCIO_CLIENT.add_container(RUCIO_SCOPE, PUBLISHNAME)
+        container_did = {'scope': RUCIO_SCOPE, 'type': "container", 'name': PUBLISHNAME}
+        RUCIO_CLIENT.add_replication_rule([container_did], copies=1, rse_expression=DESTINATION)
     except:
-        try:
-            RUCIO_CLIENT.add_container(RUCIO_SCOPE, PUBLISHNAME)
-            RUCIO_CLIENT.add_replication_rule(RUCIO_SCOPE+":"+PUBLISHNAME, copies=1, rse_expression=DESTINATION)
-        except:
-            raise
+        # TODO: try and explicit excption. go on only if alreadyExists error
 
     return
 
@@ -144,19 +164,21 @@ def check_or_create_current_dataset(force_create=False):
         datasets = RUCIO_CLIENT.list_content(RUCIO_SCOPE, PUBLISHNAME)
         # get open datasets
         # if more than one, close the most occupied
-        closed_ds = []
+        open_ds = []
         for d in datasets:
             # check if closed and append
+            if RUCIO_CLIENT.get_did(RUCIO_SCOPE, d["name"])["open"]:
+                open_ds.append(d)
 
-        if len(closed_ds) == 0:
+        if len(open_ds) == 0:
             # create a new dataset
             RUCIO_CLIENT.add_dataset(RUCIO_SCOPE, CURRENT_DATASET)
-
+            ds_did = {'scope': RUCIO_SCOPE, 'type': "dataset", 'name': CURRENT_DATASET}
             # attach dataset to the container
-            RUCIO_CLIENT.attach_dids(RUCIO_SCOPE, PUBLISHNAME, RUCIO_SCOPE+ ":" + CURRENT_DATASET) 
-        elif len(closed_ds)  > 1:
+            RUCIO_CLIENT.attach_dids(RUCIO_SCOPE, PUBLISHNAME, [ds_did]) 
+        elif len(open_ds)  > 1:
             # close the most occupied and take the other as the current one
-        elif len(closed_ds)  == 1:
+        elif len(open_ds)  == 1:
             # set it as the current
 
     else:    
@@ -198,14 +220,19 @@ def chunks(l, n):
 
 
 def get_pfns(rse, lfns):
+    # Get the rse prefix from the first entry, then apply to all
 
     pfns = []
 
-    for chunk in chunks(lfns, 10):
-        # lfns2pfns: (rse, lfns, protocol_domain='ALL', operation=None, scheme=None)
-        pfns += RUCIO_CLIENT.lfns2pfns(rse,  lfns)
+    pfn_0 = RUCIO_CLIENT.lfns2pfns(rse,  lfns[0])
 
-    # returning {"rse":{"lfn":"pfn"}}
+    pfns.append(pfn_0)
+
+    prefix = pfn_0.split(lfns[0])[0]
+
+    for lfn in lfns:
+        
+        pfns.append(prefix + lfn)
 
     map_dict = {}
     for lfn, pfn in zip(lfns, pfns):
@@ -215,7 +242,7 @@ def get_pfns(rse, lfns):
     return pfn_map
 
 
-def manage_replicas_for_remote_remote_direct(transfer_dicts, direct_lfns):
+def manage_replicas_for_remote_and_direct(transfer_dicts, direct_lfns):
     """Generate a replica list starting from 2 subset, one for directly staged file and one for the files in temp RSEs
 
     """
@@ -276,7 +303,7 @@ def manage_replicas_for_remote_remote_direct(transfer_dicts, direct_lfns):
         rse = xdict["source"]
         destination_lfn = xdict["destination_lfn"]
         size = xdict["filesize"]
-        replica = {'scope': RUCIO_SCOPE, 'pfn': pfn_map[rse][source_lfn], 'name': destination_lfn, 'bytes': size}
+        replica = {'scope': RUCIO_SCOPE, 'name': destination_lfn, 'bytes': size}
         replicas[rse].append(replica)
 
     return replicas
@@ -306,7 +333,7 @@ def register_replicas(input_replicas=[]):
             if not RUCIO_CLIENT.add_replicas(rse, chunk):
                 # TODO: add to failed list
             else: 
-                dids = [RUCIO_SCOPE+":"+x["name"] for x in chunk]
+                dids = [{'scope': RUCIO_SCOPE, 'type': "dataset", 'name': x["name"]} for x in chunk]
 
                 # keep file in place at least one rule with lifetime (1m) for replicas on TEMP RSE
                 # 2629800 seconds in a month
@@ -328,9 +355,50 @@ def register_replicas(input_replicas=[]):
 
 def monitor_locks_status():
     # Monitor by datasets
+    # Remember that in RUCIO "A dataset/container where all files have replicas available is complete."
+    dataset_completed = []
+    try:
+        datasets = RUCIO_CLIENT.list_content(RUCIO_SCOPE, PUBLISHNAME)
+        # get open datasets
+        # if more than one, close the most occupied
+        for d in datasets:
+            # check if closed and append
+            if RUCIO_CLIENT.get_did(RUCIO_SCOPE, d["name"])["complete"]:
+                dataset_completed.append(d)
+    except:
+        pass
 
-    # remove rule for file if transferred
+    # check for dataset not reported as completed yet in oracle
+
+    # add to the list of completed all the dataset content
+
+    # for did in complete dataset remove rule for files
+    
+    # write somewhere the list of dataset not to check again
     return
+
+def update_db(fileDoc):
+    """take a list of files and status --> update oracle
+            fileDoc = dict()
+            fileDoc['asoworker'] = 'rucio'
+            fileDoc['subresource'] = 'updateTransfers'
+            fileDoc['list_of_ids'] = [id_map[x[0]] for x in list_update]
+            fileDoc['list_of_transfer_state'] = ["SUBMITTED" for _ in list_update]
+            fileDoc['list_of_fts_instance'] = ['https://fts3-cms.cern.ch:8446/' for _ in list_update]
+            fileDoc['list_of_fts_id'] = [x[1] for x in list_update]
+    """
+
+    ids =[]
+
+    try:
+        crabserver.post(api='filetransfers',
+                                 data=encodeRequest(fileDoc))
+    except Exception:
+        logging.exception("Error updating documents")
+        return None
+
+    return ids
+
 
 def main():
     """
@@ -368,7 +436,7 @@ def main():
         with open("task_process/transfers/registered_direct_files.txt", "r") as list_file:
             # list of directly staged files in transfer_dicts format
             direct_lfns = [x.split('\n')[0] for x in list_file.readlines()]
-            REPLICAS = manage_replicas_for_remote_remote_direct(transfers_dicts, direct_lfns)
+            REPLICAS = manage_replicas_for_remote_and_direct(transfers_dicts, direct_lfns)
 
     check_or_create_container()
     check_or_create_current_dataset()
@@ -381,54 +449,7 @@ def main():
 
     # TODO: update DB
 
-    # TODO: write LASTLINE to file
+    # TODO: write LASTLINE e LASTLINE_DIRECT to file
     # first in temp and then copy to avoid inconsistency for kill while processing
 
     return
-
-
-
-## TODO: remove this... only for reference so far
-def monitor_manager(user, taskname):
-    """Monitor Rucio replica locks for user task
-
-    :param user: user HN name
-    :type user: str
-    :param taskname: name of the task
-    :type taskname: str
-    :return: exit code 0 or None
-    :rtype: int
-    """
-
-    # Get proxy for talking to Rucio
-    proxy = None
-#    if os.path.exists('task_process/rest_filetransfers.txt'):
-#        with open("task_process/rest_filetransfers.txt", "r") as _rest:
-#            proxy = os.getcwd() + "/" + _rest.readline()
-#            logging.info("Proxy: %s", proxy)
-#            os.environ["X509_USER_PROXY"] = proxy
-
-    if os.path.exists('task_process/RestInfoForFileTransfers.json'):
-        with open('task_process/RestInfoForFileTransfers.json') as fp:
-            restInfo = json.load(fp)
-            proxy = os.getcwd() + "/" + restInfo['proxyfile']
-            os.environ["X509_USER_PROXY"] = proxy
-
-    # Same as submission process
-    # If no proxy present yet, wait for first postjob to finish
-    if not proxy:
-        logging.info('No proxy available yet - waiting for first post-job')
-        return None
-
-    # Start the monitoring process, managed in:
-    # src/python/TransferInterface/MonitorTransfers.py
-    try:
-        monitor(user, taskname, logging)
-    except Exception:
-        logging.exception('Monitor process failed.')
-
-    return 0
-
-
-
-
