@@ -275,7 +275,7 @@ class Master(object):
         info = []
         for task in unique_tasks:
             info.append([x for x in filesToPublish if x['taskname'] == task[3]])
-        return zip(unique_tasks, info)
+        return list(zip(unique_tasks, info))
 
     def getPublDescFiles(self, workflow, lfn_ready, logger):
         """
