@@ -235,7 +235,7 @@ class Master(object):
         asoworkers = self.config.asoworker
         # asoworkers can be a string or a list of strings
         # but if it is a string, do not turn it into a list of chars !
-        asoworkers = [asoworkers] if isinstance(asoworkers, basestring) else asoworkers
+        asoworkers = [asoworkers] if isinstance(asoworkers, str) else asoworkers
         for asoworker in asoworkers:
             self.logger.info("Processing publication requests for asoworker: %s", asoworker)
             fileDoc = {}
