@@ -40,8 +40,6 @@ pushd $STARTDIR
 
 rm -f $STARTDIR/CRAB3.zip
 rm -f $STARTDIR/WMCore.zip
-rm -f $STARTDIR/nose.tar.gz
-
 
 # For developers, we download all our dependencies from the various upstream servers.
 # For actual releases, we take the libraries from the build environment RPMs.
@@ -84,17 +82,6 @@ else
         curl -L https://github.com/$CRABSERVERREPO/CRABServer/archive/$CRABSERVERVER.tar.gz | tar zx || exit 2
         CRABSERVER_PATH="CRABServer-$CRABSERVERVER"
     fi
-
-    if [[ ! -e nose.tar.gz ]]; then
-        curl -L https://github.com/nose-devs/nose/archive/release_1.3.0.tar.gz > nose.tar.gz || exit 2
-    fi
-
-    tar xzf nose.tar.gz || exit 2
-
-    pushd nose-release_1.3.0/
-    zip -rq $STARTDIR/CRAB3.zip nose -x \*.pyc || exit 3
-    popd
-
 
     # up until this point, evertying in CRAB3.zip is an external
     cp $STARTDIR/CRAB3.zip $ORIGDIR/CRAB3-externals.zip
