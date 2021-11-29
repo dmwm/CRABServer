@@ -638,7 +638,7 @@ class Master(object):
                 # find the location in the current environment of the script we want to run
                 import Publisher.TaskPublish as tp
                 taskPublishScript = tp.__file__
-                cmd = "python %s " % taskPublishScript
+                cmd = "python3 %s " % taskPublishScript
                 cmd += " --configFile=%s" % self.configurationFile
                 cmd += " --taskname=%s" % workflow
                 if self.TPconfig.dryRun:
