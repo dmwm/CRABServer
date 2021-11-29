@@ -235,7 +235,7 @@ class Master(object):
         asoworkers = self.config.asoworker
         # asoworkers can be a string or a list of strings
         # but if it is a string, do not turn it into a list of chars !
-        asoworkers = [asoworkers] if isinstance(asoworkers, basestring) else asoworkers
+        asoworkers = [asoworkers] if isinstance(asoworkers, str) else asoworkers
         for asoworker in asoworkers:
             self.logger.info("Processing publication requests for asoworker: %s", asoworker)
             fileDoc = {}
@@ -275,7 +275,7 @@ class Master(object):
         info = []
         for task in unique_tasks:
             info.append([x for x in filesToPublish if x['taskname'] == task[3]])
-        return zip(unique_tasks, info)
+        return list(zip(unique_tasks, info))
 
     def getPublDescFiles(self, workflow, lfn_ready, logger):
         """
@@ -638,7 +638,7 @@ class Master(object):
                 # find the location in the current environment of the script we want to run
                 import Publisher.TaskPublish as tp
                 taskPublishScript = tp.__file__
-                cmd = "python %s " % taskPublishScript
+                cmd = "python3 %s " % taskPublishScript
                 cmd += " --configFile=%s" % self.configurationFile
                 cmd += " --taskname=%s" % workflow
                 if self.TPconfig.dryRun:
