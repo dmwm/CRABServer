@@ -3,11 +3,10 @@
 from __future__ import print_function
 from __future__ import division
 
+import os
 from  datetime import datetime
 import argparse
 
-# this is needed to make it possible for the following import to work
-import CRABClient #pylint: disable=unused-import
 from dbs.apis.dbsClient import DbsApi
 
 def main():
@@ -15,6 +14,16 @@ def main():
     parser.add_argument('--id', help='migrationId to be removed', required=True)
     args = parser.parse_args()
     migrationId = int(args.id)
+
+    # if X509 vars are not defined, use default Publisher location
+    userProxy = os.getenv('X509_USER_PROXY')
+    if userProxy:
+        os.environ['X509_USER_CERT'] = userProxy
+        os.environ['X509_USER_KEY'] = userProxy
+    if not os.getenv('X509_USER_CERT'):
+        os.environ['X509_USER_CERT'] = '/data/certs/servicecert.pem'
+    if not os.getenv('X509_USER_KEY'):
+        os.environ['X509_USER_KEY'] = '/data/certs/servicekey.pem'
 
     migUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSMigrate'
     apiMig = DbsApi(url=migUrl)
@@ -42,7 +51,7 @@ def main():
     answer = raw_input("Do you want to remove it ? Yes/[No]: ")
     if answer in ['Yes', 'YES', 'Y', 'y', 'yes']:
         answer = 'Yes'
-    if answer is not 'Yes':
+    if answer != 'Yes':
         return
 
     print("\nRemoving it...")
@@ -54,6 +63,8 @@ def main():
     print("Migration %d successfully removed\n" % migrationId)
     print("CRAB Publisher will issue such a migration request again as/when needed")
     print("but if you want to recreated it now, you can do it  with this python fragment")
+    print("make sure you are in Publisher environmet, or add import CRABCline (lxplus e.g.)")
+    print("and that you have a valid proxy in X509_USER_PROXY")
     print("\n  ===============\n")
     print("import CRABClient")
     print("from dbs.apis.dbsClient import DbsApi")
