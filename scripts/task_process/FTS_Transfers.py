@@ -48,10 +48,7 @@ if os.path.exists('task_process/RestInfoForFileTransfers.json'):
 #        proxy = os.getcwd() + "/" + _rest.readline()
 #        print("Proxy: %s" % proxy)
 
-if os.path.exists('USE_NEW_PUBLISHER'):
-    asoworker = 'schedd'
-else:
-    asoworker = 'asoless'
+asoworker = 'schedd'
 
 if os.path.exists('USE_FTS_REUSE'):
     ftsReuse = True
