@@ -34,17 +34,20 @@ else
 fi
 pushd $STARTDIR
 
-#
-# cleanup, avoid to keep adding to existing tarballs
-#
 
+# cleanup, avoid to keep adding to existing tarballs
 rm -f $STARTDIR/CRAB3.zip
 rm -f $STARTDIR/WMCore.zip
+
+# make sure there's always a CRAB3.zip to avoid errors in other parts
+touch /tmp/dummyFile
+zip -r $STARTDIR/CRAB3.zip /tmp/dummyFile
+
 
 # For developers, we download all our dependencies from the various upstream servers.
 # For actual releases, we take the libraries from the build environment RPMs.
 if [[ "x$RPM_RELEASE" != "x" ]]; then
-
+    # I am inside  a release building
     pushd $ORIGDIR/../WMCore-$WMCOREVER/build/lib/
     zip -r $STARTDIR/WMCore.zip *
     zip -rq $STARTDIR/CRAB3.zip WMCore PSetTweaks Utils -x \*.pyc || exit 3
@@ -63,7 +66,7 @@ if [[ "x$RPM_RELEASE" != "x" ]]; then
     cp $ORIGDIR/src/python/{Logger.py,ProcInfo.py,ServerUtilities.py,RucioUtils.py,CMSGroupMapper.py,RESTInteractions.py} .
 
 else
-
+    # building runtime tarballs from development area or GH
     if [[ -d "$REPLACEMENT_ABSOLUTE/WMCore" ]]; then
         echo "Using replacement WMCore source at $REPLACEMENT_ABSOLUTE/WMCore"
         WMCORE_PATH="$REPLACEMENT_ABSOLUTE/WMCore"

@@ -1,6 +1,9 @@
 # Run the script inside CRABServer
 # this is a hardcoded name in htcondor_make_runtime.sh with no relation
 # with actual CRAB version
+
+set -x
+
 CRAB3_DUMMY_VERSION=3.3.0-pre1
 
 #
@@ -55,6 +58,7 @@ if [ $? -eq 0 ]
 then
   echo ""
   echo "OK. New tarballs created and placed inside directory tree: $TW_CURRENT"
+  echo "See log in ${logFile}"
   echo "Previous files have been saved in $CRABTASKWORKER_ROOT/data/PreviousRuntime/"
   echo "BEWARE: Safest way to revert to original configuration is to re-deploy container"
 else
