@@ -417,10 +417,6 @@ class DagmanCreator(TaskAction):
     def isGlobalBlacklistIgnored(self, kwargs):
         """ Determine wether the user wants to ignore the globalblacklist
         """
-        extrajdls = literal_eval(kwargs['task']['tm_extrajdl'])
-        for ej in extrajdls:
-            if ej.find('CRAB_IgnoreGlobalBlacklist') in [0, 1]: #there might be a + before
-                return True
 
         return kwargs['task']['tm_ignore_global_blacklist'] == 'T'
 
