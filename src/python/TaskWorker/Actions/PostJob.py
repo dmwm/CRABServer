@@ -843,12 +843,7 @@ class ASOServerJob(object):
             # https://github.com/dmwm/CRABServer/blob/43f6377447922d46353072e86d960e3c78967a17/src/python/CRABInterface/RESTFileUserTransfers.py#L122-L125
             # we need to update the record after insetion with a POST, which requires list of ids and states
             # https://github.com/dmwm/CRABServer/blob/43f6377447922d46353072e86d960e3c78967a17/src/python/CRABInterface/RESTFileTransfers.py#L131-L133
-            if os.path.exists('USE_NEW_PUBLISHER'):
-                self.logger.info("USE_NEW_PUBLISHER: set asoworker=schedd in transferdb")
-                updateDoc['asoworker'] = 'schedd'
-            else:
-                self.logger.info("OLD Publisher: set asoworker=asoless in transferdb")
-                updateDoc['asoworker'] = 'asoless'
+            updateDoc['asoworker'] = 'schedd'
             try:
                 self.crabserver.post(api='filetransfers', data=encodeRequest(updateDoc))
             except HTTPException as hte:
@@ -885,12 +880,7 @@ class ASOServerJob(object):
             updateDoc['list_of_ids'] = [newDoc['id']]
             updateDoc['list_of_transfer_state'] = [newDoc['transfer_state']]
             updateDoc['subresource'] = 'updateTransfers'
-            if os.path.exists('USE_NEW_PUBLISHER'):
-                self.logger.info("USE_NEW_PUBLISHER: set asoworker=schedd in transferdb")
-                updateDoc['asoworker'] = 'schedd'
-            else:
-                self.logger.info("OLD Publisher: set asoworker=asoless in transferdb")
-                updateDoc['asoworker'] = 'asoless'
+            updateDoc['asoworker'] = 'schedd'
             try:
                 self.crabserver.post(api='filetransfers', data=encodeRequest(updateDoc))
             except HTTPException as hte:
