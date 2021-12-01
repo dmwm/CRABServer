@@ -70,7 +70,7 @@ case $MODE in
     if [ "$debug" = true ]; then
       python3 ${COMMAND_DIR}/SequentialPublisher.py --config ${CONFIG} --debug
     else
-      nohup3 python ${COMMAND_DIR}/PublisherMaster.py --config $PUBLISHER_HOME/PublisherConfig.py &
+      nohup python3 ${COMMAND_DIR}/PublisherMaster.py --config $PUBLISHER_HOME/PublisherConfig.py &
     fi
   ;;
   private)
