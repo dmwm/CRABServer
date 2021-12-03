@@ -4,7 +4,11 @@ from __future__ import print_function
 from __future__ import division
 
 import os
-from httplib import HTTPException
+try:
+    from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
+except:  # pylint: disable=bare-except
+    from httplib import HTTPException  # old Python 2 version in CMSSW_7
+
 from CRABAPI.RawCommand import crabCommand
 from CRABClient.ClientExceptions import ClientException
 
