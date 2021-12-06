@@ -65,7 +65,7 @@ ln -s /data/hostdisk/${SERVICE}/nohup.out nohup.out
 case $MODE in
     current)
     # current mode: run current instance
-    COMMAND_DIR=${TASKWORKER_ROOT}/lib/python2.7/site-packages/TaskWorker/
+    COMMAND_DIR=${TASKWORKER_ROOT}/lib/python3.8/site-packages/TaskWorker/
     CONFIG=${TASKWORKER_HOME}/current/TaskWorkerConfig.py
     if [ "$debug" = true ]; then
       python3 ${COMMAND_DIR}/SequentialWorker.py  $CONFIG --logDebug
