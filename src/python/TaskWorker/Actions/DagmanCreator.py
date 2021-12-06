@@ -1099,16 +1099,16 @@ class DagmanCreator(TaskAction):
         # Import needed because the DagmanCreator module is also imported in the schedd,
         # where there is no ldap available. This function however is only called
         # in the TW (where ldap is installed) during submission.
-        from ldap import LDAPError
 
         highPrioUsers = set()
         try:
+            from ldap import LDAPError
             for egroup in egroups:
                 highPrioUsers.update(get_egroup_users(egroup))
-        except LDAPError as le:
+        except Exception as ex:
             msg = "Error when getting the high priority users list." \
                   " Will ignore the high priority list and continue normally." \
-                  " Error reason: %s" % str(le)
+                  " Error reason: %s" % str(ex)
             self.uploadWarning(msg, userProxy, workflow)
             return []
         return highPrioUsers
