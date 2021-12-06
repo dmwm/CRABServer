@@ -68,9 +68,9 @@ case $MODE in
     COMMAND_DIR=${TASKWORKER_ROOT}/lib/python2.7/site-packages/TaskWorker/
     CONFIG=${TASKWORKER_HOME}/current/TaskWorkerConfig.py
     if [ "$debug" = true ]; then
-      python ${COMMAND_DIR}/SequentialWorker.py  $CONFIG --logDebug
+      python3 ${COMMAND_DIR}/SequentialWorker.py  $CONFIG --logDebug
     else
-      nohup python ${COMMAND_DIR}/MasterWorker.py --config ${CONFIG} --logDebug &
+      nohup python3 ${COMMAND_DIR}/MasterWorker.py --config ${CONFIG} --logDebug &
     fi
   ;;
   private)
@@ -80,9 +80,9 @@ case $MODE in
     COMMAND_DIR=${GHrepoDir}/CRABServer/src/python/TaskWorker
     CONFIG=$TASKWORKER_HOME/current/TaskWorkerConfig.py
     if [ "$debug" = true ]; then
-      python -m pdb ${COMMAND_DIR}/SequentialWorker.py ${CONFIG} --logDebug
+      python3 -m pdb ${COMMAND_DIR}/SequentialWorker.py ${CONFIG} --logDebug
     else
-      nohup python ${COMMAND_DIR}/MasterWorker.py --config ${CONFIG} --logDebug &
+      nohup python3 ${COMMAND_DIR}/MasterWorker.py --config ${CONFIG} --logDebug &
     fi
 esac
 
