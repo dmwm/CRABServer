@@ -133,6 +133,11 @@ def fixupTask(task):
             if isinstance(value, bytes):
                 result[field][idx] = value.decode("utf8")
 
+    # py3 crabserver compatible with tasks submitted with py2 crabserver
+    for arg in ('lumis', 'runs'):
+        for idx, val in enumerate(result['tm_split_args'].get(arg)):
+            result['tm_split_args'][arg][idx] = decodeBytesToUnicode(val)
+
     #convert tm_arguments to the desired values
     extraargs = result['tm_arguments']
     result['resubmit_publication'] = extraargs['resubmit_publication'] if 'resubmit_publication' in extraargs else None
