@@ -507,7 +507,11 @@ class DagmanSubmitter(TaskAction.TaskAction):
             for k, v in dagAd.items():
                 if k == 'X509UserProxy':
                     v = os.path.basename(v)
-                if isinstance(v, basestring):
+                if isinstance(v, str):
+                    value = classad.quote(v)
+                elif isinstance(v, bytes):
+                    # we only expect strings in the code above, but.. just in case,
+                    # be prarped for bytes in case it requires a different handling at some point
                     value = classad.quote(v)
                 elif isinstance(v, classad.ExprTree):
                     value = repr(v)

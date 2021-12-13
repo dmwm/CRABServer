@@ -4,7 +4,7 @@ import time
 import logging
 import traceback
 import multiprocessing
-from Queue import Empty
+from queue import Empty
 from base64 import b64encode
 from logging import FileHandler
 from http.client import HTTPException
@@ -195,7 +195,7 @@ class Worker(object):
         """Starting up all the slaves"""
         if len(self.pool) == 0:
             # Starting things up
-            for x in xrange(1, self.nworkers + 1):
+            for x in range(1, self.nworkers + 1):
                 self.logger.debug("Starting process %i", x)
                 p = multiprocessing.Process(target = processWorker, args = (self.inputs, self.results, self.resthost, self.dbInstance, WORKER_CONFIG.TaskWorker.logsDir, x))
                 p.start()
@@ -253,7 +253,7 @@ class Worker(object):
             return []
         allout = []
         self.logger.info("%d work on going, checking if some has finished", len(self.working.keys()))
-        for _ in xrange(len(self.working.keys())):
+        for _ in range(len(self.working.keys())):
             out = None
             try:
                 out = self.results.get_nowait()
