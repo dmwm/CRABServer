@@ -39,7 +39,6 @@ systems = \
     'TaskWorker':
     {
         'py_modules': ['RESTInteractions',
-                       'apmon',
                        'CRABQuality', 'HTCondorUtils', 'HTCondorLocator',
                        'ServerUtilities', 'MultiProcessingLog', 'CMSGroupMapper',
                        'RucioUtils', 'cache_status'],
