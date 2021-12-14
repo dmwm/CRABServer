@@ -3,4 +3,4 @@
 # Format:
 # Dependency==version          
 
-wmcver==py3.211214
+wmcver==py3.211214patch1
