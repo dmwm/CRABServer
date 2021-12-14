@@ -63,7 +63,7 @@ if [[ "x$RPM_RELEASE" != "x" ]]; then
 
     mkdir -p bin
     cp -r $ORIGDIR/scripts/{TweakPSet.py,CMSRunAnalysis.py,task_process} .
-    cp $ORIGDIR/src/python/{Logger.py,ProcInfo.py,ServerUtilities.py,RucioUtils.py,CMSGroupMapper.py,RESTInteractions.py} .
+    cp $ORIGDIR/src/python/{ServerUtilities.py,RucioUtils.py,CMSGroupMapper.py,RESTInteractions.py} .
 
 else
     # building runtime tarballs from development area or GH
@@ -100,12 +100,12 @@ else
 
     mkdir -p bin
     cp -r $CRABSERVER_PATH/scripts/{TweakPSet.py,CMSRunAnalysis.py,task_process} .
-    cp $CRABSERVER_PATH/src/python/{Logger.py,ProcInfo.py,ServerUtilities.py,RucioUtils.py,CMSGroupMapper.py,RESTInteractions.py} .
+    cp $CRABSERVER_PATH/src/python/{ServerUtilities.py,RucioUtils.py,CMSGroupMapper.py,RESTInteractions.py} .
 fi
 
 pwd
 echo "Making TaskManagerRun tarball"
-tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip TweakPSet.py CMSRunAnalysis.py task_process Logger.py ProcInfo.py ServerUtilities.py RucioUtils.py CMSGroupMapper.py RESTInteractions.py || exit 4
+tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip TweakPSet.py CMSRunAnalysis.py task_process ServerUtilities.py RucioUtils.py CMSGroupMapper.py RESTInteractions.py || exit 4
 echo "Making CMSRunAnalysis tarball"
-tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py Logger.py ProcInfo.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py || exit 4
+tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py || exit 4
 popd
