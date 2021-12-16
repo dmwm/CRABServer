@@ -3,7 +3,7 @@ import os
 import sys
 import json
 import shutil
-import urllib
+import urllib.request
 import logging
 import traceback
 

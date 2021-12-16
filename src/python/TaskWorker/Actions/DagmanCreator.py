@@ -601,6 +601,8 @@ class DagmanCreator(TaskAction):
                 localOutputFiles.append("%s=%s" % (origFile, fileName))
             remoteOutputFilesStr = " ".join(remoteOutputFiles)
             localOutputFiles = ", ".join(localOutputFiles)
+            # no need to use // in the next line, thanks to integer formatting with `%d`
+            # see: https://docs.python.org/3/library/string.html#formatstrings
             counter = "%04d" % (i / 1000)
             tempDest = os.path.join(temp_dest, counter)
             directDest = os.path.join(dest, counter)

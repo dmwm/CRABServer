@@ -51,8 +51,8 @@ class MyProxyLogon(TaskAction):
             self.logger.error("===========PROXY ERROR END   ==========================")
             raise TaskWorkerException(errmsg)
 
-        hoursleft = timeleft/3600
-        minutesleft = (timeleft%3600)/60
+        hoursleft = timeleft // 3600
+        minutesleft = (timeleft % 3600) // 60
         self.logger.info('retrieved proxy lifetime in h:m: %d:%d', hoursleft, minutesleft)
         return (userproxy, usergroups)
 
