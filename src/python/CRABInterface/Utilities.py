@@ -18,6 +18,8 @@ from WMCore.Credential.SimpleMyProxy import SimpleMyProxy, MyProxyException
 from WMCore.Credential.Proxy import Proxy
 from WMCore.Services.pycurl_manager import ResponseHeader
 
+from Utils.Utilities import encodeUnicodeToBytes
+
 from CRABInterface.Regexps import RX_CERT
 """
 The module contains some utility functions used by the various modules of the CRAB REST interface
@@ -198,7 +200,7 @@ def retrieveUserCert(func):
                              'server_cert': serverCert,}
         mypclient = SimpleMyProxy(defaultDelegation)
         userproxy = None
-        userhash  = sha1(kwargs['userdn']).hexdigest()
+        userhash  = sha1(encodeUnicodeToBytes(kwargs['userdn'])).hexdigest()
         if serverDN:
             try:
                 userproxy = mypclient.logonRenewMyProxy(username=userhash, myproxyserver=myproxyserver, myproxyport=7512)
