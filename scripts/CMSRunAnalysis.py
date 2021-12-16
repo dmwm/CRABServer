@@ -742,7 +742,7 @@ if __name__ == "__main__":
         print("== Execution site from site-local-config.xml: %s" % slCfg.siteName)
         with open('jobReport.json', 'w') as of:
             json.dump(rep, of)
-        with open('jobReportExtract.pickle', 'w') as of:
+        with open('jobReportExtract.pickle', 'wb') as of:
             pickle.dump(rep, of)
         print("==== Report file creation FINISHED at %s ====" % time.asctime(time.gmtime()))
     except FwkJobReportException as FJRex:
