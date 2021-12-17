@@ -14,7 +14,7 @@ spec:
         app: crab3-logstash
     spec:
       containers:
-      - image: docker.elastic.co/logstash/logstash:7.4.1
+      - image: docker.elastic.co/logstash/logstash:7.16.1
         name: crab3-logstash
         env:
         - name: LS_JAVA_OPTS #added 210930
