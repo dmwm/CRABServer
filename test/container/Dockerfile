@@ -4,11 +4,11 @@ RUN yum install -y gfal2-util gfal2-all uberftp python3
 
 RUN mkdir -p /data/CRABTesting
 RUN chmod 777 /data/CRABTesting/
-ENV WDIR=/data/CRABTesting
-WORKDIR ${WDIR}
+ENV WORK_DIR=/data/CRABTesting
+WORKDIR ${WORK_DIR}
 
-COPY testingScripts ${WDIR}/testingScripts
-RUN chmod 777 ${WDIR}/testingScripts
-WORKDIR ${WDIR}/testingScripts
+COPY testingScripts ${WORK_DIR}/testingScripts
+RUN chmod 777 ${WORK_DIR}/testingScripts
+WORKDIR ${WORK_DIR}/testingScripts
 
 ENTRYPOINT ["/bin/bash"]

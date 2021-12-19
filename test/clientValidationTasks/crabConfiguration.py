@@ -1,9 +1,9 @@
 from __future__ import division
 from datetime import datetime
-from CRABClient.UserUtilities import config
+from WMCore.Configuration import Configuration
 import os
 
-config = config()
+config = Configuration()
 
 config.section_("General")
 config.General.transferOutputs = True
@@ -25,5 +25,8 @@ config.Data.totalUnits = 20
 config.Data.publication = True
 config.Data.outputDatasetTag = 'CRAB3_analysis-%d' % int(datetime.now().strftime('%y%m'))
 
+config.section_("Site")
 config.Site.storageSite = 'T2_CH_CERN'
+
+config.section_("Debug")
 config.Debug.scheddName = 'crab3@vocms059.cern.ch'

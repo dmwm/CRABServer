@@ -38,6 +38,7 @@ import os
 from testUtils import writePset, writePset8cores, writeScriptExe, writeLumiMask, \
     writeConfigFile, writeTestSubmitScript, writeValidationScript
 
+
 writePset()
 writePset8cores()
 writeScriptExe()
@@ -60,7 +61,7 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: CRAB_TransferOutputs = 0" "${workDir}/results/job_out.1.*.txt"
 """
@@ -75,7 +76,7 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: CRAB_SaveLogsFlag = 1" "${workDir}/results/job_out.1.*.txt"
 """
@@ -90,7 +91,7 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "JOB AD: CMS_Type = \\"Test\\"" "${workDir}/results/job_out.1.*.txt"
 lookFor "JOB AD: CMS_TaskType = \\"hctestnew\\"" "${workDir}/results/job_out.1.*.txt"
 """
@@ -105,12 +106,12 @@ writeValidationScript(testName=name, validationScript=validationScript)
 # inputFiles
 name = 'inputFiles'
 inFile1 = '/etc/hosts'
-inFile2 = '/etc/os-release'
+inFile2 = '/etc/centos-release'
 changeDict = {'param': name, 'section': 'JobType', 'value': [inFile1, inFile2]}
 confChangesList = [changeDict]
 testSubmitScript = """
 lookInTarFor "^hosts" ${workDir}/inputs/*default.tgz
-lookInTarFor "^os-release" ${workDir}/inputs/*default.tgz
+lookInTarFor "^centos-release" ${workDir}/inputs/*default.tgz
 """
 validationScript = """
 checkStatus ${taskName} SUBMITTED
@@ -126,7 +127,7 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "^Output files.*: \$" "${workDir}/results/job_out.1.*.txt"
 """
@@ -147,7 +148,7 @@ confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getoutput "--jobids=1"
+crabCommand getoutput "--jobids=1 --proxy=$PROXY"
 lookFor "Success in retrieving output_1.root " commandLog.txt
 lookFor "Success in retrieving My_output_1.txt " commandLog.txt
 """
@@ -175,7 +176,7 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: RequestMemory = 2500" "${workDir}/results/job_out.1.*.txt"
 """
@@ -190,7 +191,7 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: MaxWallTimeMins_RAW = 100" "${workDir}/results/job_out.1.*.txt"
 """
@@ -210,7 +211,7 @@ confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: RequestCpus = 8" "${workDir}/results/job_out.1.*.txt"
 """
@@ -227,7 +228,7 @@ lookInTarFor "^SIMPLE-SCRIPT.sh" ${workDir}/inputs/*default.tgz
 """
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "SB CMSRUN starting" "${workDir}/results/job_out.1.*.txt"
 lookFor "====== arg checking: \$1 = 1" "${workDir}/results/job_out.1.*.txt"
@@ -248,7 +249,7 @@ lookInTarFor "^SIMPLE-SCRIPT.sh" ${workDir}/inputs/*default.tgz
 """
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "SB CMSRUN starting" "${workDir}/results/job_out.1.*.txt"
 lookFor "====== arg checking: \$1 = 1" "${workDir}/results/job_out.1.*.txt"
@@ -318,7 +319,7 @@ testSubmitScript = dummyTestScript
 # make sure that parents were really read by cmsRun
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "opened.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt"
 """
@@ -335,7 +336,7 @@ testSubmitScript = dummyTestScript
 # make sure that the secondary dataset was really used in cmsRun
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "opened.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt"
 """
@@ -352,7 +353,7 @@ testSubmitScript = dummyTestScript
 # make sure that the lumimask was really applied
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "== JOB AD: CRAB_AlgoArgs.*\\"lumis\\": \\[\\"1,10" "${workDir}/results/job_out.1.*.txt"
 """
@@ -360,26 +361,41 @@ writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
-# lumiMask-URL
-name = 'lumiMaskUrl'
-confChangesList = []
-changeDict = {'param': 'lumiMask', 'section': 'Data',
+if os.getenv('singularity') != '6':
+    # lumiMask-URL
+    name = 'lumiMaskUrl'
+    confChangesList = []
+    changeDict = {'param': 'lumiMask', 'section': 'Data',
               'value': '"https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions16/13TeV/ReReco/Final/Cert_271036-284044_13TeV_ReReco_07Aug2017_Collisions16_JSON.txt"'}
-confChangesList.append(changeDict)
-changeDict = {'param': 'inputDataset', 'section': 'Data',
+    confChangesList.append(changeDict)
+    changeDict = {'param': 'inputDataset', 'section': 'Data',
               'value': '"/MuonEG/Run2016B-23Sep2016-v3/MINIAOD"'}
-confChangesList.append(changeDict)
-testSubmitScript = dummyTestScript
-# make sure that the lumimask was really applied
-validationScript = """
-checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "== JOB AD: CRAB_AlgoArgs.*\\"273158\\"" "${workDir}/results/job_out.1.*.txt"
-"""
-writeConfigFile(testName=name, listOfDicts=confChangesList)
-writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
-writeValidationScript(testName=name, validationScript=validationScript)
+    confChangesList.append(changeDict)
+    testSubmitScript = dummyTestScript
+    # make sure that the lumimask was really applied
+    validationScript = """
+    checkStatus ${taskName} COMPLETED
+    crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
+    lookFor "Retrieved job_out.1.*.txt" commandLog.txt
+    lookFor "== JOB AD: CRAB_AlgoArgs.*\\"273158\\"" "${workDir}/results/job_out.1.*.txt"
+    """
+    writeConfigFile(testName=name, listOfDicts=confChangesList)
+    writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+    writeValidationScript(testName=name, validationScript=validationScript)
+
+    # outLFNDirBase
+    name = 'outLFNDirBase'
+    changeDict = {'param': name, 'value': "'/store/user/%s/OLFNtest/Adir'%getUsername()", 'section': 'Data'}
+    confChangesList = [changeDict]
+    testSubmitScript = dummyTestScript
+    validationScript = """
+    checkStatus ${taskName} COMPLETED
+    crabCommand getoutput "--dump --jobids=1 --proxy=$PROXY"
+    lookFor "OLFNtest/Adir" commandLog.txt
+    """
+    writeConfigFile(testName=name, listOfDicts=confChangesList)
+    writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+    writeValidationScript(testName=name, validationScript=validationScript)
 
 # runRange
 name = 'runRange'
@@ -394,23 +410,9 @@ testSubmitScript = dummyTestScript
 # make sure that the run range was really applied
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "== JOB AD: CRAB_AlgoArgs.*\\"273150\\"" "${workDir}/results/job_out.1.*.txt"
-"""
-writeConfigFile(testName=name, listOfDicts=confChangesList)
-writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
-writeValidationScript(testName=name, validationScript=validationScript)
-
-# outLFNDirBase
-name = 'outLFNDirBase'
-changeDict = {'param': name, 'value': "'/store/user/%s/OLFNtest/Adir'%getUsername()", 'section': 'Data'}
-confChangesList = [changeDict]
-testSubmitScript = dummyTestScript
-validationScript = """
-checkStatus ${taskName} COMPLETED
-crabCommand getoutput "--dump --jobids=1"
-lookFor "OLFNtest/Adir" commandLog.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -430,7 +432,7 @@ confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand status "--long"
+crabCommand status "--long --proxy=$PROXY"
 lookFor "T2_CH_CERN" commandLog.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
@@ -468,7 +470,7 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: DESIRED_SITES = \\"T2_DE_DESY\\"" "${workDir}/results/job_out.1.*.txt"
 """
@@ -489,7 +491,7 @@ confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: JOB_CMSSite = \\"T1_US_FNAL\\"" "${workDir}/results/job_out.1.*.txt"
 """
@@ -526,7 +528,7 @@ if os.getenv('CRABClient_version') != 'prod':
     testSubmitScript = dummyTestScript
     validationScript = """
     checkStatus ${taskName} COMPLETED
-    crabCommand getlog "--short --jobids=1"
+    crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
     lookFor "Retrieved job_out.1.*.txt" commandLog.txt
     lookFor "JOB AD: CRAB_UserRole = \\"production\\"" "${workDir}/results/job_out.1.*.txt"
     lookFor "JOB AD: x509UserProxyFirstFQAN = \\"/cms/Role=production/Capability=NULL\\"" "${workDir}/results/job_out.1.*.txt"
@@ -575,7 +577,7 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: CMS_ALLOW_OVERFLOW = false" "${workDir}/results/job_out.1.*.txt"
 lookFor "JOB AD: CRAB_StageoutPolicy = \\"remote\\"" "${workDir}/results/job_out.1.*.txt"

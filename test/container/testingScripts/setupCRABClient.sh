@@ -4,12 +4,8 @@
 # 1. dev - CRABClient from Intergration Build (IB);
 # 2. GH - CRABClient from CRABClient GH repository master branch. This option requires to set DBS, WMCore and CRABServer tags to use;
 # 3. prod - production CRABClient from cvmfs;
-#Variables ${SCRAM_ARCHITECTURE}, ${CMSSW_release}, ${CRABServer_tag}, ${CRABClient_version}, ${WMCore_tag}, ${DBS_tag}
+#Variables ${SCRAM_ARCH}, ${CMSSW_release}, ${CRABServer_tag}, ${CRABClient_version}, ${WMCore_tag}, ${DBS_tag}
 # comes from Jenkins job CRABServer_ExecuteTests configuration.
-
-export WORK_DIR=`pwd`
-export SCRAM_ARCH=${SCRAM_ARCH}
-mkdir repos
 
 source /cvmfs/cms-ib.cern.ch/latest/cmsset_default.sh
 scramv1 project ${CMSSW_release}
@@ -17,9 +13,8 @@ cd ${CMSSW_release}/src
 eval `scramv1 runtime -sh`
 scram build
 
-cd ${WORK_DIR}/repos
-git clone https://github.com/dmwm/CRABServer
-chmod -R 777 CRABServer
+cd ${WORK_DIR}
+[ ! -d 'CRABServer' ] && git clone git@github.com:dmwm/CRABServer
 
 case $CRABClient_version in
   dev)
@@ -45,7 +40,7 @@ case $CRABClient_version in
 	git clone https://github.com/dmwm/DBS
 	cd DBS; git checkout ${DBS_tag}
 	cd ${WORK_DIR}
-	GitDir=${WORK_DIR}/repos
+	GitDir=${WORK_DIR}
 
 	MY_DBS=${GitDir}/DBS
 	MY_CRAB=${GitDir}/CRABClient
@@ -64,4 +59,3 @@ esac
 
 cd ${WORK_DIR}
 crab --version
-

@@ -7,11 +7,9 @@
 # 3. failed_tests: tests that returned exit code not equal to 0 or 2, i.e. test failed.
 #Script is used in Jenkins job CRABServer_ClientConfigurationValidation.
 
-set -o
-
 #setup CRABClient
 source setupCRABClient.sh
-python /data/CRABTesting/testingScripts/repos/CRABServer/test/makeTests.py
+python ${WORK_DIR}/CRABServer/test/makeTests.py
 
 while read task ; do
   echo "$task"
@@ -20,10 +18,10 @@ while read task ; do
 
   retVal=$?
   if [ $retVal -eq 0 ]; then
-        echo ${test_to_execute}-check.sh ${task} - $retVal >> /artifacts/successful_tests
+        echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/artifacts/successful_tests
   elif [ $retVal -eq 2 ]; then
-        echo ${test_to_execute}-check.sh ${task} - $retVal >> /artifacts/retry_tests
+        echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/artifacts/retry_tests
   else
-        echo ${test_to_execute}-check.sh ${task} - $retVal >> /artifacts/failed_tests
+        echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/artifacts/failed_tests
   fi
-done </artifacts/submitted_tasks
+done <${WORK_DIR}/artifacts/submitted_tasks
