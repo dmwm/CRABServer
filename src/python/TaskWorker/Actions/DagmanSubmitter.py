@@ -24,8 +24,6 @@ import TaskWorker.DataObjects.Result as Result
 import TaskWorker.Actions.TaskAction as TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
-from ApmonIf import ApmonIf
-
 # Bootstrap either the native module or the BossAir variant.
 try:
     import classad
@@ -460,8 +458,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         data = urllib.urlencode(configreq)
         self.crabserver.post(api='workflowdb', data=data)
 
-        self.sendDashboardJobs(dashboardParams, info['apmon'])
-
         return Result.Result(task=kwargs['task'], result='OK')
 
     def submitDirect(self, schedd, cmd, arg, info): #pylint: disable=R0201
@@ -553,16 +549,3 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         #if we don't raise exception above the id is here
         return results.outputObj['ClusterId']
-
-
-    def sendDashboardJobs(self, params, info):
-        """Send dashboard information about jobs of task"""
-        apmon = ApmonIf()
-        for job in info:
-            job.update(params)
-            apmon.sendToML(job)
-        if info:
-            self.logger.debug("Dashboard job info submitted. Last job for example is: %s", info[-1])
-        else:
-            self.logger.debug("No dashboard job info submitted")
-        apmon.free()

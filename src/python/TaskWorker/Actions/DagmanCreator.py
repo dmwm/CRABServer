@@ -34,8 +34,6 @@ try:
 except ImportError:
     UserFileCache = None
 
-from ApmonIf import ApmonIf
-
 DAG_HEADER = """
 
 NODE_STATUS_FILE node_state{nodestate} 30 ALWAYS-UPDATE
@@ -368,37 +366,6 @@ class DagmanCreator(TaskAction):
         TaskAction.__init__(self, config, crabserver, procnum)
         self.rucioClient = rucioClient
 
-    def buildDashboardInfo(self, task):
-        taskType = self.getDashboardTaskType(task)
-
-        params = {'tool': 'crab3',
-                  'SubmissionType':'crab3',
-                  'JSToolVersion': '3.3.0',
-                  'tool_ui': os.environ.get('HOSTNAME', ''),
-                  'scheduler': 'GLIDEIN',
-                  'GridName': task['tm_user_dn'],
-                  'ApplicationVersion': task['tm_job_sw'],
-                  'taskType': taskType,
-                  'vo': 'cms',
-                  'CMSUser': task['tm_username'],
-                  'user': task['tm_username'],
-                  'taskId': task['tm_taskname'],
-                  'datasetFull': task['tm_input_dataset'],
-                  'resubmitter': task['tm_username'],
-                  'exe': 'cmsRun'}
-        return params
-
-
-    def sendDashboardTask(self, task):
-        apmon = ApmonIf()
-        params = self.buildDashboardInfo(task)
-        params_copy = dict(params)
-        params_copy['jobId'] = 'TaskMeta'
-        self.logger.debug("Dashboard task info: %s", str(params_copy))
-        apmon.sendToML(params_copy)
-        apmon.free()
-        return params
-
     def populateGlideinMatching(self, info):
         scram_arch = info['tm_job_arch']
         # Set defaults
@@ -450,10 +417,6 @@ class DagmanCreator(TaskAction):
     def isGlobalBlacklistIgnored(self, kwargs):
         """ Determine wether the user wants to ignore the globalblacklist
         """
-        extrajdls = literal_eval(kwargs['task']['tm_extrajdl'])
-        for ej in extrajdls:
-            if ej.find('CRAB_IgnoreGlobalBlacklist') in [0, 1]: #there might be a + before
-                return True
 
         return kwargs['task']['tm_ignore_global_blacklist'] == 'T'
 
@@ -1096,29 +1059,6 @@ class DagmanCreator(TaskAction):
         elif info.get('faillimit') < 0:
             info['faillimit'] = -1
 
-        # Info for ML:
-        target_se = ''
-        max_len_target_se = 900
-        for site in (str(s) for s in availablesites):
-            if len(target_se) > max_len_target_se:
-                target_se += ',Many_More'
-                break
-            if len(target_se):
-                target_se += ','
-            target_se += site
-        ml_info = info.setdefault('apmon', [])
-        shift = 0 if stage == 'probe' else 1
-        for idx in range(shift, info['jobcount']+shift):
-            taskid = kwargs['task']['tm_taskname']
-            jinfo = {'broker': os.environ.get('HOSTNAME', ''),
-                     'bossId': str(idx),
-                     'TargetSE': target_se,
-                     'localId': '',
-                     'StatusValue': 'pending',
-                    }
-            insertJobIdSid(jinfo, idx, taskid, 0)
-            ml_info.append(jinfo)
-
         return info, splitterResult, subdags, dagSpecs
 
 
@@ -1246,8 +1186,6 @@ class DagmanCreator(TaskAction):
         kw['task']['resthost'] = self.crabserver.server['host']
         kw['task']['dbinstance'] = self.crabserver.getDbInstance()
         params = {}
-        if kw['task']['tm_dry_run'] == 'F':
-            params = self.sendDashboardTask(kw['task'])
 
         inputFiles = ['gWMS-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh',
                       'AdjustSites.py', 'site.ad', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.pkl', 'taskworkerconfig.pkl',
