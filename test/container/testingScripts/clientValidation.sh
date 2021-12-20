@@ -1,27 +1,21 @@
 #!/bin/bash
 
-{
-  set +x
-  # load the logging functions
-  if [ -f /lib/lsb/init-functions ]; then
-    . /lib/lsb/init-functions
-  elif [ -f /etc/init.d/functions ]; then
-    . /etc/init.d/functions
-    LSB_DISTRO="false"
-  fi
+source setupCRABClient.sh
 
-  LSB_DISTRO="true"
+{
+ 
   TMP_BUFFER=$(mktemp -dt )/client_validation.log
   STORAGE_SITE="T2_CH_CERN"
   PROXY=$(voms-proxy-info -path 2>&1)
   OUTPUTDIR="$PWD/logdir"
   TASK_TO_SUBMIT="crabConfiguration.py"
-  TASK_DIR="repos/CRABServer/test/clientValidationTasks"
+  TASK_DIR="${WORK_DIR}/CRABServer/test/clientValidationTasks"
 
-  #list of commands to execute for PR testing
-  PR_TEST=(submit createmyproxy checkusername checkwrite tasks status)  
-  #list of commands to execute for full testing
+  #list of commands to execute for full testing (sl7/8)
   FULL_TEST=(createmyproxy checkusername checkwrite tasks preparelocal status report getlog getoutput)
+  #list of commands to execute on sl6
+  SL6_TESTS=(status)
+  
   #${TEST_LIST} comes from Jenkins and is used to specify which testing should be done: PR_TEST or FULL_TEST
   TEST_TO_EXECUTE=${TEST_LIST}[@]
 
@@ -29,28 +23,28 @@
     local kind=$1
     local msg=$2
     case $kind in
-    success)
+    OK)
       if [ "$LSB_DISTRO" == "true" ]; then
         log_success_msg "$msg"
       else
-        printf "$msg %-80s"
-        echo_success
+        printf "$kind %-80s"
+        #echo_success
       fi
       ;;
-    warning)
+    WARNING)
       if [ "$LSB_DISTRO" == "true" ]; then
         log_warning_msg "$msg"
       else
-        printf "$msg %-80s"
-        echo_warning
+        printf "$kind %-80s"
+        #echo_warning
       fi
       ;;
-    failure)
+    FAILED)
       if [ "$LSB_DISTRO" == "true" ]; then
         log_failure_msg "$msg"
       else
-        printf "$msg %-80s"
-        echo_failure
+        printf "$kind %-80s"
+        #echo_failure
       fi
       ;;
     esac
@@ -63,38 +57,37 @@
     if [[ ! " ${!TEST_TO_EXECUTE} " =~ " ${cmd} " ]]; then
          :
     else
-    	echo -ne "TEST_COMMAND: crab $cmd $parms \n"
+      echo "____________"
+    	echo -ne "TEST_COMMAND: crab $cmd $parms \n" 
     	crab $cmd $parms 2>&1 > $TMP_BUFFER
     	if [ $? != 0 ]; then
       		error=`cat $TMP_BUFFER`
       		if [[ $error == *"Cannot retrieve the status_cache file"* ]]; then
-        		echo "TEST_RESULT: `logMsg warning`"
+        		echo "TEST_RESULT: `logMsg WARNING`"
       		else
-        		echo "TEST_RESULT: `logMsg failure`"
+        		echo "TEST_RESULT: `logMsg FAILED`"
       		fi
     	else
-      		echo "TEST_RESULT: `logMsg success`"
+          
+      		echo "TEST_RESULT: `logMsg OK`"
     	fi
     	echo "TEST_MESSAGE:"
     	cat $TMP_BUFFER
-    	echo -ne "\n\n\n"
+    	echo -e "____________\n"
      fi
   }
 
   # check for a valid proxy
   function checkProxy(){
+    voms-proxy-init -rfc -voms cms -valid 192:00 > /dev/null 2>&1
+    export PROXY=$(voms-proxy-info -path 2>&1)
+
     noProxy=`echo "$PROXY" | grep 'Proxy not found'`
     if [ "$noProxy" != "" ];then
       echo -ne "Fatal Proxy error: No proxy found..Please create one to proceed with the validation\n"
-      exit
+      exit 1
     fi
 
-    # check also if the proxy is still valid
-    isValid=`voms-proxy-info -timeleft`
-    if [ $isValid == 0 ];then
-      echo -ne "Fatal Proxy error: Proxy is expired..Please create a new one\n"
-      exit
-    fi
   }
 
   TMP_PARM1=("")
@@ -130,23 +123,10 @@
   # START CRABCLIENT VALIDATION
   ##################################################
 
-  ### 0. test crab submit -h, --proxy=PROXY
-  cd ${TASK_DIR}
-  sed -i -e "/config.General.instance*/c\config.General.instance = \"${REST_Instance}\"" ${TASK_TO_SUBMIT}
+  ### 1. test crab createmyproxy -h, --days=100
   USETHISPARMS=()
-  INITPARMS="--config --proxy"
-  feedParms "$TASK_TO_SUBMIT $PROXY"
-  for parm in "${USETHISPARMS[@]}"; do
-      checkThisCommand submit "$parm"
-  done
-  
-  TASKTOTRACK=`cat /artifacts/submitted_tasks`
-  PROJDIR=`crab remake --task=$TASKTOTRACK --instance=$REST_Instance | grep 'Finished remaking project directory' | awk '{print $6}'`
-
-  ### 1. test crab createmyproxy -h, --proxy=PROXY, --days=100
-  USETHISPARMS=()
-  INITPARMS="--proxy --days"
-  feedParms "$PROXY 100"
+  INITPARMS="--days"
+  feedParms "100"
   for parm in "${USETHISPARMS[@]}"; do
       checkThisCommand createmyproxy "$parm"
   done
@@ -186,6 +166,8 @@
   # START CHECKING SUBMITTED TASK'S STATUS
   ##################################################
 
+  TASKTOTRACK=`cat ${WORK_DIR}/artifacts/submitted_tasks`
+  PROJDIR=`crab remake --task=$TASKTOTRACK --instance=$REST_Instance --proxy=$PROXY| grep 'Finished remaking project directory' | awk '{print $6}'`
 
   ### 5. test crab preparelocal --proxy=PROXY --dir=PROJDIR
   USETHISPARMS=()
@@ -237,21 +219,19 @@
   # --dump --xrootd --jobids=JOBIDS --checksum=CHECKSUM --proxy=PROXY --dir=PROJDIR
   USETHISPARMS=()
   # use --jobids instead of --quantity
-  INITPARMS="--parallel --wait --outputpath '|--dump|--xrootd' --jobids --checksum --dir"
-  feedParms "10 4 $OUTPUTDIR 1 2,3 yes  $PROJDIR"
-  feedParms "10 4 $OUTPUTDIR 1 2,3 no  $PROJDIR"
-  feedParms "10 4 $OUTPUTDIR 2 2,3 yes  $PROJDIR"
-  feedParms "10 4 $OUTPUTDIR 2 2,3 no  $PROJDIR"
-  feedParms "10 4 $OUTPUTDIR 3 2,3 yes  $PROJDIR"
-  feedParms "10 4 $OUTPUTDIR 3 2,3 no  $PROJDIR"
+  INITPARMS="--parallel --wait --outputpath '|--dump|--xrootd' --jobids --checksum --proxy --dir"
+  feedParms "10 4 $OUTPUTDIR 1 2,3 yes $PROXY $PROJDIR"
+  feedParms "10 4 $OUTPUTDIR 1 2,3 no  $PROXY $PROJDIR"
+  feedParms "10 4 $OUTPUTDIR 2 2,3 yes $PROXY $PROJDIR"
+  feedParms "10 4 $OUTPUTDIR 2 2,3 no  $PROXY $PROJDIR"
+  feedParms "10 4 $OUTPUTDIR 3 2,3 yes $PROXY $PROJDIR"
+  feedParms "10 4 $OUTPUTDIR 3 2,3 no  $PROXY $PROJDIR"
   # use --quantity instead of jobis
-  INITPARMS="--quantity --parallel --wait --outputpath '|--dump|--xrootd' --checksum --dir"
-  feedParms "1 10 4 $OUTPUTDIR 1 yes $PROJDIR"
-  feedParms "3 10 4 $OUTPUTDIR 1 no  $PROJDIR"
+  INITPARMS="--quantity --parallel --wait --outputpath '|--dump|--xrootd' --checksum --proxy --dir"
+  feedParms "1 10 4 $OUTPUTDIR 1 yes $PROXY $PROJDIR"
+  feedParms "3 10 4 $OUTPUTDIR 1 no  $PROXY $PROJDIR"
   for param in "${USETHISPARMS[@]}";do
     checkThisCommand getoutput "$param"
   done
 
-  set -x
-} 2>&1 | tee /artifacts/client-validation-$(date "+%s").log
-
+} 2>&1 | tee ${WORK_DIR}/client-validation.log
