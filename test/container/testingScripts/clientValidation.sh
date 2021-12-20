@@ -11,11 +11,12 @@ source setupCRABClient.sh
   TASK_TO_SUBMIT="crabConfiguration.py"
   TASK_DIR="${WORK_DIR}/CRABServer/test/clientValidationTasks"
 
-  #list of commands to execute for full testing
+  #list of commands to execute for full testing (sl7/8)
   FULL_TEST=(createmyproxy checkusername checkwrite tasks preparelocal status report getlog getoutput)
-  #${TEST_LIST} comes from Jenkins and is used to specify which testing should be done: PR_TEST or FULL_TEST
+  #list of commands to execute on sl6
   SL6_TESTS=(status)
-
+  
+  #${TEST_LIST} comes from Jenkins and is used to specify which testing should be done: PR_TEST or FULL_TEST
   TEST_TO_EXECUTE=${TEST_LIST}[@]
 
   function logMsg() {
