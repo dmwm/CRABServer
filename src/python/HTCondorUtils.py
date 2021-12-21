@@ -50,8 +50,12 @@ class AuthenticatedSubprocess(object):
 
     def __enter__(self):
         self.r, self.w = os.pipe()
-        self.rpipe = os.fdopen(self.r, 'rb')
-        self.wpipe = os.fdopen(self.w, 'wb')
+        if self.pickleOut:
+            self.rpipe = os.fdopen(self.r, 'rb')
+            self.wpipe = os.fdopen(self.w, 'wb')
+        else:
+            self.rpipe = os.fdopen(self.r, 'r')
+            self.wpipe = os.fdopen(self.w, 'w')
         self.pid = os.fork()
         if self.pid == 0:
             htcondor.SecMan().invalidateAllSessions()
