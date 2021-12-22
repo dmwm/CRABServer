@@ -311,14 +311,11 @@ class ASOServerJob(object):
         self.aso_start_timestamp = aso_start_timestamp
         proxy = os.environ.get('X509_USER_PROXY', None)
         self.proxy = proxy
-        self.aso_db_url = self.job_ad['CRAB_ASOURL']
         self.rest_host = rest_host
         self.db_instance = db_instance
         self.rest_url = rest_host + '/crabserver/' + db_instance + '/'  # used in logging
         self.found_doc_in_db = False
         try:
-            if first_pj_execution():
-                self.logger.info("Will use ASO server at %s." % (self.aso_db_url))
             self.crabserver = CRABRest(self.rest_host, proxy, proxy, retry=2, userAgent='CRABSchedd')
             self.crabserver.setDbInstance(self.db_instance)
         except Exception as ex:
@@ -2481,8 +2478,6 @@ class PostJob():
         """
         required_job_ad_attrs = {'CRAB_UserRole': {'allowUndefined': True},
                                  'CRAB_UserGroup': {'allowUndefined': True},
-                                 'CRAB_ASOURL': {'allowUndefined': False},
-                                 'CRAB_ASODB': {'allowUndefined': True},
                                  'CRAB_AsyncDest': {'allowUndefined': False},
                                  'CRAB_DBSURL': {'allowUndefined': False},
                                  'DESIRED_CMSDataset': {'allowUndefined': True},
