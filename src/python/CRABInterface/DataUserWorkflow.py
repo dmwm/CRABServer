@@ -184,12 +184,10 @@ class DataUserWorkflow(object):
         """
         return self.workflow.proceed(workflow)
 
-    def publicationStatus(self, workflow, asourl, asodb, username):
+    def publicationStatus(self, workflow, username):
         """Retrieve the status of the publication, used by status2 when displaying publication information
 
            :arg str workflow: a workflow name
-           :arg str asourl: url of where the aso DB is located
-           :arg str asodb: which aso DB instance to use
            :yield:  dictionary with the number of jobs in certain publication state and failure reasons
         """
-        yield self.workflow.publicationStatus(workflow, asourl, asodb, username)
+        yield self.workflow.publicationStatus(workflow, username)

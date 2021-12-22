@@ -216,8 +216,6 @@ class HTCondorDataWorkflow(DataWorkflow):
         if row.split_algo:
             result['splitting'] = row.split_algo
 
-        self.asoDBURL = row.asourl
-
         # 0 - simple crab status
         # 1 - crab status -long
         # 2 - crab status -idle
@@ -341,16 +339,10 @@ class HTCondorDataWorkflow(DataWorkflow):
         if len(taskStatus) == 0 and results and results['JobStatus'] == 2:
             result['status'] = 'Running (jobs not submitted)'
 
-        #Always returning ASOURL also, it is required for kill, resubmit
-        self.logger.info("ASO: %s" % row.asourl)
-        result['ASOURL'] = row.asourl
-
         ## Retrieve publication information.
         publicationInfo = {}
         if (row.publication == 'T' and 'finished' in jobsPerStatus):
-            #let's default asodb to asynctransfer, for old task this is empty!
-            asodb = row.asodb or 'asynctransfer'
-            publicationInfo = self.publicationStatus(workflow, row.asourl, asodb, row.username)
+            publicationInfo = self.publicationStatus(workflow, row.username)
             self.logger.info("Publication status for workflow %s done", workflow)
         elif (row.publication == 'F'):
             publicationInfo['status'] = {'disabled': []}
@@ -459,8 +451,8 @@ class HTCondorDataWorkflow(DataWorkflow):
 
             # Before executing any new curl, truncate and clean temp file
             fp, hbuf = self.cleanTempFileAndBuff(fp, hbuf)
-            aso_url = url + "/aso_status.json"
-            curl.setopt(pycurl.URL, aso_url)
+            aso_status_url = url + "/aso_status.json"
+            curl.setopt(pycurl.URL, aso_status_url)
             self.logger.debug("Starting download of aso state")
             curl.perform()
             self.logger.debug("Finished download of aso state")
@@ -478,7 +470,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             hbuf.close()
 
     @conn_handler(services=['servercert'])
-    def publicationStatus(self, workflow, asourl, asodb, user):
+    def publicationStatus(self, workflow, user):
         """Here is what basically the function return, a dict called publicationInfo in the subcalls:
                 publicationInfo['status']: something like {'publishing': 0, 'publication_failed': 0, 'not_published': 0, 'published': 5}.
                                            Later on goes into dictresult['publication'] before being returned to the client

@@ -94,7 +94,7 @@ class DataWorkflow(object):
                sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                username, userdn, savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
-               ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, asodb=None, scriptexe=None, scriptargs=None,
+               ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, scriptexe=None, scriptargs=None,
                scheddname=None, extrajdl=None, collector=None, dryrun=False, publishgroupname=False, nonvaliddata=False, inputdata=None, primarydataset=None,
                debugfilename=None, submitipaddr=None, ignoreglobalblacklist=False):
         """Perform the workflow injection
@@ -143,8 +143,6 @@ class DataWorkflow(object):
            :arg int priority: priority of this task
            :arg str lfn: lfn used to store output files.
            :arg str userfiles: The files to process instead of a DBS-based dataset.
-           :arg str asourl: Specify which ASO to use for transfers and publishing.
-           :arg str asodb: ASO db to be used in place of the one in the ext configuration. Default to asynctransfer.
            :arg str scheddname: Schedd Name used for debugging.
            :arg str collector: Collector Name used for debugging.
            :arg int dryrun: enable dry run mode (initialize but do not submit task).
@@ -222,8 +220,6 @@ class DataWorkflow(object):
                             scriptexe       = [scriptexe],
                             scriptargs      = [dbSerializer(scriptargs)],
                             extrajdl        = [dbSerializer(extrajdl)],
-                            asourl          = [asourl],
-                            asodb           = [asodb],
                             collector       = [collector],
                             schedd_name     = [scheddname],
                             dry_run         = ['T' if dryrun else 'F'],
@@ -239,12 +235,10 @@ class DataWorkflow(object):
 
         return [{'RequestName': workflow}]
 
-    def publicationStatusWrapper(self, workflow, asourl, asodb, username, publicationenabled):
+    def publicationStatusWrapper(self, workflow, username, publicationenabled):
         publicationInfo = {}
         if (publicationenabled == 'T'):
-            #let's default asodb to asynctransfer, for old task this is empty!
-            asodb = asodb or 'asynctransfer'
-            publicationInfo = self.publicationStatus(workflow, asourl, asodb, username)
+            publicationInfo = self.publicationStatus(workflow, username)
             self.logger.info("Publication status for workflow %s done", workflow)
         else:
             publicationInfo['status'] = {'disabled': []}
@@ -303,10 +297,8 @@ class DataWorkflow(object):
             if publication:
                 ## Retrieve publication information.
                 publicationEnabled = row.publication
-                asourl = row.asourl
-                asodb = row.asodb
                 username = row.username
-                publicationInfo = self.publicationStatusWrapper(workflow, asourl, asodb, username, publicationEnabled)
+                publicationInfo = self.publicationStatusWrapper(workflow, username, publicationEnabled)
 
                 if 'status' not in publicationInfo:
                     msg  = "Cannot resubmit publication."
@@ -323,7 +315,7 @@ class DataWorkflow(object):
                 ## Here we can add a check on the publication status of the documents
                 ## corresponding to the job ids in resubmitjobids and jobids. So far the
                 ## publication resubmission will resubmit all the failed publications.
-                self.resubmitPublication(asourl, asodb, userproxy, workflow)
+                self.resubmitPublication(userproxy, workflow)
                 return [{'result': retmsg}]
             else:
                 self.logger.info("Jobs to resubmit: %s", jobids)
@@ -397,8 +389,6 @@ class DataWorkflow(object):
             warnings += [killwarning]
         warnings = str(warnings)
 
-        args = {'ASOURL' : getattr(row, 'asourl', '')}
-
         if row.task_status in ['SUBMITTED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED', 'KILLED', 'TAPERECALL']:
             args.update({"killList": jobids})
             #Set arguments first so in case of failure we don't do any "damage"
@@ -428,7 +418,7 @@ class DataWorkflow(object):
 
         return [{'result': 'ok'}]
 
-    def resubmitPublication(self, asourl, asodb, proxy, taskname):
+    def resubmitPublication(self, proxy, taskname):
 
         return self.resubmitOraclePublication(taskname)
 
