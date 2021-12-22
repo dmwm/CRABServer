@@ -121,42 +121,36 @@ def getCentralConfig(extconfigurl, mode):
         
         return jsonConfig
 
-    extConfigJson = retrieveConfig(extconfigurl)  # will raise ExecutionError if http calls fail
-    try:
-        extConfCommon = json.loads(extConfigJson)
-    except Exception as ex:
-        raise ExecutionError("non-JSON format in external configuration from %s" % externalLink)
+    extConfCommon = json.loads(retrieveConfig(extconfigurl))
 
-    schedListLink = extConfCommon['htcondorScheddsLink']
-    schedListJson = retrieveConfig(schedListLink)  # will raise ExecutionError if http calls fail
-    try:
-        extConfSchedds = json.loads(schedListJson)
-    except Exception as ex:
-        raise ExecutionError("non-JSON format in sched list from %s" % schedListLink)
+    # below 'if' condition is only added for the transition period from the old config file to the new one. It should be removed after some time.
+    if 'modes' in extConfCommon:
+        extConfSchedds = json.loads(retrieveConfig(extConfCommon['htcondorScheddsLink']))
 
-    # The code below constructs dict from below provided JSON structure
-    # {   u'htcondorPool': '', u'compatible-version': [''], u'htcondorScheddsLink': '',
-    #     u'modes': [{
-    #         u'mode': '', u'backend-urls': {
-    #             u'asoConfig': [{ u'couchURL': '', u'couchDBName': ''}],
-    #             u'htcondorSchedds': [''], u'cacheSSL': '', u'baseURL': ''}}],
-    #     u'banned-out-destinations': [], u'delegate-dn': ['']}
-    # to match expected dict structure which is:
-    # {   u'compatible-version': [''], u'htcondorScheddsLink': '',
-    #     'backend-urls': {
-    #         u'asoConfig': [{u'couchURL': '', u'couchDBName': ''}],
-    #         u'htcondorSchedds': {u'crab3@vocmsXXXX.cern.ch': {u'proxiedurl': '', u'weightfactor': 1}},
-    #         u'cacheSSL': '', u'baseURL': '', 'htcondorPool': ''},
-    #     u'banned-out-destinations': [], u'delegate-dn': ['']}
-    extConfCommon['backend-urls'] = next((item['backend-urls'] for item in extConfCommon['modes'] if item['mode'] == mode), None)
-    extConfCommon['backend-urls']['htcondorPool'] = extConfCommon.pop('htcondorPool')
-    del extConfCommon['modes']
+        # The code below constructs dict from below provided JSON structure
+        # {   u'htcondorPool': '', u'compatible-version': [''], u'htcondorScheddsLink': '',
+        #     u'modes': [{
+        #         u'mode': '', u'backend-urls': {
+        #             u'htcondorSchedds': [''], u'cacheSSL': '', u'baseURL': ''}}],
+        #     u'banned-out-destinations': [], u'delegate-dn': ['']}
+        # to match expected dict structure which is:
+        # {   u'compatible-version': [''], u'htcondorScheddsLink': '',
+        #     'backend-urls': {
+        #         u'htcondorSchedds': {u'crab3@vocmsXXXX.cern.ch': {u'proxiedurl': '', u'weightfactor': 1}},
+        #         u'cacheSSL': '', u'baseURL': '', 'htcondorPool': ''},
+        #     u'banned-out-destinations': [], u'delegate-dn': ['']}
+        extConfCommon['backend-urls'] = next((item['backend-urls'] for item in extConfCommon['modes'] if item['mode'] == mode), None)
+        extConfCommon['backend-urls']['htcondorPool'] = extConfCommon.pop('htcondorPool')
+        del extConfCommon['modes']
 
-    # if htcondorSchedds": [] is not empty, it gets populated with the specified list of schedds,
-    # otherwise it takes default list of schedds
-    if extConfCommon['backend-urls']['htcondorSchedds']:
-        extConfCommon['backend-urls']['htcondorSchedds'] = {k: v for k, v in extConfSchedds.items() if
-                                                            k in extConfCommon['backend-urls']['htcondorSchedds']}
+        # if htcondorSchedds": [] is not empty, it gets populated with the specified list of schedds,
+        # otherwise it takes default list of schedds
+        if extConfCommon['backend-urls']['htcondorSchedds']:
+            extConfCommon['backend-urls']['htcondorSchedds'] = {k: v for k, v in extConfSchedds.items() if
+                                                                k in extConfCommon['backend-urls']['htcondorSchedds']}
+        else:
+            extConfCommon["backend-urls"]["htcondorSchedds"] = extConfSchedds
+        centralCfgFallback = extConfCommon
     else:
         extConfCommon["backend-urls"]["htcondorSchedds"] = extConfSchedds
     centralCfgFallback = extConfCommon
