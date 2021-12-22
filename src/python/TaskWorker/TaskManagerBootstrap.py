@@ -36,7 +36,7 @@ def bootstrap():
     print("..done")
     in_args = []
     if infile != "None":
-        with open(infile, "r") as fd:
+        with open(infile, "rb") as fd:
             in_args = pickle.load(fd)
 
     config = Configuration.Configuration()
@@ -75,7 +75,7 @@ def bootstrap():
     results = task.execute(in_args, task=ad).result
 
     print(results)
-    with open(outfile, "w") as fd:
+    with open(outfile, "wb") as fd:
         pickle.dump(results, fd)
 
     return 0

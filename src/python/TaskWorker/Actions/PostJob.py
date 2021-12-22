@@ -2705,7 +2705,7 @@ class PostJob():
                 self.logger.warning("       -----> Failed to set job ClassAd attributes -----")
                 maxSleep = 2*counter -1
                 self.logger.warning("Sleeping for %d minute at most...", maxSleep)
-                time.sleep(60 * random.randint(2*(counter/3), maxSleep+1))
+                time.sleep(60 * random.randint(2*(counter//3), maxSleep+1))
             else:
                 self.logger.error("Failed to set job ClassAd attributes for %d times, will not retry. Dashboard may report stale job status/exit-code.", limit)
 

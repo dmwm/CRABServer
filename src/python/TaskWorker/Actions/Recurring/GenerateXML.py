@@ -1,11 +1,7 @@
 # report health of TaskWorker to SLS
 import os
 import sys
-import time
-import json
-import urllib
 import logging
-import traceback
 import subprocess
 from datetime import datetime
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction

@@ -219,7 +219,7 @@ class RetryJob(object):
         """
         # If job was killed on the worker node, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to memory use"):
-            job_rss = int(self.ad.get("ResidentSetSize","0"))/1000
+            job_rss = int(self.ad.get("ResidentSetSize","0")) // 1000
             exitMsg = "Job killed by HTCondor due to excessive memory use"
             exitMsg += " (RSS=%d MB)." % job_rss
             exitMsg += " Will not retry it." 
