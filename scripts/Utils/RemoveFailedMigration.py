@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding: utf-8
 from __future__ import print_function
 from __future__ import division
@@ -48,7 +48,7 @@ def main():
     print("migrationId: %d was created on %s by %s for block:" % (migrationId, created, creator))
     print(" %s" % block)
 
-    answer = raw_input("Do you want to remove it ? Yes/[No]: ")
+    answer = input("Do you want to remove it ? Yes/[No]: ")
     if answer in ['Yes', 'YES', 'Y', 'y', 'yes']:
         answer = 'Yes'
     if answer != 'Yes':
@@ -61,24 +61,21 @@ def main():
         print("Migration removal failed with this exception:\n%s" % str(ex))
         return
     print("Migration %d successfully removed\n" % migrationId)
-    print("CRAB Publisher will issue such a migration request again as/when needed")
-    print("but if you want to recreated it now, you can do it  with this python fragment")
-    print("make sure you are in Publisher environmet, or add import CRABCline (lxplus e.g.)")
-    print("and that you have a valid proxy in X509_USER_PROXY")
-    print("\n  ===============\n")
-    print("import CRABClient")
-    print("from dbs.apis.dbsClient import DbsApi")
-    print("globUrl='https://cmsweb-prod.cern.ch/dbs/prod/global/DBSReader'")
-    print("migUrl='https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSMigrate'")
-    print("apiMig = DbsApi(url=migUrl)")
-    print("block='%s'" % block)
-    print("data= {'migration_url': globUrl, 'migration_input': block}")
-    print("result = apiMig.submitMigration(data)")
-    print("newId = result.get('migration_details', {}).get('migration_request_id')")
-    print("print('new migration created: %d' % newId)")
-    print("status = apiMig.statusMigration(migration_rqst_id=newId)")
-    print("print(status)")
-    print("\n  ===============\n")
+    print("CRAB Publisher will issue such a migration request again as/when needed.")
+    print("But if you want to re-create it now, you can by answering yes here")
+    answer = input("Do you want to re-create the migration request ? Yes/[No]: ")
+    if answer in ['Yes', 'YES', 'Y', 'y', 'yes']:
+        answer = 'Yes'
+    if answer != 'Yes':
+        return
+    print("\nSubmitting new migration request...")
+    globUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/global/DBSReader'
+    data = {'migration_url': globUrl, 'migration_input': block}
+    result = apiMig.submitMigration(data)
+    newId = result.get('migration_details', {}).get('migration_request_id')
+    print('new migration created: %d' % newId)
+    status = apiMig.statusMigration(migration_rqst_id=newId)
+    print(status)
     return
 
 if __name__ == '__main__':
