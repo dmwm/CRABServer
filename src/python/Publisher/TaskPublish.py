@@ -280,6 +280,7 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir):
             msg += "\nRequest detail: %s" % data
             msg += "\nDBS3 exception: %s" % ex
             logger.error(msg)
+        return reqid, atDestination, alreadyQueued
     if not atDestination:
         msg = "Result of migration request: %s" % str(result)
         logger.info(msg)
