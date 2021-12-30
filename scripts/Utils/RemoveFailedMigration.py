@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding: utf-8
 from __future__ import print_function
 from __future__ import division
@@ -48,7 +48,7 @@ def main():
     print("migrationId: %d was created on %s by %s for block:" % (migrationId, created, creator))
     print(" %s" % block)
 
-    answer = raw_input("Do you want to remove it ? Yes/[No]: ")
+    answer = input("Do you want to remove it ? Yes/[No]: ")
     if answer in ['Yes', 'YES', 'Y', 'y', 'yes']:
         answer = 'Yes'
     if answer != 'Yes':
@@ -63,10 +63,13 @@ def main():
     print("Migration %d successfully removed\n" % migrationId)
     print("CRAB Publisher will issue such a migration request again as/when needed")
     print("but if you want to recreated it now, you can do it  with this python fragment")
-    print("make sure you are in Publisher environmet, or add import CRABCline (lxplus e.g.)")
-    print("and that you have a valid proxy in X509_USER_PROXY")
+    print("make sure you are in Publisher environment and set")
+    print("export X509_USER_CERT=/data/certs/servicecert.pem")
+    print("export X509_USER_KEY=/data/certs/servicekey.pem")
+    print("or if running e.g on lxplus add import CRABClient and")
+    print("have a valid proxy in X509_USER_PROXY")
     print("\n  ===============\n")
-    print("import CRABClient")
+    print("#import CRABClient")
     print("from dbs.apis.dbsClient import DbsApi")
     print("globUrl='https://cmsweb-prod.cern.ch/dbs/prod/global/DBSReader'")
     print("migUrl='https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSMigrate'")
