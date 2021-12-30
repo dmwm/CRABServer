@@ -61,27 +61,21 @@ def main():
         print("Migration removal failed with this exception:\n%s" % str(ex))
         return
     print("Migration %d successfully removed\n" % migrationId)
-    print("CRAB Publisher will issue such a migration request again as/when needed")
-    print("but if you want to recreated it now, you can do it  with this python fragment")
-    print("make sure you are in Publisher environment and set")
-    print("export X509_USER_CERT=/data/certs/servicecert.pem")
-    print("export X509_USER_KEY=/data/certs/servicekey.pem")
-    print("or if running e.g on lxplus add import CRABClient and")
-    print("have a valid proxy in X509_USER_PROXY")
-    print("\n  ===============\n")
-    print("#import CRABClient")
-    print("from dbs.apis.dbsClient import DbsApi")
-    print("globUrl='https://cmsweb-prod.cern.ch/dbs/prod/global/DBSReader'")
-    print("migUrl='https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSMigrate'")
-    print("apiMig = DbsApi(url=migUrl)")
-    print("block='%s'" % block)
-    print("data= {'migration_url': globUrl, 'migration_input': block}")
-    print("result = apiMig.submitMigration(data)")
-    print("newId = result.get('migration_details', {}).get('migration_request_id')")
-    print("print('new migration created: %d' % newId)")
-    print("status = apiMig.statusMigration(migration_rqst_id=newId)")
-    print("print(status)")
-    print("\n  ===============\n")
+    print("CRAB Publisher will issue such a migration request again as/when needed.")
+    print("But if you want to re-create it now, you can by answering yes here")
+    answer = input("Do you want to re-create the migration request ? Yes/[No]: ")
+    if answer in ['Yes', 'YES', 'Y', 'y', 'yes']:
+        answer = 'Yes'
+    if answer != 'Yes':
+        return
+    print("\nSubmitting new migration request...")
+    globUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/global/DBSReader'
+    data = {'migration_url': globUrl, 'migration_input': block}
+    result = apiMig.submitMigration(data)
+    newId = result.get('migration_details', {}).get('migration_request_id')
+    print('new migration created: %d' % newId)
+    status = apiMig.statusMigration(migration_rqst_id=newId)
+    print(status)
     return
 
 if __name__ == '__main__':
