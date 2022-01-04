@@ -16,9 +16,9 @@ function manage_transfers {
         DEST_LFN=`python -c 'import sys, json; print json.loads( open("task_process/transfers.txt").readlines()[0] )["destination_lfn"]' `
 
         if [[ $DEST_LFN =~ ^/store/user/rucio/* ]]; then
-        timeout 15m python task_process/RUCIO_Transfers.py
+        timeout 15m env PYTHONPATH=$PYTHONPATH:$RucioPy3 python3 task_process/RUCIO_Transfers.py
         else
-        timeout 15m python task_process/FTS_Transfers.py
+        timeout 15m env PYTHONPATH=$PYTHONPATH:$RucioPy2 python task_process/FTS_Transfers.py
         fi
 
         err=$?
@@ -100,7 +100,9 @@ export PYTHONPATH=$PYTHONPATH:/data/srv/pycurl3/7.44.1
 
 export PYTHONPATH=`pwd`/task_process:`pwd`/CRAB3.zip:`pwd`/WMCore.zip:$PYTHONPATH
 
-export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/
+# will use one of the other of following two as appropriate
+export RucioPy2=/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py2/current/lib/python2.7/site-packages/
+export RucioPy3=/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/
 
 log "Starting task daemon wrapper"
 while true
