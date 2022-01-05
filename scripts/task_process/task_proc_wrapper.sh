@@ -100,7 +100,9 @@ export PYTHONPATH=$PYTHONPATH:/data/srv/pycurl3/7.44.1
 
 export PYTHONPATH=`pwd`/task_process:`pwd`/CRAB3.zip:`pwd`/WMCore.zip:$PYTHONPATH
 
-# will use one of the other of following two as appropriate
+# will use one of the other of following two as appropriate, of course this implies
+# that we use python(2 or 3) from the OS and that we have an FTS python client available
+# in CVMFS for the same python version
 export RucioPy2=/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py2/current/lib/python2.7/site-packages/
 export RucioPy3=/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/
 
