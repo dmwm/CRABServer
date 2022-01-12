@@ -94,7 +94,7 @@ class DataWorkflow(object):
                sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                username, userdn, savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
-               ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, userproxy=None, asourl=None, asodb=None, scriptexe=None, scriptargs=None,
+               ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, asourl=None, asodb=None, scriptexe=None, scriptargs=None,
                scheddname=None, extrajdl=None, collector=None, dryrun=False, publishgroupname=False, nonvaliddata=False, inputdata=None, primarydataset=None,
                debugfilename=None, submitipaddr=None, ignoreglobalblacklist=False):
         """Perform the workflow injection
@@ -252,7 +252,7 @@ class DataWorkflow(object):
 
     @conn_handler(services=['servercert'])
     def resubmit2(self, workflow, publication, jobids, siteblacklist, sitewhitelist, maxjobruntime, maxmemory,
-                  numcores, priority, userproxy):
+                  numcores, priority):
         """Request to reprocess what the workflow hasn't finished to reprocess.
            This needs to create a new workflow in the same campaign
         """
@@ -323,7 +323,7 @@ class DataWorkflow(object):
                 ## Here we can add a check on the publication status of the documents
                 ## corresponding to the job ids in resubmitjobids and jobids. So far the
                 ## publication resubmission will resubmit all the failed publications.
-                self.resubmitPublication(asourl, asodb, userproxy, workflow)
+                self.resubmitPublication(asourl, asodb, workflow)
                 return [{'result': retmsg}]
             else:
                 self.logger.info("Jobs to resubmit: %s", jobids)
@@ -370,7 +370,7 @@ class DataWorkflow(object):
         self.api.modify(self.Task.SetStatusTask_sql, status = newstate, command = newcommand, taskname = [workflow])
         return [{'result': retmsg}]
 
-    def status(self, workflow, userdn, userproxy=None):
+    def status(self, workflow, userdn):
         """Retrieve the status of the workflow.
 
            :arg str workflow: a valid workflow name
@@ -379,7 +379,7 @@ class DataWorkflow(object):
 
 
     @conn_handler(services=['centralconfig'])
-    def kill(self, workflow, force, jobids, killwarning, userdn, userproxy=None):
+    def kill(self, workflow, force, jobids, killwarning, userdn):
         """Request to Abort a workflow.
 
            :arg str workflow: a workflow name"""
@@ -428,7 +428,7 @@ class DataWorkflow(object):
 
         return [{'result': 'ok'}]
 
-    def resubmitPublication(self, asourl, asodb, proxy, taskname):
+    def resubmitPublication(self, asourl, asodb, taskname):
 
         return self.resubmitOraclePublication(taskname)
 

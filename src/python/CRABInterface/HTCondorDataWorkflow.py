@@ -171,7 +171,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
     @throttle.make_throttled()
     @conn_handler(services=['centralconfig', 'servercert'])
-    def status(self, workflow, userdn, userproxy=None):
+    def status(self, workflow, userdn):
         """Retrieve the status of the workflow.
 
            :arg str workflow: a valid workflow name
