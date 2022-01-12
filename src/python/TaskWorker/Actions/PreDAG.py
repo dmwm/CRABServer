@@ -208,11 +208,17 @@ class PreDAG(object):
                 sumEventsThr += throughput
                 sumEventsSize += eventsize
                 count += 1
-        eventsThr = sumEventsThr / count
-        eventsSize = sumEventsSize / count
+        if count > 0:
+            eventsThr = sumEventsThr / count
+            eventsSize = sumEventsSize / count
 
         self.logger.info("average throughput for %s jobs: %s evt/s", count, eventsThr)
         self.logger.info("average eventsize for %s jobs: %s bytes", count, eventsSize)
+
+        if eventsThr == 0:
+            retmsg = "Splitting failed because all probe jobs failed or anyhow failed to provide estimates"
+            self.logger.error(retmsg)
+            return 1
 
         maxSize = getattr(config.TaskWorker, 'automaticOutputSizeMaximum', 5 * 1000**3)
         maxEvents = (maxSize / eventsSize) if eventsSize > 0 else 0
