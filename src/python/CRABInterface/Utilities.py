@@ -14,8 +14,6 @@ import json
 from WMCore.WMFactory import WMFactory
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.Services.CRIC.CRIC import CRIC
-from WMCore.Credential.SimpleMyProxy import SimpleMyProxy, MyProxyException
-from WMCore.Credential.Proxy import Proxy
 from WMCore.Services.pycurl_manager import ResponseHeader
 
 from Utils.Utilities import encodeUnicodeToBytes
