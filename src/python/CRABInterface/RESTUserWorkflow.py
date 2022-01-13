@@ -545,7 +545,6 @@ class RESTUserWorkflow(RESTEntity):
 
         elif method in ['DELETE']:
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
-            validate_num("force", param, safe, optional=True)
             validate_str("killwarning", param, safe, RX_TEXT_FAIL, optional=True)
             #decode killwarning message if present
             if safe.kwargs['killwarning']:
@@ -721,7 +720,7 @@ class RESTUserWorkflow(RESTEntity):
         return result
 
     @restcall
-    def delete(self, workflow, force, killwarning):
+    def delete(self, workflow, killwarning=''):
         """Aborts a workflow. The user needs to be a CMS owner of the workflow.
 
            :arg str list workflow: list of unique name identifiers of workflows;
@@ -730,4 +729,4 @@ class RESTUserWorkflow(RESTEntity):
 
         # strict check on authz: only the workflow owner can modify it
         authz_owner_match(self.api, [workflow], self.Task)
-        return self.userworkflowmgr.kill(workflow, force, killwarning, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
+        return self.userworkflowmgr.kill(workflow, killwarning)
