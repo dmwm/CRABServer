@@ -195,7 +195,7 @@ source setupCRABClient.sh
   done
 
 
-  ### 7. test crab report --proxy=PROXY --dir=PROJDIR --outputdid=OUTPUTDIR
+  ### 7. test crab report --proxy=PROXY --dir=PROJDIR --outputdir=OUTPUTDIR
   USETHISPARMS=()
   INITPARMS="--outputdir --proxy --dir"
   feedParms "$OUTPUTDIR $PROXY $PROJDIR"
