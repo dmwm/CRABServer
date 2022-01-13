@@ -234,4 +234,13 @@ source setupCRABClient.sh
     checkThisCommand getoutput "$param"
   done
 
+  ### 10. test crab kill --proxy=PROXY --dir=PROJDIR
+  USETHISPARMS=()
+  INITPARMS="--proxy --dir"
+  feedParms "$PROXY $PROJDIR"
+  for param in "${USETHISPARMS[@]}"; do
+    checkThisCommand kill "$param"
+  done
+
+
 } 2>&1 | tee ${WORK_DIR}/client-validation.log
