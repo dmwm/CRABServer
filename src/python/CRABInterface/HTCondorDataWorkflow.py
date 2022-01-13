@@ -170,8 +170,8 @@ class HTCondorDataWorkflow(DataWorkflow):
         yield res
 
     @throttle.make_throttled()
-    @conn_handler(services=['centralconfig', 'servercert'])
-    def status(self, workflow, userdn, userproxy=None):
+    @conn_handler(services=['centralconfig'])
+    def status(self, workflow, userdn):
         """Retrieve the status of the workflow.
 
            :arg str workflow: a valid workflow name
@@ -477,7 +477,7 @@ class HTCondorDataWorkflow(DataWorkflow):
             fp.close()
             hbuf.close()
 
-    @conn_handler(services=['servercert'])
+    @conn_handler(services=[])
     def publicationStatus(self, workflow, asourl, asodb, user):
         """Here is what basically the function return, a dict called publicationInfo in the subcalls:
                 publicationInfo['status']: something like {'publishing': 0, 'publication_failed': 0, 'not_published': 0, 'published': 5}.
