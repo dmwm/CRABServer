@@ -250,7 +250,7 @@ class DataWorkflow(object):
             publicationInfo['status'] = {'disabled': []}
         return publicationInfo
 
-    @conn_handler(services=['servercert'])
+    @conn_handler(services=[])
     def resubmit2(self, workflow, publication, jobids, siteblacklist, sitewhitelist, maxjobruntime, maxmemory,
                   numcores, priority):
         """Request to reprocess what the workflow hasn't finished to reprocess.

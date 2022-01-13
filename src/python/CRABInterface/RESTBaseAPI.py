@@ -37,10 +37,6 @@ class RESTBaseAPI(DatabaseRESTApi):
 
         self.formats = [ ('application/json', JSONFormat()) ]
 
-        status, serverdn = getstatusoutput('openssl x509 -noout -subject -in %s | cut -f2- -d\ ' % config.serverhostcert)
-        if status is not 0:
-            raise ExecutionError("Internal issue when retrieving crabserver service DN.")
-
         extconfig = ConfigCache(centralconfig=getCentralConfig(extconfigurl=config.extconfigurl, mode=config.mode),
                                       cachetime=mktime(gmtime()))
 
@@ -49,12 +45,12 @@ class RESTBaseAPI(DatabaseRESTApi):
         DataWorkflow.globalinit(dbapi=self, credpath=config.credpath, centralcfg=extconfig, config=config)
         DataFileMetadata.globalinit(dbapi=self, config=config)
         RESTTask.globalinit(centralcfg=extconfig)
-        globalinit(config.serverhostkey, config.serverhostcert, serverdn, config.credpath)
+        globalinit(config.credpath)
 
         ## TODO need a check to verify the format depending on the resource
         ##      the RESTFileMetadata has the specifc requirement of getting xml reports
         self._add( {'workflow': RESTUserWorkflow(app, self, config, mount, extconfig),
-                    'info': RESTServerInfo(app, self, config, mount, serverdn, extconfig),
+                    'info': RESTServerInfo(app, self, config, mount, extconfig),
                     'filemetadata': RESTFileMetadata(app, self, config, mount),
                     'workflowdb': RESTWorkerWorkflow(app, self, config, mount),
                     'task': RESTTask(app, self, config, mount),

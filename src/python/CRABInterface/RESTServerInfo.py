@@ -15,10 +15,9 @@ from CRABInterface.__init__ import __version__
 class RESTServerInfo(RESTEntity):
     """REST entity for workflows and relative subresources"""
 
-    def __init__(self, app, api, config, mount, serverdn, centralcfg):
+    def __init__(self, app, api, config, mount, centralcfg):
         RESTEntity.__init__(self, app, api, config, mount)
         self.centralcfg = centralcfg
-        self.serverdn = serverdn
         self.logger = logging.getLogger("CRABLogger:RESTServerInfo")
         #used by the client to get the url where to update the cache (cacheSSL)
 

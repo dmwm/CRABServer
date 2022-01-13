@@ -27,9 +27,6 @@ CMSSitesCache = namedtuple("CMSSitesCache", ["cachetime", "sites"])
 ConfigCache = namedtuple("ConfigCache", ["cachetime", "centralconfig"])
 
 #These parameters are set in the globalinit (called in RESTBaseAPI)
-serverCert = None
-serverKey = None
-serverDN = None
 credServerPath = None
 
 def getDBinstance(config, namespace, name):
@@ -39,13 +36,13 @@ def getDBinstance(config, namespace, name):
         backend = 'Oracle'
 
     #factory = WMFactory(name = 'TaskQuery', namespace = 'Databases.TaskDB.%s.Task' % backend)
-    factory = WMFactory(name = name, namespace = 'Databases.%s.%s.%s' % (namespace, backend, name))
+    factory = WMFactory(name=name, namespace='Databases.%s.%s.%s' % (namespace, backend, name))
 
     return factory.loadObject( name )
 
-def globalinit(serverkey, servercert, serverdn, credpath):
-    global serverCert, serverKey, serverDN, credServerPath  # pylint: disable=global-statement
-    serverCert, serverKey, serverDN, credServerPath = servercert, serverkey, serverdn, credpath
+def globalinit(credpath):
+    global credServerPath  # pylint: disable=global-statement
+    credServerPath = credpath
 
 def execute_command(command, logger, timeout):
     """
@@ -170,8 +167,7 @@ def conn_handler(services):
     as CRIC, WMStats monitoring
 
     arg str list services: list of string telling which service connections
-                           should be started; currently availables are
-                           'monitor' and 'asomonitor'.
+                           should be started
     """
     def wrap(func):
         def wrapped_func(*args, **kwargs):
@@ -180,9 +176,6 @@ def conn_handler(services):
                 args[0].allPNNNames = CMSSitesCache(sites=CRIC().getAllPhEDExNodeNames(), cachetime=mktime(gmtime()))
             if 'centralconfig' in services and (not args[0].centralcfg.centralconfig or (args[0].centralcfg.cachetime+1800 < mktime(gmtime()))):
                 args[0].centralcfg = ConfigCache(centralconfig=getCentralConfig(extconfigurl=args[0].config.extconfigurl, mode=args[0].config.mode), cachetime=mktime(gmtime()))
-            if 'servercert' in services:
-                args[0].serverCert = serverCert
-                args[0].serverKey = serverKey
             return func(*args, **kwargs)
         return wrapped_func
     return wrap
