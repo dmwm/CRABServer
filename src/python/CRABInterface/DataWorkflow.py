@@ -379,7 +379,7 @@ class DataWorkflow(object):
 
 
     @conn_handler(services=['centralconfig'])
-    def kill(self, workflow, force, jobids, killwarning, userdn):
+    def kill(self, workflow, killwarning=''):
         """Request to Abort a workflow.
 
            :arg str workflow: a workflow name"""
@@ -400,7 +400,6 @@ class DataWorkflow(object):
         args = {'ASOURL' : getattr(row, 'asourl', '')}
 
         if row.task_status in ['SUBMITTED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED', 'KILLED', 'TAPERECALL']:
-            args.update({"killList": jobids})
             #Set arguments first so in case of failure we don't do any "damage"
             self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow], arguments = [str(args)])
             self.api.modify(self.Task.SetStatusWarningTask_sql, status = ["NEW"], command = ["KILL"], taskname = [workflow], warnings = [str(warnings)])
