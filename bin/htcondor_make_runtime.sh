@@ -57,10 +57,6 @@ if [[ "x$RPM_RELEASE" != "x" ]]; then
     zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface  TransferInterface -x \*.pyc || exit 3
     popd
 
-    pushd $VO_CMS_SW_DIR/$SCRAM_ARCH/external/cherrypy/*/lib/python2.7/site-packages
-    zip -rq $STARTDIR/CRAB3.zip cherrypy -x \*.pyc
-    popd
-
     mkdir -p bin
     cp -r $ORIGDIR/scripts/{TweakPSet.py,CMSRunAnalysis.py,task_process} .
     cp $ORIGDIR/src/python/{ServerUtilities.py,RucioUtils.py,CMSGroupMapper.py,RESTInteractions.py} .
