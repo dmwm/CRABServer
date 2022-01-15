@@ -40,8 +40,9 @@ rm -f $STARTDIR/CRAB3.zip
 rm -f $STARTDIR/WMCore.zip
 
 # make sure there's always a CRAB3.zip to avoid errors in other parts
-touch /tmp/dummyFile
-zip -r $STARTDIR/CRAB3.zip /tmp/dummyFile
+touch $PWD/tmp/dummyFile
+zip -r $STARTDIR/CRAB3.zip $PWD/tmp/dummyFile
+rm -f $PWD/tmp/dummyFile
 
 
 # For developers, we download all our dependencies from the various upstream servers.
@@ -55,10 +56,6 @@ if [[ "x$RPM_RELEASE" != "x" ]]; then
 
     pushd $ORIGDIR/build/lib
     zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface  TransferInterface -x \*.pyc || exit 3
-    popd
-
-    pushd $VO_CMS_SW_DIR/$SCRAM_ARCH/external/cherrypy/*/lib/python2.7/site-packages
-    zip -rq $STARTDIR/CRAB3.zip cherrypy -x \*.pyc
     popd
 
     mkdir -p bin
