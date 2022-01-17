@@ -527,7 +527,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["TransferInput"] = str(info['inputFilesString'])
 
         condorIdDict = {}
-        with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], pickleOut=True, outputObj=condorIdDict, logger=self.logger) as (parent, rpipe):
+        tokenDir = getattr(self.config.TaskWorker, 'SEC_TOKEN_DIRECTORY', None)
+        with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], tokenDir,
+                                                   pickleOut=True, outputObj=condorIdDict,
+                                                   logger=self.logger) as (parent, rpipe):
             if not parent:
                 resultAds = []
                 condorIdDict['ClusterId'] = schedd.submit(dagAd, 1, True, resultAds)
