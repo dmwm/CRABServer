@@ -489,9 +489,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["Environment"] = classad.ExprTree('strcat("PATH=/usr/bin:/bin CRAB3_VERSION=3.3.0-pre1 CONDOR_ID=", ClusterId, ".", ProcId," %s")' % " ".join(info['additional_environment_options'].split(";")))
         dagAd["RemoteCondorSetup"] = info['remote_condor_setup']
 
-        dagAd["CRAB_TaskSubmitTime"] = classad.ExprTree("%s" % info["start_time"].encode('ascii', 'ignore'))
+        dagAd["CRAB_TaskSubmitTime"] = info['start_time']
         dagAd['CRAB_TaskLifetimeDays'] = TASKLIFETIME // 24 // 60 // 60
-        dagAd['CRAB_TaskEndTime'] = int(info["start_time"]) + TASKLIFETIME
+        dagAd['CRAB_TaskEndTime'] = int(info['start_time']) + TASKLIFETIME
         #For task management info see https://github.com/dmwm/CRABServer/issues/4681#issuecomment-302336451
         dagAd["LeaveJobInQueue"] = classad.ExprTree("true")
         dagAd["PeriodicHold"] = classad.ExprTree("time() > CRAB_TaskEndTime")
