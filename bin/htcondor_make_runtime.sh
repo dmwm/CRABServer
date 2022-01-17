@@ -40,10 +40,9 @@ rm -f $STARTDIR/CRAB3.zip
 rm -f $STARTDIR/WMCore.zip
 
 # make sure there's always a CRAB3.zip to avoid errors in other parts
-touch $PWD/tmp/dummyFile
-zip -r $STARTDIR/CRAB3.zip $PWD/tmp/dummyFile
-rm -f $PWD/tmp/dummyFile
-
+touch $STARTDIR/dummyFile
+zip -r $STARTDIR/CRAB3.zip $STARTDIR/dummyFile
+rm -f $STARTDIR/dummyFile
 
 # For developers, we download all our dependencies from the various upstream servers.
 # For actual releases, we take the libraries from the build environment RPMs.
