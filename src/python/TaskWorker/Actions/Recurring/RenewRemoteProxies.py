@@ -142,10 +142,10 @@ class CRAB3ProxyRenewer(object):
             raise Exception("Failed to retrieve proxy.")
         return userproxy
 
-    def push_new_proxy_to_schedd(self, schedd, ad, proxy):
+    def push_new_proxy_to_schedd(self, schedd, ad, proxy, tokenDir):
         if not hasattr(schedd, 'refreshGSIProxy'):
             raise NotImplementedError()
-        with HTCondorUtils.AuthenticatedSubprocess(proxy) as (parent, rpipe):
+        with HTCondorUtils.AuthenticatedSubprocess(proxy, tokenDir) as (parent, rpipe):
             if not parent:
                 schedd.refreshGSIProxy(ad['ClusterId'], ad['ProcID'], proxy, -1)
         results = rpipe.read()
@@ -153,6 +153,8 @@ class CRAB3ProxyRenewer(object):
             raise Exception("Failure when renewing HTCondor task proxy: '%s'" % results)
 
     def execute_schedd(self, schedd_name, collector):
+
+        tokenDir = getattr(self.config.TaskWorker, 'SEC_TOKEN_DIRECTORY', None)
         self.logger.info("Updating tasks in schedd %s", schedd_name)
         self.logger.debug("Trying to locate schedd.")
         schedd_ad = collector.locate(htcondor.DaemonTypes.Schedd, schedd_name)
@@ -196,7 +198,7 @@ class CRAB3ProxyRenewer(object):
                 continue
             for ad in ad_list:
                 try:
-                    self.push_new_proxy_to_schedd(schedd, ad, proxyfile)
+                    self.push_new_proxy_to_schedd(schedd, ad, proxyfile, tokenDir)
                 except NotImplementedError:
                     raise
                 except Exception:

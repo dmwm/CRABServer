@@ -92,7 +92,8 @@ class DagmanKiller(TaskAction):
         # TODO: Remove jobConst query when htcondor ticket is solved
         # https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=5175
 
-        with HTCondorUtils.AuthenticatedSubprocess(self.proxy) as (parent, rpipe):
+        tokenDir = getattr(self.config.TaskWorker, 'SEC_TOKEN_DIRECTORY', None)
+        with HTCondorUtils.AuthenticatedSubprocess(self.proxy, tokenDir) as (parent, rpipe):
             if not parent:
                 with self.schedd.transaction() as dummytsc:
                     self.schedd.act(htcondor.JobAction.Hold, rootConst)

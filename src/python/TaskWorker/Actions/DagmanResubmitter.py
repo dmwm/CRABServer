@@ -47,6 +47,7 @@ class DagmanResubmitter(TaskAction):
         if task['tm_collector']:
             self.backendurls['htcondorPool'] = task['tm_collector']
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
+        tokenDir = getattr(self.config.TaskWorker, 'SEC_TOKEN_DIRECTORY', None)
 
         schedd = ""
         dummyAddress = ""
@@ -94,7 +95,8 @@ class DagmanResubmitter(TaskAction):
                     overwrite = True
 
         if ('resubmit_jobids' in task) and task['resubmit_jobids']:
-            with HTCondorUtils.AuthenticatedSubprocess(proxy, logger=self.logger) as (parent, rpipe):
+            with HTCondorUtils.AuthenticatedSubprocess(proxy, tokenDir,
+                                                       logger=self.logger) as (parent, rpipe):
                 if not parent:
                     schedd.edit(rootConst, "HoldKillSig", 'SIGKILL')
                     ## Overwrite parameters in the os.environ[_CONDOR_JOB_AD] file. This will affect
@@ -111,7 +113,8 @@ class DagmanResubmitter(TaskAction):
                     schedd.act(htcondor.JobAction.Release, rootConst)
         elif overwrite:
             self.logger.debug("Resubmitting under condition overwrite = True")
-            with HTCondorUtils.AuthenticatedSubprocess(proxy, logger=self.logger) as (parent, rpipe):
+            with HTCondorUtils.AuthenticatedSubprocess(proxy, tokenDir,
+                                                       logger=self.logger) as (parent, rpipe):
                 if not parent:
                     for adparam, taskparam in params.items():
                         if taskparam in ad:
@@ -128,7 +131,8 @@ class DagmanResubmitter(TaskAction):
             ## starting from CRAB 3.3.16 the resubmission parameters are written to the
             ## Task DB with value != None, so the overwrite variable should never be False.
             self.logger.debug("Resubmitting under condition overwrite = False")
-            with HTCondorUtils.AuthenticatedSubprocess(proxy, logger=self.logger) as (parent, rpipe):
+            with HTCondorUtils.AuthenticatedSubprocess(proxy, tokenDir,
+                                                       logger=self.logger) as (parent, rpipe):
                 if not parent:
                     schedd.edit(rootConst, "HoldKillSig", 'SIGKILL')
                     schedd.edit(rootConst, "CRAB_ResubmitList", classad.ExprTree("true"))
