@@ -210,7 +210,11 @@ def makeWebDir(ad):
     """
     Need a doc string here.
     """
-    path = os.path.expanduser("~/%s" % ad['CRAB_ReqName'])
+    authenticatedViaToken = getattr(ad,'AuthTokenId', None)
+    if authenticatedViaToken:
+        path = os.path.expanduser("/home/grid/%s/%s" % (ad['CRAB_UserHN'], ad['CRAB_ReqName']))
+    else:
+        path = os.path.expanduser("~/%s" % ad['CRAB_ReqName'])
     try:
         ## Create the web directory.
         os.makedirs(path)
