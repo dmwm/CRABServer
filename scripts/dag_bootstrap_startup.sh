@@ -211,7 +211,7 @@ else
     then
         echo "creating and executing task process daemon jdl"
         TASKNAME=`grep '^CRAB_ReqName =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
-        USERNAME = `grep '^CRAB_UserHN =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
+        USERNAME=`grep '^CRAB_UserHN =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
         CMSTYPE=`grep '^CMS_Type =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
         CMSWMTOOL=`grep '^CMS_WMTool =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
         CMSTTASKYPE=`grep '^CMS_TaskType =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
