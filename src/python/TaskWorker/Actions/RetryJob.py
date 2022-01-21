@@ -322,7 +322,7 @@ class RetryJob(object):
         if exitCode == 134:
             recoverable_signal = False
             try:
-                fname = os.path.expanduser("~/%s/job_out.%s.%d.txt" % (self.reqname, self.job_id, self.crab_retry))
+                fname = os.path.realpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
                 with open(fname) as fd:
                     for line in fd:
                         if line.startswith("== CMSSW:  A fatal system signal has occurred: illegal instruction"):
@@ -338,7 +338,7 @@ class RetryJob(object):
         if exitCode == 8001 or exitCode == 65:
             cvmfs_issue = False
             try:
-                fname = os.path.expanduser("~/%s/job_out.%s.%d.txt" % (self.reqname, self.job_id, self.crab_retry))
+                fname = os.path.relpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
                 cvmfs_issue_re = re.compile("== CMSSW:  unable to load /cvmfs/.*file too short")
                 with open(fname) as fd:
                     for line in fd: 

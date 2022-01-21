@@ -1329,15 +1329,8 @@ class PostJob():
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def create_taskwebdir(self):
-        ## Create the task web directory in the schedd.
-        self.logpath = os.path.expanduser("~/%s" % (self.reqname))
-        try:
-            os.makedirs(self.logpath)
-        except OSError as ose:
-            if ose.errno != errno.EEXIST:
-                msg = "Failed to create log web-shared directory %s" % (self.logpath)
-                self.logger.error(msg)
-                raise
+        ## The task web directory in the schedd has been created by AdjustSites.py
+        self.logpath = os.path.realpath('WEB_DIR')
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
