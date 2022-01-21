@@ -442,20 +442,13 @@ class PreJob:
 
     def touch_logs(self, crab_retry):
         """
-        Create the log web-shared directory for the task and create the
+        Use the log web-shared directory created by AdjustSites.py for the task and create the
         job_out.<job_id>.<crab_retry>.txt and postjob.<job_id>.<crab_retry>.txt files
         with default messages.
         """
         try:
             taskname = self.task_ad['CRAB_ReqName']
-            logpath = os.path.expanduser("~/%s" % (taskname))
-            try:
-                os.makedirs(logpath)
-            except OSError as oe:
-                if oe.errno != errno.EEXIST:
-                    msg = "Failed to create log web-shared directory %s" % (logpath)
-                    self.logger.info(msg)
-                    return
+            logpath = os.path.relpath('WEB_DIR')
             job_retry = "%s.%s" % (self.job_id, crab_retry)
             fname = os.path.join(logpath, "job_out.%s.txt" % job_retry)
             with open(fname, 'w') as fd:
