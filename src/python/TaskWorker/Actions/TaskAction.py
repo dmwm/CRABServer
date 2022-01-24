@@ -59,7 +59,7 @@ class TaskAction(object):
                      'workflow': taskname,
                      'warning': b64encode(encodeUnicodeToBytes(truncWarning))}
         try:
-            self.crabserver.post(api='/task', data=urlencode(configreq))
+            self.crabserver.post(api='task', data=urlencode(configreq))
         except HTTPException as hte:
             self.logger.error("Error uploading warning: %s", str(hte))
             self.logger.warning("Cannot add a warning to REST interface. Warning message: %s", warning)
