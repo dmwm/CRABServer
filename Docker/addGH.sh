@@ -8,8 +8,8 @@ CRABServerTag=$TW_VERSION
 CRABServerDir=`realpath /data/srv/TaskManager/current/*/cms/crabtaskworker`
 
 # 1. find out which WMCore tag was installed
-export PYTHONPATH=$CRABServerDir/$CRABServerTag/lib/python2.7/site-packages
-WMCoreTag=`python -c "from WMCore import __version__; print __version__"`
+export PYTHONPATH=$CRABServerDir/$CRABServerTag/lib/python3.6/site-packages
+WMCoreTag=`python3 -c "from WMCore import __version__; print __version__"`
 
 # 2. create directories for repositories and clone 
 mkdir /data/repos
@@ -24,6 +24,7 @@ git remote add stefano https://github.com/belforte/CRABServer.git
 git remote add daina https://github.com/ddaina/CRABServer.git
 git remote add mapellidario https://github.com/mapellidario/CRABServer.git
 git remote add diego https://github.com/dciangot/CRABServer.git
+git remote add wa https://github.com/novicecpp/CRABServer.git
 cd ..
 cd WMCore
 git checkout $WMCoreTag
@@ -31,6 +32,7 @@ git remote add stefano https://github.com/belforte/WMCore.git
 git remote add daina https://github.com/ddaina/WMCore.git
 git remote add mapellidario https://github.com/mapellidario/WMCore.git
 git remote add diego https://github.com/dciangot/WMCore.git
+git remote add wa https://github.com/novicecpp/CRABServer.git
 
 # 4. create .gitconfig
 cat > ~/.gitconfig << EOF
