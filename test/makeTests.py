@@ -371,27 +371,28 @@ writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
-if os.getenv('singularity') != '6':
-    # lumiMask-URL
-    name = 'lumiMaskUrl'
-    confChangesList = []
-    changeDict = {'param': 'lumiMask', 'section': 'Data',
-              'value': '"https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions16/13TeV/ReReco/Final/Cert_271036-284044_13TeV_ReReco_07Aug2017_Collisions16_JSON.txt"'}
-    confChangesList.append(changeDict)
-    changeDict = {'param': 'inputDataset', 'section': 'Data',
-              'value': '"/MuonEG/Run2016B-23Sep2016-v3/MINIAOD"'}
-    confChangesList.append(changeDict)
-    testSubmitScript = dummyTestScript
-    # make sure that the lumimask was really applied
-    validationScript = """
-    checkStatus ${taskName} COMPLETED
-    crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-    lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-    lookFor "== JOB AD: CRAB_AlgoArgs.*\\"273158\\"" "${workDir}/results/job_out.1.*.txt"
-    """
-    writeConfigFile(testName=name, listOfDicts=confChangesList)
-    writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
-    writeValidationScript(testName=name, validationScript=validationScript)
+# lumiMask-URL
+name = 'lumiMaskUrl'
+confChangesList = []
+changeDict = {'param': 'lumiMask', 'section': 'Data',
+          'value': '"https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions16/13TeV/ReReco/Final/Cert_271036-284044_13TeV_ReReco_07Aug2017_Collisions16_JSON.txt"'}
+confChangesList.append(changeDict)
+changeDict = {'param': 'inputDataset', 'section': 'Data',
+          'value': '"/MuonEG/Run2016B-23Sep2016-v3/MINIAOD"'}
+confChangesList.append(changeDict)
+testSubmitScript = dummyTestScript
+# make sure that the lumimask was really applied
+validationScript = """
+checkStatus ${taskName} COMPLETED
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt
+lookFor "== JOB AD: CRAB_AlgoArgs.*\\"273158\\"" "${workDir}/results/job_out.1.*.txt"
+"""
+if SL6:  # skip: our lumiMask does not work on the primary input used for CMSSW_7 tests
+    validationScript = dummyTestScript
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
 
 # outLFNDirBase
 name = 'outLFNDirBase'
