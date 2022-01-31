@@ -38,6 +38,10 @@ import os
 from testUtils import writePset, writePset8cores, writeScriptExe, writeLumiMask, \
     writeConfigFile, writeTestSubmitScript, writeValidationScript
 
+# some tests needs changing if running on SL6
+# rely on $singularity which is set by Jenkins as
+# export singularity=`echo ${SCRAM_ARCH:3:1}`
+SL6 = getattr(os.environ,'singularity','7') == '6'
 
 writePset()
 writePset8cores()
@@ -152,6 +156,8 @@ crabCommand getoutput "--jobids=1 --proxy=$PROXY"
 lookFor "Success in retrieving output_1.root " commandLog.txt
 lookFor "Success in retrieving My_output_1.txt " commandLog.txt
 """
+if SL6:  # skip: singularity, no gfal_copy, crab getoutput can't work
+    validationScript = dummyTestScript
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
@@ -340,6 +346,8 @@ crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "opened.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt"
 """
+if SL6:  # skip. primary input used for CMSSW_7 has different lumisection numbers from the dataset above
+    validationScript = dummyTestScript
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
@@ -357,6 +365,8 @@ crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "== JOB AD: CRAB_AlgoArgs.*\\"lumis\\": \\[\\"1,10" "${workDir}/results/job_out.1.*.txt"
 """
+if SL6:  # skip: our lumiMask does not work on the primary input used for CMSSW_7 tests
+    validationScript = dummyTestScript
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
@@ -383,19 +393,21 @@ if os.getenv('singularity') != '6':
     writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
     writeValidationScript(testName=name, validationScript=validationScript)
 
-    # outLFNDirBase
-    name = 'outLFNDirBase'
-    changeDict = {'param': name, 'value': "'/store/user/%s/OLFNtest/Adir'%getUsername()", 'section': 'Data'}
-    confChangesList = [changeDict]
-    testSubmitScript = dummyTestScript
-    validationScript = """
-    checkStatus ${taskName} COMPLETED
-    crabCommand getoutput "--dump --jobids=1 --proxy=$PROXY"
-    lookFor "OLFNtest/Adir" commandLog.txt
-    """
-    writeConfigFile(testName=name, listOfDicts=confChangesList)
-    writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
-    writeValidationScript(testName=name, validationScript=validationScript)
+# outLFNDirBase
+name = 'outLFNDirBase'
+changeDict = {'param': name, 'value': "'/store/user/%s/OLFNtest/Adir'%getUsername()", 'section': 'Data'}
+confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
+validationScript = """
+checkStatus ${taskName} COMPLETED
+crabCommand getoutput "--dump --jobids=1 --proxy=$PROXY"
+lookFor "OLFNtest/Adir" commandLog.txt
+"""
+if SL6:  # skip: singularity, no gfal_copy, crab getoutput can't work
+    validationScript = dummyTestScript
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
 
 # runRange
 name = 'runRange'
@@ -414,6 +426,8 @@ crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "== JOB AD: CRAB_AlgoArgs.*\\"273150\\"" "${workDir}/results/job_out.1.*.txt"
 """
+if SL6:  # skip: our runRange does not work on the primary input used for CMSSW_7 tests
+    validationScript = dummyTestScript
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
@@ -423,10 +437,10 @@ name = 'ignoreLocality'
 confChangesList = []
 changeDict = {'param': name, 'section': 'Data', 'value': "True"}
 confChangesList.append(changeDict)
-# pick a dataset which is NOT at CERN
-changeDict = {'param': 'inputDataset', 'section': 'Data',
-              'value': '"/MuonEG/Run2016B-23Sep2016-v3/MINIAOD"'}
-confChangesList.append(changeDict)
+if not SL6:  # pick a dataset which is NOT at CERN (the one for CMSSW is only at FNAL)
+    changeDict = {'param': 'inputDataset', 'section': 'Data',
+                  'value': '"/MuonEG/Run2016B-23Sep2016-v3/MINIAOD"'}
+    confChangesList.append(changeDict)
 changeDict = {'param': 'whitelist', 'section': 'Site', 'value': "['T2_CH_CERN']"}
 confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
@@ -454,6 +468,8 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 """
+if SL6:  # skip: those input files can't be read with CKSSW_7
+    validationScript = dummyTestScript
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
@@ -474,6 +490,8 @@ crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: DESIRED_SITES = \\"T2_DE_DESY\\"" "${workDir}/results/job_out.1.*.txt"
 """
+if SL6:  # skip: old dataset for CMSSW_7 has not enough locations to test this
+    validationScript = dummyTestScript
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
@@ -526,7 +544,7 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: CRAB_UserRole = \\"production\\"" "${workDir}/results/job_out.1.*.txt"
 lookFor "JOB AD: x509UserProxyFirstFQAN = \\"/cms/Role=production/Capability=NULL\\"" "${workDir}/results/job_out.1.*.txt"
@@ -543,7 +561,7 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: CRAB_UserGroup = \\"itcms\\"" "${workDir}/results/job_out.1.*.txt"
 lookFor "JOB AD: x509UserProxyFirstFQAN = \\"/cms/itcms/Role=NULL/Capability=NULL\\"" "${workDir}/results/job_out.1.*.txt"
