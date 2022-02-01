@@ -394,20 +394,21 @@ if not SL6:  # skip on SL6, can't fetch lumMask from URL inside singularity
     writeValidationScript(testName=name, validationScript=validationScript)
 
 # outLFNDirBase
-name = 'outLFNDirBase'
-changeDict = {'param': name, 'value': "'/store/user/%s/OLFNtest/Adir'%getUsername()", 'section': 'Data'}
-confChangesList = [changeDict]
-testSubmitScript = dummyTestScript
-validationScript = """
-checkStatus ${taskName} COMPLETED
-crabCommand getoutput "--dump --jobids=1 --proxy=$PROXY"
-lookFor "OLFNtest/Adir" commandLog.txt
-"""
-if SL6:  # skip: singularity, no gfal_copy, crab getoutput can't work
-    validationScript = dummyTestScript
-writeConfigFile(testName=name, listOfDicts=confChangesList)
-writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
-writeValidationScript(testName=name, validationScript=validationScript)
+if not SL6:  # skip on SL6, can't submit this see https://github.com/dmwm/CRABServer/issues/7034
+    name = 'outLFNDirBase'
+    changeDict = {'param': name, 'value': "'/store/user/%s/OLFNtest/Adir'%getUsername()", 'section': 'Data'}
+    confChangesList = [changeDict]
+    testSubmitScript = dummyTestScript
+    validationScript = """
+    checkStatus ${taskName} COMPLETED
+    crabCommand getoutput "--dump --jobids=1 --proxy=$PROXY"
+    lookFor "OLFNtest/Adir" commandLog.txt
+    """
+    if SL6:  # skip: singularity, no gfal_copy, crab getoutput can't work
+        validationScript = dummyTestScript
+    writeConfigFile(testName=name, listOfDicts=confChangesList)
+    writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+    writeValidationScript(testName=name, validationScript=validationScript)
 
 # runRange
 name = 'runRange'
