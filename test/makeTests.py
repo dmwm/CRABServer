@@ -43,6 +43,9 @@ from testUtils import writePset, writePset8cores, writeScriptExe, writeLumiMask,
 # export singularity=`echo ${SCRAM_ARCH:3:1}`
 SL6 = os.environ.get('singularity','7') == '6'
 
+# some tests need a small tweak on CMSSW_8
+CMSSW8 =  os.environ.get('CMSSW_VERSION').split('_')[1] == '8'
+
 writePset()
 writePset8cores()
 writeScriptExe()
@@ -329,6 +332,8 @@ crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "opened.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt"
 """
+if CMSSW8:  # skip: needed parent dataset for the sample that we can read witn CMSSW_8 is not on disk
+    validationScript = dummyTestScript
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
@@ -346,7 +351,9 @@ crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "opened.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt"
 """
-if SL6:  # skip. primary input used for CMSSW_7 has different lumisection numbers from the dataset above
+if SL6:  # skip: primary input used for CMSSW_7 has different lumisection numbers from the dataset above
+    validationScript = dummyTestScript
+if CMSSW8:  # skip: needed parent dataset for the sample that we can read witn CMSSW_8 is not on disk
     validationScript = dummyTestScript
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -469,7 +476,9 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 """
-if SL6:  # skip: those input files can't be read with CKSSW_7
+if SL6:  # skip: those input files can't be read with CMSSW_7
+    validationScript = dummyTestScript
+if CMSSW8:  # skip: those input files can't be read with CMSSW_8
     validationScript = dummyTestScript
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
