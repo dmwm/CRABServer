@@ -41,10 +41,10 @@ from testUtils import writePset, writePset8cores, writeScriptExe, writeLumiMask,
 # some tests needs changing if running on SL6
 # rely on $singularity which is set by Jenkins as
 # export singularity=`echo ${SCRAM_ARCH:3:1}`
-SL6 = os.environ.get('singularity','7') == '6'
+SL6 = os.environ.get('singularity', '7') == '6'
 
 # some tests need a small tweak on CMSSW_8
-CMSSW8 =  os.environ.get('CMSSW_VERSION').split('_')[1] == '8'
+CMSSW8 = os.environ.get('CMSSW_VERSION').split('_')[1] == '8'
 
 writePset()
 writePset8cores()
