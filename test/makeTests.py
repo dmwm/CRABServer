@@ -38,11 +38,6 @@ import os
 from testUtils import writePset, writePset8cores, writeScriptExe, writeLumiMask, \
     writeConfigFile, writeTestSubmitScript, writeValidationScript
 
-# SB START temporary diagnostic
-import pprint
-pprint.pprint(os.environ)
-# SB END
-
 # some tests needs changing if running on SL6
 # rely on $singularity which is set by Jenkins as
 # export singularity=`echo ${SCRAM_ARCH:3:1}`
