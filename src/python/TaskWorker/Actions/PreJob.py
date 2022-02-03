@@ -14,7 +14,6 @@ from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
 import CMSGroupMapper
 
-
 class PreJob:
     """
     Need a doc string here.
@@ -434,11 +433,15 @@ class PreJob:
             self.logger.error("Can not submit since DESIRED_Sites list is empty")
             self.prejob_exit_code = 1
             sys.exit(self.prejob_exit_code)
+        ## Make sure that attributest which will be used in MatchMaking are SORTED lists
+        available = list(available)
+        available.sort()
+        datasites = list(datasites)
+        datasites.sort()
         ## Add DESIRED_SITES to the Job.<job_id>.submit content.
         new_submit_text = '+DESIRED_SITES="%s"\n%s' % (",".join(available), new_submit_text)
         new_submit_text = '+DESIRED_CMSDataLocations="%s"\n%s' % (",".join(datasites), new_submit_text)
         return new_submit_text
-
 
     def touch_logs(self, crab_retry):
         """
