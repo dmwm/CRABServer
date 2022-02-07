@@ -13,6 +13,19 @@ cd ${CMSSW_release}/src
 eval `scramv1 runtime -sh`
 scram build
 
+if echo $CMSSW_release | grep -q CMSSW_7
+then
+  # when using CMSSW_7, need to force latest curl
+  if echo $SCRAM_ARCH | grep -q slc6; then
+    echo "using CMSSW_7 on SL6. Setup/cvmfs/cms.cern.ch/slc6_amd64_gcc900/external/curl/7.59.0"
+    source /cvmfs/cms.cern.ch/slc6_amd64_gcc700/external/curl/7.59.0/etc/profile.d/init.sh
+  fi
+  if echo $SCRAM_ARCH | grep -q slc7; then
+    echo "using CMSSW_7 on SL7. Setup /cvmfs/cms.cern.ch/slc7_amd64_gcc630/external/curl/7.59.0"
+    source /cvmfs/cms.cern.ch/slc7_amd64_gcc630/external/curl/7.59.0/etc/profile.d/init.sh
+  fi
+fi
+
 cd ${WORK_DIR}
 [ ! -d 'CRABServer' ] && git clone git@github.com:dmwm/CRABServer
 
