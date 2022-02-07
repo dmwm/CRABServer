@@ -14,7 +14,7 @@ source setupCRABClient.sh
   #list of commands to execute for full testing (sl7/8)
   FULL_TEST=(createmyproxy checkusername checkwrite tasks preparelocal status report getlog getoutput)
   #list of commands to execute on sl6
-  SL6_TESTS=(status)
+  SL6_TESTS=(status checkusername)
   
   #${TEST_LIST} comes from Jenkins and is used to specify which testing should be done: PR_TEST or FULL_TEST
   TEST_TO_EXECUTE=${TEST_LIST}[@]
