@@ -197,6 +197,9 @@ class PreDAG(object):
         sumEventsThr = 0
         sumEventsSize = 0
         count = 0
+        eventsThr = 0
+        eventsSize = 0
+        
         for jid in estimates:
             if jid in self.failedJobs:
                 continue
@@ -206,8 +209,9 @@ class PreDAG(object):
                 sumEventsThr += throughput
                 sumEventsSize += eventsize
                 count += 1
-        eventsThr = sumEventsThr / count
-        eventsSize = sumEventsSize / count
+                
+        eventsThr = (sumEventsThr / count) if count > 0 else 0
+        eventsSize = (sumEventsSize / count) if count > 0 else 0
 
         self.logger.info("average throughput for %s jobs: %s evt/s", count, eventsThr)
         self.logger.info("average eventsize for %s jobs: %s bytes", count, eventsSize)
