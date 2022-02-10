@@ -208,14 +208,17 @@ class PreDAG(object):
                 sumEventsThr += throughput
                 sumEventsSize += eventsize
                 count += 1
-        if count > 0:
+        if count:
             eventsThr = sumEventsThr / count
             eventsSize = sumEventsSize / count
+            self.logger.info("average throughput for %s jobs: %s evt/s", count, eventsThr)
+            self.logger.info("average eventsize for %s jobs: %s bytes", count, eventsSize)
+        else:
+            self.logger.info("No probe job output could be found")
+            eventsThr = 0
+            eventsSize = 0
 
-        self.logger.info("average throughput for %s jobs: %s evt/s", count, eventsThr)
-        self.logger.info("average eventsize for %s jobs: %s bytes", count, eventsSize)
-
-        if eventsThr == 0:
+        if not count or not eventsThr or not eventsSize:
             retmsg = "Splitting failed because all probe jobs failed or anyhow failed to provide estimates"
             self.logger.error(retmsg)
             return 1
