@@ -284,6 +284,8 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir):
     if not atDestination:
         msg = "Result of migration request: %s" % str(result)
         logger.info(msg)
+        if isinstance(result, list):
+            result = result[0] # New DBS server returns list of dicts
         reqid = result.get('migration_details', {}).get('migration_request_id')
         report = result.get('migration_report')
         migInput = result.get('migration_details', {}).get('migration_input')
