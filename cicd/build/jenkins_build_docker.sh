@@ -9,11 +9,7 @@ echo "(DEBUG)   \- WORKSPACE: $WORKSPACE"
 echo "(DEBUG) end"
 
 #build and push crabtaskworker image
-# FIXME TODO TEMPORARY CHANGE: go back to use dmwm/CRABServer after merge
-# git clone https://github.com/dmwm/CRABServer.git
-git clone https://github.com/mapellidario/CRABServer.git -b master-20220127-jenkinsscripts
-# FIXME TODO: change next line if you move CRABServer/Docker !
-#cd CRABServer/cicd/crabtaskworker/docker/
+git clone https://github.com/dmwm/CRABServer.git
 cd CRABServer/Docker
 
 #replace where RPMs are stored
