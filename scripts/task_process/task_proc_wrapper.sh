@@ -18,7 +18,7 @@ function manage_transfers {
         if [[ $DEST_LFN =~ ^/store/user/rucio/* ]]; then
         timeout 15m env PYTHONPATH=$PYTHONPATH:$RucioPy3 python3 task_process/RUCIO_Transfers.py
         else
-        timeout 15m env PYTHONPATH=$PYTHONPATH:$RucioPy2 python task_process/FTS_Transfers.py
+        timeout 15m env PYTHONPATH=$PYTHONPATH:$RucioPy3 python3 task_process/FTS_Transfers.py
         fi
 
         err=$?
@@ -96,7 +96,9 @@ TIME_OF_LAST_QUERY=$(date +"%s")
 # submission is most likely pointless and relatively expensive, the script will run normally and perform the query later.
 DAG_INFO="init"
 
+# following two lines are needed to use pycurl on python3 without the full COMP or CMSSW env.
 export PYTHONPATH=$PYTHONPATH:/data/srv/pycurl3/7.44.1
+source /cvmfs/cms.cern.ch/slc7_amd64_gcc900/external/curl/7.59.0/etc/profile.d/init.sh
 
 export PYTHONPATH=`pwd`/task_process:`pwd`/CRAB3.zip:`pwd`/WMCore.zip:$PYTHONPATH
 
