@@ -14,9 +14,10 @@ ENV USER=crab3
 RUN useradd ${USER} && install -o ${USER} -d ${WDIR}
 USER ${USER}
 
-ARG TW_VERSION
-ENV RELEASE $TW_VERSION
-ENV TW_VERSION $TW_VERSION
+ARG RELEASE_TAG
+ENV RELEASE_TAG $RELEASE_TAG
+ARG RPM_RELEASETAG_HASH
+ENV RPM_RELEASETAG_HASH $RPM_RELEASETAG_HASH
 
 RUN mkdir -p /data/srv/tmp && mkdir -p /data/srv/Publisher && mkdir -p /data/srv/TaskManager
 WORKDIR ${WDIR}
