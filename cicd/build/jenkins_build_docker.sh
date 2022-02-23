@@ -46,7 +46,6 @@ echo "(DEBUG) diff dmwm/CMSKubernetes/docker/crabserver/install.sh"
 diff -u crabserver/install.sh.bak crabserver/install.sh || true
 echo "(DEBUG) end"
 
-echo $DOCKER_CONFIG
 # relogin to using cmsweb robot account
-#docker login registry.cern.ch --username $HARBOR_CMSWEB_USERNAME --password-stdin <<< $HARBOR_CMSWEB_PASSWORD
-#CMSK8STAG=${RELEASE_TAG} ./build.sh "crabserver"
+docker login registry.cern.ch --username $HARBOR_CMSWEB_USERNAME --password-stdin <<< $HARBOR_CMSWEB_PASSWORD
+CMSK8STAG=${RELEASE_TAG} ./build.sh "crabserver"
