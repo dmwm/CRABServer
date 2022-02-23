@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -euo pipefail
+set -x
 
 echo "(DEBUG) variables from upstream jenkin job (CRABServer_BuildImage_20220127):"
 echo "(DEBUG)   \- BRANCH: ${BRANCH}"
