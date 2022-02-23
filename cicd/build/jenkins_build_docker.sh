@@ -18,7 +18,8 @@ cd CRABServer/Docker
 #replace where RPMs are stored
 sed -i.bak -e "/export REPO=*/c\export REPO=comp.crab_${BRANCH}" install.sh
 echo "(DEBUG) diff dmwm/CRABServer/Docker/install.sh"
-diff -u install.sh.bak install.sh
+ls .
+diff -u install.sh.bak install.sh || true
 echo "(DEBUG) end"
 
 # use cmscrab robot account credentials
@@ -40,7 +41,7 @@ docker rmi registry.cern.ch/cmscrab/crabtaskworker:${RELEASE_TAG}
 #HGVERSION=$(curl -s "http://cmsrep.cern.ch/cmssw/repos/comp.crab_${BRANCH}/slc7_amd64_gcc630/latest/RPMS.json" | grep -oP 'HG\d{4}(.*)(?=":)' | head -1)
 #sed -i.bak -e "/REPO=\"comp*/c\REPO=\"comp.crab_${BRANCH}\"" -e "s/VER=HG.*/VER=$HGVERSION/g" -- crabserver/install.sh
 #echo "(DEBUG) diff dmwm/CMSKubernetes/docker/crabserver/install.sh"
-#diff -u crabserver/install.sh.bak crabserver/install.sh
+#diff -u crabserver/install.sh.bak crabserver/install.sh || true
 #echo "(DEBUG) end"
 #
 #CMSK8STAG=${RELEASE_TAG} ./build.sh "crabserver"
