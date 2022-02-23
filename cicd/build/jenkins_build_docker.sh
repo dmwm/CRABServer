@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 echo "(DEBUG) variables from upstream jenkin job (CRABServer_BuildImage_20220127):"
 echo "(DEBUG)   \- BRANCH: ${BRANCH}"
 echo "(DEBUG)   \- RELEASE_TAG: ${RELEASE_TAG}"
@@ -20,7 +22,7 @@ echo "(DEBUG) end"
 
 # use cmscrab robot account credentials
 export DOCKER_CONFIG=$PWD/docker_login
-docker login registry.cern.ch --username $HARBOR_CMSCRAB_USERNAME --password-stdin <<< $HARBOR_CMSCRAB_USERNAME
+docker login registry.cern.ch --username $HARBOR_CMSCRAB_USERNAME --password-stdin <<< $HARBOR_CMSCRAB_PASSWORD
 
 docker build . -t registry.cern.ch/cmscrab/crabtaskworker:${RELEASE_TAG} --network=host \
         --build-arg RELEASE_TAG=${RELEASE_TAG} \
