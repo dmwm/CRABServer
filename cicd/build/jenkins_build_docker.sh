@@ -11,6 +11,9 @@ echo "(DEBUG) jenkin job's env variables:"
 echo "(DEBUG)   \- WORKSPACE: $WORKSPACE"
 echo "(DEBUG) end"
 
+# use docker config on our WORKSPACE area, avoid replace default creds in ~/.docker that many pipeline depend on it
+export DOCKER_CONFIG=$PWD/docker_login
+
 #build and push crabtaskworker image
 git clone https://github.com/dmwm/CRABServer.git
 cd CRABServer/Docker
@@ -23,7 +26,6 @@ diff -u install.sh.bak install.sh || true
 echo "(DEBUG) end"
 
 # use cmscrab robot account credentials
-export DOCKER_CONFIG=$PWD/docker_login
 docker login registry.cern.ch --username $HARBOR_CMSCRAB_USERNAME --password-stdin <<< $HARBOR_CMSCRAB_PASSWORD
 
 docker build . -t registry.cern.ch/cmscrab/crabtaskworker:${RELEASE_TAG} --network=host \
