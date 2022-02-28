@@ -33,7 +33,6 @@ class RESTFileMetadata(RESTEntity):
             safe.kwargs['inparentlfns'] = str(safe.kwargs['inparentlfns'])
             validate_str("globalTag", param, safe, RX_GLOBALTAG, optional=True)
             validate_str("jobid", param, safe, RX_JOBID, optional=True)
-            safe.kwargs["pandajobid"] = 0
             validate_num("outsize", param, safe, optional=False)
             validate_str("publishdataname", param, safe, RX_PUBLISH, optional=False)
             validate_str("appver", param, safe, RX_CMSSW, optional=False)
@@ -79,11 +78,11 @@ class RESTFileMetadata(RESTEntity):
     ## * The name of the arguments has to be the same as used in the http request, and the same as used in validate().
 
     @restcall
-    def put(self, taskname, outfilelumis, inparentlfns, globalTag, outfileruns, jobid, pandajobid, outsize, publishdataname, appver, outtype, checksummd5,\
+    def put(self, taskname, outfilelumis, inparentlfns, globalTag, outfileruns, jobid, outsize, publishdataname, appver, outtype, checksummd5,\
             checksumcksum, checksumadler32, outlocation, outtmplocation, outdatasetname, acquisitionera, outlfn, events, filestate, directstageout, outtmplfn):
         """Insert a new job metadata information"""
         return self.jobmetadata.inject(taskname=taskname, outfilelumis=outfilelumis, inparentlfns=inparentlfns, globalTag=globalTag, outfileruns=outfileruns,\
-                           jobid=jobid, pandajobid=pandajobid, outsize=outsize, publishdataname=publishdataname, appver=appver, outtype=outtype, checksummd5=checksummd5,\
+                           jobid=jobid, outsize=outsize, publishdataname=publishdataname, appver=appver, outtype=outtype, checksummd5=checksummd5,\
                            checksumcksum=checksumcksum, checksumadler32=checksumadler32, outlocation=outlocation, outtmplocation=outtmplocation,\
                            outdatasetname=outdatasetname, acquisitionera=acquisitionera, outlfn=outlfn, outtmplfn=outtmplfn, events=events, filestate=filestate, \
                            directstageout=directstageout)

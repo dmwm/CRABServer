@@ -29,10 +29,6 @@ import classad
 
 import WMCore.WMSpec.WMTask
 from WMCore.Services.CRIC.CRIC import CRIC
-try:
-    from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
-except ImportError:
-    UserFileCache = None
 
 DAG_HEADER = """
 
@@ -101,8 +97,6 @@ CRAB_Id = $(count)
 +CRAB_OutTempLFNDir = "%(temp_dest)s"
 +CRAB_OutLFNDir = "%(output_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s
-+CRAB_ASOURL = %(tm_asourl)s
-+CRAB_ASODB = %(tm_asodb)s
 +CRAB_PrimaryDataset = %(primarydataset)s
 +TaskType = "Job"
 accounting_group = %(accounting_group)s
@@ -207,6 +201,7 @@ def makeLFNPrefixes(task):
     if 'tm_user_role' in task and task['tm_user_role']:
         hash_input += "," + task['tm_user_role']
     lfn = task['tm_output_lfn']
+    hash_input = hash_input.encode('utf-8')
     pset_hash = hashlib.sha1(hash_input).hexdigest()
     user = task['tm_username']
     tmp_user = "%s.%s" % (user, pset_hash)
@@ -287,7 +282,7 @@ def transform_strings(data):
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'primarydataset', 'splitalgo', 'algoargs', \
                'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
-               'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'tm_asodb', \
+               'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', \
                'stageoutpolicy', 'taskType', 'worker_name', 'cms_wmtool', 'cms_tasktype', 'cms_type', \
                'desired_arch', 'resthost', 'dbinstance', 'submitter_ip_addr', \
                'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
@@ -319,7 +314,6 @@ def transform_strings(data):
     for var in ["cacheurl", "jobsw", "jobarch", "cachefilename", "asyncdest", "requestname"]:
         info[var+"_flatten"] = data[var]
 
-    # TODO: PanDA wrapper wants some sort of dictionary.
     info["addoutputfiles_flatten"] = '{}'
 
     temp_dest, dest = makeLFNPrefixes(data)
@@ -469,9 +463,6 @@ class DagmanCreator(TaskAction):
         info['tfileoutfiles'] = task['tm_tfile_outfiles']
         info['edmoutfiles'] = task['tm_edm_outfiles']
         info['oneEventMode'] = 1 if info['tm_one_event_mode'] == 'T' else 0
-        info['ASOURL'] = task['tm_asourl']
-        asodb = task.get('tm_asodb', 'asynctransfer') or 'asynctransfer'
-        info['ASODB'] = asodb
         info['taskType'] = self.getDashboardTaskType(task)
         info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
         info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
@@ -558,10 +549,12 @@ class DagmanCreator(TaskAction):
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
         try:
-            # use temp_dest since it the longest path and overall LFN has a length limit to fit in DataBase
+            # validate LFN's. Check both dest and temp_dest. See https://github.com/dmwm/CRABServer/issues/6871
             if task['tm_publication'] == 'T':
+                validateLFNs(dest, outfiles)
                 validateLFNs(temp_dest, outfiles)
             else:
+                validateUserLFNs(dest, outfiles)
                 validateUserLFNs(temp_dest, outfiles)
         except AssertionError as ex:
             msg = "\nYour task speficies an output LFN which fails validation in"
@@ -608,6 +601,8 @@ class DagmanCreator(TaskAction):
                 localOutputFiles.append("%s=%s" % (origFile, fileName))
             remoteOutputFilesStr = " ".join(remoteOutputFiles)
             localOutputFiles = ", ".join(localOutputFiles)
+            # no need to use // in the next line, thanks to integer formatting with `%d`
+            # see: https://docs.python.org/3/library/string.html#formatstrings
             counter = "%04d" % (i / 1000)
             tempDest = os.path.join(temp_dest, counter)
             directDest = os.path.join(dest, counter)
@@ -1101,23 +1096,22 @@ class DagmanCreator(TaskAction):
         # Import needed because the DagmanCreator module is also imported in the schedd,
         # where there is no ldap available. This function however is only called
         # in the TW (where ldap is installed) during submission.
-        from ldap import LDAPError
 
         highPrioUsers = set()
         try:
+            from ldap import LDAPError
             for egroup in egroups:
                 highPrioUsers.update(get_egroup_users(egroup))
-        except LDAPError as le:
+        except Exception as ex:
             msg = "Error when getting the high priority users list." \
                   " Will ignore the high priority list and continue normally." \
-                  " Error reason: %s" % str(le)
+                  " Error reason: %s" % str(ex)
             self.uploadWarning(msg, userProxy, workflow)
             return []
         return highPrioUsers
 
 
     def executeInternal(self, *args, **kw):
-        # FIXME: In PanDA, we provided the executable as a URL.
         # So, the filename becomes http:// -- and doesn't really work.  Hardcoding the analysis wrapper.
         #transform_location = getLocation(kw['task']['tm_transformation'], 'CAFUtilities/src/python/transformation/CMSRunAnalysis/')
         transform_location = getLocation('CMSRunAnalysis.sh', 'CRABServer/scripts/')
@@ -1138,8 +1132,8 @@ class DagmanCreator(TaskAction):
         sandboxTarBall = 'sandbox.tar.gz'
         debugTarBall = 'debug_files.tar.gz'
 
-        # Bootstrap the ISB if we are using S3 and running in the TW
-        if self.crabserver and 'S3' in kw['task']['tm_cache_url'].upper():
+        # Bootstrap the ISB if we are running in the TW
+        if self.crabserver:
             username = kw['task']['tm_username']
             sandboxName = kw['task']['tm_user_sandbox']
             dbgFilesName = kw['task']['tm_debug_files']
@@ -1156,26 +1150,6 @@ class DagmanCreator(TaskAction):
                                tarballname=dbgFilesName, filepath=debugTarBall, logger=self.logger)
             except Exception as ex:
                 self.logger.exception(ex)
-
-        # Bootstrap the ISB if we are using UFC
-        else:
-            if UserFileCache and kw['task']['tm_cache_url'].find('/crabcache') != -1:
-                ufc = UserFileCache(mydict={'cert': kw['task']['user_proxy'], 'key': kw['task']['user_proxy'], 'endpoint' : kw['task']['tm_cache_url']})
-                try:
-                    ufc.download(hashkey=kw['task']['tm_user_sandbox'].split(".")[0], output=sandboxTarBall)
-                except Exception as ex:
-                    self.logger.exception(ex)
-                    raise TaskWorkerException("The CRAB3 server backend could not download the input sandbox with your code "+\
-                                        "from the frontend (crabcache component).\nThis could be a temporary glitch; please try to submit a new task later "+\
-                                        "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex)) #TODO url!?
-                kw['task']['tm_user_sandbox'] = sandboxTarBall
-
-                # For an older client (<3.3.1607) this field will be empty and the file will not exist.
-                if kw['task']['tm_debug_files']:
-                    try:
-                        ufc.download(hashkey=kw['task']['tm_debug_files'].split(".")[0], output=debugTarBall)
-                    except Exception as ex:
-                        self.logger.exception(ex)
 
         # Bootstrap the runtime if it is available.
         job_runtime = getLocation('CMSRunAnalysis.tar.gz', 'CRABServer/')

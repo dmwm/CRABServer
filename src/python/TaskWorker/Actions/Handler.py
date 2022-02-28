@@ -4,9 +4,7 @@ import time
 import logging
 import tempfile
 import traceback
-from httplib import HTTPException
-
-from WMCore.Services.UserFileCache.UserFileCache import UserFileCache
+from http.client import HTTPException
 
 from RESTInteractions import CRABRest
 from RucioUtils import getNativeRucioClient
@@ -94,29 +92,13 @@ class TaskHandler(object):
             #TODO: we need to do that also in Worker.py otherwise some messages might only be in the TW file but not in the crabcache.
             logpath = self.config.TaskWorker.logsDir+'/tasks/%s/%s.log' % (self._task['tm_username'], self.taskname)
             if os.path.isfile(logpath) and 'user_proxy' in self._task: #the user proxy might not be there if myproxy retrieval failed
-                cacheurldict = {'endpoint':self._task['tm_cache_url'], 'cert':self._task['user_proxy'], 'key':self._task['user_proxy']}
-                if 'S3' in self._task['tm_cache_url'].upper():
-                    # use S3
-                    try:
-                        uploadToS3(crabserver=self.crabserver, objecttype='twlog', filepath=logpath,
-                                   taskname=self.taskname, logger=self.logger)
-                    except Exception as e:
-                        msg = 'Failed to upload logfile to S3 for task %s. ' % self.taskname
-                        msg += 'Details:\n%s' % str(e)
-                        self.logger.error(msg)
-                else:
-                    # use old crabcache
-                    try:
-                        ufc = UserFileCache(cacheurldict)
-                        logfilename = self.taskname + '_TaskWorker.log'
-                        ufc.uploadLog(logpath, logfilename)
-                    except HTTPException as hte:
-                        msg = "Failed to upload the logfile to %s for task %s. More details in the http headers and body:\n%s\n%s" % (self._task['tm_cache_url'], self.taskname, hte.headers, hte.result)
-                        self.logger.error(msg)
-                    except Exception: #pylint: disable=broad-except
-                        msg = "Unknown error while uploading the logfile for task %s" % self.taskname
-                        self.logger.exception(msg) #upload logfile of the task to the crabcache
-
+                try:
+                    uploadToS3(crabserver=self.crabserver, objecttype='twlog', filepath=logpath,
+                               taskname=self.taskname, logger=self.logger)
+                except Exception as e:
+                    msg = 'Failed to upload logfile to S3 for task %s. ' % self.taskname
+                    msg += 'Details:\n%s' % str(e)
+                    self.logger.error(msg)
         return output
 
 

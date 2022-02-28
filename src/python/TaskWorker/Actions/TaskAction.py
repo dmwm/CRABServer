@@ -1,11 +1,17 @@
 import os
 import json
-import urllib
 import logging
 from base64 import b64encode
-from httplib import HTTPException
+from http.client import HTTPException
+import sys
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
+if sys.version_info < (3, 0):
+    from urllib import urlencode
 
 from ServerUtilities import truncateError
+
+from Utils.Utilities import encodeUnicodeToBytes
 
 class TaskAction(object):
     """The ABC of all actions"""
@@ -51,9 +57,9 @@ class TaskAction(object):
         truncWarning = truncateError(warning)
         configreq = {'subresource': 'addwarning',
                      'workflow': taskname,
-                     'warning': b64encode(truncWarning)}
+                     'warning': b64encode(encodeUnicodeToBytes(truncWarning))}
         try:
-            self.crabserver.post(api='/task', data=urllib.urlencode(configreq))
+            self.crabserver.post(api='task', data=urlencode(configreq))
         except HTTPException as hte:
             self.logger.error("Error uploading warning: %s", str(hte))
             self.logger.warning("Cannot add a warning to REST interface. Warning message: %s", warning)
@@ -62,7 +68,7 @@ class TaskAction(object):
     def deleteWarnings(self, userProxy, taskname):
         configreq = {'subresource': 'deletewarnings', 'workflow': taskname}
         try:
-            self.crabserver.post(api='task', data=urllib.urlencode(configreq))
+            self.crabserver.post(api='task', data=urlencode(configreq))
         except HTTPException as hte:
             self.logger.error("Error deleting warnings: %s", str(hte))
             self.logger.warning("Can not delete warnings from REST interface.")

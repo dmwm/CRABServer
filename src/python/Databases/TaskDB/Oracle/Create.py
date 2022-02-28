@@ -12,9 +12,7 @@ class Create(DBCreator):
     """
     Implementation of TaskMgr DB for Oracle
     """
-    requiredTables = ['tasks',
-                      'jobgroups',
-                      'jobgroups_id_seq'
+    requiredTables = ['tasks'
                       ]
 
     def __init__(self, logger=None, dbi=None, param=None):
@@ -34,7 +32,6 @@ class Create(DBCreator):
         CREATE TABLE tasks(
         tm_taskname VARCHAR(255) NOT NULL,
         tm_activity VARCHAR(255),
-        panda_jobset_id NUMBER(11),
         tm_task_status VARCHAR(255) NOT NULL,
         tm_task_command VARCHAR(20),
         tm_start_time TIMESTAMP,
@@ -71,7 +68,6 @@ class Create(DBCreator):
         tm_generator VARCHAR(255),
         tm_events_per_lumi NUMBER(38),
         tm_arguments CLOB,
-        panda_resubmitted_jobs CLOB,
         tm_save_logs VARCHAR(1) NOT NULL,
         tw_name VARCHAR(255),
         tm_user_infiles VARCHAR(4000),

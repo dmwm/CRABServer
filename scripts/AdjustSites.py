@@ -14,10 +14,10 @@ import sys
 import time
 import glob
 import shutil
-import urllib
+from urllib.parse import urlencode
 import traceback
 from datetime import datetime
-from httplib import HTTPException
+from http.client import HTTPException
 
 import classad
 import htcondor
@@ -210,7 +210,10 @@ def makeWebDir(ad):
     """
     Need a doc string here.
     """
-    path = os.path.expanduser("~/%s" % ad['CRAB_ReqName'])
+    if 'AuthTokenId' in ad:
+        path = os.path.expanduser("/home/grid/%s/%s" % (ad['CRAB_UserHN'], ad['CRAB_ReqName']))
+    else:
+        path = os.path.expanduser("~/%s" % ad['CRAB_ReqName'])
     try:
         ## Create the web directory.
         os.makedirs(path)
@@ -238,23 +241,6 @@ def makeWebDir(ad):
         os.symlink(os.path.abspath(os.path.join(".", ".job.ad")), os.path.join(path, "job_ad.txt"))
         os.symlink(os.path.abspath(os.path.join(".", "task_process/status_cache.txt")), os.path.join(path, "status_cache"))
         os.symlink(os.path.abspath(os.path.join(".", "task_process/status_cache.pkl")), os.path.join(path, "status_cache.pkl"))
-        # prepare a startup cache_info file with time info for client to have something useful to print
-        # in crab status while waiting for task_process to fill with actual jobs info. Do it in two ways
-        # new way: a pickle file for python3 compatibility
-        startInfo = {'bootstrapTime': {}}
-        startInfo['bootstrapTime']['date'] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-        startInfo['bootstrapTime']['fromEpoch'] = int(time.time())
-        with open(os.path.abspath(os.path.join(".", "task_process/status_cache.pkl")), 'w') as fp:
-            pickle.dump(startInfo, fp)
-        # old way: a file with multiple lines and print-like output
-        startInfo = "# Task bootstrapped at " + datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC") + "\n"
-        startInfo += "%d\n" % (int(time.time()))  # machines will like seconds from Epoch more
-        # prepare fake status_cache info to please current (v3.210127) CRAB Client
-        fakeInfo = startInfo + "{"
-        fakeInfo += "'DagStatus': {'SubDagStatus': {}, 'Timestamp': 0L, 'NodesTotal': 1L, 'SubDags': {}, 'DagStatus': 1L}"
-        fakeInfo += "}\n{}\n"
-        with open(os.path.abspath(os.path.join(".", "task_process/status_cache.txt")), 'w') as fd:
-            fd.write(fakeInfo)
         os.symlink(os.path.abspath(os.path.join(".", "prejob_logs/predag.0.txt")), os.path.join(path, "AutomaticSplitting_Log0.txt"))
         os.symlink(os.path.abspath(os.path.join(".", "prejob_logs/predag.0.txt")), os.path.join(path, "AutomaticSplitting/DagLog0.txt"))
         os.symlink(os.path.abspath(os.path.join(".", "prejob_logs/predag.1.txt")), os.path.join(path, "AutomaticSplitting/DagLog1.txt"))
@@ -266,6 +252,24 @@ def makeWebDir(ad):
     except Exception as ex: #pylint: disable=broad-except
         #Should we just catch OSError and IOError? Is that enough?
         printLog("Failed to copy/symlink files in the user web directory: %s" % str(ex))
+
+    # prepare a startup cache_info file with time info for client to have something useful to print
+    # in crab status while waiting for task_process to fill with actual jobs info. Do it in two ways
+    # new way: a pickle file for python3 compatibility
+    startInfo = {'bootstrapTime': {}}
+    startInfo['bootstrapTime']['date'] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    startInfo['bootstrapTime']['fromEpoch'] = int(time.time())
+    with open(os.path.abspath(os.path.join(".", "task_process/status_cache.pkl")), 'wb') as fp:
+        pickle.dump(startInfo, fp)
+    # old way: a file with multiple lines and print-like output
+    startInfo = "# Task bootstrapped at " + datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC") + "\n"
+    startInfo += "%d\n" % (int(time.time()))  # machines will like seconds from Epoch more
+    # prepare fake status_cache info to please current (v3.210127) CRAB Client
+    fakeInfo = startInfo + "{"
+    fakeInfo += "'DagStatus': {'SubDagStatus': {}, 'Timestamp': 0L, 'NodesTotal': 1L, 'SubDags': {}, 'DagStatus': 1L}"
+    fakeInfo += "}\n{}\n"
+    with open(os.path.abspath(os.path.join(".", "task_process/status_cache.txt")), 'w') as fd:
+        fd.write(fakeInfo)
     printLog("WEB_DIR created, sym links in place and status_cache initialized")
 
     try:
@@ -287,7 +291,7 @@ def uploadWebDir(crabserver, ad):
 
     try:
         printLog("Uploading webdir %s to the REST" % data['webdirurl'])
-        crabserver.post(api='task', data=urllib.urlencode(data))
+        crabserver.post(api='task', data=urlencode(data))
         return 0
     except HTTPException as hte:
         printLog(traceback.format_exc())
@@ -314,7 +318,7 @@ def saveProxiedWebdir(crabserver, ad):
     if proxied_webDir: # Prefer the proxied webDir to the non-proxied one
         ad[webDir_adName] = str(proxied_webDir)
 
-    if ad[webDir_adName]:
+    if webDir_adName in ad:
         # This condor_edit is required because in the REST interface we look for the webdir if the DB upload failed (or in general if we use the "old logic")
         # See https://github.com/dmwm/CRABServer/blob/3.3.1507.rc8/src/python/CRABInterface/HTCondorDataWorkflow.py#L398
         dagJobId = '%d.%d' % (ad['ClusterId'], ad['ProcId'])

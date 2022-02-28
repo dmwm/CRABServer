@@ -6,12 +6,7 @@ function log {
 
 function cache_status {
     log "Running cache_status.py"
-    python task_process/cache_status.py
-}
-
-function cache_status_jel {
-    log "Running cache_status_jel.py"
-    python task_process/cache_status_jel.py
+    python3 task_process/cache_status.py
 }
 
 function manage_transfers {
@@ -21,9 +16,9 @@ function manage_transfers {
         DEST_LFN=`python -c 'import sys, json; print json.loads( open("task_process/transfers.txt").readlines()[0] )["destination_lfn"]' `
 
         if [[ $DEST_LFN =~ ^/store/user/rucio/* ]]; then
-        timeout 15m python task_process/RUCIO_Transfers.py
+        timeout 15m env PYTHONPATH=$PYTHONPATH:$RucioPy3 python3 task_process/RUCIO_Transfers.py
         else
-        timeout 15m python task_process/FTS_Transfers.py
+        timeout 15m env PYTHONPATH=$PYTHONPATH:$RucioPy3 python3 task_process/FTS_Transfers.py
         fi
 
         err=$?
@@ -101,9 +96,17 @@ TIME_OF_LAST_QUERY=$(date +"%s")
 # submission is most likely pointless and relatively expensive, the script will run normally and perform the query later.
 DAG_INFO="init"
 
+# following two lines are needed to use pycurl on python3 without the full COMP or CMSSW env.
+export PYTHONPATH=$PYTHONPATH:/data/srv/pycurl3/7.44.1
+source /cvmfs/cms.cern.ch/slc7_amd64_gcc900/external/curl/7.59.0/etc/profile.d/init.sh
+
 export PYTHONPATH=`pwd`/task_process:`pwd`/CRAB3.zip:`pwd`/WMCore.zip:$PYTHONPATH
 
-export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/current/lib/python2.7/site-packages
+# will use one of the other of following two as appropriate, of course this implies
+# that we use python(2 or 3) from the OS and that we have an FTS python client available
+# in CVMFS for the same python version
+export RucioPy2=/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py2/current/lib/python2.7/site-packages/
+export RucioPy3=/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/
 
 log "Starting task daemon wrapper"
 while true
@@ -120,11 +123,7 @@ do
     fi
 
     # Run the parsing script
-    if [ -f USE_JEL ] ; then
-        cache_status_jel
-    else
-        cache_status
-    fi
+    cache_status
     manage_transfers
     sleep 300s
 

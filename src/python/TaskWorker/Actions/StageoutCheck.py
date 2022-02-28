@@ -5,7 +5,7 @@ from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from ServerUtilities import isFailurePermanent
 from ServerUtilities import getCheckWriteCommand, createDummyFile
-from ServerUtilities import removeDummyFile, executeCommand
+from ServerUtilities import removeDummyFile, execute_command
 from RucioUtils import getWritePFN
 
 class StageoutCheck(TaskAction):
@@ -30,7 +30,7 @@ class StageoutCheck(TaskAction):
         Return 0 otherwise
         """
         self.logger.info("Executing command: %s ", Cmd)
-        out, err, exitcode = executeCommand(Cmd)
+        out, err, exitcode = execute_command(Cmd)
         if exitcode != 0:
             isPermanent, failure, dummyExitCode = isFailurePermanent(err)
             if isPermanent:

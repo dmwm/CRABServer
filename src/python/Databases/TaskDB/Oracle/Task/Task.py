@@ -6,12 +6,12 @@ class Task(object):
     """
     """
     #ID
-    ID_tuple = namedtuple("ID", ["taskname", "panda_jobset_id", "task_status", "task_command", "user_role", "user_group", \
-             "task_failure", "split_algo", "split_args", "panda_resubmitted_jobs", "save_logs", "username", \
+    ID_tuple = namedtuple("ID", ["taskname", "task_status", "task_command", "user_role", "user_group", \
+             "task_failure", "split_algo", "split_args", "save_logs", "username", \
              "user_dn", "arguments", "input_dataset", "dbs_url", "task_warnings", "publication", "user_webdir", \
              "asourl", "asodb", "output_dataset", "collector", "schedd", "dry_run", "clusterid", "start_time", "twname"])
-    ID_sql = "SELECT tm_taskname, panda_jobset_id, tm_task_status, tm_task_command, tm_user_role, tm_user_group, \
-             tm_task_failure, tm_split_algo, tm_split_args, panda_resubmitted_jobs, tm_save_logs, tm_username, \
+    ID_sql = "SELECT tm_taskname, tm_task_status, tm_task_command, tm_user_role, tm_user_group, \
+             tm_task_failure, tm_split_algo, tm_split_args, tm_save_logs, tm_username, \
              tm_user_dn, tm_arguments, tm_input_dataset, tm_dbs_url, tm_task_warnings, tm_publication, tm_user_webdir, tm_asourl, \
              tm_asodb, tm_output_dataset, tm_collector, tm_schedd, tm_dry_run, clusterid, tm_start_time, tw_name \
              FROM tasks WHERE tm_taskname=:taskname"
@@ -39,45 +39,45 @@ class Task(object):
 
     #New
     New_sql = "INSERT INTO tasks ( \
-              tm_taskname, tm_activity, panda_jobset_id, tm_task_status, tm_task_command, tm_start_time, tm_task_failure, tm_job_sw, \
+              tm_taskname, tm_activity, tm_task_status, tm_task_command, tm_start_time, tm_task_failure, tm_job_sw, \
               tm_job_arch, tm_input_dataset, tm_primary_dataset, tm_nonvalid_input_dataset, tm_use_parent, tm_secondary_input_dataset, tm_site_whitelist, tm_site_blacklist, \
               tm_split_algo, tm_split_args, tm_totalunits, tm_user_sandbox, tm_debug_files, tm_cache_url, tm_username, tm_user_dn, \
               tm_user_vo, tm_user_role, tm_user_group, tm_publish_name, tm_publish_groupname, tm_asyncdest, tm_dbs_url, tm_publish_dbs_url, \
               tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, tm_job_type, tm_generator, tm_arguments, \
-              panda_resubmitted_jobs, tm_save_logs, tm_user_infiles, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority, \
+              tm_save_logs, tm_user_infiles, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority, \
               tm_scriptexe, tm_scriptargs, tm_extrajdl, tm_asourl, tm_asodb, tm_events_per_lumi, tm_collector, tm_schedd, tm_dry_run, \
               tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode, tm_submitter_ip_addr, tm_ignore_global_blacklist) \
-              VALUES (:task_name, :task_activity, :jobset_id, upper(:task_status), upper(:task_command), SYS_EXTRACT_UTC(SYSTIMESTAMP), :task_failure, :job_sw, \
+              VALUES (:task_name, :task_activity, upper(:task_status), upper(:task_command), SYS_EXTRACT_UTC(SYSTIMESTAMP), :task_failure, :job_sw, \
               :job_arch, :input_dataset, :primary_dataset, :nonvalid_data, :use_parent, :secondary_dataset, :site_whitelist, :site_blacklist, \
               :split_algo, :split_args, :total_units, :user_sandbox, :debug_files, :cache_url, :username, :user_dn, \
               :user_vo, :user_role, :user_group, :publish_name, :publish_groupname, :asyncdest, :dbs_url, :publish_dbs_url, \
               :publication, :outfiles, :tfile_outfiles, :edm_outfiles, :job_type, :generator, :arguments, \
-              :resubmitted_jobs, :save_logs, :user_infiles, :maxjobruntime, :numcores, :maxmemory, :priority, \
+              :save_logs, :user_infiles, :maxjobruntime, :numcores, :maxmemory, :priority, \
               :scriptexe, :scriptargs, :extrajdl, :asourl, :asodb, :events_per_lumi, :collector, :schedd_name, :dry_run, \
               :user_files, :transfer_outputs, :output_lfn, :ignore_locality, :fail_limit, :one_event_mode, :submitter_ip_addr, :ignore_global_blacklist)"
 
-    GetReadyTasks_tuple = namedtuple("GetReadyTasks", ["tm_taskname", "panda_jobset_id", "tm_task_status", "tm_task_command", \
+    GetReadyTasks_tuple = namedtuple("GetReadyTasks", ["tm_taskname", "tm_task_status", "tm_task_command", \
                        "tm_start_time", "tm_start_injection", "tm_end_injection", \
                        "tm_task_failure", "tm_job_sw", "tm_job_arch", "tm_input_dataset", "tm_DDM_reqid", \
                        "tm_site_whitelist", "tm_site_blacklist", "tm_split_algo", "tm_split_args", \
                        "tm_totalunits", "tm_user_sandbox", "tm_debug_files", "tm_cache_url", "tm_username", "tm_user_dn", "tm_user_vo", \
                        "tm_user_role", "tm_user_group", "tm_publish_name", "tm_asyncdest", "tm_dbs_url", \
                        "tm_publish_dbs_url", "tm_publication", "tm_outfiles", "tm_tfile_outfiles", "tm_edm_outfiles", \
-                       "tm_job_type", "tm_arguments", "panda_resubmitted_jobs", "tm_save_logs", \
+                       "tm_job_type", "tm_arguments", "tm_save_logs", \
                        "tm_user_infiles", "tw_name", "tm_maxjobruntime", "tm_numcores", "tm_maxmemory", "tm_priority", "tm_activity", \
                        "tm_scriptexe", "tm_scriptargs", "tm_extrajdl", "tm_generator", "tm_asourl", "tm_asodb", "tm_events_per_lumi", \
                        "tm_use_parent", "tm_collector", "tm_schedd", "tm_dry_run", \
                        "tm_user_files", "tm_transfer_outputs", "tm_output_lfn", "tm_ignore_locality", "tm_fail_limit", "tm_one_event_mode", \
                        "tm_publish_groupname", "tm_nonvalid_input_dataset", "tm_secondary_input_dataset", "tm_primary_dataset", "tm_submitter_ip_addr", "tm_ignore_global_blacklist"])
     #GetReadyTasks
-    GetReadyTasks_sql = """SELECT tm_taskname, panda_jobset_id, tm_task_status, tm_task_command, \
+    GetReadyTasks_sql = """SELECT tm_taskname, tm_task_status, tm_task_command, \
                        tm_start_time, tm_start_injection, tm_end_injection, \
                        tm_task_failure, tm_job_sw, tm_job_arch, tm_input_dataset, tm_DDM_reqid, \
                        tm_site_whitelist, tm_site_blacklist, tm_split_algo, tm_split_args, \
                        tm_totalunits, tm_user_sandbox, tm_debug_files, tm_cache_url, tm_username, tm_user_dn, tm_user_vo, \
                        tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, \
                        tm_publish_dbs_url, tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, \
-                       tm_job_type, tm_arguments, panda_resubmitted_jobs, tm_save_logs, \
+                       tm_job_type, tm_arguments, tm_save_logs, \
                        tm_user_infiles, tw_name, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority, tm_activity, \
                        tm_scriptexe, tm_scriptargs, tm_extrajdl, tm_generator, tm_asourl, tm_asodb, tm_events_per_lumi, \
                        tm_use_parent, tm_collector, tm_schedd, tm_dry_run, \
@@ -116,12 +116,8 @@ class Task(object):
     #SetInjectedTasks
     SetInjectedTasks_sql = "UPDATE tasks SET tm_end_injection = SYS_EXTRACT_UTC(SYSTIMESTAMP), \
                              tm_task_status = upper(:tm_task_status), \
-                             panda_resubmitted_jobs = :resubmitted_jobs, \
                              clusterid = :clusterid \
                              WHERE tm_taskname = :tm_taskname"
-
-    #SetJobSetId
-    SetJobSetId_sql = "UPDATE tasks SET panda_jobset_id = :jobsetid WHERE tm_taskname = :taskname"
 
     #SetReadyTasks
     SetReadyTasks_sql = "UPDATE tasks SET tm_start_injection = SYS_EXTRACT_UTC(SYSTIMESTAMP), \

@@ -62,6 +62,10 @@ config.TaskWorker.cmscert = '/data/certs/servicecert.pem'
 config.TaskWorker.cmskey = '/data/certs/servicekey.pem'
 
 config.TaskWorker.backend = 'glidein'
+
+# for connection to HTCondor scheds
+config.TaskWorker.SEC_TOKEN_DIRECTORY = '/data/certs/tokens.d'
+
 #Retry policy
 config.TaskWorker.max_retry = 4
 config.TaskWorker.retry_interval = [30, 60, 120, 0]

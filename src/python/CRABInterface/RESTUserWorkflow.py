@@ -8,10 +8,10 @@ import logging
 import cherrypy
 from base64 import b64decode
 # WMCore dependecies here
+from Utils.Utilities import decodeBytesToUnicode
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Error import ExecutionError, InvalidParameter
-from WMCore.REST.Validation import validate_str, validate_strlist, validate_ustr, validate_ustrlist,\
-    validate_num, validate_real
+from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_real
 from WMCore.Services.TagCollector.TagCollector import TagCollector
 from WMCore.Lexicon import userprocdataset, userProcDSParts, primdataset
 
@@ -349,9 +349,9 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("useparent", param, safe, optional=True)
             validate_str("secondarydata", param, safe, RX_DATASET, optional=True)
             # site black/white list needs to be cast to unicode for later use in self._expandSites
-            validate_ustrlist("siteblacklist", param, safe, RX_CMSSITE)
+            validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
             safe.kwargs['siteblacklist'] = self._expandSites(safe.kwargs['siteblacklist'])
-            validate_ustrlist("sitewhitelist", param, safe, RX_CMSSITE)
+            validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
             safe.kwargs['sitewhitelist'] = self._expandSites(safe.kwargs['sitewhitelist'])
             validate_str("splitalgo", param, safe, RX_SPLIT, optional=False)
             validate_num("algoargs", param, safe, optional=False)
@@ -399,7 +399,7 @@ class RESTUserWorkflow(RESTEntity):
                 param.kwargs["publishname2"] = safe.kwargs["publishname"]
 
             ## 'publishname' was already validated above in _checkPublishDataName().
-            ## Calling validate_ustr with a fake regexp to move the param to the
+            ## Calling validate_str with a fake regexp to move the param to the
             ## list of validated inputs
             validate_str("publishname2", param, safe, RX_ANYTHING, optional=True)
 
@@ -452,7 +452,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("nonvaliddata", param, safe, optional=True)
             #if one and only one between outputDatasetTag and publishDbsUrl is set raise an error (we need both or none of them)
             # asyncdest needs to be cast to unicode for later use in self._checkASODestination
-            validate_ustr("asyncdest", param, safe, RX_CMSSITE, optional=False)
+            validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
             self._checkASODestination(safe.kwargs['asyncdest'])
             # We no longer use this attribute, but keep it around for older client compatibility
             validate_num("blacklistT1", param, safe, optional=True)
@@ -491,14 +491,14 @@ class RESTUserWorkflow(RESTEntity):
             ## or whitelist, set it to None and DataWorkflow will use the corresponding
             ## list defined in the initial task submission. If the site black- or whitelist
             ## is equal to the string 'empty', set it to an empty list and don't call
-            ## validate_ustrlist as it would fail.
+            ## validate_strlist as it would fail.
             if 'siteblacklist' not in param.kwargs:
                 safe.kwargs['siteblacklist'] = None
             elif param.kwargs['siteblacklist'] == 'empty':
                 safe.kwargs['siteblacklist'] = []
                 del param.kwargs['siteblacklist']
             else:
-                validate_ustrlist("siteblacklist", param, safe, RX_CMSSITE)
+                validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
                 safe.kwargs['siteblacklist'] = self._expandSites(safe.kwargs['siteblacklist'])
             if 'sitewhitelist' not in param.kwargs:
                 safe.kwargs['sitewhitelist'] = None
@@ -506,7 +506,7 @@ class RESTUserWorkflow(RESTEntity):
                 safe.kwargs['sitewhitelist'] = []
                 del param.kwargs['sitewhitelist']
             else:
-                validate_ustrlist("sitewhitelist", param, safe, RX_CMSSITE)
+                validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
                 safe.kwargs['sitewhitelist'] = self._expandSites(safe.kwargs['sitewhitelist'])
             validate_num("maxjobruntime", param, safe, optional=True)
             validate_num("maxmemory", param, safe, optional=True)
@@ -545,12 +545,11 @@ class RESTUserWorkflow(RESTEntity):
 
         elif method in ['DELETE']:
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
-            validate_num("force", param, safe, optional=True)
             validate_str("killwarning", param, safe, RX_TEXT_FAIL, optional=True)
             #decode killwarning message if present
             if safe.kwargs['killwarning']:
                 try:
-                    safe.kwargs['killwarning'] = b64decode(safe.kwargs['killwarning'])
+                    safe.kwargs['killwarning'] = decodeBytesToUnicode(b64decode(safe.kwargs['killwarning']))
                 except TypeError:
                     raise InvalidParameter("Failure message is not in the accepted format")
 
@@ -721,7 +720,7 @@ class RESTUserWorkflow(RESTEntity):
         return result
 
     @restcall
-    def delete(self, workflow, force, killwarning):
+    def delete(self, workflow, killwarning=''):
         """Aborts a workflow. The user needs to be a CMS owner of the workflow.
 
            :arg str list workflow: list of unique name identifiers of workflows;
@@ -730,4 +729,4 @@ class RESTUserWorkflow(RESTEntity):
 
         # strict check on authz: only the workflow owner can modify it
         authz_owner_match(self.api, [workflow], self.Task)
-        return self.userworkflowmgr.kill(workflow, force, killwarning, userdn=cherrypy.request.headers['Cms-Authn-Dn'])
+        return self.userworkflowmgr.kill(workflow, killwarning)

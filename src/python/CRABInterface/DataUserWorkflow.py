@@ -23,10 +23,6 @@ class DataUserWorkflow(object):
                           (this should probably have a default!)
            :arg int limit: limit on the workflow age
            :return: a list of workflows"""
-        # convert the workflow age in something eatable by a couch view
-        # in practice it's convenient that the timestamp is on a fixed format: latest 1 or 3 days, latest 1 week, latest 1 month
-        # and that it's a list (probably it can be converted into it): [year, month-num, day, hh, mm, ss]
-        # this will allow to query as it's described here: http://guide.couchdb.org/draft/views.html#many
         return self.workflow.getLatests(username, timestamp)
 
     def errors(self, workflow, shortformat):
@@ -49,14 +45,14 @@ class DataUserWorkflow(object):
     def report2(self, workflow, userdn, usedbs):
         return self.workflow.report2(workflow, userdn)
 
-    def logs(self, workflow, howmany, exitcode, jobids, userdn, userproxy=None):
+    def logs(self, workflow, howmany, exitcode, jobids, userdn):
         """Returns the workflow logs PFN. It takes care of the LFN - PFN conversion too.
 
            :arg str workflow: a workflow name
            :arg int howmany: the limit on the number of PFN to return
            :arg int exitcode: the log has to be of a job ended with this exit_code
            :return: a generator of list of logs pfns"""
-        return self.workflow.logs(workflow, howmany, exitcode, jobids, userdn, userproxy)
+        return self.workflow.logs(workflow, howmany, exitcode, jobids, userdn)
 
     def logs2(self, workflow, howmany, jobids):
         """Returns information about the workflow log files.
@@ -68,13 +64,13 @@ class DataUserWorkflow(object):
            :return: a generator of list of logs pfns"""
         return self.workflow.logs2(workflow, howmany, jobids)
 
-    def output(self, workflow, howmany, jobids, userdn, userproxy=None):
+    def output(self, workflow, howmany, jobids, userdn):
         """Returns the workflow output PFN. It takes care of the LFN - PFN conversion too.
 
            :arg str list workflow: a workflow name
            :arg int howmany: the limit on the number of PFN to return
            :return: a generator of list of output pfns"""
-        return self.workflow.output(workflow, howmany, jobids, userdn, userproxy)
+        return self.workflow.output(workflow, howmany, jobids, userdn)
 
     def output2(self, workflow, howmany, jobids):
         """Returns information about the workflow output files.
@@ -148,38 +144,34 @@ class DataUserWorkflow(object):
 
         return self.workflow.submit(*args, **kwargs)
 
-    def resubmit(self, workflow, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority, userdn, userproxy=None):
+    def resubmit(self, workflow, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority, userdn):
         """Request to Resubmit a workflow.
 
            :arg str workflow: a workflow name"""
-        return self.workflow.resubmit(workflow, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority, userdn, userproxy)
+        return self.workflow.resubmit(workflow, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority, userdn)
 
-    def resubmit2(self, workflow, publication, jobids, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority,
-                  userproxy=None):
+    def resubmit2(self, workflow, publication, jobids, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority):
         """Request to Resubmit a workflow.
 
            :arg str workflow: a workflow name"""
-        return self.workflow.resubmit2(workflow, publication, jobids, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority,
-                                       userproxy)
+        return self.workflow.resubmit2(workflow, publication, jobids, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority)
 
-    def status(self, workflow, userdn, userproxy=None, verbose=False):
+    def status(self, workflow, userdn, verbose=False):
         """Retrieve the status of the workflow
 
            :arg str workflow: a valid workflow name
            :arg str userdn: the user dn makind the request
-           :arg str userproxy: the user proxy retrieved by `retrieveUserCert`
            :return: a generator of workflow states
         """
-        return self.workflow.status(workflow, userdn, userproxy)
+        return self.workflow.status(workflow, userdn)
 
-    def kill(self, workflow, force, killwarning, userdn, userproxy=None):
+    def kill(self, workflow, killwarning=''):
         """Request to Abort a workflow.
 
            :arg str workflow: a workflow name
            :arg str force: a flag to know if kill should be brutal
-           :arg str userproxy: the user proxy retrieved by `retrieveUserCert`
            :arg int force: force to delete the workflows in any case; 0 no, everything else yes"""
-        return self.workflow.kill(workflow, force, killwarning, userdn, userproxy)
+        return self.workflow.kill(workflow, killwarning)
 
     def proceed(self, workflow):
         """Continue a task initialized with 'crab submit --dryrun'.

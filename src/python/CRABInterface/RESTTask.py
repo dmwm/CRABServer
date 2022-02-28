@@ -1,4 +1,5 @@
 # WMCore dependecies here
+from Utils.Utilities import decodeBytesToUnicode
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_strlist
 from WMCore.REST.Error import InvalidParameter, ExecutionError, NotAcceptable
@@ -25,7 +26,6 @@ class RESTTask(RESTEntity):
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
-        self.JobGroup = getDBinstance(config, 'TaskDB', 'JobGroup')
         self.logger = logging.getLogger("CRABLogger.RESTTask")
 
     def validate(self, apiobj, method, api, param, safe):
@@ -219,7 +219,7 @@ class RESTTask(RESTEntity):
         workflow = kwargs['workflow']
         authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
         try:
-            warning = b64decode(kwargs['warning'])
+            warning = decodeBytesToUnicode(b64decode(kwargs['warning']))
         except TypeError:
             raise InvalidParameter("Failure message is not in the accepted format")
 

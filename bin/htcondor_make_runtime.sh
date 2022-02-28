@@ -34,19 +34,20 @@ else
 fi
 pushd $STARTDIR
 
-#
-# cleanup, avoid to keep adding to existing tarballs
-#
 
+# cleanup, avoid to keep adding to existing tarballs
 rm -f $STARTDIR/CRAB3.zip
 rm -f $STARTDIR/WMCore.zip
-rm -f $STARTDIR/nose.tar.gz
 
+# make sure there's always a CRAB3.zip to avoid errors in other parts
+touch $STARTDIR/dummyFile
+zip -r $STARTDIR/CRAB3.zip $STARTDIR/dummyFile
+rm -f $STARTDIR/dummyFile
 
 # For developers, we download all our dependencies from the various upstream servers.
 # For actual releases, we take the libraries from the build environment RPMs.
 if [[ "x$RPM_RELEASE" != "x" ]]; then
-
+    # I am inside  a release building
     pushd $ORIGDIR/../WMCore-$WMCOREVER/build/lib/
     zip -r $STARTDIR/WMCore.zip *
     zip -rq $STARTDIR/CRAB3.zip WMCore PSetTweaks Utils -x \*.pyc || exit 3
@@ -56,16 +57,12 @@ if [[ "x$RPM_RELEASE" != "x" ]]; then
     zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface  TransferInterface -x \*.pyc || exit 3
     popd
 
-    pushd $VO_CMS_SW_DIR/$SCRAM_ARCH/external/cherrypy/*/lib/python2.7/site-packages
-    zip -rq $STARTDIR/CRAB3.zip cherrypy -x \*.pyc
-    popd
-
     mkdir -p bin
     cp -r $ORIGDIR/scripts/{TweakPSet.py,CMSRunAnalysis.py,task_process} .
-    cp $ORIGDIR/src/python/{Logger.py,ProcInfo.py,ServerUtilities.py,RucioUtils.py,CMSGroupMapper.py,RESTInteractions.py} .
+    cp $ORIGDIR/src/python/{ServerUtilities.py,RucioUtils.py,CMSGroupMapper.py,RESTInteractions.py} .
 
 else
-
+    # building runtime tarballs from development area or GH
     if [[ -d "$REPLACEMENT_ABSOLUTE/WMCore" ]]; then
         echo "Using replacement WMCore source at $REPLACEMENT_ABSOLUTE/WMCore"
         WMCORE_PATH="$REPLACEMENT_ABSOLUTE/WMCore"
@@ -85,17 +82,6 @@ else
         CRABSERVER_PATH="CRABServer-$CRABSERVERVER"
     fi
 
-    if [[ ! -e nose.tar.gz ]]; then
-        curl -L https://github.com/nose-devs/nose/archive/release_1.3.0.tar.gz > nose.tar.gz || exit 2
-    fi
-
-    tar xzf nose.tar.gz || exit 2
-
-    pushd nose-release_1.3.0/
-    zip -rq $STARTDIR/CRAB3.zip nose -x \*.pyc || exit 3
-    popd
-
-
     # up until this point, evertying in CRAB3.zip is an external
     cp $STARTDIR/CRAB3.zip $ORIGDIR/CRAB3-externals.zip
 
@@ -110,12 +96,12 @@ else
 
     mkdir -p bin
     cp -r $CRABSERVER_PATH/scripts/{TweakPSet.py,CMSRunAnalysis.py,task_process} .
-    cp $CRABSERVER_PATH/src/python/{Logger.py,ProcInfo.py,ServerUtilities.py,RucioUtils.py,CMSGroupMapper.py,RESTInteractions.py} .
+    cp $CRABSERVER_PATH/src/python/{ServerUtilities.py,RucioUtils.py,CMSGroupMapper.py,RESTInteractions.py} .
 fi
 
 pwd
 echo "Making TaskManagerRun tarball"
-tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip TweakPSet.py CMSRunAnalysis.py task_process Logger.py ProcInfo.py ServerUtilities.py RucioUtils.py CMSGroupMapper.py RESTInteractions.py || exit 4
+tar zcf $ORIGDIR/TaskManagerRun-$CRAB3_VERSION.tar.gz CRAB3.zip TweakPSet.py CMSRunAnalysis.py task_process ServerUtilities.py RucioUtils.py CMSGroupMapper.py RESTInteractions.py || exit 4
 echo "Making CMSRunAnalysis tarball"
-tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py Logger.py ProcInfo.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py || exit 4
+tar zcf $ORIGDIR/CMSRunAnalysis-$CRAB3_VERSION.tar.gz WMCore.zip TweakPSet.py CMSRunAnalysis.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py || exit 4
 popd
