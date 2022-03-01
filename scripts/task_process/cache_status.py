@@ -1,20 +1,21 @@
 #!/usr/bin/python
+"""
+VERSION OF CACHE_STATUS USING HTCONDOR JobEventLog API
+THIS REQUIRES HTCONDOR 8.9.3 OR ABOVE
+"""
 from __future__ import print_function, division
 import re
 import time
 import logging
 import os
 import ast
-import sys
-import classad
 import glob
 import copy
 from shutil import move
-# Need to import HTCondorUtils from a parent directory, not easy when the files are not in python packages.
-# Solution by ajay, SO: http://stackoverflow.com/questions/11536764
-# /attempted-relative-import-in-non-package-even-with-init-py/27876800#comment28841658_19190695
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import HTCondorUtils
+import pickle
+import json
+import htcondor
+import classad
 
 logging.basicConfig(filename='task_process/cache_status.log', level=logging.DEBUG)
 
@@ -33,6 +34,8 @@ NODE_DEFAULTS = {
 }
 
 STATUS_CACHE_FILE = "task_process/status_cache.txt"
+PKL_STATUS_CACHE_FILE = "task_process/status_cache.pkl"
+LOG_PARSING_POINTERS_DIR = "task_process/jel_pickles/"
 FJR_PARSE_RES_FILE = "task_process/fjr_parse_results.txt"
 
 #
@@ -44,6 +47,12 @@ cpuRe = re.compile(r"Usr \d+ (\d+):(\d+):(\d+), Sys \d+ (\d+):(\d+):(\d+)")
 
 
 def insertCpu(event, info):
+    """
+    add CPU usage information to the job info record
+    :param event: an event from HTCondor log
+    :param info: the structure where information for a job is collected
+    :return: nothing
+    """
     if 'TotalRemoteUsage' in event:
         m = cpuRe.match(event['TotalRemoteUsage'])
         if m:
@@ -62,9 +71,19 @@ def insertCpu(event, info):
 nodeNameRe = re.compile("DAG Node: Job(\d+(?:-\d+)?)")
 nodeName2Re = re.compile("Job(\d+(?:-\d+)?)")
 
-def parseJobLog(fp, nodes, nodeMap):
+# this now takes as input an htcondor.JobEventLog object
+# which as of HTCondor 8.9 can be saved/restored with memory of
+# where it had reached in processing the job log file
+def parseJobLog(jel, nodes, nodeMap):
+    """
+    parses new events in condor job log file and updates nodeMap
+    :param jel: a condor JobEventLog object which provides an iterator over events
+    :param nodes: the structure where we collect one job info for cache_status file
+    :param nodeMap: the structure where collect summary of all events
+    :return: nothing
+    """
     count = 0
-    for event in HTCondorUtils.readEvents(fp):
+    for event in jel.events(0):
         count += 1
         eventtime = time.mktime(time.strptime(event['EventTime'], "%Y-%m-%dT%H:%M:%S"))
         if event['MyType'] == 'SubmitEvent':
@@ -95,7 +114,7 @@ def parseJobLog(fp, nodes, nodeMap):
             if nodes[node]['StartTimes'] :
                 nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
             else:
-                 nodes[node]['WallDurations'][-1] = 0
+                nodes[node]['WallDurations'][-1] = 0
             insertCpu(event, nodes[node])
             if event['TerminatedNormally']:
                 if event['ReturnValue'] == 0:
@@ -138,10 +157,6 @@ def parseJobLog(fp, nodes, nodeMap):
                 nodes[node]['StartTimes'].append(-1)
                 if not nodes[node]['RecordedSite']:
                     nodes[node]['SiteHistory'].append("Unknown")
-            if nodes[node]['State'] == 'running':
-                nodes[node]['EndTimes'].append(eventtime)
-                # nodes[node]['State'] can be 'running' only if an ExcuteEvent was found, so StartTime must be defined
-                nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
             nodes[node]['State'] = 'killed'
             insertCpu(event, nodes[node])
         elif event['MyType'] == 'JobHeldEvent':
@@ -195,13 +210,20 @@ def parseJobLog(fp, nodes, nodeMap):
             info['SiteHistory'].append("Unknown")
 
 def parseErrorReport(data, nodes):
-    #iterate over the jobs and set the error dict for those which are failed
-    for jobid, statedict in nodes.iteritems():
+    """
+    iterate over the jobs and set the error dict for those which are failed
+    :param data: a dictionary as returned by summarizeFjrParseResults() : {jobid:errdict}
+                 errdict is {crab_retry:error_summary} from PostJob/prepareErrorSummary
+                 which writes one line for PostJoun run: {job_id : {crab_retry : error_summary}}
+                 where crab_retry is a string and error_summary a list [exitcode, errorMsg, {}]
+    :param nodes: a dictionary with format {jobid:statedict}
+    :return: nothing, modifies nodes in place
+    """
+    for jobid, statedict in nodes.items():
         if 'State' in statedict and statedict['State'] == 'failed' and jobid in data:
-            # data[jobid] is a dictionary with the retry number as a key and error summary information as a value.
-            # Here we want to get the error summary information, and since values() returns a list
-            # (even if there's only a single value) it has to be indexed to zero.
-            statedict['Error'] = data[jobid].values()[0] #data[jobid] contains all retries. take the last one
+            # pick error info from last retry (SB: AFAICT only last retry is listed anyhow)
+            for key in data[jobid]:
+                statedict['Error'] = data[jobid][key]
 
 def parseNodeStateV2(fp, nodes, level):
     """
@@ -271,35 +293,55 @@ def parseNodeStateV2(fp, nodes, level):
             # observed; STATUS_ERROR is terminal.
             info['State'] = 'failed'
 
-# --- New code ----
-
 def storeNodesInfoInFile():
-    # Open cache file and get the location until which the jobs_log was parsed last time
-    try:
-        if os.path.exists(STATUS_CACHE_FILE) and os.stat(STATUS_CACHE_FILE).st_size > 0:
-            logging.debug("cache file found, opening and reading")
+    """
+    Open cache file and get the location until which the jobs_log was parsed last time
+    returns: a dictionary with keys: jobLogCheckpoint, fjrParseResCheckpoint, nodes, nodeMap
+    """
+    jobLogCheckpoint = None
+    if os.path.exists(STATUS_CACHE_FILE) and os.stat(STATUS_CACHE_FILE).st_size > 0:
+        logging.debug("cache file found, opening")
+        try:
             nodesStorage = open(STATUS_CACHE_FILE, "r")
+            jobLogCheckpoint = nodesStorage.readline().strip()
+            if jobLogCheckpoint.startswith('#') :
+                logging.debug("cache file contains initial comments, skipping")
+                # comment line indicates a place-holder file created at DAG bootstrap time
+                jobLogCheckpoint = None
+            else:
+                logging.debug("reading cache file")
+                fjrParseResCheckpoint = int(nodesStorage.readline())
+                nodes = ast.literal_eval(nodesStorage.readline())
+                nodeMap = ast.literal_eval(nodesStorage.readline())
+                nodesStorage.close()
+        except Exception:
+            logging.exception("error during status_cache handling")
+            jobLogCheckpoint = None
 
-            jobLogCheckpoint = int(nodesStorage.readline())
-            fjrParseResCheckpoint = int(nodesStorage.readline())
-            nodes = ast.literal_eval(nodesStorage.readline())
-            nodeMap = ast.literal_eval(nodesStorage.readline())
-            nodesStorage.close()
-        else:
-            logging.debug("cache file not found, creating")
-            jobLogCheckpoint = 0
-            fjrParseResCheckpoint = 0
-            nodes = {}
-            nodeMap = {}
-    except Exception:
-        logging.exception("error during status_cache handling")
-    jobsLog = open("job_log", "r")
+    if not jobLogCheckpoint:
+        logging.debug("no usable cache file found, creating")
+        fjrParseResCheckpoint = 0
+        nodes = {}
+        nodeMap = {}
 
-    jobsLog.seek(jobLogCheckpoint)
+    if jobLogCheckpoint:
+        # resume log parsing where we left
+        with open((LOG_PARSING_POINTERS_DIR+jobLogCheckpoint), 'rb') as f:
+            jel = pickle.load(f)
+    else:
+        # parse log from beginning
+        jel = htcondor.JobEventLog('job_log')
+    #jobsLog = open("job_log", "r")
+    #jobsLog.seek(jobLogCheckpoint)
 
-    parseJobLog(jobsLog, nodes, nodeMap)
-    newJobLogCheckpoint = jobsLog.tell()
-    jobsLog.close()
+    parseJobLog(jel, nodes, nodeMap)
+    # save jel object in a pickle file made unique by a timestamp
+    newJelPickleName = 'jel-%d.pkl' % int(time.time())
+    if not os.path.exists(LOG_PARSING_POINTERS_DIR):
+        os.mkdir(LOG_PARSING_POINTERS_DIR)
+    with open((LOG_PARSING_POINTERS_DIR+newJelPickleName), 'wb') as f:
+        pickle.dump(jel, f)
+    newJobLogCheckpoint = newJelPickleName
 
     for fn in glob.glob("node_state*"):
         level = re.match(r'(\w+)(?:.(\w+))?', fn).group(2)
@@ -326,6 +368,131 @@ def storeNodesInfoInFile():
 
     move(tempFilename, STATUS_CACHE_FILE)
 
+    # collect all cache info in a single dictionary and return it to called
+    cacheDoc = {}
+    cacheDoc['jobLogCheckpoint'] = newJobLogCheckpoint
+    cacheDoc['fjrParseResCheckpoint'] = newFjrParseResCheckpoint
+    cacheDoc['nodes'] = nodes
+    cacheDoc['nodeMap'] = nodeMap
+    return cacheDoc
+
+def readOldStatusCacheFile():
+    """
+    it is enough to read the Pickle version, since we want to transition to that
+    returns: a dictionary with keys: jobLogCheckpoint, fjrParseResCheckpoint, nodes, nodeMap
+    """
+    jobLogCheckpoint = None
+    if os.path.exists(PKL_STATUS_CACHE_FILE) and os.stat(PKL_STATUS_CACHE_FILE).st_size > 0:
+        logging.debug("cache file found, opening")
+        try:
+            with open(PKL_STATUS_CACHE_FILE, "rb") as fp:
+                cacheDoc = pickle.load(fp)
+            # protect against fake file with just bootstrapTime created by AdjustSites.py
+            jobLogCheckpoint = getattr(cacheDoc, 'jobLogCheckpoint', None)
+            fjrParseResCheckpoint = getattr(cacheDoc, 'fjrParseResCheckpoint', None)
+            nodes = getattr(cacheDoc, 'nodes', None)
+            nodeMap = getattr(cacheDoc, 'nodeMap', None)
+        except Exception:
+            logging.exception("error during status_cache handling")
+            jobLogCheckpoint = None
+
+    if not jobLogCheckpoint:
+        logging.debug("no usable cache file found, creating")
+        fjrParseResCheckpoint = 0
+        nodes = {}
+        nodeMap = {}
+
+    # collect all cache info in a single dictionary and return it to called
+    cacheDoc = {}
+    cacheDoc['jobLogCheckpoint'] = jobLogCheckpoint
+    cacheDoc['fjrParseResCheckpoint'] = fjrParseResCheckpoint
+    cacheDoc['nodes'] = nodes
+    cacheDoc['nodeMap'] = nodeMap
+    return cacheDoc
+
+def parseCondorLog(cacheDoc):
+    """
+    do all real work and update checkpoints, nodes and nodemap dictionaries
+    takes as input a cacheDoc dictionary with keys
+      jobLogCheckpoint, fjrParseResCheckpoint, nodes, nodeMap
+    and returns the same dictionary with updated information
+    """
+
+    jobLogCheckpoint = cacheDoc['jobLogCheckpoint']
+    fjrParseResCheckpoint = cacheDoc['fjrParseResCheckpoint']
+    nodes = cacheDoc['nodes']
+    nodeMap = cacheDoc['nodeMap']
+    if jobLogCheckpoint:
+        # resume log parsing where we left
+        with open((LOG_PARSING_POINTERS_DIR+jobLogCheckpoint), 'rb') as f:
+            jel = pickle.load(f)
+    else:
+        # parse log from beginning
+        jel = htcondor.JobEventLog('job_log')
+
+    parseJobLog(jel, nodes, nodeMap)
+    # save jel object in a pickle file made unique by a timestamp
+    newJelPickleName = 'jel-%d.pkl' % int(time.time())
+    if not os.path.exists(LOG_PARSING_POINTERS_DIR):
+        os.mkdir(LOG_PARSING_POINTERS_DIR)
+    with open((LOG_PARSING_POINTERS_DIR+newJelPickleName), 'wb') as f:
+        pickle.dump(jel, f)
+    newJobLogCheckpoint = newJelPickleName
+
+    for fn in glob.glob("node_state*"):
+        level = re.match(r'(\w+)(?:.(\w+))?', fn).group(2)
+        with open(fn, 'r') as nodeState:
+            parseNodeStateV2(nodeState, nodes, level)
+
+    try:
+        errorSummary, newFjrParseResCheckpoint = summarizeFjrParseResults(fjrParseResCheckpoint)
+        if errorSummary and newFjrParseResCheckpoint:
+            parseErrorReport(errorSummary, nodes)
+    except IOError:
+        logging.exception("error during error_summary file handling")
+
+    # collect all cache info in a single dictionary and return it to called
+    newCacheDoc = {}
+    newCacheDoc['jobLogCheckpoint'] = newJobLogCheckpoint
+    newCacheDoc['fjrParseResCheckpoint'] = newFjrParseResCheckpoint
+    newCacheDoc['nodes'] = nodes
+    newCacheDoc['nodeMap'] = nodeMap
+    return newCacheDoc
+
+def storeNodesInfoInPklFile(cacheDoc):
+    """
+    takes as input an cacheDoc dictionary with keys
+      jobLogCheckpoint, fjrParseResCheckpoint, nodes, nodeMap
+    """
+    # First write the new cache file under a temporary name, so that other processes
+    # don't get an incomplete result. Then replace the old one with the new one.
+    tempFilename = (PKL_STATUS_CACHE_FILE + ".%s") % os.getpid()
+
+    # persist cache info in py2-compatible pickle format
+    with open(tempFilename, "wb") as fp:
+        pickle.dump(cacheDoc, fp, protocol=2)
+    move(tempFilename, PKL_STATUS_CACHE_FILE)
+
+def storeNodesInfoInTxtFile(cacheDoc):
+    """
+    takes as input an cacheDoc dictionary with keys
+      jobLogCheckpoint, fjrParseResCheckpoint, nodes, nodeMap
+    """
+    jobLogCheckpoint = cacheDoc['jobLogCheckpoint']
+    fjrParseResCheckpoint = cacheDoc['fjrParseResCheckpoint']
+    nodes = cacheDoc['nodes']
+    nodeMap = cacheDoc['nodeMap']
+    # First write the new cache file under a temporary name, so that other processes
+    # don't get an incomplete result. Then replace the old one with the new one.
+    tempFilename = (STATUS_CACHE_FILE + ".%s") % os.getpid()
+
+    nodesStorage = open(tempFilename, "w")
+    nodesStorage.write(str(jobLogCheckpoint) + "\n")
+    nodesStorage.write(str(fjrParseResCheckpoint) + "\n")
+    nodesStorage.write(str(nodes) + "\n")
+    nodesStorage.write(str(nodeMap) + "\n")
+    nodesStorage.close()
+
 def summarizeFjrParseResults(checkpoint):
     '''
     Reads the fjr_parse_results file line by line. The file likely contains multiple
@@ -337,6 +504,14 @@ def summarizeFjrParseResults(checkpoint):
     Return the updated error dictionary and also the location until which the
     fjr_parse_results file was read so that we can store it and
     don't have t re-read the same information next time the cache_status.py runs.
+
+    SB: what this does is to convert a JSON file with a list of dictionaries [{job:msg},...] which
+    may have the same jobId as key, into a single dictionay with for each jobId key contains only the
+    last value of msg
+    for d in content:
+      for k,v in d.items():
+        errDict[k] = v
+
     '''
 
     if os.path.exists(FJR_PARSE_RES_FILE):
@@ -344,23 +519,35 @@ def summarizeFjrParseResults(checkpoint):
             f.seek(checkpoint)
             content = f.readlines()
             newCheckpoint = f.tell()
-
         errDict = {}
         for line in content:
-            fjrResult = ast.literal_eval(line)
-            jobId = fjrResult.keys()[0]
-            errDict[jobId] = fjrResult[jobId]
+            fjrResult = json.loads(line)
+            for jobId,msg in fjrResult.items():
+                errDict[jobId] = msg
         return errDict, newCheckpoint
     else:
         return None, 0
 
 def main():
+    """
+    parse condor job_log from last checkpoint until now and write summary in status_cache files
+    :return:
+    """
     try:
-        storeNodesInfoInFile()
+        # this is the old part
+        cacheDoc = storeNodesInfoInFile()
+        # this is new for the picke file but for the time being stick to using
+        # cacheDoc information from old way. At some point shoudl carefull check code
+        # and move on to the more strucutred 3-steps below, most likely when running
+        # in python3 the old status_cache.txt file will be unusable, as we found in crab client
+        #infoN = readOldStatusCacheFile()
+        #infoN = parseCondorLog(info)
+        storeNodesInfoInPklFile(cacheDoc)
+        # in case we still need the text file (e.g. for the UI) when we remove the old code:
+        # storeNodesInfoInTxtFile(cacheDoc)
     except Exception:
         logging.exception("error during main loop")
 
 main()
 
-logging.debug("cache_status.py exiting")
-
+logging.debug("cache_status_jel.py exiting")

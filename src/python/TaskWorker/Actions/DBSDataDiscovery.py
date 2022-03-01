@@ -3,8 +3,13 @@ import os
 import sys
 import logging
 import copy
-from httplib import HTTPException
-import urllib
+from http.client import HTTPException
+
+import sys
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
+if sys.version_info < (3, 0):
+    from urllib import urlencode
 
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.DBS.DBSReader import DBSReader
@@ -60,7 +65,7 @@ class DBSDataDiscovery(DataDiscovery):
         # get all the RucioStorageElements (RSEs) which are of kind 'Disk'
         # locationsMap is a dictionary {block1:[locations], block2:[locations],...}
         diskLocationsMap = {}
-        for block, locations in locationsMap.iteritems():
+        for block, locations in locationsMap.items():
             # as of Sept 2020, tape RSEs ends with _Tape, go for the quick hack
             diskRSEs = [rse for rse in locations if not 'Tape' in rse]
             if  'T3_CH_CERN_OpenData' in diskRSEs:
@@ -197,7 +202,7 @@ class DBSDataDiscovery(DataDiscovery):
                          'subresource': 'addddmreqid',
                          }
             try:
-                tapeRecallStatusSet = self.crabserver.post(api='task', data=urllib.urlencode(configreq))
+                tapeRecallStatusSet = self.crabserver.post(api='task', data=urlencode(configreq))
             except HTTPException as hte:
                 self.logger.exception(hte)
                 msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (
@@ -254,7 +259,11 @@ class DBSDataDiscovery(DataDiscovery):
             dbsurl = dbsurl.replace(hostname, self.config.Services.DBSHostName)
         self.logger.info("will connect to DBS at URL: %s", dbsurl)
         self.dbs = DBSReader(dbsurl)
-        self.dbsInstance = self.dbs.dbs.serverinfo()["dbs_instance"]
+        # with new DBS, we can not get the instance from serverinfo api
+        # instead, we parse it from the URL
+        # if url is 'https://cmsweb.cern.ch/dbs/prod/global/DBSReader'
+        # then self.dbsInstance needs to be 'prod/global'
+        self.dbsInstance = "{}/{}".format(dbsurl.split("//")[1].split("/")[2], dbsurl.split("//")[1].split("/")[3])
 
         self.taskName = kwargs['task']['tm_taskname']           # pylint: disable=W0201
         self.username = kwargs['task']['tm_username']           # pylint: disable=W0201

@@ -65,12 +65,12 @@ ln -s /data/hostdisk/${SERVICE}/nohup.out nohup.out
 case $MODE in
   current)
   # current mode: run current instance
-    COMMAND_DIR=${PUBLISHER_ROOT}/lib/python2.7/site-packages/Publisher/
+    COMMAND_DIR=${PUBLISHER_ROOT}/lib/python3.8/site-packages/Publisher/
     CONFIG=${PUBLISHER_HOME}/PublisherConfig.py
     if [ "$debug" = true ]; then
-      python ${COMMAND_DIR}/SequentialPublisher.py --config ${CONFIG} --debug
+      python3 ${COMMAND_DIR}/SequentialPublisher.py --config ${CONFIG} --debug
     else
-      nohup python ${COMMAND_DIR}/PublisherMaster.py --config $PUBLISHER_HOME/PublisherConfig.py &
+      nohup python3 ${COMMAND_DIR}/PublisherMaster.py --config $PUBLISHER_HOME/PublisherConfig.py &
     fi
   ;;
   private)
@@ -80,9 +80,8 @@ case $MODE in
     COMMAND_DIR=${GHrepoDir}/CRABServer/src/python/Publisher/
     CONFIG=$PUBLISHER_HOME/PublisherConfig.py
     if [ "$debug" = true ]; then
-      python ${COMMAND_DIR}/SequentialPublisher.py --config  ${CONFIG} --debug
+      python3 ${COMMAND_DIR}/SequentialPublisher.py --config  ${CONFIG} --debug
     else
-      nohup python ${COMMAND_DIR}/PublisherMaster.py --config ${CONFIG} &
+      nohup python3 ${COMMAND_DIR}/PublisherMaster.py --config ${CONFIG} &
     fi
 esac
-

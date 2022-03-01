@@ -5,9 +5,8 @@ via periodical partition dropping, but is kept as reference of how to use
 the filemetadata delete API
 """
 import sys
-import urllib
 import logging
-from httplib import HTTPException
+from http.client import HTTPException
 
 from RESTInteractions import CRABRest
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
@@ -19,9 +18,9 @@ class FMDCleaner(BaseRecurringAction):
         self.logger.info('Cleaning filemetadata older than 30 days..')
         ONE_MONTH = 24 * 30
         try:
-            crabserver.delete(api='filemetadata', data=urllib.urlencode({'hours': ONE_MONTH}))
+            crabserver.delete(api='filemetadata', data=urlencode({'hours': ONE_MONTH}))
 #TODO return from the server a value (e.g.: ["ok"]) to see if everything is ok
-#            result = crabserver.delete(api='filemetadata', data=urllib.urlencode({'hours': ONE_MONTH}))[0]['result'][0]
+#            result = crabserver.delete(api='filemetadata', data=urlencode({'hours': ONE_MONTH}))[0]['result'][0]
 #            self.logger.info('FMDCleaner, got %s' % result)
         except HTTPException as hte:
             self.logger.error(hte.headers)

@@ -19,16 +19,20 @@ import os
 import traceback
 import sys
 import json
+import pickle
+import tempfile
 from datetime import datetime
 import time
 from multiprocessing import Process
 from MultiProcessingLog import MultiProcessingLog
 
 from WMCore.Configuration import loadConfigurationFile
+from WMCore.Services.Requests import Requests
 
 from RESTInteractions import CRABRest
 from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping, executeCommand
 from ServerUtilities import SERVICE_INSTANCES
+from ServerUtilities import getProxiedWebDir
 from TaskWorker import __version__
 from TaskWorker.WorkerExceptions import ConfigException
 
@@ -43,24 +47,24 @@ def chunks(l, n):
     for i in range(0, len(l), n):
         yield l[i:i + n]
 
-def setMasterLogger(name='master'):
+def setMasterLogger(logsDir, name='master'):
     """ Set the logger for the master process. The file used for it is logs/processes/proc.name.txt and it
         can be retrieved with logging.getLogger(name) in other parts of the code
     """
     logger = logging.getLogger(name)
-    fileName = os.path.join('logs', 'processes', "proc.c3id_%s.pid_%s.txt" % (name, os.getpid()))
+    fileName = os.path.join(logsDir, 'processes', "proc.c3id_%s.pid_%s.txt" % (name, os.getpid()))
     handler = TimedRotatingFileHandler(fileName, 'midnight', backupCount=30)
     formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+name+":%(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     return logger
 
-def setSlaveLogger(name):
+def setSlaveLogger(logsDir, name):
     """ Set the logger for a single slave process. The file used for it is logs/processes/proc.name.txt and it
         can be retrieved with logging.getLogger(name) in other parts of the code
     """
     logger = logging.getLogger(name)
-    fileName = os.path.join('logs', 'processes', "proc.c3id_%s.txt" % name)
+    fileName = os.path.join(logsDir, 'processes', "proc.c3id_%s.txt" % name)
     #handler = TimedRotatingFileHandler(fileName, 'midnight', backupCount=30)
     # slaves are short lived, use one log file for each
     handler = FileHandler(fileName)
@@ -124,11 +128,11 @@ class Master(object):
             if debug:
                 loglevel = logging.DEBUG
             logging.getLogger().setLevel(loglevel)
-            logger = setMasterLogger()
+            logger = setMasterLogger(logsDir)
             logger.debug("PID %s.", os.getpid())
             logger.debug("Logging level initialized to %s.", loglevel)
             return logger
-        
+
         def logVersionAndConfig(config=None, logger=None):
             """
             log version number and major config. parameters
@@ -206,14 +210,14 @@ class Master(object):
         # CRAB REST API's
         self.max_files_per_block = self.config.max_files_per_block
         self.crabServer = CRABRest(hostname=restHost, localcert=self.config.serviceCert,
-                              localkey=self.config.serviceKey, retry=3,
-                              userAgent='CRABPublisher')
+                                   localkey=self.config.serviceKey, retry=3,
+                                   userAgent='CRABPublisher')
         self.crabServer.setDbInstance(dbInstance=dbInstance)
         self.startTime = time.time()
 
-    def active_tasks(self, crabserver):
+    def active_tasks(self, crabServer):
         """
-        :param crabserver: CRABRest object to access proper REST as createdin __init__ method
+        :param crabServer: CRABRest object to access proper REST as createdin __init__ method
         TODO  detail here the strucutre it returns
         :return: a list tuples [(task,info)]. One element for each task which has jobs to be published
                  each list element has the format (task, info) where task and info are lists
@@ -231,7 +235,7 @@ class Master(object):
         asoworkers = self.config.asoworker
         # asoworkers can be a string or a list of strings
         # but if it is a string, do not turn it into a list of chars !
-        asoworkers = [asoworkers] if isinstance(asoworkers, basestring) else asoworkers
+        asoworkers = [asoworkers] if isinstance(asoworkers, str) else asoworkers
         for asoworker in asoworkers:
             self.logger.info("Processing publication requests for asoworker: %s", asoworker)
             fileDoc = {}
@@ -239,7 +243,7 @@ class Master(object):
             fileDoc['subresource'] = 'acquirePublication'
             data = encodeRequest(fileDoc)
             try:
-                result = crabserver.post(api='filetransfers', data=data)  # pylint: disable=unused-variable
+                result = crabServer.post(api='filetransfers', data=data)  # pylint: disable=unused-variable
             except Exception as ex:
                 self.logger.error("Failed to acquire publications from crabserver: %s", ex)
                 return []
@@ -252,7 +256,7 @@ class Master(object):
             fileDoc['limit'] = 100000
             data = encodeRequest(fileDoc)
             try:
-                results = crabserver.get(api='filetransfers', data=data)
+                results = crabServer.get(api='filetransfers', data=data)
             except Exception as ex:
                 self.logger.error("Failed to acquire publications from crabserver: %s", ex)
                 return []
@@ -271,7 +275,7 @@ class Master(object):
         info = []
         for task in unique_tasks:
             info.append([x for x in filesToPublish if x['taskname'] == task[3]])
-        return zip(unique_tasks, info)
+        return list(zip(unique_tasks, info))
 
     def getPublDescFiles(self, workflow, lfn_ready, logger):
         """
@@ -303,6 +307,83 @@ class Master(object):
         logger.info('Got filemetadata for %d LFNs', len(out))
         return out
 
+    def getTaskStatusFromSched(self, workflow, logger):
+
+        def translateStatus(statusToTr):
+            """Translate from DAGMan internal integer status to a string.
+
+            Uses parameter `dbstatus` to clarify if the state is due to the
+            user killing the task. See:
+            https://htcondor.readthedocs.io/en/latest/users-manual/dagman-workflows.html#capturing-the-status-of-nodes-in-a-file
+            """
+            status = {0:'PENDING', 1: 'SUBMITTED', 2: 'SUBMITTED', 3: 'SUBMITTED',
+                      4: 'SUBMITTED', 5: 'COMPLETED', 6: 'FAILED'}[statusToTr]
+            return status
+
+        def collapseDAGStatus(dagInfo):
+            """Collapse the status of one or several DAGs to a single one.
+            Take into account that subdags can be submitted to the queue on the
+            schedd, but not yet started.
+            """
+            status_order = ['PENDING', 'SUBMITTED', 'FAILED', 'COMPLETED']
+
+            subDagInfos = dagInfo.get('SubDags', {})
+            subDagStatus = dagInfo.get('SubDagStatus', {})
+            # Regular splitting, return status of DAG
+            if len(subDagInfos) == 0 and len(subDagStatus) == 0:
+                return translateStatus(dagInfo['DagStatus'])
+
+            def check_queued(statusOrSUBMITTED):
+                # 99 is the status for a subDAG still to be submitted. An ad-hoc value
+                # introduced in cache_status.py. If there are less
+                # actual DAG status informations than expected DAGs, at least one
+                # DAG has to be queued.
+                if len(subDagInfos) < len([k for k in subDagStatus if subDagStatus[k] == 99]):
+                    return 'SUBMITTED'
+                return statusOrSUBMITTED
+
+            # If the processing DAG is still running, we are 'SUBMITTED',
+            # still.
+            if len(subDagInfos) > 0:
+                state = translateStatus(subDagInfos[0]['DagStatus'])
+                if state == 'SUBMITTED':
+                    return state
+            # Tails active: return most active tail status according to
+            # `status_order`
+            if len(subDagInfos) > 1:
+                states = [translateStatus(subDagInfos[k]['DagStatus']) for k in subDagInfos if k > 0]
+                for iStatus in status_order:
+                    if states.count(iStatus) > 0:
+                        return check_queued(iStatus)
+            # If no tails are active, return the status of the processing DAG.
+            if len(subDagInfos) > 0:
+                return check_queued(translateStatus(subDagInfos[0]['DagStatus']))
+            return check_queued(translateStatus(dagInfo['DagStatus']))
+
+        crabDBInfo, _, _ = self.crabServer.get(api='task', data={'subresource':'search', 'workflow':workflow})
+        dbStatus = getColumn(crabDBInfo, 'tm_task_status')
+        if dbStatus == 'KILLED':
+            return 'KILLED'
+        proxiedWebDir = getProxiedWebDir(crabserver=self.crabServer, task=workflow, logFunction=logger)
+        # Download status_cache file
+        _, local_status_cache_pkl = tempfile.mkstemp(dir='/tmp', prefix='status-cache-', suffix='.pkl')
+        url = proxiedWebDir + "/status_cache.pkl"
+        # this host is dummy since we will pass full url to downloadFile but WMCore.Requests needs it
+        host = 'https://cmsweb.cern.ch'
+        cdict = {'cert':self.config.serviceCert, 'key':self.config.serviceKey}
+        req = Requests(url=host, idict=cdict)
+        _, ret = req.downloadFile(local_status_cache_pkl, url)
+        if not ret.status == 200:
+            raise Exception('download attempt returned HTTP code %d' % ret.status)
+        with open(local_status_cache_pkl, 'rb') as fp:
+            statusCache = pickle.load(fp)
+        # get DAG status from downloaded cache_status file
+        statusCacheInfo = statusCache['nodes']
+        dagInfo = statusCacheInfo['DagStatus']
+        dagStatus = collapseDAGStatus(dagInfo)  # takes care of possible multiple subDAGs for automatic splitting
+        status = dagStatus
+        return status
+
     def algorithm(self):
         """
         1. Get a list of files to publish from the REST and organize by taskname
@@ -323,17 +404,15 @@ class Master(object):
 
         maxSlaves = self.config.max_slaves
         self.logger.info('kicking off pool for %s tasks using up to %s concurrent slaves', len(tasks), maxSlaves)
-        #self.logger.debug('list of tasks %s', [x[0][3] for x in tasks])
-        ## print one line per task with the number of files to be published. Allow to find stuck tasks
+        # print one line per task with the number of files to be published. Allow to find stuck tasks
         self.logger.debug(' # of acquired files : taskname')
         for task in tasks:
             taskName = task[0][3]
             acquiredFiles = len(task[1])
-            flag = '(***)' if acquiredFiles > 1000 else '     '  # mark suspicious tasks
-            self.logger.debug('%s %5d : %s', flag, acquiredFiles, taskName)
+            flag = '  OK' if acquiredFiles < 1000 else 'WARN' # mark suspicious tasks
+            self.logger.debug('acquired_files: %s %5d : %s', flag, acquiredFiles, taskName)
 
         processes = []
-
         try:
             for task in tasks:
                 taskname = str(task[0][3])
@@ -386,9 +465,8 @@ class Master(object):
         :param task: one tupla describing  a task as returned by  active_tasks()
         :return: 0  It will always terminate normally, if publication fails it will mark it in the DB
         """
-        # TODO: lock task!
         # - process logger
-        logger = setSlaveLogger(str(task[0][3]))
+        logger = setSlaveLogger(self.config.logsDir, str(task[0][3]))
         logger.info("Process %s is starting. PID %s", task[0][3], os.getpid())
 
         self.force_publication = False
@@ -400,36 +478,18 @@ class Master(object):
             msg += " No need to retrieve task status nor last publication time."
             logger.info(msg)
         else:
-            msg = "At least one dataset has less than %s ready files." % (self.max_files_per_block)
+            msg = "At least one dataset has less than %s ready files. Retrieve task status" % (self.max_files_per_block)
             logger.info(msg)
-            # Retrieve the workflow status. If the status can not be retrieved, continue
-            # with the next workflow.
-            workflow_status = ''
-            msg = "Retrieving status"
-            logger.info(msg)
-            data = encodeRequest({'workflow': workflow})
             try:
-                res = self.crabServer.get(api='workflow', data=data)
+                workflow_status = self.getTaskStatusFromSched(workflow, logger)
             except Exception as ex:
-                logger.warn('Error retrieving status from crabserver for %s:\n%s', workflow, str(ex))
-                return 0
-
-            try:
-                workflow_status = res[0]['result'][0]['status']
-                msg = "Task status is %s." % workflow_status
-                logger.info(msg)
-            except ValueError:
-                msg = "Workflow removed from WM."
-                logger.error(msg)
-                workflow_status = 'REMOVED'
-            except Exception as ex:
-                msg = "Error loading task status!"
-                msg += str(ex)
-                msg += str(traceback.format_exc())
-                logger.error(msg)
+                logger.warn('Error retrieving status cache from sched for %s:\n%s', workflow, str(ex))
+                logger.warn('Assuming COMPLETED in order to force pending publications if any')
+                workflow_status = 'COMPLETED'
+            logger.info('Task status from DAG info: %s', workflow_status)
             # If the workflow status is terminal, go ahead and publish all the ready files
             # in the workflow.
-            if workflow_status in ['COMPLETED', 'FAILED', 'KILLED', 'REMOVED']:
+            if workflow_status in ['COMPLETED', 'FAILED', 'KILLED', 'REMOVED', 'FAILED (KILLED)']:
                 self.force_publication = True
                 if workflow_status in ['KILLED', 'REMOVED']:
                     self.force_failure = True
@@ -437,9 +497,7 @@ class Master(object):
                 logger.info(msg)
             # Otherwise...
             else:    ## TODO put this else in a function like def checkForPublication()
-                msg = "Task status is not considered terminal."
-                logger.info(msg)
-                msg = "Getting last publication time."
+                msg = "Task status is not considered terminal. Will check last publication time."
                 logger.info(msg)
                 # Get when was the last time a publication was done for this workflow (this
                 # should be more or less independent of the output dataset in case there are
@@ -448,10 +506,10 @@ class Master(object):
                 data = encodeRequest({'workflow':workflow, 'subresource':'search'})
                 try:
                     result = self.crabServer.get(api='task', data=data)
-                    logger.debug("task: %s ", str(result[0]))
+                    #logger.debug("task: %s ", str(result[0]))
                     last_publication_time = getColumn(result[0], 'tm_last_publication')
                 except Exception as ex:
-                    logger.error("Error during task doc retrieving:\n%s", ex)
+                    logger.error("Error during task info retrieving:\n%s", ex)
                 if last_publication_time:
                     date = last_publication_time # datetime in Oracle format
                     timetuple = datetime.strptime(date, "%Y-%m-%d %H:%M:%S.%f").timetuple()  # convert to time tuple
@@ -580,7 +638,7 @@ class Master(object):
                 # find the location in the current environment of the script we want to run
                 import Publisher.TaskPublish as tp
                 taskPublishScript = tp.__file__
-                cmd = "python %s " % taskPublishScript
+                cmd = "python3 %s " % taskPublishScript
                 cmd += " --configFile=%s" % self.configurationFile
                 cmd += " --taskname=%s" % workflow
                 if self.TPconfig.dryRun:

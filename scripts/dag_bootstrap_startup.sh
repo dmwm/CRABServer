@@ -14,10 +14,13 @@ done
 export PATH="/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
 export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
 
-os_ver=$(source /etc/os-release;echo $VERSION_ID)
-curl_path="/cvmfs/cms.cern.ch/slc${os_ver}_amd64_gcc700/external/curl/7.59.0"
-libcurl_path="${curl_path}/lib"
-source ${curl_path}/etc/profile.d/init.sh
+export PYTHONPATH=$PYTHONPATH:/data/srv/pycurl3/7.44.1
+#os_ver=$(source /etc/os-release;echo $VERSION_ID)
+#curl_path="/cvmfs/cms.cern.ch/slc${os_ver}_amd64_gcc700/external/curl/7.59.0"
+#libcurl_path="${curl_path}/lib"
+#source ${curl_path}/etc/profile.d/init.sh
+source /cvmfs/cms.cern.ch/slc7_amd64_gcc900/external/curl/7.59.0/etc/profile.d/init.sh
+
 
 srcname=$0
 env > ${srcname%.sh}.env
@@ -85,16 +88,16 @@ fi
 # Bootstrap the runtime - we want to do this before DAG is submitted
 # so all the children don't try this at once.
 if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]; then
-    command -v python > /dev/null
+    command -v python3 > /dev/null
     rc=$?
     if [[ $rc != 0 ]]; then
         echo "Error: Python isn't available on `hostname`." >&2
-        echo "Error: Bootstrap execution requires python" >&2
-        condor_qedit $CONDOR_ID DagmanHoldReason "'Error: Bootstrap execution requires python.'"
+        echo "Error: Bootstrap execution requires python3" >&2
+        condor_qedit $CONDOR_ID DagmanHoldReason "'Error: Bootstrap execution requires python3.'"
         exit 1
     else
-        echo "I found python at.."
-        echo `which python`
+        echo "I found python3 at.."
+        echo `which python3`
     fi
 
     if [[ "X$CRAB_TASKMANAGER_TARBALL" == "X" ]]; then
@@ -138,7 +141,7 @@ cp $_CONDOR_JOB_AD  ./_CONDOR_JOB_AD
 if [ -e AdjustSites.py ]; then
     export schedd_name=`condor_config_val schedd_name`
     echo "Execute AdjustSites.py ..."
-    python AdjustSites.py
+    python3 AdjustSites.py
     ret=$?
     if [ $ret -eq 1 ]; then
         echo "Error: AdjustSites.py failed to update the webdir." >&2
@@ -159,16 +162,6 @@ else
     exit 1
 fi
 
-# Decide if this task will use old cache_status.py or the new cache_status_jel.py
-# for parsing the condor job_log ( git issues: #5942 #5939 ) via the new JobEventLog API
-# Do it here so that decision stays for task lifetime, even if schedd configuratoion
-# is changed at some point
-if [ -f /etc/use_condor_jel ] ;
-then
-    echo "Set this task to use condor JobEventLog API"
-    touch USE_JEL
-fi
-
 # Decide if this task will use enable REUSE flag for FTS ASO jobs
 # Do it here so that decision stays for task lifetime, even if schedd configuratoion
 # is changed at some point
@@ -176,22 +169,6 @@ if [ -f /etc/use_fts_reuse ] ;
 then
     echo "Found file /etc/use_fts_reuse. Set this task to enable REUSE flag in FTS"
     touch USE_FTS_REUSE
-fi
-
-# Decide if this task will use old ASO based DBSPublisher, or new standalone Publisher
-# Do it here so that decision stays for task lifetime, even if schedd configuratoion
-# is changed at some point
-if [ -f /etc/use_new_publisher ] ;
-then
-    echo "Found file /etc/use_new_publisher. Set this task to use New Publisher"
-    touch USE_NEW_PUBLISHER
-fi
-
-UseNewPublisher=`grep '^CRAB_USE_NEW_PUBLISHER =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
-if [ "$UseNewPublisher" = "True" ];
-then
-    echo "+CRAB_USE_NEW_PUBLISHER classAd is True. Set this task to use New Publisher"
-    touch USE_NEW_PUBLISHER
 fi
 
 export _CONDOR_DAGMAN_LOG=$PWD/$1.dagman.out
@@ -234,6 +211,7 @@ else
     then
         echo "creating and executing task process daemon jdl"
         TASKNAME=`grep '^CRAB_ReqName =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
+        USERNAME=`grep '^CRAB_UserHN =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
         CMSTYPE=`grep '^CMS_Type =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
         CMSWMTOOL=`grep '^CMS_WMTool =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
         CMSTTASKYPE=`grep '^CMS_TaskType =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
@@ -246,6 +224,7 @@ Log           = task_process/daemon.PC.log
 Output        = task_process/daemon.out.\$(Cluster).\$(Process)
 Error         = task_process/daemon.err.\$(Cluster).\$(Process)
 +CRAB_ReqName = $TASKNAME
++CRAB_UserHN  = $USERNAME
 +CMS_Type     = $CMSTYPE
 +CMS_WMTool   = $CMSWMTOOL
 +CMS_TaskType = $CMSTTASKYPE

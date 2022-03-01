@@ -8,9 +8,14 @@ import copy
 import json
 import time
 import pickle
-import urllib
 
-from httplib import HTTPException
+import sys
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
+if sys.version_info < (3, 0):
+    from urllib import urlencode
+
+from http.client import HTTPException
 
 import HTCondorUtils
 import CMSGroupMapper
@@ -81,8 +86,6 @@ SUBMIT_INFO = [ \
     ('MaxWallTimeMinsProbe', 'maxproberuntime'),
     ('MaxWallTimeMinsTail', 'maxtailruntime'),
     ('JobPrio', 'tm_priority'),
-    ('CRAB_ASOURL', 'tm_asourl'),
-    ('CRAB_ASODB', 'tm_asodb'),
     ('CRAB_FailedNodeLimit', 'faillimit'),
     ('CRAB_DashboardTaskType', 'taskType'),
     ('CRAB_MaxIdle', 'maxidle'),
@@ -203,7 +206,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         configreq = {'workflow':task['tm_taskname'],
                      'subresource':'updateschedd', 'scheddname':schedd}
         try:
-            self.crabserver.post(api='task', data=urllib.urlencode(configreq))
+            self.crabserver.post(api='task', data=urlencode(configreq))
         except HTTPException as hte:
             msg = "Unable to contact cmsweb and update scheduler on which task will be submitted. Error msg: %s" % hte.headers
             self.logger.warning(msg)
@@ -364,7 +367,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                      'clusterid': results[0]['ClusterId']
                     }
         self.logger.warning("Task %s already submitted to HTCondor; pushing information centrally: %s", workflow, str(configreq))
-        data = urllib.urlencode(configreq)
+        data = urlencode(configreq)
         self.crabserver.post(api='workflowdb', data=data)
 
         # Note that we don't re-send Dashboard jobs; we assume this is a rare occurrance and
@@ -455,7 +458,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                      'subresource': 'success',
                      'clusterid' : self.clusterId} #that's the condor cluster id of the dag_bootstrap.sh
         self.logger.debug("Pushing information centrally %s", configreq)
-        data = urllib.urlencode(configreq)
+        data = urlencode(configreq)
         self.crabserver.post(api='workflowdb', data=data)
 
         return Result.Result(task=kwargs['task'], result='OK')
@@ -486,9 +489,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["Environment"] = classad.ExprTree('strcat("PATH=/usr/bin:/bin CRAB3_VERSION=3.3.0-pre1 CONDOR_ID=", ClusterId, ".", ProcId," %s")' % " ".join(info['additional_environment_options'].split(";")))
         dagAd["RemoteCondorSetup"] = info['remote_condor_setup']
 
-        dagAd["CRAB_TaskSubmitTime"] = classad.ExprTree("%s" % info["start_time"].encode('ascii', 'ignore'))
+        dagAd["CRAB_TaskSubmitTime"] = info['start_time']
         dagAd['CRAB_TaskLifetimeDays'] = TASKLIFETIME // 24 // 60 // 60
-        dagAd['CRAB_TaskEndTime'] = int(info["start_time"]) + TASKLIFETIME
+        dagAd['CRAB_TaskEndTime'] = int(info['start_time']) + TASKLIFETIME
         #For task management info see https://github.com/dmwm/CRABServer/issues/4681#issuecomment-302336451
         dagAd["LeaveJobInQueue"] = classad.ExprTree("true")
         dagAd["PeriodicHold"] = classad.ExprTree("time() > CRAB_TaskEndTime")
@@ -502,7 +505,11 @@ class DagmanSubmitter(TaskAction.TaskAction):
             for k, v in dagAd.items():
                 if k == 'X509UserProxy':
                     v = os.path.basename(v)
-                if isinstance(v, basestring):
+                if isinstance(v, str):
+                    value = classad.quote(v)
+                elif isinstance(v, bytes):
+                    # we only expect strings in the code above, but.. just in case,
+                    # be prarped for bytes in case it requires a different handling at some point
                     value = classad.quote(v)
                 elif isinstance(v, classad.ExprTree):
                     value = repr(v)
@@ -520,7 +527,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["TransferInput"] = str(info['inputFilesString'])
 
         condorIdDict = {}
-        with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], pickleOut=True, outputObj=condorIdDict, logger=self.logger) as (parent, rpipe):
+        tokenDir = getattr(self.config.TaskWorker, 'SEC_TOKEN_DIRECTORY', None)
+        with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], tokenDir,
+                                                   pickleOut=True, outputObj=condorIdDict,
+                                                   logger=self.logger) as (parent, rpipe):
             if not parent:
                 resultAds = []
                 condorIdDict['ClusterId'] = schedd.submit(dagAd, 1, True, resultAds)

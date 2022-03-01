@@ -18,5 +18,5 @@ defaultDelegation = {'logger': logger,
                      'server_cert': sys.argv[3],}
 timeleftthreshold = 60 * 60 * 24
 mypclient = SimpleMyProxy(defaultDelegation)
-userproxy = mypclient.logonRenewMyProxy(username=sha1(sys.argv[4]+userdn).hexdigest(), myproxyserver=myproxyserver, myproxyport=7512)
+userproxy = mypclient.logonRenewMyProxy(username=sha1((sys.argv[4]+userdn).encode("utf8")).hexdigest(), myproxyserver=myproxyserver, myproxyport=7512)
 print ("Proxy Retrieved with len ", len(userproxy))

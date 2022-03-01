@@ -1,8 +1,12 @@
 import re
 import socket
-import urllib
+import sys
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
+if sys.version_info < (3, 0):
+    from urllib import urlencode
 
-from httplib import HTTPException
+from http.client import HTTPException
 
 import htcondor
 
@@ -88,7 +92,8 @@ class DagmanKiller(TaskAction):
         # TODO: Remove jobConst query when htcondor ticket is solved
         # https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=5175
 
-        with HTCondorUtils.AuthenticatedSubprocess(self.proxy) as (parent, rpipe):
+        tokenDir = getattr(self.config.TaskWorker, 'SEC_TOKEN_DIRECTORY', None)
+        with HTCondorUtils.AuthenticatedSubprocess(self.proxy, tokenDir) as (parent, rpipe):
             if not parent:
                 with self.schedd.transaction() as dummytsc:
                     self.schedd.act(htcondor.JobAction.Hold, rootConst)
@@ -123,7 +128,7 @@ class DagmanKiller(TaskAction):
                          'workflow': kwargs['task']['tm_taskname'],
                          'status': 'KILLED'}
             self.logger.debug("Setting the task as successfully killed with %s", str(configreq))
-            self.crabserver.post(api='workflowdb', data=urllib.urlencode(configreq))
+            self.crabserver.post(api='workflowdb', data=urlencode(configreq))
         except HTTPException as hte:
             self.logger.error(hte.headers)
             msg = "The CRAB server successfully killed the task,"

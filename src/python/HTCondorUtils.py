@@ -35,27 +35,36 @@ class OutputObj:
         self.outputMessage = outputMessage
         self.outputObj = outputObj
         self.environmentStr = ""
-        for key, val in os.environ.iteritems():
+        for key, val in os.environ.items():
             self.environmentStr += "%s=%s\n" % (key, val)
 
 
 class AuthenticatedSubprocess(object):
 
-    def __init__(self, proxy, pickleOut=False, outputObj = None, logger = logging):
+    def __init__(self, proxy, tokenDir=None, pickleOut=False, outputObj=None, logger=logging):
         self.proxy = proxy
         self.pickleOut = pickleOut
         self.outputObj = outputObj
         self.timedout = False
         self.logger = logger
+        self.tokenDir = tokenDir
 
     def __enter__(self):
         self.r, self.w = os.pipe()
-        self.rpipe = os.fdopen(self.r, 'r')
-        self.wpipe = os.fdopen(self.w, 'w')
+        if self.pickleOut:
+            self.rpipe = os.fdopen(self.r, 'rb')
+            self.wpipe = os.fdopen(self.w, 'wb')
+        else:
+            self.rpipe = os.fdopen(self.r, 'r')
+            self.wpipe = os.fdopen(self.w, 'w')
         self.pid = os.fork()
         if self.pid == 0:
             htcondor.SecMan().invalidateAllSessions()
-            htcondor.param['SEC_CLIENT_AUTHENTICATION_METHODS'] = 'FS,GSI'
+            if self.tokenDir:
+                htcondor.param['SEC_TOKEN_DIRECTORY'] = self.tokenDir
+                htcondor.param['SEC_CLIENT_AUTHENTICATION_METHODS'] = 'IDTOKENS,FS,GSI'
+            else:
+                htcondor.param['SEC_CLIENT_AUTHENTICATION_METHODS'] = 'FS,GSI'
             htcondor.param['DELEGATE_FULL_JOB_GSI_CREDENTIALS'] = 'true'
             htcondor.param['DELEGATE_JOB_GSI_CREDENTIALS_LIFETIME'] = '0'
             os.environ['X509_USER_PROXY'] = self.proxy

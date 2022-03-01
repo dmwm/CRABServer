@@ -3,7 +3,6 @@ _Destroy_
 
 """
 import threading
-import string
 
 from WMCore.Database.DBCreator import DBCreator
 from Databases.TaskDB.Oracle.Create import Create
@@ -29,7 +28,7 @@ class Destroy(DBCreator):
         i = 0
         for tableName in orderedTables:
             i += 1
-            prefix = string.zfill(i, 2)
+            prefix = str(i).zfill(2)
             if tableName.endswith("_seq"):
                  self.create[prefix + tableName] = "DROP SEQUENCE %s" % tableName
             elif tableName.endswith("_trg"):

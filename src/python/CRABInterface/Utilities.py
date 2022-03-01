@@ -8,15 +8,15 @@ import re
 from hashlib import sha1
 import cherrypy
 import pycurl
-import StringIO
+import io
 import json
 
 from WMCore.WMFactory import WMFactory
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.Services.CRIC.CRIC import CRIC
-from WMCore.Credential.SimpleMyProxy import SimpleMyProxy, MyProxyException
-from WMCore.Credential.Proxy import Proxy
 from WMCore.Services.pycurl_manager import ResponseHeader
+
+from Utils.Utilities import encodeUnicodeToBytes
 
 from CRABInterface.Regexps import RX_CERT
 """
@@ -27,9 +27,6 @@ CMSSitesCache = namedtuple("CMSSitesCache", ["cachetime", "sites"])
 ConfigCache = namedtuple("ConfigCache", ["cachetime", "centralconfig"])
 
 #These parameters are set in the globalinit (called in RESTBaseAPI)
-serverCert = None
-serverKey = None
-serverDN = None
 credServerPath = None
 
 def getDBinstance(config, namespace, name):
@@ -39,13 +36,13 @@ def getDBinstance(config, namespace, name):
         backend = 'Oracle'
 
     #factory = WMFactory(name = 'TaskQuery', namespace = 'Databases.TaskDB.%s.Task' % backend)
-    factory = WMFactory(name = name, namespace = 'Databases.%s.%s.%s' % (namespace, backend, name))
+    factory = WMFactory(name=name, namespace='Databases.%s.%s.%s' % (namespace, backend, name))
 
     return factory.loadObject( name )
 
-def globalinit(serverkey, servercert, serverdn, credpath):
-    global serverCert, serverKey, serverDN, credServerPath  # pylint: disable=global-statement
-    serverCert, serverKey, serverDN, credServerPath = servercert, serverkey, serverdn, credpath
+def globalinit(credpath):
+    global credServerPath  # pylint: disable=global-statement
+    credServerPath = credpath
 
 def execute_command(command, logger, timeout):
     """
@@ -96,8 +93,8 @@ def getCentralConfig(extconfigurl, mode):
 
     def retrieveConfig(externalLink):
 
-        hbuf = StringIO.StringIO()
-        bbuf = StringIO.StringIO()
+        hbuf = io.BytesIO()
+        bbuf = io.BytesIO()
 
         curl = pycurl.Curl()
         curl.setopt(pycurl.URL, externalLink)
@@ -121,40 +118,45 @@ def getCentralConfig(extconfigurl, mode):
         
         return jsonConfig
 
-    extConfCommon = json.loads(retrieveConfig(extconfigurl))
+    extConfigJson = retrieveConfig(extconfigurl)  # will raise ExecutionError if http calls fail
+    try:
+        extConfCommon = json.loads(extConfigJson)
+    except Exception as ex:
+        raise ExecutionError("non-JSON format in external configuration from %s" % externalLink)
 
-    # below 'if' condition is only added for the transition period from the old config file to the new one. It should be removed after some time.
-    if 'modes' in extConfCommon:
-        extConfSchedds = json.loads(retrieveConfig(extConfCommon['htcondorScheddsLink']))
+    schedListLink = extConfCommon['htcondorScheddsLink']
+    schedListJson = retrieveConfig(schedListLink)  # will raise ExecutionError if http calls fail
+    try:
+        extConfSchedds = json.loads(schedListJson)
+    except Exception as ex:
+        raise ExecutionError("non-JSON format in sched list from %s" % schedListLink)
 
-        # The code below constructs dict from below provided JSON structure
-        # {   u'htcondorPool': '', u'compatible-version': [''], u'htcondorScheddsLink': '',
-        #     u'modes': [{
-        #         u'mode': '', u'backend-urls': {
-        #             u'asoConfig': [{ u'couchURL': '', u'couchDBName': ''}],
-        #             u'htcondorSchedds': [''], u'cacheSSL': '', u'baseURL': ''}}],
-        #     u'banned-out-destinations': [], u'delegate-dn': ['']}
-        # to match expected dict structure which is:
-        # {   u'compatible-version': [''], u'htcondorScheddsLink': '',
-        #     'backend-urls': {
-        #         u'asoConfig': [{u'couchURL': '', u'couchDBName': ''}],
-        #         u'htcondorSchedds': {u'crab3@vocmsXXXX.cern.ch': {u'proxiedurl': '', u'weightfactor': 1}},
-        #         u'cacheSSL': '', u'baseURL': '', 'htcondorPool': ''},
-        #     u'banned-out-destinations': [], u'delegate-dn': ['']}
-        extConfCommon['backend-urls'] = next((item['backend-urls'] for item in extConfCommon['modes'] if item['mode'] == mode), None)
-        extConfCommon['backend-urls']['htcondorPool'] = extConfCommon.pop('htcondorPool')
-        del extConfCommon['modes']
+    # The code below constructs dict from below provided JSON structure
+    # {   u'htcondorPool': '', u'compatible-version': [''], u'htcondorScheddsLink': '',
+    #     u'modes': [{
+    #         u'mode': '', u'backend-urls': {
+    #             u'asoConfig': [{ u'couchURL': '', u'couchDBName': ''}],
+    #             u'htcondorSchedds': [''], u'cacheSSL': '', u'baseURL': ''}}],
+    #     u'banned-out-destinations': [], u'delegate-dn': ['']}
+    # to match expected dict structure which is:
+    # {   u'compatible-version': [''], u'htcondorScheddsLink': '',
+    #     'backend-urls': {
+    #         u'asoConfig': [{u'couchURL': '', u'couchDBName': ''}],
+    #         u'htcondorSchedds': {u'crab3@vocmsXXXX.cern.ch': {u'proxiedurl': '', u'weightfactor': 1}},
+    #         u'cacheSSL': '', u'baseURL': '', 'htcondorPool': ''},
+    #     u'banned-out-destinations': [], u'delegate-dn': ['']}
+    extConfCommon['backend-urls'] = next((item['backend-urls'] for item in extConfCommon['modes'] if item['mode'] == mode), None)
+    extConfCommon['backend-urls']['htcondorPool'] = extConfCommon.pop('htcondorPool')
+    del extConfCommon['modes']
 
-        # if htcondorSchedds": [] is not empty, it gets populated with the specified list of schedds,
-        # otherwise it takes default list of schedds
-        if extConfCommon['backend-urls']['htcondorSchedds']:
-            extConfCommon['backend-urls']['htcondorSchedds'] = {k: v for k, v in extConfSchedds.items() if
-                                                                k in extConfCommon['backend-urls']['htcondorSchedds']}
-        else:
-            extConfCommon["backend-urls"]["htcondorSchedds"] = extConfSchedds
-        centralCfgFallback = extConfCommon
+    # if htcondorSchedds": [] is not empty, it gets populated with the specified list of schedds,
+    # otherwise it takes default list of schedds
+    if extConfCommon['backend-urls']['htcondorSchedds']:
+        extConfCommon['backend-urls']['htcondorSchedds'] = {k: v for k, v in extConfSchedds.items() if
+                                                            k in extConfCommon['backend-urls']['htcondorSchedds']}
     else:
-        centralCfgFallback = extConfCommon[mode]
+        extConfCommon["backend-urls"]["htcondorSchedds"] = extConfSchedds
+    centralCfgFallback = extConfCommon
         
     return centralCfgFallback
 
@@ -162,11 +164,10 @@ def getCentralConfig(extconfigurl, mode):
 def conn_handler(services):
     """
     Decorator to be used among REST resources to optimize connections to other services
-    as CouchDB and CRIC, WMStats monitoring
+    as CRIC, WMStats monitoring
 
     arg str list services: list of string telling which service connections
-                           should be started; currently availables are
-                           'monitor' and 'asomonitor'.
+                           should be started
     """
     def wrap(func):
         def wrapped_func(*args, **kwargs):
@@ -175,46 +176,6 @@ def conn_handler(services):
                 args[0].allPNNNames = CMSSitesCache(sites=CRIC().getAllPhEDExNodeNames(), cachetime=mktime(gmtime()))
             if 'centralconfig' in services and (not args[0].centralcfg.centralconfig or (args[0].centralcfg.cachetime+1800 < mktime(gmtime()))):
                 args[0].centralcfg = ConfigCache(centralconfig=getCentralConfig(extconfigurl=args[0].config.extconfigurl, mode=args[0].config.mode), cachetime=mktime(gmtime()))
-            if 'servercert' in services:
-                args[0].serverCert = serverCert
-                args[0].serverKey = serverKey
             return func(*args, **kwargs)
         return wrapped_func
     return wrap
-
-def retrieveUserCert(func):
-    def wrapped_func(*args, **kwargs):
-        logger = logging.getLogger("CRABLogger.Utils")
-        myproxyserver = "myproxy.cern.ch"
-        defaultDelegation = {'logger': logger,
-                             'proxyValidity': '192:00',
-                             'min_time_left': 36000,
-                             'server_key': serverKey,
-                             'server_cert': serverCert,}
-        mypclient = SimpleMyProxy(defaultDelegation)
-        userproxy = None
-        userhash  = sha1(kwargs['userdn']).hexdigest()
-        if serverDN:
-            try:
-                userproxy = mypclient.logonRenewMyProxy(username=userhash, myproxyserver=myproxyserver, myproxyport=7512)
-            except MyProxyException as me:
-                # Unsure if this works in standalone mode...
-                cherrypy.log(str(me))
-                cherrypy.log(str(serverKey))
-                cherrypy.log(str(serverCert))
-                invalidp = InvalidParameter("Impossible to retrieve proxy from %s for %s and hash %s" %
-                                                (myproxyserver, kwargs['userdn'], userhash))
-                setattr(invalidp, 'trace', str(me))
-                raise invalidp
-
-            else:
-                if not re.match(RX_CERT, userproxy):
-                    raise InvalidParameter("Retrieved malformed proxy from %s for %s and hash %s" %
-                                                (myproxyserver, kwargs['userdn'], userhash))
-        else:
-            proxy = Proxy(defaultDelegation)
-            userproxy = proxy.getProxyFilename()
-        kwargs['userproxy'] = userproxy
-        out = func(*args, **kwargs)
-        return out
-    return wrapped_func

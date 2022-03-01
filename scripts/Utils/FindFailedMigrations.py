@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding: utf-8
 from __future__ import print_function
 from __future__ import division
@@ -7,8 +7,6 @@ import os
 from  datetime import datetime
 import argparse
 
-# this is needed to make it possible for the following import to work
-import CRABClient #pylint: disable=unused-import
 from dbs.apis.dbsClient import DbsApi
 
 
@@ -60,9 +58,19 @@ def readAndParse(csvFile, apiMig):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--file', help='log file of terminally failed migrations in CSV format',
-                        default='TerminallyFailedLog.txt')
+                        default='/data/srv/Publisher/logs/migrations/TerminallyFailedLog.txt')
     args = parser.parse_args()
     logFile = os.path.abspath(args.file)
+
+    # if X509 vars are not defined, use default Publisher location
+    userProxy = os.getenv('X509_USER_PROXY')
+    if userProxy:
+        os.environ['X509_USER_CERT'] = userProxy
+        os.environ['X509_USER_KEY'] = userProxy
+    if not os.getenv('X509_USER_CERT'):
+        os.environ['X509_USER_CERT'] = '/data/certs/servicecert.pem'
+    if not os.getenv('X509_USER_KEY'):
+        os.environ['X509_USER_KEY'] = '/data/certs/servicekey.pem'
 
     migUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSMigrate'
     apiMig = DbsApi(url=migUrl)

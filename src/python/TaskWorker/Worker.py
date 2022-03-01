@@ -1,20 +1,27 @@
 from __future__ import print_function
 import os
 import time
-import urllib
 import logging
 import traceback
 import multiprocessing
-from Queue import Empty
+from queue import Empty
 from base64 import b64encode
 from logging import FileHandler
-from httplib import HTTPException
+from http.client import HTTPException
 from logging.handlers import TimedRotatingFileHandler
+
+import sys
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
+if sys.version_info < (3, 0):
+    from urllib import urlencode
 
 from RESTInteractions import CRABRest
 from TaskWorker.DataObjects.Result import Result
 from ServerUtilities import truncateError, executeCommand
 from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException
+
+from Utils.Utilities import encodeUnicodeToBytes
 
 ## Creating configuration globals to avoid passing these around at every request
 ## and tell pylink to bare with this :-)
@@ -48,8 +55,8 @@ def failTask(taskName, crabserver, msg, log, failstatus='FAILED'):
                      'status': failstatus,
                      'subresource': 'failure',
                      # Limit the message to 7500 chars, which means no more than 10000 once encoded. That's the limit in the REST
-                     'failure': b64encode(truncMsg)}
-        crabserver.post(api='workflowdb', data = urllib.urlencode(configreq))
+                     'failure': b64encode(encodeUnicodeToBytes(truncMsg))}
+        crabserver.post(api='workflowdb', data = urlencode(configreq))
         log.info("Failure message successfully uploaded to the REST")
     except HTTPException as hte:
         log.warning("Cannot upload failure message to the REST for task %s. HTTP exception headers follows:", taskName)
@@ -188,7 +195,7 @@ class Worker(object):
         """Starting up all the slaves"""
         if len(self.pool) == 0:
             # Starting things up
-            for x in xrange(1, self.nworkers + 1):
+            for x in range(1, self.nworkers + 1):
                 self.logger.debug("Starting process %i", x)
                 p = multiprocessing.Process(target = processWorker, args = (self.inputs, self.results, self.resthost, self.dbInstance, WORKER_CONFIG.TaskWorker.logsDir, x))
                 p.start()
@@ -246,7 +253,7 @@ class Worker(object):
             return []
         allout = []
         self.logger.info("%d work on going, checking if some has finished", len(self.working.keys()))
-        for _ in xrange(len(self.working.keys())):
+        for _ in range(len(self.working.keys())):
             out = None
             try:
                 out = self.results.get_nowait()
