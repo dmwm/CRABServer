@@ -6,14 +6,13 @@ from WMCore.REST.Error import InvalidParameter, ExecutionError, NotAcceptable
 
 from CRABInterface.Utilities import conn_handler, getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match
-from CRABInterface.Regexps import RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME, RX_TEXT_FAIL,\
+from CRABInterface.Regexps import RX_MANYLINES_SHORT, RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME,\
     RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE
 
 # external dependecies here
 import re
 import logging
 from ast import literal_eval
-from base64 import b64decode
 
 
 class RESTTask(RESTEntity):
@@ -34,7 +33,7 @@ class RESTTask(RESTEntity):
         if method in ['POST']:
             validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
             validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
-            validate_str("warning", param, safe, RX_TEXT_FAIL, optional=True)
+            validate_str("warning", param, safe, RX_MANYLINES_SHORT, optional=True)
             validate_str("webdirurl", param, safe, RX_URL, optional=True)
             validate_str("scheddname", param, safe, RX_SCHEDD_NAME, optional=True)
             validate_strlist("outputdatasets", param, safe, RX_OUT_DATASET)
@@ -218,10 +217,6 @@ class RESTTask(RESTEntity):
         #decoding and setting the parameters
         workflow = kwargs['workflow']
         authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
-        try:
-            warning = decodeBytesToUnicode(b64decode(kwargs['warning']))
-        except TypeError:
-            raise InvalidParameter("Failure message is not in the accepted format")
 
 #        rows = self.api.query(None, None, "SELECT tm_task_warnings FROM tasks WHERE tm_taskname = :workflow", workflow=workflow)#self.Task.TASKSUMMARY_sql)
         rows = self.api.query(None, None, self.Task.ID_sql, taskname=workflow)#self.Task.TASKSUMMARY_sql)
@@ -231,12 +226,12 @@ class RESTTask(RESTEntity):
 
         row = self.Task.ID_tuple(*rows[0])
         warnings = literal_eval(row.task_warnings.read() if row.task_warnings else '[]')
-        if warning in warnings:
+        if kwargs['warning'] in warnings:
             self.logger.info("Warning message already present in the task database. Will not add it again.")
             return []
         if len(warnings)>10:
             raise NotAcceptable("You cannot add more than 10 warnings to a task")
-        warnings.append(warning)
+        warnings.append(kwargs['warning'])
 
         self.api.modify(self.Task.SetWarnings_sql, warnings=[str(warnings)], workflow=[workflow])
 

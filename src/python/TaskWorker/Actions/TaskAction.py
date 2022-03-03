@@ -1,7 +1,6 @@
 import os
 import json
 import logging
-from base64 import b64encode
 from http.client import HTTPException
 import sys
 if sys.version_info >= (3, 0):
@@ -10,8 +9,6 @@ if sys.version_info < (3, 0):
     from urllib import urlencode
 
 from ServerUtilities import truncateError
-
-from Utils.Utilities import encodeUnicodeToBytes
 
 class TaskAction(object):
     """The ABC of all actions"""
@@ -57,7 +54,7 @@ class TaskAction(object):
         truncWarning = truncateError(warning)
         configreq = {'subresource': 'addwarning',
                      'workflow': taskname,
-                     'warning': b64encode(encodeUnicodeToBytes(truncWarning))}
+                     'warning': truncWarning}
         try:
             self.crabserver.post(api='task', data=urlencode(configreq))
         except HTTPException as hte:
