@@ -392,9 +392,11 @@ class DBSDataDiscovery(DataDiscovery):
 
         # From now on code is not dependent from having used Rucio or PhEDEx
 
-        blocksWithLocation = locationsMap.keys()
+        # make a copy of locationsMap dictionary, so that manipulating it in keeOnlyDiskRSE
+        # does not touch blocksWithLocation
+        blocksWithLocation = locationsMap.copy().keys()
         if secondaryDataset:
-            secondaryBlocksWithLocation = secondaryLocationsMap.keys()
+            secondaryBlocksWithLocation = secondaryLocationsMap.copy().keys()
 
         # filter out TAPE locations
         self.keepOnlyDiskRSEs(locationsMap)
