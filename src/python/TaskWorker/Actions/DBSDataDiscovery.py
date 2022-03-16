@@ -139,7 +139,7 @@ class DBSDataDiscovery(DataDiscovery):
             sizeToRecall = 0
             for block in blockList:
                 replicas = rucioClient.list_dataset_replicas(scope='cms', name=block, deep=True)
-                blockBytes = replicas.next()['bytes']  # pick first replica for each block, they better all have same size
+                blockBytes = next(replicas)['bytes']  # pick first replica for each block, they better all have same size
                 sizeToRecall += blockBytes
             TBtoRecall = sizeToRecall // 1e12
             if TBtoRecall > 0:
