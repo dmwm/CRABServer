@@ -644,7 +644,9 @@ class ASOServerJob(object):
                 dest_lfn = os.path.join(self.dest_dir, 'log', filename)
                 file_type = 'log'
                 size = self.log_size
-                checksums = {'adler32': 'abc'}
+                # a few fake values for log files for fields which will go in CRAB internal DB's
+                checksums = {'adler32': 'abc'}  # this is not what FTS will use !
+                outputdataset = G_FAKE_OUTDATASET
                 ## needs_transfer is False if and only if the file was staged out
                 ## from the worker node directly to the permanent storage.
                 needs_transfer = self.log_needs_transfer
