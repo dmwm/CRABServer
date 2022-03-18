@@ -160,10 +160,14 @@ def truncateError(msg):
     """Truncate the error message to the first 7400 chars if needed, and add a message if we truncate it.
        See https://github.com/dmwm/CRABServer/pull/4867#commitcomment-12086393
     """
-    MSG_LIMIT = 7500
+    MSG_LIMIT = 1100
+    # hack to avoid passing HTTP error code to message parsing code in CRABClient/CrabRestInterface.py
+    codeString = 'HTTP/1.'
+    if codeString in msg :
+        msg = msg.replace(codeString,'HTTP 1.')
     if len(msg) > MSG_LIMIT:
         truncMsg = msg[:MSG_LIMIT - 100]
-        truncMsg += "\n[... message truncated to the first 7400 chars ...]"
+        truncMsg += "\n[... message truncated to the first %d chars ...]" % (MSG_LIMIT-100)
         return truncMsg
     else:
         return msg
