@@ -366,7 +366,7 @@ class Master(object):
             return 'KILLED'
         proxiedWebDir = getProxiedWebDir(crabserver=self.crabServer, task=workflow, logFunction=logger)
         # Download status_cache file
-        _, local_status_cache_pkl = tempfile.mkstemp(dir='/tmp', prefix='status-cache-', suffix='.pkl')
+        local_status_cache_fd, local_status_cache_pkl = tempfile.mkstemp(dir='/tmp', prefix='status-cache-', suffix='.pkl')
         url = proxiedWebDir + "/status_cache.pkl"
         # this host is dummy since we will pass full url to downloadFile but WMCore.Requests needs it
         host = 'https://cmsweb.cern.ch'
@@ -377,6 +377,8 @@ class Master(object):
             raise Exception('download attempt returned HTTP code %d' % ret.status)
         with open(local_status_cache_pkl, 'rb') as fp:
             statusCache = pickle.load(fp)
+        os.close(local_status_cache_fd)
+        os.remove(local_status_cache_pkl)
         # get DAG status from downloaded cache_status file
         statusCacheInfo = statusCache['nodes']
         dagInfo = statusCacheInfo['DagStatus']
