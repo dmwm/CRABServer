@@ -2771,7 +2771,10 @@ class PostJob():
         Update PostJobStatus and job exit-code among the job ClassAds for the monitoring script to update the Grafana dashboard.
         """
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
-            self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
+            try:  # this may fail when running PostJob interactively for debugging
+                self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
+            except Exception:
+                pass  # caller is not equipped for dealing with exceptions from this method
             return
         self.logger.info("====== Starting to update job ClassAd.")
         msg = "status: %s." % (state)
