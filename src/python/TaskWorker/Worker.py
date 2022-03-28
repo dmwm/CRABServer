@@ -5,7 +5,6 @@ import logging
 import traceback
 import multiprocessing
 from queue import Empty
-from base64 import b64encode
 from logging import FileHandler
 from http.client import HTTPException
 from logging.handlers import TimedRotatingFileHandler
@@ -21,7 +20,6 @@ from TaskWorker.DataObjects.Result import Result
 from ServerUtilities import truncateError, executeCommand
 from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException
 
-from Utils.Utilities import encodeUnicodeToBytes
 
 ## Creating configuration globals to avoid passing these around at every request
 ## and tell pylink to bare with this :-)
@@ -54,8 +52,8 @@ def failTask(taskName, crabserver, msg, log, failstatus='FAILED'):
         configreq = {'workflow': taskName,
                      'status': failstatus,
                      'subresource': 'failure',
-                     # Limit the message to 7500 chars, which means no more than 10000 once encoded. That's the limit in the REST
-                     'failure': b64encode(encodeUnicodeToBytes(truncMsg))}
+                     # Limit the message to 1000. That's the limit in the REST
+                     'failure': truncMsg}
         crabserver.post(api='workflowdb', data = urlencode(configreq))
         log.info("Failure message successfully uploaded to the REST")
     except HTTPException as hte:

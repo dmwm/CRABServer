@@ -157,7 +157,7 @@ def getTestDataDirectory():
     return os.sep.join(testdirList)
 
 def truncateError(msg):
-    """Truncate the error message to the first 7400 chars if needed, and add a message if we truncate it.
+    """Truncate the error message to the first 1000 chars if needed, and add a message if we truncate it.
        See https://github.com/dmwm/CRABServer/pull/4867#commitcomment-12086393
     """
     MSG_LIMIT = 1100

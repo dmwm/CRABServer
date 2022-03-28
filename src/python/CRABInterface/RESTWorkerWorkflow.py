@@ -10,12 +10,11 @@ from WMCore.REST.Error import InvalidParameter
 from ServerUtilities import getEpochFromDBTime
 from CRABInterface.Utilities import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import (RX_TASKNAME, RX_WORKER_NAME, RX_STATUS, RX_TEXT_FAIL, RX_SUBPOSTWORKER,
+from CRABInterface.Regexps import (RX_MANYLINES_SHORT, RX_TASKNAME, RX_WORKER_NAME, RX_STATUS, RX_SUBPOSTWORKER,
                                   RX_JOBID)
 
 # external dependecies here
 from ast import literal_eval
-from base64 import b64decode
 
 
 class RESTWorkerWorkflow(RESTEntity):
@@ -36,7 +35,7 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_str("status", param, safe, RX_STATUS, optional=True)
             validate_str("command", param, safe, RX_STATUS, optional=True)
             validate_str("getstatus", param, safe, RX_STATUS, optional=True)
-            validate_str("failure", param, safe, RX_TEXT_FAIL, optional=True)
+            validate_str("failure", param, safe, RX_MANYLINES_SHORT, optional=True)
             validate_strlist("resubmittedjobs", param, safe, RX_JOBID)
             validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
             validate_str("subresource", param, safe, RX_SUBPOSTWORKER, optional=True)
@@ -61,11 +60,6 @@ class RESTWorkerWorkflow(RESTEntity):
     @restcall
     def post(self, workflow, status, command, subresource, failure, resubmittedjobs, getstatus, workername, limit, clusterid):
         """ Updates task information """
-        if failure is not None:
-            try:
-                failure = decodeBytesToUnicode(b64decode(failure))
-            except TypeError:
-                raise InvalidParameter("Failure message is not in the accepted format")
         methodmap = {"state": {"args": (self.Task.SetStatusTask_sql,), "method": self.api.modify, "kwargs": {"status": [status],
                      "command": [command], "taskname": [workflow]}},
                      #TODO MM - I don't see where this start API is used
