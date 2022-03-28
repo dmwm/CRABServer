@@ -189,6 +189,9 @@ class RetryJob(object):
         if self.ad.get("RemoveReason", "").startswith("Removed due to wall clock limit"):
             exitMsg = "Not retrying job due to wall clock limit (job automatically killed on the worker node)"
             self.create_fake_fjr(exitMsg, 50664, 50664)
+        if "CPU usage over limit" in self.ad.get("RemoveReason", ""):
+            exitMsg = "Not retrying job due CPU limit (using more CPU than Wall Clock)"
+            self.create_fake_fjr(exitMsg, 50663, 50663)
         subreport = self.report
         for attr in ['steps', 'cmsRun', 'performance', 'cpu', 'TotalJobTime']:
             subreport = subreport.get(attr, None)
