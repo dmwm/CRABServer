@@ -88,6 +88,7 @@ from http.client import HTTPException
 
 import htcondor
 import classad
+from WMCore import Lexicon
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.WMArchive.DataMap import createArchiverDoc
 
@@ -2352,6 +2353,12 @@ class PostJob():
                 lfn = '/store/user/dummy/DummyLFN'
             else:
                 lfn = ifile['lfn']
+                # beware the case where cmsRun was only given a PFN to run on and still we get it in the LFN field
+                try:
+                    Lexicon.lfn(testLfn)  # will raise if testLfn is not a valid lfn
+                except AssertionError:
+                    lfn = '/store/user/dummy/DummyLFN'
+
             lfn = lfn + "_" + str(self.job_id) ## jobs can analyze the same input
             configreq = {"taskname"        : self.job_ad['CRAB_ReqName'],
                          "globalTag"       : "None",
