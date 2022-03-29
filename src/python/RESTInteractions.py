@@ -47,6 +47,23 @@ def retriableError(ex):
         return ex.args[0] in [28, 35]
     return False
 
+def terminalError(ex):
+    """
+    Return True if HTTP server reported a clear "no way" which does
+    not make sense to retry
+    """
+    #406 NotAcceptable (server understand what client wants, but refuses)
+    #405 Unsupported Method
+    #404 NoSuchInstance (typically when trying a DB instance not supported by a given host)
+    #403 Forbidden (usually authentication failure)
+    #401 Unauthorized (usually we do not get this but 403, but meaning is the same. Future proofing)
+    #400 BadRequest (more generic refusal of this request by HTTP server)
+    terminal = False
+    if isinstance(ex, HTTPException) and \
+            ex.status in [400, 401, 403, 404, 405, 406]:
+        terminal = True
+    return terminal
+
 
 class HTTPRequests(dict):
     """
@@ -158,7 +175,12 @@ class HTTPRequests(dict):
                                                          ckey=self['key'], cert=self['cert'], capath=caCertPath,
                                                          verbose=self['verbose'])
             except Exception as ex:
-                # add here other temporary errors we need to retry
+                if terminalError(ex):
+                    # HTTP went OK, but operation is definitely not possible
+                    msg = "Rejected request when connecting to %s using %s. Error details: " % (url, data)
+                    msg = msg + str(ex.headers) if hasattr(ex, 'headers') else msg + str(ex)
+                    self.logger.error(msg)
+                    raise
                 if (i < 2) or (retriableError(ex) and (i < self['retry'])):
                     sleeptime = 20 * (i + 1) + random.randint(-10, 10)
                     msg = "Sleeping %s seconds after HTTP error. Error details:  " % sleeptime
