@@ -191,6 +191,7 @@ class DBSDataDiscovery(DataDiscovery):
             msg += "\nyou can check progress via either of the following two commands:"
             msg += "\n rucio rule-info %s" % ruleId
             msg += "\n rucio list-rules %s:%s" % (myScope, containerName)
+            msg += "\nor simply check 'state' line in this page: https://cms-rucio-webui.cern.ch/rule?rule_id=%s" % ruleId
             automaticTapeRecallIsImplemented = True
             if automaticTapeRecallIsImplemented:
                 tapeRecallStatus = 'TAPERECALL'
