@@ -80,6 +80,7 @@ import subprocess
 import unittest
 import datetime
 import tempfile
+import pickle
 import traceback
 import random
 import shutil
@@ -562,7 +563,6 @@ class ASOServerJob(object):
         if str(self.job_ad['CRAB_UserGroup']).lower() == 'undefined':
             group = ''
 
-        import pickle
         with open('taskinformation.pkl', 'rb') as fd:
             task = pickle.load(fd)
 
@@ -579,6 +579,7 @@ class ASOServerJob(object):
                 file_info['direct_stageout'] = output_file_info.get(u'direct_stageout', False)
                 file_info['pset_hash'] = output_file_info.get(u'pset_hash', 32*'0')
                 file_info['module_label'] = output_file_info.get(u'module_label')
+                # assign filetype based on the classification made by CRAB Client
                 if file_info['pfn'] in task['tm_edm_outfiles']:
                     file_info['filetype'] = 'EDM'
                 elif file_info['pfn'] in task['tm_tfile_outfiles']:
@@ -2654,6 +2655,10 @@ class PostJob():
                     if ifile is not None:
                         return output_file_info
             return None
+
+        with open('taskinformation.pkl', 'rb') as fd:
+            task = pickle.load(fd)
+
         ## Loop over the output files that have to be collected.
         for filename in self.output_files_names:
             ## Search for the output file info in the job report.
@@ -2670,17 +2675,16 @@ class PostJob():
                 self.logger.debug(msg)
                 file_info = {}
                 self.output_files_info.append(file_info)
-                ## Note incorrect spelling of 'output module' in current WMCore
-                if (output_file_info.get(u'output_module_class', '') == u'PoolOutputModule' or \
-                    output_file_info.get(u'ouput_module_class', '') == u'PoolOutputModule'):
+                # assign filetype based on the classification made by CRAB Client
+                file_info['pfn'] = orig_file_name
+                if file_info['pfn'] in task['tm_edm_outfiles']:
                     file_info['filetype'] = 'EDM'
-                elif output_file_info.get(u'Source', '') == u'TFileService':
+                elif file_info['pfn'] in task['tm_tfile_outfiles']:
                     file_info['filetype'] = 'TFILE'
-                elif (output_file_info.get(u'output_module_class', '') == u'DQMRootOutputModule' or \
-                      output_file_info.get(u'ouput_module_class', '') == u'DQMRootOutputModule'):
-                    file_info['filetype'] = 'DQM'
-                else:
+                elif file_info['pfn'] in task['tm_outfiles']:
                     file_info['filetype'] = 'FAKE'
+                else:
+                    file_info['filetype'] = 'UNKNOWN'
                 file_info['module_label'] = output_file_info.get(u'module_label', 'unknown')
                 file_info['inparentlfns'] = [str(i) for i in output_file_info.get(u'input', [])]
                 file_info['events'] = output_file_info.get(u'events', 0)
@@ -2688,6 +2692,8 @@ class PostJob():
                 file_info['outsize'] = output_file_info.get(u'size', 0)
                 if u'pset_hash' in output_file_info:
                     file_info['pset_hash'] = output_file_info[u'pset_hash']
+                else:
+                    file_info['pset_hash'] = 32*'0'
                 if u'pfn' in output_file_info:
                     file_info['pfn'] = str(output_file_info[u'pfn'])
                 file_info['local_stageout'] = output_file_info.get(u'local_stageout', False)
