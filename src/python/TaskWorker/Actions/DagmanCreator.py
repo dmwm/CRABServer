@@ -29,6 +29,7 @@ import classad
 
 import WMCore.WMSpec.WMTask
 from WMCore.Services.CRIC.CRIC import CRIC
+from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS
 
 DAG_HEADER = """
 
@@ -491,14 +492,11 @@ class DagmanCreator(TaskAction):
         info = transform_strings(info)
         info['faillimit'] = task['tm_fail_limit']
         info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
-        if info['jobarch_flatten'].startswith("slc5_"):
-            info['opsys_req'] = '+REQUIRED_OS="rhel6"'
-        elif info['jobarch_flatten'].startswith("slc6_"):
-            info['opsys_req'] = '+REQUIRED_OS="rhel6"'
-        elif info['jobarch_flatten'].startswith("slc7_"):
-            info['opsys_req'] = '+REQUIRED_OS="rhel7"'
-        else:
-            info['opsys_req'] = '+REQUIRED_OS="any"'
+
+        # info['jobarch_flatten'].split("_")[0]: extracts "slc7" from "slc7_amd64_gcc10"
+        required_os_list = ARCH_TO_OS.get(info['jobarch_flatten'].split("_")[0])
+        # ARCH_TO_OS.get("slc7") gives a list with one item only: ['rhel7']
+        info['opsys_req'] = '+REQUIRED_OS="{}"'.format(required_os_list[0] if required_os_list else "any")
 
         info.setdefault("additional_environment_options", '')
         info.setdefault("additional_input_file", "")
