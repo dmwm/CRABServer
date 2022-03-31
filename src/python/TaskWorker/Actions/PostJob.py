@@ -2356,7 +2356,7 @@ class PostJob():
                 lfn = ifile['lfn']
                 # beware the case where cmsRun was only given a PFN to run on and still we get it in the LFN field
                 try:
-                    Lexicon.lfn(testLfn)  # will raise if testLfn is not a valid lfn
+                    Lexicon.lfn(lfn)  # will raise if testLfn is not a valid lfn
                 except AssertionError:
                     lfn = '/store/user/dummy/DummyLFN'
 
