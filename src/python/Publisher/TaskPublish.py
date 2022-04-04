@@ -29,7 +29,7 @@ def format_file_3(file_):
     """
     nf = {'logical_file_name': file_['lfn'],
           'file_type': 'EDM',
-          'check_sum': file_['cksum'],
+          'check_sum': str(file_['cksum']),  # historically CRAB FILEMTETADATADB has the wrong type (int)
           'event_count': file_['inevents'],
           'file_size': file_['filesize'],
           'adler32': file_['adler32'],
