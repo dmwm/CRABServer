@@ -4,6 +4,8 @@ CMSRunAnalysis.py - the runtime python portions to launch a CRAB3 / cmsRun job.
 """
 from __future__ import print_function
 
+from future import standard_library
+standard_library.install_aliases()
 import os
 import re
 import sys
@@ -16,7 +18,7 @@ import pickle
 import signal
 import os.path
 import logging
-import commands
+import subprocess
 import traceback
 from ast import literal_eval
 from optparse import OptionParser, BadOptionError, AmbiguousOptionError
@@ -385,7 +387,7 @@ def prepSandbox(opts):
     print("==== Sandbox untarring STARTING at %s ====" % time.asctime(time.gmtime()))
 
     #The user sandbox.tar.gz has to be unpacked no matter what (even in DEBUG mode)
-    print(commands.getoutput('tar xfm %s' % opts.archiveJob))
+    print(subprocess.getoutput('tar xfm %s' % opts.archiveJob))
     print("==== Sandbox untarring FINISHED at %s ====" % time.asctime(time.gmtime()))
 
     #move the pset in the right place
@@ -409,7 +411,7 @@ def extractUserSandbox(archiveJob, cmsswVersion):
     # will be executed from the job working directory, so we move "up"
     # the PSet which is also in the user sandbox
     os.chdir(cmsswVersion)
-    print(commands.getoutput('tar xfm %s ' % os.path.join('..', archiveJob)))
+    print(subprocess.getoutput('tar xfm %s ' % os.path.join('..', archiveJob)))
     os.rename('PSet.py','../PSet.py')
     os.rename('PSet.pkl','../PSet.pkl')
     os.chdir('..')
@@ -671,7 +673,7 @@ if __name__ == "__main__":
                 # e.g. from xroot https://github.com/dmwm/CRABServer/issues/6640#issuecomment-909362639
                 print("Sanitize FJR")
                 cmd = 'cat -v FrameworkJobReport.xml > sane; mv sane FrameworkJobReport.xml'
-                print(commands.getoutput(cmd))
+                print(subprocess.getoutput(cmd))
                 # parse FJR
                 rep = Report("cmsRun")
                 rep.parse('FrameworkJobReport.xml', "cmsRun")
@@ -701,7 +703,7 @@ if __name__ == "__main__":
         # e.g. from xroot https://github.com/dmwm/CRABServer/issues/6640#issuecomment-909362639
         print("Sanitize FJR")
         cmd = 'cat -v FrameworkJobReport.xml > sane; mv sane FrameworkJobReport.xml'
-        print(commands.getoutput(cmd))
+        print(subprocess.getoutput(cmd))
         # parse FJR
         rep = Report("cmsRun")
         rep.parse('FrameworkJobReport.xml', "cmsRun")
