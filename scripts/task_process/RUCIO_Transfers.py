@@ -44,6 +44,7 @@ class globals:
     # RUCIO/Task variables
     rucio_scope: str = "user."
     current_dataset: str = None
+    logs_dataset: str = None
     publishname: str = None
     destination: str = None
     replicas: dict = {}
@@ -137,6 +138,8 @@ def init_rucio_client():
         rucio_logger.exception(
             "task_process/transfers.txt does not exist. Probably no completed jobs in the task yet.", ex)
         return
+    
+    g.logs_dataset = g.publishname + "#LOGS"
 
     rucio_logger.info(
         "Checking if task_process/RestInfoForFileTransfers.json exists")
@@ -222,8 +225,25 @@ def check_or_create_current_dataset(force_create: bool = False):
         open_ds = []
 
         dids = []
+        logs_ds_exists = False
+
         for d in datasets:
+            if d['name'] == g.logs_dataset:
+                logs_ds_exists = True
+
             dids.append(d)
+
+        # If a ds for logs does not exists, create one
+        g.logs_dataset = "/" + g.publishname+"#LOGS"
+        try:
+            g.rucio_client.add_dataset(g.rucio_scope, g.logs_dataset)
+            ds_did = {'scope': g.rucio_scope, 'type': "DATASET", 'name': g.logs_dataset}
+            g.rucio_client.add_replication_rule([ds_did], 1, g.destination)
+            # attach dataset to the container
+            g.rucio_client.attach_dids(g.rucio_scope, g.logs_dataset, [ds_did])
+        except Exception as ex:
+            checkds_logger.exception("Failed to create and attach a logs RUCIO dataset %s" % ex)        
+
 
         if len(dids) > 0:
             try:
