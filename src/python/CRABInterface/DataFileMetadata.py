@@ -82,7 +82,6 @@ class DataFileMetadata(object):
                 # 'state': None, 
                 # 'created': "[b'/store/[...]-0CC47A7C34C8.root']",      ## THIS CONTAINS BYTES
                 # 'tmplfn': '/store/user/dmapelli/GenericTTbar/[...]/220113_142727/0000/output_7.root'}
-                self.logger.info("converting bytes into unicode in filemetadata - before - %s", filedict)
                 for key0, val0 in filedict.items():
                     if isinstance(val0, list):  # 'parents' and 'created'
                         filedict[key0]  = [decodeBytesToUnicode(el) for el in val0]
@@ -94,7 +93,6 @@ class DataFileMetadata(object):
                                 for key2, val2 in list(val1.items()):
                                     val1.pop(key2)
                                     val1[decodeBytesToUnicode(key2)] = decodeBytesToUnicode(val2)
-                self.logger.info("converting bytes into unicode in filemetadata - after - %s", filedict)
                 ## temporary changes for making REST py3 compatible with Publisher py2 - end
                 filedict['created'] = str(filedict['created'])   # convert to str, after removal of bytes
                 yield json.dumps(filedict)
