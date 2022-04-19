@@ -1,5 +1,6 @@
 from __future__ import print_function
 import os
+import random
 import sys
 import logging
 import copy
@@ -142,20 +143,46 @@ class DBSDataDiscovery(DataDiscovery):
                 blockBytes = next(replicas)['bytes']  # pick first replica for each block, they better all have same size
                 sizeToRecall += blockBytes
             TBtoRecall = sizeToRecall // 1e12
+            # Sanity check
+            if TBtoRecall > 1e3 :
+                msg = 'Dataset size %d TB. Will not trigger autoamatic recall for >1PB. Contact DataOps' % TBtoRecall
+                raise TaskWorkerException(msg)
             if TBtoRecall > 0:
                 self.logger.info("Total size of data to recall : %d TBytes", TBtoRecall)
             else:
                 self.logger.info("Total size of data to recall : %d GBytes", sizeToRecall/1e9)
 
-            if TBtoRecall > 30.:
-                grouping = 'DATASET'  # Rucio DATASET i.e. CMS block !
-                self.logger.info("Will scatter blocks on multiple sites")
-            else:
+            if TBtoRecall < 10.:
                 grouping = 'ALL'
                 self.logger.info("Will place all blocks at a single site")
+                RSE_EXPRESSION = 'ddm_quota>0&(tier=1|tier=2)&rse_type=DISK'  # any site will do
+            else:
+                grouping = 'DATASET'  # Rucio DATASET i.e. CMS block !
+                self.logger.info("Will scatter blocks on multiple sites")
+                # make a list of largish RSEs  which have space
+                # asking for ddm_quota>0 gets rid also of Temp and Test RSE's, all in all
+                # this means "RSEs where DataOps is willing to manage data"
+                neededSpace = 100e12  # 100 TB (Rucio ddm_quota is in bytes)
+                ALL_RSES = "ddm_quota>%d&(tier=1|tier=2)&rse_type=DISK" % neededSpace
+                rses = rucio.list_rses(ALL_RSES)
+                rseNames = [r['rse'] for r in rses]
+                # check size for those RSEs
+                goodRSEs = []
+                for rse in rseNames:
+                    size = list(rucio.get_rse_usage(rse, filters={'source': 'static'}))[0]['used']
+                    size = float(size) / 1.e15  # from bytes to PB
+                    if size > 1.0 :  # more than 1 PB indicates a largish RSE
+                        goodRSEs.append(rse)  # add to our list
+                # now restrict the list to as many sites as there are 10TB chunks in the dataset, plus some slack
+                nRSEs = int(TBtoRecall/10) + 2
+                myRSEs = random.sample(goodRSEs, nRSEs)
+                RSE_EXPRESSION = myRSEs[0]
+                for rse in myRSEs[1:]:
+                    RSE_EXPRESSION = RSE_EXPRESSION + '|' + rse
+                self.logger.debug('Will use RSE_EXPRESSION = %s', RSE_EXPRESSION)
 
             # create rule
-            RSE_EXPRESSION = 'ddm_quota>0&(tier=1|tier=2)&rse_type=DISK'
+            #RSE_EXPRESSION = 'ddm_quota>0&(tier=1|tier=2)&rse_type=DISK'
             #RSE_EXPRESSION = 'T3_IT_Trieste' # for testing
             WEIGHT = 'ddm_quota'
             #WEIGHT = None # for testing
