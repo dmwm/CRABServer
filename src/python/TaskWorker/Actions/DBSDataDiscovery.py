@@ -400,6 +400,14 @@ class DBSDataDiscovery(DataDiscovery):
             secondaryBlocksWithLocation = secondaryLocationsMap.copy().keys()
 
         # filter out TAPE locations
+        # temporary hack until we have a new config. parameter: allow user to accpet a partial dataset
+        # by inserting '0' as (first element of) runRange
+        usePartialDataset = False
+        runRange = kwargs['task']['tm_split_args']['runs']
+        if runRange and runRange[0] == '0':
+            usePartialDataset = True
+            runRange[0] = runRange[1:]  # remove initial '0' from run list
+
         self.keepOnlyDiskRSEs(locationsMap)
         if not locationsMap:
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
@@ -411,7 +419,12 @@ class DBSDataDiscovery(DataDiscovery):
                 self.requestTapeRecall(blockList=blocksWithLocation, system='Rucio', msgHead=msg)
         if set(locationsMap.keys()) != set(blocksWithLocation):
             dataTier = inputDataset.split('/')[3]
-            if dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []):
+            if usePartialDataset:
+                msg = "Some blocks are on TAPE only and can not be reaed."
+                msg += "\nSince you specified to accept a partial dataset, only blocks on disk will be processed"
+                self.logger.warning(msg)
+                self.uploadWarning(msg, self.userproxy, self.taskName)
+            elif dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []):
                 msg = "Task could not be submitted because not all blocks of dataset %s are on DISK" % inputDataset
                 msg += "\nWill try to request a full disk copy for you. See"
                 msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
@@ -426,7 +439,6 @@ class DBSDataDiscovery(DataDiscovery):
         # will not need lumi info if user has asked for split by file with no run/lumi mask
         splitAlgo = kwargs['task']['tm_split_algo']
         lumiMask = kwargs['task']['tm_split_args']['lumis']
-        runRange = kwargs['task']['tm_split_args']['runs']
 
         needLumiInfo = splitAlgo != 'FileBased' or lumiMask != [] or runRange != []
         # secondary dataset access relies on run/lumi info
@@ -488,7 +500,7 @@ if __name__ == '__main__':
     # export X509_USER_CERT=/data/certs/servicecert.pem
     # export X509_USER_KEY=/data/certs/servicekey.pem
     #
-    # Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/global /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
+    # Example: python /data/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/global /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
     ###
     dbsInstance = sys.argv[1]
     dbsDataset = sys.argv[2]
