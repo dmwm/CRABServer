@@ -406,7 +406,11 @@ class DBSDataDiscovery(DataDiscovery):
         runRange = kwargs['task']['tm_split_args']['runs']
         if runRange and runRange[0] == '0':
             usePartialDataset = True
-            runRange[0] = runRange[1:]  # remove initial '0' from run list
+            # remove initial '0' from run list
+            # note that it caused an extra entry to be created in lumilis as well
+            kwargs['task']['tm_split_args']['runs'] = kwargs['task']['tm_split_args']['runs'][1:]
+            kwargs['task']['tm_split_args']['lumis'] = kwargs['task']['tm_split_args']['lumis'][1:]
+            runRange = kwargs['task']['tm_split_args']['runs']
 
         self.keepOnlyDiskRSEs(locationsMap)
         if not locationsMap:
