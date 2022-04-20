@@ -400,6 +400,18 @@ class DBSDataDiscovery(DataDiscovery):
             secondaryBlocksWithLocation = secondaryLocationsMap.copy().keys()
 
         # filter out TAPE locations
+        # temporary hack until we have a new config. parameter: allow user to accpet a partial dataset
+        # by inserting '0' as (first element of) runRange
+        usePartialDataset = False
+        runRange = kwargs['task']['tm_split_args']['runs']
+        if runRange and runRange[0] == '0':
+            usePartialDataset = True
+            # remove initial '0' from run list
+            # note that it caused an extra entry to be created in lumilis as well
+            kwargs['task']['tm_split_args']['runs'] = kwargs['task']['tm_split_args']['runs'][1:]
+            kwargs['task']['tm_split_args']['lumis'] = kwargs['task']['tm_split_args']['lumis'][1:]
+            runRange = kwargs['task']['tm_split_args']['runs']
+
         self.keepOnlyDiskRSEs(locationsMap)
         if not locationsMap:
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
@@ -411,7 +423,12 @@ class DBSDataDiscovery(DataDiscovery):
                 self.requestTapeRecall(blockList=blocksWithLocation, system='Rucio', msgHead=msg)
         if set(locationsMap.keys()) != set(blocksWithLocation):
             dataTier = inputDataset.split('/')[3]
-            if dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []):
+            if usePartialDataset:
+                msg = "Some blocks are on TAPE only and can not be reaed."
+                msg += "\nSince you specified to accept a partial dataset, only blocks on disk will be processed"
+                self.logger.warning(msg)
+                self.uploadWarning(msg, self.userproxy, self.taskName)
+            elif dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []):
                 msg = "Task could not be submitted because not all blocks of dataset %s are on DISK" % inputDataset
                 msg += "\nWill try to request a full disk copy for you. See"
                 msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
@@ -426,7 +443,6 @@ class DBSDataDiscovery(DataDiscovery):
         # will not need lumi info if user has asked for split by file with no run/lumi mask
         splitAlgo = kwargs['task']['tm_split_algo']
         lumiMask = kwargs['task']['tm_split_args']['lumis']
-        runRange = kwargs['task']['tm_split_args']['runs']
 
         needLumiInfo = splitAlgo != 'FileBased' or lumiMask != [] or runRange != []
         # secondary dataset access relies on run/lumi info
@@ -482,13 +498,10 @@ class DBSDataDiscovery(DataDiscovery):
 
 if __name__ == '__main__':
     ###
-    # Usage: python DBSDataDiscovery.py dbs_instance dbsDataset [secondaryDataset]
+    # Usage: python3 DBSDataDiscovery.py dbs_instance dbsDataset [secondaryDataset]
     # where dbs_instance should be either prod/global or prod/phys03
-    # Needs to define first:
-    # export X509_USER_CERT=/data/certs/servicecert.pem
-    # export X509_USER_KEY=/data/certs/servicekey.pem
     #
-    # Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/global /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
+    # Example: python3 /data/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/global /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
     ###
     dbsInstance = sys.argv[1]
     dbsDataset = sys.argv[2]
@@ -502,13 +515,17 @@ if __name__ == '__main__':
     config = ConfigurationEx()
     config.section_("Services")
     config.section_("TaskWorker")
-    # will use X509_USER_PROXY var for this test
-    #config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
-    #config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
 
     # will user service cert as defined for TW
-    config.TaskWorker.cmscert = os.environ["X509_USER_CERT"]
-    config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
+    if "X509_USER_CERT" in os.environ:
+        config.TaskWorker.cmscert = os.environ["X509_USER_CERT"]
+    else:
+        config.TaskWorker.cmscert = '/data/certs/servicecert.pem'
+    if "X509_USER_KEY" in os.environ:
+        config.TaskWorker.cmscert = os.environ["X509_USER_KEY"]
+    else:
+        config.TaskWorker.cmscert = '/data/certs/servicekey.pem'
+
     config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=config.TaskWorker.cmscert,
                                                 X509_USER_KEY=config.TaskWorker.cmskey)
 
