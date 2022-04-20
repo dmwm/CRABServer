@@ -494,13 +494,10 @@ class DBSDataDiscovery(DataDiscovery):
 
 if __name__ == '__main__':
     ###
-    # Usage: python DBSDataDiscovery.py dbs_instance dbsDataset [secondaryDataset]
+    # Usage: python3 DBSDataDiscovery.py dbs_instance dbsDataset [secondaryDataset]
     # where dbs_instance should be either prod/global or prod/phys03
-    # Needs to define first:
-    # export X509_USER_CERT=/data/certs/servicecert.pem
-    # export X509_USER_KEY=/data/certs/servicekey.pem
     #
-    # Example: python /data/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/global /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
+    # Example: python3 /data/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/global /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
     ###
     dbsInstance = sys.argv[1]
     dbsDataset = sys.argv[2]
@@ -514,13 +511,17 @@ if __name__ == '__main__':
     config = ConfigurationEx()
     config.section_("Services")
     config.section_("TaskWorker")
-    # will use X509_USER_PROXY var for this test
-    #config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
-    #config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
 
     # will user service cert as defined for TW
-    config.TaskWorker.cmscert = os.environ["X509_USER_CERT"]
-    config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
+    if "X509_USER_CERT" in os.environ:
+        config.TaskWorker.cmscert = os.environ["X509_USER_CERT"]
+    else:
+        config.TaskWorker.cmscert = '/data/certs/servicecert.pem'
+    if "X509_USER_KEY" in os.environ:
+        config.TaskWorker.cmscert = os.environ["X509_USER_KEY"]
+    else:
+        config.TaskWorker.cmscert = '/data/certs/servicekey.pem'
+
     config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=config.TaskWorker.cmscert,
                                                 X509_USER_KEY=config.TaskWorker.cmskey)
 
