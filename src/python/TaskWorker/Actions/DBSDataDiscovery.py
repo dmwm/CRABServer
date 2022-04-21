@@ -125,14 +125,14 @@ class DBSDataDiscovery(DataDiscovery):
             except DataIdentifierAlreadyExists:
                 self.logger.debug("Container name already exists in Rucio. Keep going")
             except Exception as ex:
-                msg += "Rucio exception creating container: %s" %  (str(ex))
+                msg += "\nRucio exception creating container: %s" %  (str(ex))
                 raise TaskWorkerException(msg)
             try:
                 rucioClient.attach_dids(myScope, containerName, dids)
             except DuplicateContent:
                 self.logger.debug("Some dids are already in this container. Keep going")
             except Exception as ex:
-                msg += "Rucio exception adding blocks to container: %s" %  (str(ex))
+                msg += "\nRucio exception adding blocks to container: %s" %  (str(ex))
                 raise TaskWorkerException(msg)
             self.logger.info("Rucio container %s:%s created with %d blocks", myScope, containerName, len(blockList))
 
@@ -145,7 +145,7 @@ class DBSDataDiscovery(DataDiscovery):
             TBtoRecall = sizeToRecall // 1e12
             # Sanity check
             if TBtoRecall > 1e3 :
-                msg = 'Dataset size %d TB. Will not trigger autoamatic recall for >1PB. Contact DataOps' % TBtoRecall
+                msg += '\nDataset size %d TB. Will not trigger autoamatic recall for >1PB. Contact DataOps' % TBtoRecall
                 raise TaskWorkerException(msg)
             if TBtoRecall > 0:
                 self.logger.info("Total size of data to recall : %d TBytes", TBtoRecall)
@@ -207,10 +207,10 @@ class DBSDataDiscovery(DataDiscovery):
                 # find the existing rule id
                 ruleId = rucioClient.list_did_rules(myScope, containerName)
             except (InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage) as ex:
-                msg = "Not enough global quota to issue a tape recall request. Rucio exception:\n%s" % str(ex)
+                msg = "\nNot enough global quota to issue a tape recall request. Rucio exception:\n%s" % str(ex)
                 raise TaskWorkerException(msg)
             except Exception as ex:
-                msg += "Rucio exception creating rule: %s" %  str(ex)
+                msg += "\nRucio exception creating rule: %s" %  str(ex)
                 raise TaskWorkerException(msg)
             ruleId = str(ruleId[0])  # from list to singleId and remove unicode
 
