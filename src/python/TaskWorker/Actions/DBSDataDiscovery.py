@@ -164,12 +164,12 @@ class DBSDataDiscovery(DataDiscovery):
                 # this means "RSEs where DataOps is willing to manage data"
                 neededSpace = 100e12  # 100 TB (Rucio ddm_quota is in bytes)
                 ALL_RSES = "ddm_quota>%d&(tier=1|tier=2)&rse_type=DISK" % neededSpace
-                rses = rucio.list_rses(ALL_RSES)
+                rses = rucioClient.list_rses(ALL_RSES)
                 rseNames = [r['rse'] for r in rses]
                 # check size for those RSEs
                 goodRSEs = []
                 for rse in rseNames:
-                    size = list(rucio.get_rse_usage(rse, filters={'source': 'static'}))[0]['used']
+                    size = list(rucioClient.get_rse_usage(rse, filters={'source': 'static'}))[0]['used']
                     size = float(size) / 1.e15  # from bytes to PB
                     if size > 1.0 :  # more than 1 PB indicates a largish RSE
                         goodRSEs.append(rse)  # add to our list
