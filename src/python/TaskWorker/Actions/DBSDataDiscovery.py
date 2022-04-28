@@ -1,16 +1,12 @@
 from __future__ import print_function
 import os
 import random
-import sys
 import logging
 import copy
 from http.client import HTTPException
 
 import sys
-if sys.version_info >= (3, 0):
-    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
-if sys.version_info < (3, 0):
-    from urllib import urlencode
+from urllib.parse import urlencode  # pylint: disable=no-name-in-module (for pylint2 compat.)
 
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.DBS.DBSReader import DBSReader
@@ -22,7 +18,7 @@ from ServerUtilities import FEEDBACKMAIL
 from RucioUtils import getNativeRucioClient
 
 from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent,
-    InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage)
+                                    InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage)
 
 class DBSDataDiscovery(DataDiscovery):
     """Performing the data discovery through CMS DBS service.
@@ -144,7 +140,7 @@ class DBSDataDiscovery(DataDiscovery):
                 sizeToRecall += blockBytes
             TBtoRecall = sizeToRecall // 1e12
             # Sanity check
-            if TBtoRecall > 1e3 :
+            if TBtoRecall > 1e3:
                 msg += '\nDataset size %d TB. Will not trigger autoamatic recall for >1PB. Contact DataOps' % TBtoRecall
                 raise TaskWorkerException(msg)
             if TBtoRecall > 0:
@@ -152,34 +148,33 @@ class DBSDataDiscovery(DataDiscovery):
             else:
                 self.logger.info("Total size of data to recall : %d GBytes", sizeToRecall/1e9)
 
-            if TBtoRecall < 10.:
+            # make RSEs lists
+            # asking for ddm_quota>0 gets rid also of Temp and Test RSE's
+            ALL_RSES = "ddm_quota>0&(tier=1|tier=2)&rse_type=DISK"
+            rses = rucioClient.list_rses(ALL_RSES)
+            rseNames = [r['rse'] for r in rses]
+            largeRSEs = []  # a list of largish (i.e. solid) RSEs
+            freeRSEs = []  # a subset of largeRSEs which also have quite some free space
+            for rse in rseNames:
+                size = list(rucioClient.get_rse_usage(rse, filters={'source': 'static'}))[0]['used']  # bytes
+                if float(size)/1.e15 > 1.0:  # more than 1 PB
+                    largeRSEs.append(rse)
+                    availableSpace = int(rucioClient.list_rse_attributes(rse)['ddm_quota'])  # bytes
+                    if availableSpace/1e12 > 100:  # at least 100TB available
+                        freeRSEs.append(rse)
+            # use either list (largeRSEs or freeRSEs) according to dataset size:
+            if TBtoRecall < 50.:
                 grouping = 'ALL'
                 self.logger.info("Will place all blocks at a single site")
-                RSE_EXPRESSION = 'ddm_quota>0&(tier=1|tier=2)&rse_type=DISK'  # any site will do
+                RSE_EXPRESSION = '|'.join(largeRSEs)  # any solid site will do, most datasets are a few TB anyhow
             else:
                 grouping = 'DATASET'  # Rucio DATASET i.e. CMS block !
                 self.logger.info("Will scatter blocks on multiple sites")
-                # make a list of largish RSEs  which have space
-                # asking for ddm_quota>0 gets rid also of Temp and Test RSE's, all in all
-                # this means "RSEs where DataOps is willing to manage data"
-                neededSpace = 100e12  # 100 TB (Rucio ddm_quota is in bytes)
-                ALL_RSES = "ddm_quota>%d&(tier=1|tier=2)&rse_type=DISK" % neededSpace
-                rses = rucioClient.list_rses(ALL_RSES)
-                rseNames = [r['rse'] for r in rses]
-                # check size for those RSEs
-                goodRSEs = []
-                for rse in rseNames:
-                    size = list(rucioClient.get_rse_usage(rse, filters={'source': 'static'}))[0]['used']
-                    size = float(size) / 1.e15  # from bytes to PB
-                    if size > 1.0 :  # more than 1 PB indicates a largish RSE
-                        goodRSEs.append(rse)  # add to our list
-                # now restrict the list to as many sites as there are 10TB chunks in the dataset, plus some slack
-                nRSEs = int(TBtoRecall/10) + 2
-                myRSEs = random.sample(goodRSEs, nRSEs)
-                RSE_EXPRESSION = myRSEs[0]
-                for rse in myRSEs[1:]:
-                    RSE_EXPRESSION = RSE_EXPRESSION + '|' + rse
-                self.logger.debug('Will use RSE_EXPRESSION = %s', RSE_EXPRESSION)
+                # restrict the list to as many sites as there are 50TB chunks in the dataset, plus some slack
+                nRSEs = int(TBtoRecall/50) + 1
+                myRSEs = random.sample(freeRSEs, nRSEs)
+                RSE_EXPRESSION = '|'.join(myRSEs)
+            self.logger.debug('Will use RSE_EXPRESSION = %s', RSE_EXPRESSION)
 
             # create rule
             #RSE_EXPRESSION = 'ddm_quota>0&(tier=1|tier=2)&rse_type=DISK'
@@ -192,14 +187,11 @@ class DBSDataDiscovery(DataDiscovery):
             ACCOUNT = 'crab_tape_recall'
             copies = 1
             try:
-                ruleId = rucioClient.add_replication_rule(dids=[containerDid],
-                                                  copies=copies, rse_expression=RSE_EXPRESSION,
-                                                  grouping=grouping,
-                                                  weight=WEIGHT, lifetime=LIFETIME, account=ACCOUNT,
-                                                  activity='Analysis Input',
-                                                  comment='Staged from tape for %s' % self.username,
-                                                  ask_approval=ASK_APPROVAL, asynchronous=True,
-                                                  )
+                ruleId = rucioClient.add_replication_rule(
+                    dids=[containerDid], copies=copies, rse_expression=RSE_EXPRESSION,
+                    grouping=grouping, weight=WEIGHT, lifetime=LIFETIME, account=ACCOUNT,
+                    activity='Analysis Input', comment='Staged from tape for %s' % self.username,
+                    ask_approval=ASK_APPROVAL, asynchronous=True)
             except DuplicateRule as ex:
                 # handle "A duplicate rule for this account, did, rse_expression, copies already exists"
                 # which should only happen when testing, since container name is unique like task name, anyhow...
@@ -570,7 +562,7 @@ if __name__ == '__main__':
                           'tm_taskname': 'pippo1', 'tm_username':config.Services.Rucio_account,
                           'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
                           'tm_dbs_url': DBSUrl}, tempDir='')
-    
+
 #===============================================================================
 #    Some interesting datasets for testing
 #    dataset = '/DoubleMuon/Run2018B-PromptReco-v2/AOD'       # on tape
