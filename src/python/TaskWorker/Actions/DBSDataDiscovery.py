@@ -150,7 +150,7 @@ class DBSDataDiscovery(DataDiscovery):
 
             # make RSEs lists
             # asking for ddm_quota>0 gets rid also of Temp and Test RSE's
-            ALL_RSES = "ddm_quota>%0&(tier=1|tier=2)&rse_type=DISK"
+            ALL_RSES = "ddm_quota>0&(tier=1|tier=2)&rse_type=DISK"
             rses = rucioClient.list_rses(ALL_RSES)
             rseNames = [r['rse'] for r in rses]
             largeRSEs = []  # a list of largish (i.e. solid) RSEs
