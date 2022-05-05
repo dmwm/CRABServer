@@ -34,13 +34,13 @@ class DataFileMetadata(object):
             howmany = -1
         if not lfnList:
             binds = {'taskname': taskname, 'filetype': filetype, 'howmany': howmany}
-            allRows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, **binds)
+            allRows = self.api.query_load_all_rows(None, None, self.FileMetaData.GetFromTaskAndType_sql, **binds)
         else:
             allRows = []
             lfns = makeList(lfnList)  # from a string to a python list of strings
             for lfn in lfns:
                 binds = {'taskname': taskname, 'lfn': lfn}
-                rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndLfn_sql, **binds)
+                rows = self.api.query_load_all_rows(None, None, self.FileMetaData.GetFromTaskAndLfn_sql, **binds)
                 for row in rows:  # above call returns a generator, but we want a list
                     allRows.append(row)
         for row in allRows:
@@ -57,13 +57,13 @@ class DataFileMetadata(object):
                     'publishname': row.publishname,
                     'location': row.location,
                     'tmplocation': row.tmplocation,
-                    'runlumi': literal_eval(row.runlumi.read()),
+                    'runlumi': literal_eval(row.runlumi),
                     'adler32': row.adler32,
                     'cksum': row.cksum,
                     'md5': row.md5,
                     'lfn': row.lfn,
                     'filesize': row.filesize,
-                    'parents': literal_eval(row.parents.read()),
+                    'parents': literal_eval(row.parents),
                     'state': row.state,
                     'created': str(row.parents),
                     'tmplfn': row.tmplfn

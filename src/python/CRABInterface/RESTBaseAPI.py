@@ -3,6 +3,7 @@ import logging
 import traceback
 
 import cherrypy
+import time
 from subprocess import getstatusoutput
 from time import mktime, gmtime
 
@@ -24,6 +25,7 @@ from CRABInterface.RESTCache import RESTCache
 from CRABInterface.DataFileMetadata import DataFileMetadata
 from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
+from ServerUtilities import get_size
 
 #In case the log level is not specified in the configuration we use the NullHandler and we do not print messages
 #The NullHandler is included as of python 3.1
@@ -84,6 +86,67 @@ class RESTBaseAPI(DatabaseRESTApi):
         trace and cherrypy.log("%s commit" % trace)  # pylint: disable=expression-not-assigned
         cherrypy.request.db["handle"]["connection"].commit()
         return rows([{ "modified": c.rowcount }])
+
+    def execute(self, sql, *binds, **kwbinds):
+        """overrides WMCore/REST/Server.py/DatabaseRESTApi.execute() function
+           in order to measure time used by cursor.execute(). Code is copied
+           from WMCore but we sandwich cursor.execute() with time.perf_counter().
+        """
+        c = self.prepare(sql)
+        trace = cherrypy.request.db["handle"]["trace"]
+        cherrypy.request.db["last_bind"] = (binds, kwbinds)
+        trace and cherrypy.log("%s execute: %s %s" % (trace, binds, kwbinds))
+        if cherrypy.request.db['type'].__name__ == 'MySQLdb':
+            return c, c.execute(sql, kwbinds)
+        start_time = time.perf_counter()
+        ret = c.execute(None, *binds, **kwbinds)
+        elapsed_time = time.perf_counter() - start_time
+        cherrypy.log("%s execute time: %6f" % (trace, elapsed_time,))
+        return c, ret
+
+    def executemany(self, sql, *binds, **kwbinds):
+        """Override DatabaseRESTApi.executemany() function. Same as execute
+           function above to measure elapsed time.
+        """
+
+        c = self.prepare(sql)
+        trace = cherrypy.request.db["handle"]["trace"]
+        cherrypy.request.db["last_bind"] = (binds, kwbinds)
+        trace and cherrypy.log("%s executemany: %s %s" % (trace, binds, kwbinds))
+        if cherrypy.request.db['type'].__name__ == 'MySQLdb':
+            return c, c.executemany(sql, binds[0])
+        start_time = time.perf_counter()
+        ret = c.executemany(None, *binds, **kwbinds)
+        elapsed_time = time.perf_counter() - start_time
+        cherrypy.log("%s executemany time: %6f" % (trace, elapsed_time,))
+        return c, ret
+
+    def query_load_all_rows(self, match, select, sql, *binds, **kwbinds):
+        """Same functionality as DatabaseRESTApi.query() function except it
+           returns all data from db in one go instead of returning a egenerator.
+           This function also loads Oracle LOB objects fetching them via LOB.read()
+           (without load in chunk). So caller should expect CLOB/BLOB column
+           as python string/bytes instead of cx_Oracle object.
+
+           Note that this function only support Oracle DB Connector.
+        """
+        if cherrypy.request.db['handle']['type'].__name__ == 'MySQLdb':
+            raise NotImplementedError
+        start_time = time.perf_counter()
+        rows = super().query(match, select, sql, *binds, **kwbinds)
+        ret = []
+        for row in rows:
+            new_row = list(row)
+            for i in range(len(new_row)):
+                if isinstance(new_row[i], cherrypy.request.db['handle']['type'].LOB):
+                    tmp = new_row[i].read()
+                    new_row[i] = tmp
+            ret.append(new_row)
+        elapsed_time = time.perf_counter() - start_time
+        size = get_size(ret)
+        trace = cherrypy.request.db["handle"]["trace"]
+        cherrypy.log('%s query time: %6f, size: %d' % (trace, elapsed_time, size))
+        return iter(ret) # return iterable object
 
     def _initLogger(self, logfile, loglevel, keptDays=0):
         """

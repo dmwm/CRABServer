@@ -158,8 +158,8 @@ class RESTFileTransfers(RESTEntity):
 
                 for num in range(len(ids)):
                     binds['id'] = [ids[num]]
-                    binds['transfer_state'] = [TRANSFERDB_STATUSES[states[num]]] 
-                    binds['fts_instance'] = [str(instances[num])] 
+                    binds['transfer_state'] = [TRANSFERDB_STATUSES[states[num]]]
+                    binds['fts_instance'] = [str(instances[num])]
                     binds['fts_id'] = [str(fts_id[num])]
                     binds['fail_reason'] = [reasons[num]]
                     binds['retry_value'] = [int(retry[num])]
@@ -375,7 +375,7 @@ class RESTFileTransfers(RESTEntity):
                         raise InvalidParameter('Username is not defined')
                     binds['username'] = username
                     sqlQuery = self.transferDB.GetDocsPublication1_sql
-                rows = self.api.query(None, None, sqlQuery, **binds)
+                rows = self.api.query_load_all_rows(None, None, sqlQuery, **binds)
                 return rows
 
         if subresource == 'getTransfersToKill':
