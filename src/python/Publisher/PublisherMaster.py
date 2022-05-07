@@ -625,7 +625,7 @@ class Master(object):
                 for file_ in active_:
                     if workflow in self.taskBlackList:
                         toFail.append(file_["value"][1])  # mark all files as failed to avoid to look at them again
-                        break
+                        continue
                     metadataFound = False
                     for doc in publDescFiles_list:
                         # logger.info(type(doc))
