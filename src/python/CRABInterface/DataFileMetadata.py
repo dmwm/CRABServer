@@ -8,6 +8,7 @@ import logging
 from ast import literal_eval
 
 from Utils.Utilities import decodeBytesToUnicode
+from Utils.Utilities import makeList
 
 from CRABInterface.Utilities import getDBinstance
 
@@ -24,17 +25,29 @@ class DataFileMetadata(object):
         self.logger = logging.getLogger("CRABLogger.DataFileMetadata")
         self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
 
-    def getFiles(self, taskname, filetype, howmany, lfn):
+    def getFiles(self, taskname, filetype, howmany=None, lfnList=[]):
         """ Given a taskname, a filetype and a number return a list of filemetadata from this task
+            if a list of lfn is give, it returns metadata for files in that list, otherwise
+            returns metadata for at most howmany files (default is all filemetadata for this task)
         """
         self.logger.debug("Calling jobmetadata for task %s and filetype %s" % (taskname, filetype))
         if howmany == None:
             howmany = -1
-        binds = {'taskname': taskname, 'filetype': filetype, 'howmany': howmany}
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, **binds)
-        for row in rows:
+        if not lfnList:
+            binds = {'taskname': taskname, 'filetype': filetype, 'howmany': howmany}
+            allRows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, **binds)
+        else:
+            allRows = []
+            lfns = makeList(lfnList)  # from a string to a python list of strings
+            for lfn in lfns:
+                binds = {'taskname': taskname, 'lfn': lfn}
+                rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndLfn_sql, **binds)
+                for row in rows:  # above call returns a generator, but we want a list
+                    allRows.append(row)
+        for row in allRows:
             row = self.FileMetaData.GetFromTaskAndType_tuple(*row)
-            if lfn==[] or row.lfn in lfn:
+            #if lfn==[] or row.lfn in lfn:
+            if True:
                 filedict = {
                     'taskname': taskname,
                     'filetype': filetype,
