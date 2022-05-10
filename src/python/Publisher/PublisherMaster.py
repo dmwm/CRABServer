@@ -306,6 +306,7 @@ class Master(object):
             t2 = time.time()
             elapsed = int(t2-t1)
             fmdata = int(len(str(res))/1e6) # convert dict. to string to get actual length in HTTP call
+            logger.debug('FMDATA: retrieved data for %d files', len(res['result']))
             logger.debug('FMDATA retrieved: %d MB in %d sec for %s', fmdata, elapsed, workflow)
             if elapsed > 60 and data > 100:  # more than 1 minute and more than 100MB
                 self.taskBlackList.append(workflow)  # notify this slave
@@ -355,16 +356,17 @@ class Master(object):
                 t2 = time.time()
                 elapsed = int(t2-t1)
                 fmdata = int(len(str(res))/1e6) # convert dict. to string to get actual length in HTTP call
-                logger.debug('FMDATA retrieved: %d MB in %d sec for %s', fmdata, elapsed, workflow)
+                logger.debug('FMDATA2: retrieved data for %d files', len(res['result']))
+                logger.debug('FMDATA2 retrieved: %d MB in %d sec for %s', fmdata, elapsed, workflow)
                 if elapsed > 60 and data > 100:  # more than 1 minute and more than 100MB
                     self.taskBlackList.append(workflow)  # notify this slave
                     filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
                     filepath.touch()  # notify other slaves
-                    logger.debug('++++++++ BLACKLIST TASK %s ++', workflow)
+                    logger.debug('++++++++ BLACKLIST2 TASK %s ++', workflow)
             except Exception as ex:
                 t2 = time.time()
                 elapsed = int(t2-t1)
-                logger.error("Error during metadata retrieving from crabserver:\n%s", ex)
+                logger.error("Error during metadata2 retrieving from crabserver:\n%s", ex)
                 if elapsed > 290:
                     logger.debug('FMDATA gave error after > 290 secs. Most likely it timed out')
                     self.taskBlackList.append(workflow)  # notify this slave
@@ -376,7 +378,7 @@ class Master(object):
             for md in metadataList:
                 out.append(md)
 
-        logger.info('Got filemetadata for %d LFNs', len(out))
+        logger.info('Got filemetadata2 for %d LFNs', len(out))
         return out
 
     def getTaskStatusFromSched(self, workflow, logger):
@@ -669,7 +671,7 @@ class Master(object):
                 else:
                     publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready, logger)
                     publDescFiles_list2 = self.getPublDescFiles2(workflow, lfn_ready, logger)
-                    if not publDescFiles_list == publDescFiles_list:
+                    if not publDescFiles_list == publDescFiles_list2:
                         logger.error('FATAL FMD DISCREPANCY for %s', workflow)
                         logger.error('len of publdDescFiles: old way %d - new way %d',
                                      len(publDescFiles_list), len(publDescFiles_list2))

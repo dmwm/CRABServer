@@ -25,7 +25,7 @@ class DataFileMetadata(object):
         self.logger = logging.getLogger("CRABLogger.DataFileMetadata")
         self.FileMetaData = getDBinstance(config, 'FileMetaDataDB', 'FileMetaData')
 
-    def getFiles(self, taskname, filetype, howmany=None, lfnList=[]):
+    def getFiles(self, taskname, filetype, howmany=None, lfnList=None):
         """ Given a taskname, a filetype and a number return a list of filemetadata from this task
             if a list of lfn is give, it returns metadata for files in that list, otherwise
             returns metadata for at most howmany files (default is all filemetadata for this task)
