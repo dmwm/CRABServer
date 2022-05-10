@@ -305,8 +305,8 @@ class Master(object):
             res = res[0]
             t2 = time.time()
             elapsed = int(t2-t1)
-            data = int(len(str(res))/1e6) # convert dict. to string to get actual length in HTTP call
-            logger.debug('FMDATA retrieved: %d MB in %d sec for %s', data, elapsed, workflow)
+            fmdata = int(len(str(res))/1e6) # convert dict. to string to get actual length in HTTP call
+            logger.debug('FMDATA retrieved: %d MB in %d sec for %s', fmdata, elapsed, workflow)
             if elapsed > 60 and data > 100:  # more than 1 minute and more than 100MB
                 self.taskBlackList.append(workflow)  # notify this slave
                 filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
@@ -328,6 +328,52 @@ class Master(object):
         for md in metadataList:
             # pick only the metadata we need
             if md['lfn'] in lfn_ready:
+                out.append(md)
+
+        logger.info('Got filemetadata for %d LFNs', len(out))
+        return out
+
+    def getPublDescFiles2(self, workflow, lfn_ready, logger):
+        """
+        Download and read the files describing what needs to be published
+        """
+        out = []
+        metadataList = []
+        dataDict = {}
+        dataDict['taskname'] = workflow
+        i = 0
+        numFilesAtOneTime = 100
+        while i < len(lfn_ready):
+            dataDict['lfnList'] = lfn_ready[i:i+numFilesAtOneTime]
+            data = encodeRequest(dataDict)
+            i += numFilesAtOneTime
+            try:
+                t1 = time.time()
+                res = self.crabServer.get(api='filemetadata', data=data)
+                # res is a 3-plu: (result, exit code, status)
+                res = res[0]
+                t2 = time.time()
+                elapsed = int(t2-t1)
+                fmdata = int(len(str(res))/1e6) # convert dict. to string to get actual length in HTTP call
+                logger.debug('FMDATA retrieved: %d MB in %d sec for %s', fmdata, elapsed, workflow)
+                if elapsed > 60 and data > 100:  # more than 1 minute and more than 100MB
+                    self.taskBlackList.append(workflow)  # notify this slave
+                    filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
+                    filepath.touch()  # notify other slaves
+                    logger.debug('++++++++ BLACKLIST TASK %s ++', workflow)
+            except Exception as ex:
+                t2 = time.time()
+                elapsed = int(t2-t1)
+                logger.error("Error during metadata retrieving from crabserver:\n%s", ex)
+                if elapsed > 290:
+                    logger.debug('FMDATA gave error after > 290 secs. Most likely it timed out')
+                    self.taskBlackList.append(workflow)  # notify this slave
+                    filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
+                    filepath.touch()  # notify other slaves
+                    logger.debug('++++++++ BLACKLIST TASK %s ++', workflow)
+                return []
+            metadataList = [json.loads(md) for md in res['result']]  # CRAB REST returns a list of JSON objects
+            for md in metadataList:
                 out.append(md)
 
         logger.info('Got filemetadata for %d LFNs', len(out))
@@ -622,6 +668,15 @@ class Master(object):
                                  workflow)
                 else:
                     publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready, logger)
+                    publDescFiles_list2 = self.getPublDescFiles2(workflow, lfn_ready, logger)
+                    if not publDescFiles_list == publDescFiles_list:
+                        logger.error('FATAL FMD DISCREPANCY for %s', workflow)
+                        logger.error('len of publdDescFiles: old way %d - new way %d',
+                                     len(publDescFiles_list), len(publDescFiles_list2))
+                        for dic in publDescFiles_list:
+                            if not doc in publDescFiles_list2:
+                                logger.error('FIRST DISCREPANCY FOR %s', doc)
+                                break
                 for file_ in active_:
                     if workflow in self.taskBlackList:
                         toFail.append(file_["value"][1])  # mark all files as failed to avoid to look at them again
