@@ -343,7 +343,7 @@ class Master(object):
         dataDict = {}
         dataDict['taskname'] = workflow
         i = 0
-        numFilesAtOneTime = 100
+        numFilesAtOneTime = 10
         while i < len(lfn_ready):
             dataDict['lfnList'] = lfn_ready[i:i+numFilesAtOneTime]
             data = encodeRequest(dataDict)
