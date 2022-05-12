@@ -332,7 +332,10 @@ class Master(object):
                 out.append(md)
 
         logger.info('Got filemetadata for %d LFNs', len(out))
-        return out
+        # sort the list by jobId, makes it easier to compare
+        # https://stackoverflow.com/a/73050
+        sortedOut = sorted(out, key=lambda md: int(md['jobid']))
+        return sortedOut
 
     def getPublDescFiles2(self, workflow, lfn_ready, logger):
         """
@@ -379,7 +382,10 @@ class Master(object):
                 out.append(md)
 
         logger.info('Got filemetadata2 for %d LFNs', len(out))
-        return out
+        # sort the list by jobId, makes it easier to compare
+        # https://stackoverflow.com/a/73050
+        sortedOut = sorted(out, key=lambda md: int(md['jobid']))
+        return sortedOut
 
     def getTaskStatusFromSched(self, workflow, logger):
 
@@ -671,13 +677,23 @@ class Master(object):
                 else:
                     publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready, logger)
                     publDescFiles_list2 = self.getPublDescFiles2(workflow, lfn_ready, logger)
-                    if not publDescFiles_list == publDescFiles_list2:
-                        logger.error('FATAL FMD DISCREPANCY for %s', workflow)
-                        logger.error('len of publdDescFiles: old way %d - new way %d',
+                    if publDescFiles_list == publDescFiles_list2:
+                        logger.debug('=== OLD / NEW FMD LIST MATCH OK ===')
+                    else:
+                        logger.error('===== FATAL FMD DISCREPANCY for %s', workflow)
+                        logger.error('===== len of publdDescFiles: old way %d - new way %d',
                                      len(publDescFiles_list), len(publDescFiles_list2))
                         for dic in publDescFiles_list:
-                            if not doc in publDescFiles_list2:
-                                logger.error('FIRST DISCREPANCY FOR %s', doc)
+                            if not dic in publDescFiles_list2:
+                                logger.error(
+                                    '===== FIRST DISCREPANCY: THIS IS IN OLD LIST BUT NOT IN NEW ONE\n%s',
+                                    dic)
+                                break
+                        for dic in publDescFiles_list2:
+                            if not dic in publDescFiles_list:
+                                logger.error(
+                                    '===== FIRST DISCREPANCY: THIS IS IN NEW LIST BUT NOT IN OLD ONE\n%s',
+                                    dic)
                                 break
                 for file_ in active_:
                     if workflow in self.taskBlackList:
