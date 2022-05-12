@@ -50,7 +50,7 @@ class DataFileMetadata(object):
             if True:
                 filedict = {
                     'taskname': taskname,
-                    'filetype': filetype,
+                    'filetype': row.type,
                     'jobid': row.jobid,
                      'outdataset': row.outdataset,
                      'acquisitionera': row.acquisitionera,
