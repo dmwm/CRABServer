@@ -288,58 +288,8 @@ class Master(object):
     def getPublDescFiles(self, workflow, lfn_ready, logger):
         """
         Download and read the files describing what needs to be published
-        CRAB REST does not have any good way to select from the DB only what we need
-        most efficient way is to get full list for the task, and then trim it here
-        see: https://github.com/dmwm/CRABServer/issues/6124
-        """
-        out = []
-
-        dataDict = {}
-        dataDict['taskname'] = workflow
-        dataDict['filetype'] = 'EDM'
-        data = encodeRequest(dataDict)
-        t1 = time.time()
-        try:
-            res = self.crabServer.get(api='filemetadata', data=data)
-            # res is a 3-plu: (result, exit code, status)
-            res = res[0]
-            t2 = time.time()
-            elapsed = int(t2-t1)
-            fmdata = int(len(str(res))/1e6) # convert dict. to string to get actual length in HTTP call
-            logger.debug('FMDATA: retrieved data for %d files', len(res['result']))
-            logger.debug('FMDATA retrieved: %d MB in %d sec for %s', fmdata, elapsed, workflow)
-            if elapsed > 60 and fmdata > 100:  # more than 1 minute and more than 100MB
-                self.taskBlackList.append(workflow)  # notify this slave
-                filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
-                filepath.touch()  # notify other slaves
-                logger.debug('++++++++ BLACKLIST TASK %s ++', workflow)
-        except Exception as ex:
-            t2 = time.time()
-            elapsed = int(t2-t1)
-            logger.error("Error during metadata retrieving from crabserver:\n%s", ex)
-            if elapsed > 290:
-                logger.debug('FMDATA gave error after > 290 secs. Most likely it timed out')
-                self.taskBlackList.append(workflow)  # notify this slave
-                filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
-                filepath.touch()  # notify other slaves
-                logger.debug('++++++++ BLACKLIST TASK %s ++', workflow)
-            return out
-
-        metadataList = [json.loads(md) for md in res['result']]  # CRAB REST returns a list of JSON objects
-        for md in metadataList:
-            # pick only the metadata we need
-            if md['lfn'] in lfn_ready:
-                out.append(md)
-
-        logger.info('Got filemetadata for %d LFNs', len(out))
-        # sort the list by jobId, makes it easier to compare https://stackoverflow.com/a/73050
-        # sort by jobid as strings w/o converting to int becasue of https://github.com/dmwm/CRABServer/issues/7246
-        sortedOut = sorted(out, key=lambda md: md['jobid'])
-        return sortedOut
-
-    def getPublDescFiles2(self, workflow, lfn_ready, logger):
-        """
-        Download and read the files describing what needs to be published
+        do on a small number of LFNs at a time (numFilesAtOneTime) to avoid
+        hitting the URL length limit in CMSWEB/Apache
         """
         out = []
         metadataList = []
@@ -347,6 +297,7 @@ class Master(object):
         dataDict['taskname'] = workflow
         i = 0
         numFilesAtOneTime = 10
+        logger.debug('FMDATA: will retrieve data for %d files', len(lfn_ready))
         while i < len(lfn_ready):
             dataDict['lfnList'] = lfn_ready[i:i+numFilesAtOneTime]
             data = encodeRequest(dataDict)
@@ -359,8 +310,8 @@ class Master(object):
                 t2 = time.time()
                 elapsed = int(t2-t1)
                 fmdata = int(len(str(res))/1e6) # convert dict. to string to get actual length in HTTP call
-                logger.debug('FMDATA2: retrieved data for %d files', len(res['result']))
-                logger.debug('FMDATA2 retrieved: %d MB in %d sec for %s', fmdata, elapsed, workflow)
+                logger.debug('FMDATA: retrieved data for %d files', len(res['result']))
+                logger.debug('FMDATA: retrieved: %d MB in %d sec for %s', fmdata, elapsed, workflow)
                 if elapsed > 60 and fmdata > 100:  # more than 1 minute and more than 100MB
                     self.taskBlackList.append(workflow)  # notify this slave
                     filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
@@ -381,7 +332,7 @@ class Master(object):
             for md in metadataList:
                 out.append(md)
 
-        logger.info('Got filemetadata2 for %d LFNs', len(out))
+        logger.info('Got filemetadata for %d LFNs', len(out))
         # sort the list by jobId, makes it easier to compare https://stackoverflow.com/a/73050
         # sort by jobid as strings w/o converting to int becasue of https://github.com/dmwm/CRABServer/issues/7246
         sortedOut = sorted(out, key=lambda md: md['jobid'])
@@ -676,25 +627,6 @@ class Master(object):
                                  workflow)
                 else:
                     publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready, logger)
-                    publDescFiles_list2 = self.getPublDescFiles2(workflow, lfn_ready, logger)
-                    if publDescFiles_list == publDescFiles_list2:
-                        logger.debug('=== OLD / NEW FMD LIST MATCH OK ===')
-                    else:
-                        logger.error('===== FATAL FMD DISCREPANCY for %s', workflow)
-                        logger.error('===== len of publdDescFiles: old way %d - new way %d',
-                                     len(publDescFiles_list), len(publDescFiles_list2))
-                        for dic in publDescFiles_list:
-                            if not dic in publDescFiles_list2:
-                                logger.error(
-                                    '===== FIRST DISCREPANCY: THIS IS IN OLD LIST BUT NOT IN NEW ONE\n%s',
-                                    dic)
-                                break
-                        for dic in publDescFiles_list2:
-                            if not dic in publDescFiles_list:
-                                logger.error(
-                                    '===== FIRST DISCREPANCY: THIS IS IN NEW LIST BUT NOT IN OLD ONE\n%s',
-                                    dic)
-                                break
                 for file_ in active_:
                     if workflow in self.taskBlackList:
                         toFail.append(file_["value"][1])  # mark all files as failed to avoid to look at them again
