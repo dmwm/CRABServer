@@ -308,7 +308,7 @@ class Master(object):
             fmdata = int(len(str(res))/1e6) # convert dict. to string to get actual length in HTTP call
             logger.debug('FMDATA: retrieved data for %d files', len(res['result']))
             logger.debug('FMDATA retrieved: %d MB in %d sec for %s', fmdata, elapsed, workflow)
-            if elapsed > 60 and data > 100:  # more than 1 minute and more than 100MB
+            if elapsed > 60 and fmdata > 100:  # more than 1 minute and more than 100MB
                 self.taskBlackList.append(workflow)  # notify this slave
                 filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
                 filepath.touch()  # notify other slaves
@@ -361,7 +361,7 @@ class Master(object):
                 fmdata = int(len(str(res))/1e6) # convert dict. to string to get actual length in HTTP call
                 logger.debug('FMDATA2: retrieved data for %d files', len(res['result']))
                 logger.debug('FMDATA2 retrieved: %d MB in %d sec for %s', fmdata, elapsed, workflow)
-                if elapsed > 60 and data > 100:  # more than 1 minute and more than 100MB
+                if elapsed > 60 and fmdata > 100:  # more than 1 minute and more than 100MB
                     self.taskBlackList.append(workflow)  # notify this slave
                     filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
                     filepath.touch()  # notify other slaves
