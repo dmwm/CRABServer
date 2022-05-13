@@ -332,9 +332,9 @@ class Master(object):
                 out.append(md)
 
         logger.info('Got filemetadata for %d LFNs', len(out))
-        # sort the list by jobId, makes it easier to compare
-        # https://stackoverflow.com/a/73050
-        sortedOut = sorted(out, key=lambda md: int(md['jobid']))
+        # sort the list by jobId, makes it easier to compare https://stackoverflow.com/a/73050
+        # sort by jobid as strings w/o converting to int becasue of https://github.com/dmwm/CRABServer/issues/7246
+        sortedOut = sorted(out, key=lambda md: md['jobid'])
         return sortedOut
 
     def getPublDescFiles2(self, workflow, lfn_ready, logger):
@@ -382,9 +382,9 @@ class Master(object):
                 out.append(md)
 
         logger.info('Got filemetadata2 for %d LFNs', len(out))
-        # sort the list by jobId, makes it easier to compare
-        # https://stackoverflow.com/a/73050
-        sortedOut = sorted(out, key=lambda md: int(md['jobid']))
+        # sort the list by jobId, makes it easier to compare https://stackoverflow.com/a/73050
+        # sort by jobid as strings w/o converting to int becasue of https://github.com/dmwm/CRABServer/issues/7246
+        sortedOut = sorted(out, key=lambda md: md['jobid'])
         return sortedOut
 
     def getTaskStatusFromSched(self, workflow, logger):
