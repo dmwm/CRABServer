@@ -3,10 +3,15 @@
 set -euo pipefail
 set -x
 
+if [ -z ${IMAGE_TAG} ]; then
+  IMAGE_TAG=${RELEASE_TAG}
+fi
+
 echo "(DEBUG) variables from upstream jenkin job (CRABServer_BuildImage_20220127):"
 echo "(DEBUG)   \- BRANCH: ${BRANCH}"
 echo "(DEBUG)   \- RELEASE_TAG: ${RELEASE_TAG}"
 echo "(DEBUG)   \- RPM_RELEASETAG_HASH: ${RPM_RELEASETAG_HASH}"
+echo "(DEBUG)   \- IMAGE_TAG: $IMAGE_TAG"
 echo "(DEBUG) jenkin job's env variables:"
 echo "(DEBUG)   \- WORKSPACE: $WORKSPACE"
 echo "(DEBUG) end"
@@ -28,11 +33,11 @@ echo "(DEBUG) end"
 # use cmscrab robot account credentials
 docker login registry.cern.ch --username $HARBOR_CMSCRAB_USERNAME --password-stdin <<< $HARBOR_CMSCRAB_PASSWORD
 
-docker build . -t registry.cern.ch/cmscrab/crabtaskworker:${RELEASE_TAG} --network=host \
+docker build . -t registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG} --network=host \
         --build-arg RELEASE_TAG=${RELEASE_TAG} \
         --build-arg RPM_RELEASETAG_HASH=${RPM_RELEASETAG_HASH}
-docker push registry.cern.ch/cmscrab/crabtaskworker:${RELEASE_TAG}
-docker rmi registry.cern.ch/cmscrab/crabtaskworker:${RELEASE_TAG}
+docker push registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}
+docker rmi registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}
 
 #build and push crabserver image
 cd $WORKSPACE
@@ -48,4 +53,4 @@ echo "(DEBUG) end"
 
 # relogin to using cmsweb robot account
 docker login registry.cern.ch --username $HARBOR_CMSWEB_USERNAME --password-stdin <<< $HARBOR_CMSWEB_PASSWORD
-CMSK8STAG=${RELEASE_TAG} ./build.sh "crabserver"
+CMSK8STAG=${IMAGE_TAG} ./build.sh "crabserver"
