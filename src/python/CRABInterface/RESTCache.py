@@ -65,7 +65,7 @@ class RESTCache(RESTEntity):
 
     def __init__(self, app, api, config, mount, extconfig):
         RESTEntity.__init__(self, app, api, config, mount)
-        self.logger = logging.getLogger("CRABLogger:RESTCache")
+        self.logger = logging.getLogger("CRABLogger.RESTCache")
         # get S3 connection secrets from the CRABServerAuth file in the same way
         # as done for DB connection secrets. That file needs to contain an "s3"
         # dictionary with keys: access_key, secret_key
