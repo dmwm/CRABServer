@@ -52,6 +52,7 @@ SERVICE_INSTANCES = {'prod': {'restHost':'cmsweb.cern.ch', 'dbInstance':'prod'},
                      'test4': {'restHost':'cmsweb-test4.cern.ch', 'dbInstance':'dev'},
                      'test5': {'restHost':'cmsweb-test5.cern.ch', 'dbInstance':'dev'},
                      'test6': {'restHost':'cmsweb-test6.cern.ch', 'dbInstance':'dev'},
+                     'test11': {'restHost':'cmsweb-test11.cern.ch', 'dbInstance':'devtwo'},
                      'stefanovm': {'restHost':'stefanovm.cern.ch', 'dbInstance':'dev'},
                      'stefanovm2': {'restHost':'stefanovm2.cern.ch', 'dbInstance':'dev'},
                      'other': {'restHost':None, 'dbInstance':None},
@@ -178,7 +179,7 @@ def checkOutLFN(lfn, username):
     """
     if lfn.startswith('/store/user/rucio/'):
         if lfn.split('/')[4] != username:
-            return False 
+            return False
     elif lfn.startswith('/store/user/'):
         if lfn.split('/')[3] != username:
             return False
@@ -444,7 +445,7 @@ def getTimeFromTaskname(taskname):
 def encodeRequest(configreq, listParams=None):
     """ Used to encode the request from a dict to a string. Include the code needed for transforming lists in the format required by
         cmsweb, e.g.:   adduserfiles = ['file1','file2']  ===>  [...]adduserfiles=file1&adduserfiles=file2[...]
-        The list of dictionary keys like adduserfiles above, which have a list as value, needs to be passed in the listParams argument  
+        The list of dictionary keys like adduserfiles above, which have a list as value, needs to be passed in the listParams argument
     """
     listParams = listParams or []
     encodedLists = ''
