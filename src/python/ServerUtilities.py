@@ -881,3 +881,34 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
         raise Exception("Download failure with %s. File %s was not created" % (downloadCommand, filepath))
 
     return
+
+
+class MeasureTime:
+    """
+    Context manager to measure how long a portion of code takes. 
+    It is intended to be used as:
+
+    logger = logging.getLogger()
+    with MeasureTime(logger, modulename=__name__, label="myfuncname") as _:
+        myfuncname()
+    
+    """
+    def __init__(self, logger, modulename="", label=""):
+        self.logger = logger
+        self.modulename = modulename
+        self.label = label
+
+    def __enter__(self):
+        self.perf_counter = time.perf_counter()
+        self.process_time = time.process_time()
+        self.thread_time = time.thread_time()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.thread_time = time.thread_time() - self.thread_time
+        self.process_time = time.process_time() - self.process_time
+        self.perf_counter = time.perf_counter() - self.perf_counter
+        self.readout = 'tot={:.4f} proc={:.4f} thread={:.4f}'.format(
+                 self.perf_counter, self.process_time, self.thread_time )
+        self.logger.info("MeasureTime:seconds - modulename=%s label='%s' - %s", 
+                 self.modulename, self.label, self.readout)
