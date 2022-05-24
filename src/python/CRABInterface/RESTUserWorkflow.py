@@ -2,6 +2,22 @@
 """
 
 # external dependecies here
+import re
+import random
+import logging
+import cherrypy
+# WMCore dependecies here
+from WMCore.REST.Server import RESTEntity, restcall
+from WMCore.REST.Error import ExecutionError, InvalidParameter
+from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_real
+from WMCore.Services.TagCollector.TagCollector import TagCollector
+from WMCore.Lexicon import userprocdataset, userProcDSParts, primdataset
+
+# CRABServer dependecies here
+from CRABInterface.DataUserWorkflow import DataUserWorkflow
+from CRABInterface.RESTExtensions import authz_owner_match
+from CRABInterface.Regexps import (RX_TASKNAME, RX_ACTIVITY, RX_JOBTYPE, RX_GENERATOR, RX_LUMIEVENTS, RX_CMSSW, RX_ARCH, RX_DATASET,
+    RX_CMSSITE, RX_SPLIT, RX_CACHENAME, RX_CACHEURL, RX_LFN, RX_USERFILE, RX_VOPARAMS, RX_DBSURL, RX_LFNPRIMDS, RX_OUTFILES,
     RX_RUNS, RX_LUMIRANGE, RX_SCRIPTARGS, RX_SCHEDD_NAME, RX_COLLECTOR, RX_SUBRESTAT, RX_JOBID, RX_ADDFILE,
     RX_ANYTHING, RX_USERNAME, RX_DATE, RX_TEXT_FAIL)
 
