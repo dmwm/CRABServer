@@ -8,7 +8,7 @@ from CRABInterface.RESTExtensions import authz_login_valid, authz_operator
 #from CRABInterface.Regexps import *
 from CRABInterface.Regexps import RX_CHECKSUM, RX_CMSSITE, RX_CMSSW, RX_FILESTATE, \
     RX_GLOBALTAG, RX_HOURS, RX_JOBID, RX_LFN, RX_LUMILIST, RX_OUTDSLFN, RX_OUTTYPES, \
-    RX_PARENTLFN, RX_PUBLISH, RX_RUNS, RX_TASKNAME
+    RX_PARENTLFN, RX_PUBLISH, RX_RUNS, RX_TASKNAME, RX_ANYTHING
 from CRABInterface.DataFileMetadata import DataFileMetadata
 
 class RESTFileMetadata(RESTEntity):
@@ -57,9 +57,9 @@ class RESTFileMetadata(RESTEntity):
             validate_str("filestate", param, safe, RX_FILESTATE, optional=False)
         elif method in ['GET']:
             validate_str("taskname", param, safe, RX_TASKNAME, optional=False)
-            validate_str("filetype", param, safe, RX_OUTTYPES, optional=False)
+            validate_str("filetype", param, safe, RX_OUTTYPES, optional=True)
             validate_num("howmany", param, safe, optional=True)
-            validate_strlist("lfn", param, safe, RX_LFN)
+            validate_str("lfnList", param, safe, RX_ANYTHING, optional=True)
         elif method in ['DELETE']:
             authz_operator()
             validate_str("taskname", param, safe, RX_TASKNAME, optional=True)
@@ -94,14 +94,17 @@ class RESTFileMetadata(RESTEntity):
         return self.jobmetadata.changeState(taskname=taskname, outlfn=outlfn, filestate=filestate)
 
     @restcall
-    def get(self, taskname, filetype, howmany, lfn):
+    def get(self, taskname, filetype, howmany, lfnList):
         """Retrieves a specific job metadata information.
 
            :arg str taskname: unique name identifier of the task;
            :arg str filetype: filter the file type to return;
+           The following 2 args are mutually exclusive, only one can be specified at any time
+           # ? maybe better a subresource field to tell one case from the other ?
            :arg int howmany: how many rows to retrieve;
+           :arg str lfnList: list of LFNs for which to retrieve metadata (a single LFN is also OK);
            :return: generator looping through the resulting db rows."""
-        return self.jobmetadata.getFiles(taskname, filetype, howmany, lfn)
+        return self.jobmetadata.getFiles(taskname, filetype, howmany, lfnList)
 
     @restcall
     def delete(self, taskname, hours):

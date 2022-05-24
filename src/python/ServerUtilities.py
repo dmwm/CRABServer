@@ -52,6 +52,7 @@ SERVICE_INSTANCES = {'prod': {'restHost':'cmsweb.cern.ch', 'dbInstance':'prod'},
                      'test4': {'restHost':'cmsweb-test4.cern.ch', 'dbInstance':'dev'},
                      'test5': {'restHost':'cmsweb-test5.cern.ch', 'dbInstance':'dev'},
                      'test6': {'restHost':'cmsweb-test6.cern.ch', 'dbInstance':'dev'},
+                     'test11': {'restHost':'cmsweb-test11.cern.ch', 'dbInstance':'devtwo'},
                      'stefanovm': {'restHost':'stefanovm.cern.ch', 'dbInstance':'dev'},
                      'stefanovm2': {'restHost':'stefanovm2.cern.ch', 'dbInstance':'dev'},
                      'other': {'restHost':None, 'dbInstance':None},
@@ -157,13 +158,17 @@ def getTestDataDirectory():
     return os.sep.join(testdirList)
 
 def truncateError(msg):
-    """Truncate the error message to the first 7400 chars if needed, and add a message if we truncate it.
+    """Truncate the error message to the first 1000 chars if needed, and add a message if we truncate it.
        See https://github.com/dmwm/CRABServer/pull/4867#commitcomment-12086393
     """
-    MSG_LIMIT = 7500
+    MSG_LIMIT = 1100
+    # hack to avoid passing HTTP error code to message parsing code in CRABClient/CrabRestInterface.py
+    codeString = 'HTTP/1.'
+    if codeString in msg :
+        msg = msg.replace(codeString,'HTTP 1.')
     if len(msg) > MSG_LIMIT:
         truncMsg = msg[:MSG_LIMIT - 100]
-        truncMsg += "\n[... message truncated to the first 7400 chars ...]"
+        truncMsg += "\n[... message truncated to the first %d chars ...]" % (MSG_LIMIT-100)
         return truncMsg
     else:
         return msg
@@ -174,7 +179,7 @@ def checkOutLFN(lfn, username):
     """
     if lfn.startswith('/store/user/rucio/'):
         if lfn.split('/')[4] != username:
-            return False 
+            return False
     elif lfn.startswith('/store/user/'):
         if lfn.split('/')[3] != username:
             return False
@@ -440,7 +445,7 @@ def getTimeFromTaskname(taskname):
 def encodeRequest(configreq, listParams=None):
     """ Used to encode the request from a dict to a string. Include the code needed for transforming lists in the format required by
         cmsweb, e.g.:   adduserfiles = ['file1','file2']  ===>  [...]adduserfiles=file1&adduserfiles=file2[...]
-        The list of dictionary keys like adduserfiles above, which have a list as value, needs to be passed in the listParams argument  
+        The list of dictionary keys like adduserfiles above, which have a list as value, needs to be passed in the listParams argument
     """
     listParams = listParams or []
     encodedLists = ''
@@ -876,3 +881,34 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
         raise Exception("Download failure with %s. File %s was not created" % (downloadCommand, filepath))
 
     return
+
+
+class MeasureTime:
+    """
+    Context manager to measure how long a portion of code takes. 
+    It is intended to be used as:
+
+    logger = logging.getLogger()
+    with MeasureTime(logger, modulename=__name__, label="myfuncname") as _:
+        myfuncname()
+    
+    """
+    def __init__(self, logger, modulename="", label=""):
+        self.logger = logger
+        self.modulename = modulename
+        self.label = label
+
+    def __enter__(self):
+        self.perf_counter = time.perf_counter()
+        self.process_time = time.process_time()
+        self.thread_time = time.thread_time()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.thread_time = time.thread_time() - self.thread_time
+        self.process_time = time.process_time() - self.process_time
+        self.perf_counter = time.perf_counter() - self.perf_counter
+        self.readout = 'tot={:.4f} proc={:.4f} thread={:.4f}'.format(
+                 self.perf_counter, self.process_time, self.thread_time )
+        self.logger.info("MeasureTime:seconds - modulename=%s label='%s' - %s", 
+                 self.modulename, self.label, self.readout)

@@ -2,10 +2,14 @@ import re
 from WMCore.Lexicon import lfnParts, DATASET_RE
 
 
-## This regular expression matches anything. It is useful for example for
+## This regular expression matches any single-line string. It is useful for example for
 ## functions that require a regular expression against which they will match a
 ## given value, but we don't really want to do that matching.
 RX_ANYTHING = re.compile(r"^.*$")
+# This regular expression matches any string, also multi-line strings.
+# as of 2022-03 it is used for warning and failure messages, which were previously
+# encoded in b64 and matched with RX_TEXT_FAIL. see #7106
+RX_MANYLINES_SHORT = re.compile(r"(?s)^.{0,1100}$")
 # TODO: we should start replacing most of the regex here with what we have in WMCore.Lexicon
 #       (this probably requires to adapt something on Lexicon)
 pNameRE      = r"(?=.{0,400}$)[a-zA-Z0-9\-_.]+"
@@ -34,7 +38,7 @@ RX_JOBTYPE   = re.compile(r"^(?=.{0,255}$)[A-Za-z]*$")
 RX_GENERATOR = re.compile(r'^(lhe|pythia)$')
 RX_LUMIEVENTS = re.compile(r'^\d+$')
 RX_CMSSW     = re.compile(r"^(?=.{0,255}$)CMSSW[a-zA-Z0-9-_]*$") #using a lookahead (?=.{0,255}$) to check maximum size of the regex
-RX_ARCH      = re.compile(r"^(?=.{0,255}$)slc[0-9]{1}_[a-z0-9]+_gcc[a-z0-9]+(_[a-z0-9]+)?$")
+RX_ARCH      = re.compile(r"^(?=.{0,255}$)[a-z]+[0-9]{1,2}_[a-z0-9]+_gcc[a-z0-9]+(_[a-z0-9]+)?$")
 RX_DATASET   = re.compile(DATASET_RE) #See https://github.com/dmwm/WMCore/issues/6054#issuecomment-135475550
 RX_LFNPRIMDS = re.compile(r"^%(primDS)s$" % lfnParts)
 RX_BLOCK     = re.compile(r"^(/[a-zA-Z0-9\.\-_]{1,100}){3}#[a-zA-Z0-9\.\-_]{1,100}$")
@@ -96,6 +100,7 @@ RX_DATE = re.compile(r"^(19|20)\d\d[- /.](0[1-9]|1[012])[- /.](0[1-9]|[12][0-9]|
 
 ## need to be careful with this
 RX_TEXT_FAIL = re.compile(r"^[A-Za-z0-9\-\._\s\=\+/]{0,10000}$")
+
 ## user dn
 RX_DN = re.compile(r"^/(?:C|O|DC)=.*/CN=.")
 ## worker subresources

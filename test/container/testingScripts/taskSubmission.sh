@@ -7,10 +7,7 @@
 #Variabiles ${REST_Instance}, ${Client_Validation_Suite}, ${Client_Configuration_Validation} and ${Task_Submission_Status_Tracking} comes from
 #Jenkins job CRABServer_ExecuteTests configuration.
 
-#setup CRABClient
 source setupCRABClient.sh
-export inputDataset=${inputDataset}
-export REST_Instance=${REST_Instance}
 
 submitTasks(){
 #Submit tasks and based on the exit code add task name / file name respectively to submitted_tasks or failed_tasks file
@@ -18,34 +15,35 @@ submitTasks(){
   for file_name in ${filesToSubmit};
   do
       echo -e "\nSubmitting file: ${file_name}"
-      output=$(crab submit -c ${file_name} 2>&1)
+      output=$(crab submit -c ${file_name} --proxy=${PROXY} 2>&1)
       submitExitCode=$?
       echo ${output}
       if [ $submitExitCode != 0 ]; then
-          echo ${file_name} >> /artifacts/failed_tasks
+          echo ${file_name} >> ${WORK_DIR}/artifacts/failed_tasks
           killAfterFailure
       else
-          echo ${output} | grep -oP '(?<=Task name:\s)[^\s]*(?=)' >> /artifacts/submitted_tasks_${2}
-          echo ${output} | grep -oP '(?<=Project dir:\s)[^\s]*(?=)' >> /artifacts/project_directories
+          echo ${output} | grep -oP '(?<=Task name:\s)[^\s]*(?=)' >> ${WORK_DIR}/artifacts/submitted_tasks_${2}
+          echo ${output} | grep -oP '(?<=Project dir:\s)[^\s]*(?=)' >> ${WORK_DIR}/artifacts/project_directories
       fi
   done
 }
 
 killAfterFailure(){
 #In case at least one task submission failed, kill all succesfully submitted tasks
-
-  echo -e "\nTask submission failed. Killing submitted tasks.\n"
-  while read task ; do
-      echo "Killing task: ${task}"
-      crab kill ${task}
-      killExitCode=$?
-      if [ $killExitCode != 0 ]; then
-          echo -e "Failed to kill: ${task}" >> /artifacts/killed_tasks
-      else
-          echo -e "Successfully killed: ${task}" >> /artifacts/killed_tasks
-      fi
-  done </artifacts/project_directories
-  exit 0
+  if [ -e "${WORK_DIR}/artifacts/project_directories" ]; then
+    echo -e "\nTask submission failed. Killing submitted tasks.\n"
+    while read task ; do
+        echo "Killing task: ${task}"
+        crab kill --dir=${task} --proxy=${PROXY}
+        killExitCode=$?
+        if [ $killExitCode != 0 ]; then
+            echo -e "Failed to kill: ${task}" >> ${WORK_DIR}/artifacts/killed_tasks
+        else
+            echo -e "Successfully killed: ${task}" >> ${WORK_DIR}/artifacts/killed_tasks
+        fi
+    done <${WORK_DIR}/artifacts/project_directories
+  fi
+  exit 1
 }
 
 
@@ -60,14 +58,14 @@ immediateCheck(){
       test_to_execute=`echo "${task}" | grep -oP '(?<=_crab_).*(?=)'`
       task_dir=${project_dir}/crab_${test_to_execute}
       bash -x ${test_to_execute}-testSubmit.sh ${task_dir} && \
-        echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> /artifacts/successful_tests || \
-        echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> /artifacts/failed_tests
+        echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> ${WORK_DIR}/artifacts/successful_tests || \
+        echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> ${WORK_DIR}/artifacts/failed_tests
   done
 }
 
 if [ "${Client_Validation_Suite}" = true ]; then
     echo -e "\nStarting task submission for Client Validation testing.\n"
-    cd repos/CRABServer/test/clientValidationTasks/
+    cd CRABServer/test/clientValidationTasks/
     filesToSubmit=`find . -type f -name '*.py' ! -name '*pset*'`
     submitTasks "${filesToSubmit}" "CV"
     cd ${WORK_DIR}
@@ -77,17 +75,17 @@ if [ "${Client_Configuration_Validation}" = true ]; then
     echo -e "\nStarting task submission for Client Configuration Validation testing.\n"
     mkdir -p tmpWorkDir
     cd tmpWorkDir
-    python /data/CRABTesting/testingScripts/repos/CRABServer/test/makeTests.py
+    python ${WORK_DIR}/CRABServer/test/makeTests.py
     filesToSubmit=`find . -maxdepth 1 -type f -name '*.py' ! -name '*PSET*'`
     submitTasks "${filesToSubmit}" "CCV"
-    tasksToCheck=`cat /artifacts/submitted_tasks_CCV`
+    tasksToCheck=`cat ${WORK_DIR}/artifacts/submitted_tasks_CCV`
     immediateCheck "${tasksToCheck}"
     cd ${WORK_DIR}
 fi
 
 if [ "${Task_Submission_Status_Tracking}" = true ]; then
     echo -e "\nStarting task submission for Status Tracking testing.\n"
-    cd repos/CRABServer/test/statusTrackingTasks/
+    cd CRABServer/test/statusTrackingTasks/
     filesToSubmit=`find . -type f -name '*.py' ! -name '*pset*'`
     submitTasks "${filesToSubmit}" "TS"
     cd ${WORK_DIR}

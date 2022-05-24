@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 import logging
+
 import cherrypy
 from subprocess import getstatusoutput
 from time import mktime, gmtime
@@ -61,7 +62,8 @@ class RESTBaseAPI(DatabaseRESTApi):
         if 'S3' in cacheSSL.upper():
             self._add({'cache': RESTCache(app, self, config, mount, extconfig)})
 
-        self._initLogger( getattr(config, 'loggingFile', None), getattr(config, 'loggingLevel', None) )
+        self._initLogger( getattr(config, 'loggingFile', None), getattr(config, 'loggingLevel', None),
+                          getattr(config, 'keptLogDays', 0))
 
     def modifynocheck(self, sql, *binds, **kwbinds):
         """This is the same as `WMCore.REST.Server`:modify method but
@@ -82,7 +84,7 @@ class RESTBaseAPI(DatabaseRESTApi):
         cherrypy.request.db["handle"]["connection"].commit()
         return rows([{ "modified": c.rowcount }])
 
-    def _initLogger(self, logfile, loglevel):
+    def _initLogger(self, logfile, loglevel, keptDays=0):
         """
         Setup the logger for all the CRAB API's. If loglevel is not specified (==None) we use the NullHandler which just 'pass' and does not log
 
@@ -90,10 +92,10 @@ class RESTBaseAPI(DatabaseRESTApi):
         ChildName is the specific name of the logger (child of CRABLogger). Using childs in that way we can configure
         the logging in a flexible way (a module logs at DEBUG level to a file, another module logs at INFO level to stdout, etc)
         """
-
+        import logging.handlers
         logger = logging.getLogger('CRABLogger')
         if loglevel:
-            hdlr = logging.FileHandler(logfile)
+            hdlr = logging.handlers.TimedRotatingFileHandler(logfile, when='D', interval=1, backupCount=keptDays)
             formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(module)s:%(message)s')
             hdlr.setFormatter(formatter)
             logger.addHandler(hdlr)

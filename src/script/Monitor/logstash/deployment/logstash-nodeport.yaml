@@ -1,0 +1,77 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: crab3-logstash
+  namespace: crab-monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crab3-logstash
+  template:
+    metadata:
+      labels:
+        app: crab3-logstash
+    spec:
+      containers:
+      - image: docker.elastic.co/logstash/logstash:7.16.1
+        name: crab3-logstash
+        env:
+        - name: LS_JAVA_OPTS #added 210930
+          value: "-Xms2g -Xmx2g" #added 210930
+        resources:
+          requests:
+            memory: 2Gi
+            cpu: "400m"
+          limits:
+            memory: 4Gi
+            cpu: "2000m"
+        ports:
+        - name: logstash
+          containerPort: 5044
+          protocol: TCP
+        volumeMounts:
+        - name: config
+          mountPath: /usr/share/logstash/config/logstash.yml
+          subPath: logstash.yml
+          readOnly: true
+        - name: pipeline
+          mountPath: /usr/share/logstash/pipeline/
+        command:
+        - logstash
+      volumes:
+      - name: pipeline
+        configMap:
+          name: crab3-logstash
+          items:
+          - key: crabtaskworker.conf
+            path: crabtaskworker.conf
+      - name: config
+        configMap:
+          name: logstash-config
+          items:
+          - key: logstash.yml
+            path: logstash.yml
+
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: crab3-logstash
+  namespace: crab-monitoring
+  labels:
+    app: crab3-logstash
+spec:
+  type: NodePort
+  selector:
+    app: crab3-logstash
+  ports:
+  - protocol: TCP
+    port: 5044
+    targetPort: 5044
+    nodePort: 30102
+    name: filebeat
+  - protocol: TCP
+    port: 9600
+    targetPort: 9600
+    name: logstash

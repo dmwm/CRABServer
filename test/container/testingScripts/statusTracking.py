@@ -4,7 +4,11 @@ from __future__ import print_function
 from __future__ import division
 
 import os
-from httplib import HTTPException
+try:
+    from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
+except:  # pylint: disable=bare-except
+    from httplib import HTTPException  # old Python 2 version in CMSSW_7
+
 from CRABAPI.RawCommand import crabCommand
 from CRABClient.ClientExceptions import ClientException
 
@@ -47,9 +51,10 @@ def parse_result(listOfTasks):
 def main():
 
     listOfTasks = []
-    instance = os.environ['REST_Instance']
+    instance = os.getenv('REST_Instance','preprod')
+    work_dir=os.getenv('WORK_DIR','dummy_workdir')
 
-    with open('/artifacts/submitted_tasks') as fp:
+    with open('%s/artifacts/submitted_tasks' %work_dir) as fp:
         tasks = fp.readlines()
 
     for task in tasks:
@@ -63,11 +68,9 @@ def main():
 
     summary = parse_result(listOfTasks)
 
-    with open('/artifacts/result', 'w') as fp:
+    with open('%s/artifacts/result' %work_dir, 'w') as fp:
         for result in summary:
             fp.write("%s\n" % result)
 
-
 if __name__ == '__main__':
     main()
-

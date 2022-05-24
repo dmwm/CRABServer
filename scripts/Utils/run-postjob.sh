@@ -60,7 +60,7 @@ export X509_USER_PROXY=`pwd`/`ls|egrep  [a-z,0-9]{40}`
 #voms-proxy-info
 
 # grab args from the dagman config
-PJargs=`cat RunJobs*.*dag | grep "POST Job${jobId}" | awk 'BEGIN { FS="MAX_RETRIES" }; {print $2}'`
+PJargs=`cat RunJobs*.*dag | grep "POST Job${jobId} " | awk 'BEGIN { FS="MAX_RETRIES" }; {print $2}'`
 
 # find the condor clusterId for the job
 jobClusterId=`grep '^ClusterId' finished_jobs/job.${jobId}.${jobRetry} | awk '{print $NF}'`

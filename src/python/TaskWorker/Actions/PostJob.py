@@ -80,6 +80,7 @@ import subprocess
 import unittest
 import datetime
 import tempfile
+import pickle
 import traceback
 import random
 import shutil
@@ -88,6 +89,7 @@ from http.client import HTTPException
 
 import htcondor
 import classad
+from WMCore import Lexicon
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.WMArchive.DataMap import createArchiverDoc
 
@@ -105,6 +107,7 @@ G_WMARCHIVE_REPORT_NAME = None
 G_WMARCHIVE_REPORT_NAME_NEW = None
 G_ERROR_SUMMARY_FILE_NAME = "error_summary.json"
 G_FJR_PARSE_RESULTS_FILE_NAME = "task_process/fjr_parse_results.txt"
+G_FAKE_OUTDATASET = '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER'
 
 def sighandler(*args):
     if ASO_JOB:
@@ -126,6 +129,39 @@ DEFER_NUM = -1
 
 def first_pj_execution():
     return DEFER_NUM == 0
+
+##==============================================================================
+
+def compute_outputdataset_name(primaryDS=None, username=None, publish_name=None, pset_hash=None, module_label=None):
+    """
+    a standalone function to compute the name of DBS a dataset where to publish data
+    Name of output dataset is a property of each output file, so it is not
+    unique inside the PostJob and needs to be computed "as needed" both in ASO class
+    (to communicate it to Rucio) and in PostJob class (to upload metadata) so
+    we compute it here in a uniform way from informations available inside both places
+    see
+    https://twiki.cern.ch/twiki/bin/view/CMSPublic/Crab3DataHandling#Output_dataset_names_in_DBS
+    Convention for output dataset name:
+        /<primarydataset>/<username>-<tag>[-<module>]-<PSETHASH>/USER
+    Input args are all strings:
+    primaryDS: the primaryDataSet, usually the same as the input
+    username: could be username or group name
+    publish_name : value of the tm_publish_name field in TaskDB, derived from configuration parameter Data.outputDatasetTag
+    module : if multiple EMD outputs are presents, the module label of the PoolOutputModule,
+             otherwise missing
+    pset_hash : the 32-char PSet hash . This is not the output of edmConfigHash but taken from edmProvDump.
+    returns: DBS datasetname as a string
+    """
+    if pset_hash:
+        # replace placeholder (32*'0') with correct pset hash for this file
+        publish_name = "%s-%s" % (publish_name.rsplit('-', 1)[0], pset_hash)
+    hash = pset_hash if pset_hash else 32*'0'
+    if module_label:
+        # insert output module name before the pset hash
+        left, right = publish_name.rsplit('-', 1)
+        publish_name = "%s-%s-%s" % (left, module_label, right)
+    outdataset = '/' + primaryDS + '/' + username + '-' + publish_name + '/USER'
+    return outdataset
 
 ##==============================================================================
 
@@ -282,7 +318,7 @@ class ASOServerJob(object):
     """
     def __init__(self, logger, aso_start_time, aso_start_timestamp, dest_site, source_dir,
                  dest_dir, source_sites, job_id, filenames, reqname, log_size,
-                 log_needs_transfer, job_report_output, job_ad, crab_retry, retry_timeout, \
+                 log_needs_transfer, job_report_output, job_ad, crab_retry, retry_timeout,
                  job_failed, transfer_logs, transfer_outputs, rest_host, db_instance, pubname):
         """
         ASOServerJob constructor.
@@ -527,30 +563,64 @@ class ASOServerJob(object):
         if str(self.job_ad['CRAB_UserGroup']).lower() == 'undefined':
             group = ''
 
-
-        # TODO: Add a method to resolve a single PFN.
-        import pickle
         with open('taskinformation.pkl', 'rb') as fd:
             task = pickle.load(fd)
-        if self.transfer_outputs:
-            for output_module in self.job_report_output.values():
-                for output_file_info in output_module:
-                    file_info = {}
-                    file_info['pfn'] = str(output_file_info[u'pfn'])
-                    file_info['checksums'] = output_file_info.get(u'checksums', {'cksum': '0', 'adler32': '0'})
-                    file_info['outsize'] = output_file_info.get(u'size', 0)
-                    file_info['direct_stageout'] = output_file_info.get(u'direct_stageout', False)
-                    if file_info['pfn'] in task['tm_edm_outfiles']:
-                        file_info['filetype'] = 'EDM'
-                    elif file_info['pfn'] in task['tm_tfile_outfiles']:
-                        file_info['filetype'] = 'TFILE'
-                    elif file_info['pfn'] in task['tm_outfiles']:
-                        file_info['filetype'] = 'FAKE'
-                    else:
-                        file_info['filetype'] = 'UNKNOWN'
-                    output_files.append(file_info)
+
+        # Now need to loop on all output files in this job, build the outputdatset
+        # name for each (if applicable) and fill the file_info dictionary for each
+        # For reasons detailed below, need to repeat the loop 3 times
+        # Loop #1. Find information for all output files in this job
+        for output_module in self.job_report_output.values():
+            for output_file_info in output_module:
+                file_info = {}
+                file_info['pfn'] = str(output_file_info[u'pfn'])
+                file_info['checksums'] = output_file_info.get(u'checksums', {'cksum': '0', 'adler32': '0'})
+                file_info['outsize'] = output_file_info.get(u'size', 0)
+                file_info['direct_stageout'] = output_file_info.get(u'direct_stageout', False)
+                file_info['pset_hash'] = output_file_info.get(u'pset_hash', 32*'0')
+                file_info['module_label'] = output_file_info.get(u'module_label')
+                # assign filetype based on the classification made by CRAB Client
+                if file_info['pfn'] in task['tm_edm_outfiles']:
+                    file_info['filetype'] = 'EDM'
+                elif file_info['pfn'] in task['tm_tfile_outfiles']:
+                    file_info['filetype'] = 'TFILE'
+                elif file_info['pfn'] in task['tm_outfiles']:
+                    file_info['filetype'] = 'FAKE'
+                else:
+                    file_info['filetype'] = 'UNKNOWN'
+                output_files.append(file_info)
+
+        # Loop #2. find out if there are multiple output modules, since rule
+        # for constructing outputdataset name is different in that case, see
+        # https://twiki.cern.ch/twiki/bin/view/CMSPublic/Crab3DataHandling#Output_dataset_names_in_DBS
+        edm_file_count = 0
+        for file_info in output_files:
+            if file_info['filetype'] == 'EDM':
+                edm_file_count += 1
+        multiple_edm = edm_file_count > 1
+        # Loop #3. compute the output dataset name for each file and add it to file_info
+        for file_info in output_files:
+            # use common function with PostJob to ensure uniform dataset name
+            if file_info['filetype'] in ['EDM', 'DQM']:
+                # group name overrides username when present:
+                username = self.job_ad['CRAB_UserHN']
+                if self.dest_dir.startswith('/store/group/') and self.dest_dir.split('/')[3]:
+                    username = self.dest_dir.split('/')[3]
+                module_label = file_info.get('module_label') if multiple_edm else None
+                outdataset = compute_outputdataset_name(primaryDS=self.job_ad['CRAB_PrimaryDataset'],
+                                                        username=username,
+                                                        publish_name=self.publishname,
+                                                        pset_hash=file_info['pset_hash'],
+                                                        module_label=module_label)
+            else:
+                outdataset = G_FAKE_OUTDATASET
+            file_info['outputdataset'] = outdataset
+
         found_log = False
+        # need to process output fils grouped by where they are
+        # files may be at different sites if local stageout failed for some
         for source_site, filename in zip(self.source_sites, self.filenames):
+            ## PREPARE TRANSFER INFO
             ## We assume that the first file in self.filenames is the logs archive.
             if found_log:
                 if not self.transfer_outputs:
@@ -567,6 +637,7 @@ class ASOServerJob(object):
                 ## from the worker node directly to the permanent storage.
                 needs_transfer = not output_files[ifile]['direct_stageout']
                 file_output_type = output_files[ifile]['filetype']
+                outputdataset = output_files[ifile]['outputdataset']
             else:
                 found_log = True
                 if not self.transfer_logs:
@@ -575,7 +646,9 @@ class ASOServerJob(object):
                 dest_lfn = os.path.join(self.dest_dir, 'log', filename)
                 file_type = 'log'
                 size = self.log_size
-                checksums = {'adler32': 'abc'}
+                # a few fake values for log files for fields which will go in CRAB internal DB's
+                checksums = {'adler32': 'abc'}  # this is not what FTS will use !
+                outputdataset = G_FAKE_OUTDATASET
                 ## needs_transfer is False if and only if the file was staged out
                 ## from the worker node directly to the permanent storage.
                 needs_transfer = self.log_needs_transfer
@@ -595,6 +668,7 @@ class ASOServerJob(object):
                             ## The 'job_retry_count' is used by ASO when reporting to dashboard,
                             ## so it is OK to set it equal to the crab (post-job) retry count.
                             'job_retry_count': self.crab_retry,
+                            'outputdataset': outputdataset,
                            }
             direct = False
             if not needs_transfer:
@@ -605,7 +679,7 @@ class ASOServerJob(object):
                 doc_new_info['state'] = 'done'
                 doc_new_info['end_time'] = now
                 direct = True
-            ## Set the publication flag.
+            ## SET THE PUBLLICATION FLAG
             task_publish = int(self.job_ad['CRAB_Publish'])
             publication_msg = None
             if file_type == 'output':
@@ -623,6 +697,7 @@ class ASOServerJob(object):
             else:
                 ## This is the log file, so obviously publication should be turned off.
                 publish = 0
+            ## FINALLY INJECT TO ASO (MODIFY EXISTING DOC OR CREATE NEW ONE)
             ## What does ASO needs to do for this file (transfer and/or publication) is
             ## saved in this list for the only purpose of printing a better message later.
             aso_tasks = []
@@ -894,6 +969,8 @@ class ASOServerJob(object):
                 newDoc['destination_lfn'] = doc['destination_lfn']
             if not 'destination' in newDoc:
                 newDoc['destination'] = doc['destination']
+            if not 'outputdataset' in newDoc:
+                newDoc['outputdataset'] = doc['outputdataset']
             with open('task_process/transfers.txt', 'a+') as transfers_file:
                 transfer_dump = json.dumps(newDoc)
                 transfers_file.write(transfer_dump+"\n")
@@ -993,9 +1070,10 @@ class ASOServerJob(object):
         if query_view:
             self.logger.debug("Querying ASO RDBMS database.")
             try:
-                view_results = self.crabserver.get(api='fileusertransfers', data=encodeRequest({'subresource': 'getTransferStatus',
-                                                                                                      'username': str(self.job_ad['CRAB_UserHN']),
-                                                                                                      'taskname': self.reqname}))
+                view_results = self.crabserver.get(api='fileusertransfers',
+                                                   data=encodeRequest({'subresource': 'getTransferStatus',
+                                                                       'username': str(self.job_ad['CRAB_UserHN']),
+                                                                       'taskname': self.reqname}))
                 view_results_dict = oracleOutputMapping(view_results, 'id')
                 # There is so much noise values in aso_status.json file. So lets provide a new file structure.
                 # We will not run ever for one task which can use also RDBMS
@@ -2104,6 +2182,16 @@ class PostJob():
             ifile = get_file_index(filename, self.output_files_info)
             source_sites.append(self.get_file_source_site(filename, ifile))
 
+        ## SBSB
+        # at this point we have two similar strucutres in memory
+        # (Pdb) self.output_files_info[0]['output_dataset']
+        # '/GenericTTbar/belforte-Stefano-Test-220309-94ba0e06145abd65ccb1d21786dc7e1d/USER'
+        # (Pdb) self.job_report_output
+        # {'output': [{'output_module_class': 'PoolOutputModule', 'runs': {'1': {'419': 300}}, 'temp_storage_site': 'T1_RU_JINR_Disk', 'events': 300, 'branch_hash': 'd41d8cd98f00b204e9800998ecf8427e', 'pset_hash': '94ba0e06145abd65ccb1d21786dc7e1d', 'lfn': '', 'pfn': 'kk.root', 'catalog': '', 'module_label': 'output', 'local_stageout': True, 'input': ['/store/mc/HC/GenericTTbar/AODSIM/CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/00000/8ADD04E5-1776-E711-A1BA-FA163E6741E0.root'], 'checksums': {'adler32': 'bbe03bd1', 'cksum': '3164535815'}, 'storage_site': 'T2_CH_CERN', 'guid': 'ADA2B48E-AEF4-0B4B-B0DD-BCE27657909A', 'inputpfns': ['dcap://dcap01.jinr-t1.ru:22125/pnfs/jinr-t1.ru/data/cms/store/mc/HC/GenericTTbar/AODSIM/CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/00000/8ADD04E5-1776-E711-A1BA-FA163E6741E0.root'], 'size': 561301}], 'analysis': []}
+        # (Pdb) self.output_files_info
+        # [{'filetype': 'EDM', 'module_label': 'output', 'inparentlfns': ['/store/mc/HC/GenericTTbar/AODSIM/CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/00000/8ADD04E5-1776-E711-A1BA-FA163E6741E0.root'], 'events': 300, 'checksums': {'adler32': 'bbe03bd1', 'cksum': '3164535815'}, 'outsize': 561301, 'pset_hash': '94ba0e06145abd65ccb1d21786dc7e1d', 'pfn': 'kk.root', 'output_dataset': '/GenericTTbar/belforte-Stefano-Test-220309-94ba0e06145abd65ccb1d21786dc7e1d/USER', 'local_stageout': True, 'direct_stageout': False, 'outlocation': 'T2_CH_CERN', 'outtmplocation': 'T1_RU_JINR_Disk', 'outlfn': '/store/user/belforte/GenericTTbar/Stefano-Test-220309/220310_151125/0000/kk_1.root', 'outtmplfn': '/store/temp/user/belforte.be1f4dc5be8664cbd145bf008f5399adf42b086f/GenericTTbar/Stefano-Test-220309/220310_151125/0000/kk_1.root', 'outfileruns': ['1'], 'outfilelumis': ['419:300']}]
+        ## SBSB
+
         global ASO_JOB
         ASO_JOB = ASOServerJob(self.logger, \
                                self.aso_start_time, self.aso_start_timestamp, \
@@ -2226,7 +2314,7 @@ class PostJob():
                      'outlfn'          : os.path.join(self.dest_dir, 'log', self.logs_arch_file_name),
                      'outtmplocation'  : fixUpTempStorageSite(logger=self.logger, siteName=temp_storage_site),
                      'outtmplfn'       : os.path.join(self.source_dir, 'log', self.logs_arch_file_name),
-                     'outdatasetname'  : '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER',
+                     'outdatasetname'  : G_FAKE_OUTDATASET,
                      'directstageout'  : int(self.job_report.get('direct_stageout', 0))
                     }
         rest_api = 'filemetadata'
@@ -2266,6 +2354,12 @@ class PostJob():
                 lfn = '/store/user/dummy/DummyLFN'
             else:
                 lfn = ifile['lfn']
+                # beware the case where cmsRun was only given a PFN to run on and still we get it in the LFN field
+                try:
+                    Lexicon.lfn(lfn)  # will raise if testLfn is not a valid lfn
+                except AssertionError:
+                    lfn = '/store/user/dummy/DummyLFN'
+
             lfn = lfn + "_" + str(self.job_id) ## jobs can analyze the same input
             configreq = {"taskname"        : self.job_ad['CRAB_ReqName'],
                          "globalTag"       : "None",
@@ -2283,7 +2377,7 @@ class PostJob():
                          "outlfn"          : lfn,
                          "outtmplfn"       : self.source_dir, ## does not have sense for input files
                          "events"          : ifile.get('events', 0),
-                         "outdatasetname"  : "/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER",
+                         "outdatasetname"  : G_FAKE_OUTDATASET,
                          "directstageout"  : direct_stageout
                         }
             #TODO: there could be a better py3 way to get lists of outfileruns/lumis
@@ -2319,32 +2413,17 @@ class PostJob():
         """
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
-        edm_file_count = 0
-        for file_info in self.output_files_info:
-            if file_info['filetype'] == 'EDM':
-                edm_file_count += 1
-        multiple_edm = edm_file_count > 1
         output_datasets = set()
         for file_info in self.output_files_info:
+            outdataset = file_info['output_dataset']
+            if not 'FakeDataset' in outdataset:
+                output_datasets.add(outdataset)
+            # the only reason for publishname in metadata is so that Publisher can get
+            # the pset hash to store in DBS. But that hash is part of outdataset name as well
+            # somehow a log of clenaup could be done here
             publishname = self.publish_name
             if 'pset_hash' in file_info:
                 publishname = "%s-%s" % (publishname.rsplit('-', 1)[0], file_info['pset_hash'])
-            ## Convention for output dataset name:
-            ## /<primarydataset>/<username>-<output_dataset_tag>-<PSETHASH>/USER
-            if file_info['filetype'] in ['EDM', 'DQM']:
-                if multiple_edm and file_info.get('module_label'):
-                    left, right = publishname.rsplit('-', 1)
-                    publishname = "%s_%s-%s" % (left, file_info['module_label'], right)
-                primary_dataset = self.job_ad['CRAB_PrimaryDataset']
-                group_user_prefix = self.job_ad['CRAB_UserHN']
-                if 'CRAB_PublishGroupName' in self.job_ad and self.job_ad['CRAB_PublishGroupName']:
-                    if file_info['outlfn'].startswith('/store/group/') and file_info['outlfn'].split('/')[3]:
-                        group_user_prefix = file_info['outlfn'].split('/')[3]
-                outdataset = os.path.join('/' + primary_dataset, group_user_prefix + '-' + publishname, 'USER')
-                output_datasets.add(outdataset)
-
-            else:
-                outdataset = '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER'
             configreq = {'taskname'        : self.reqname,
                          'jobid'      : self.job_id,
                          'outsize'         : file_info['outsize'],
@@ -2551,6 +2630,13 @@ class PostJob():
             self.source_dir = os.path.join(self.source_dir, 'failed')
             self.dest_dir = os.path.join(self.dest_dir, 'failed')
         self.fill_output_files_info() ## Fill self.output_files_info by parsing the job report.
+        ##
+        ## at this point self.output_files_info is a list of dictionaries [file_info, file_info...]
+        ## file_info.keys() = 'filetype', 'module_label', 'inparentlfns', 'events',
+        ## 'checksums', 'outsize', 'pset_hash', 'pfn', 'output_dataset', 'local_stageout',
+        ## 'direct_stageout', 'outlocation', 'outtmplocation', 'outlfn', 'outtmplfn',
+        ## 'outfileruns', 'outfilelumis'
+        ##
         self.aso_start_time = self.job_report.get("aso_start_time", None)
         self.aso_start_timestamp = self.job_report.get("aso_start_timestamp", None)
 
@@ -2569,6 +2655,10 @@ class PostJob():
                     if ifile is not None:
                         return output_file_info
             return None
+
+        with open('taskinformation.pkl', 'rb') as fd:
+            task = pickle.load(fd)
+
         ## Loop over the output files that have to be collected.
         for filename in self.output_files_names:
             ## Search for the output file info in the job report.
@@ -2585,17 +2675,16 @@ class PostJob():
                 self.logger.debug(msg)
                 file_info = {}
                 self.output_files_info.append(file_info)
-                ## Note incorrect spelling of 'output module' in current WMCore
-                if (output_file_info.get(u'output_module_class', '') == u'PoolOutputModule' or \
-                    output_file_info.get(u'ouput_module_class', '') == u'PoolOutputModule'):
+                # assign filetype based on the classification made by CRAB Client
+                file_info['pfn'] = orig_file_name
+                if file_info['pfn'] in task['tm_edm_outfiles']:
                     file_info['filetype'] = 'EDM'
-                elif output_file_info.get(u'Source', '') == u'TFileService':
+                elif file_info['pfn'] in task['tm_tfile_outfiles']:
                     file_info['filetype'] = 'TFILE'
-                elif (output_file_info.get(u'output_module_class', '') == u'DQMRootOutputModule' or \
-                      output_file_info.get(u'ouput_module_class', '') == u'DQMRootOutputModule'):
-                    file_info['filetype'] = 'DQM'
-                else:
+                elif file_info['pfn'] in task['tm_outfiles']:
                     file_info['filetype'] = 'FAKE'
+                else:
+                    file_info['filetype'] = 'UNKNOWN'
                 file_info['module_label'] = output_file_info.get(u'module_label', 'unknown')
                 file_info['inparentlfns'] = [str(i) for i in output_file_info.get(u'input', [])]
                 file_info['events'] = output_file_info.get(u'events', 0)
@@ -2603,6 +2692,8 @@ class PostJob():
                 file_info['outsize'] = output_file_info.get(u'size', 0)
                 if u'pset_hash' in output_file_info:
                     file_info['pset_hash'] = output_file_info[u'pset_hash']
+                else:
+                    file_info['pset_hash'] = 32*'0'
                 if u'pfn' in output_file_info:
                     file_info['pfn'] = str(output_file_info[u'pfn'])
                 file_info['local_stageout'] = output_file_info.get(u'local_stageout', False)
@@ -2631,6 +2722,33 @@ class PostJob():
             else:
                 msg = "Output file info for %s not found in job report." % (orig_file_name)
                 self.logger.error(msg)
+        # now that we have collected info from all files, we can define
+        # output dataset name for each.
+        # First find if there are multiple datasets in this job
+        # since in that case the output dataset name is different. See:
+        # https://twiki.cern.ch/twiki/bin/view/CMSPublic/Crab3DataHandling#Output_dataset_names_in_DBS
+        edm_file_count = 0
+        for file_info in self.output_files_info:
+            if file_info['filetype'] == 'EDM':
+                edm_file_count += 1
+        multiple_edm = edm_file_count > 1
+        # now compute the output dataset name for each file and add it to file_info
+        for file_info in self.output_files_info:
+            # use common function with ASOServerJob to ensure uniform dataset name
+            if file_info['filetype'] in ['EDM', 'DQM']:
+                # group name overrides username when present:
+                username = self.job_ad['CRAB_UserHN']
+                if self.dest_dir.startswith('/store/group/') and self.dest_dir.split('/')[3]:
+                    username = self.dest_dir.split('/')[3]
+                module_label = file_info.get('module_label') if multiple_edm else None
+                outdataset = compute_outputdataset_name(primaryDS=self.job_ad['CRAB_PrimaryDataset'],
+                                                        username=username,
+                                                        publish_name=self.publish_name,
+                                                        pset_hash=file_info['pset_hash'],
+                                                        module_label=module_label)
+            else:
+                outdataset = G_FAKE_OUTDATASET
+            file_info['output_dataset'] = outdataset
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -2666,7 +2784,10 @@ class PostJob():
         Update PostJobStatus and job exit-code among the job ClassAds for the monitoring script to update the Grafana dashboard.
         """
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
-            self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
+            try:  # this may fail when running PostJob interactively for debugging
+                self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
+            except Exception:
+                pass  # caller is not equipped for dealing with exceptions from this method
             return
         self.logger.info("====== Starting to update job ClassAd.")
         msg = "status: %s." % (state)

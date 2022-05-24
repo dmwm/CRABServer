@@ -1,15 +1,12 @@
 from __future__ import print_function
 import os
-import sys
+import random
 import logging
 import copy
 from http.client import HTTPException
 
 import sys
-if sys.version_info >= (3, 0):
-    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
-if sys.version_info < (3, 0):
-    from urllib import urlencode
+from urllib.parse import urlencode  # pylint: disable=no-name-in-module (for pylint2 compat.)
 
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.DBS.DBSReader import DBSReader
@@ -21,7 +18,7 @@ from ServerUtilities import FEEDBACKMAIL
 from RucioUtils import getNativeRucioClient
 
 from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent,
-    InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage)
+                                    InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage)
 
 class DBSDataDiscovery(DataDiscovery):
     """Performing the data discovery through CMS DBS service.
@@ -124,14 +121,14 @@ class DBSDataDiscovery(DataDiscovery):
             except DataIdentifierAlreadyExists:
                 self.logger.debug("Container name already exists in Rucio. Keep going")
             except Exception as ex:
-                msg += "Rucio exception creating container: %s" %  (str(ex))
+                msg += "\nRucio exception creating container: %s" %  (str(ex))
                 raise TaskWorkerException(msg)
             try:
                 rucioClient.attach_dids(myScope, containerName, dids)
             except DuplicateContent:
                 self.logger.debug("Some dids are already in this container. Keep going")
             except Exception as ex:
-                msg += "Rucio exception adding blocks to container: %s" %  (str(ex))
+                msg += "\nRucio exception adding blocks to container: %s" %  (str(ex))
                 raise TaskWorkerException(msg)
             self.logger.info("Rucio container %s:%s created with %d blocks", myScope, containerName, len(blockList))
 
@@ -139,23 +136,48 @@ class DBSDataDiscovery(DataDiscovery):
             sizeToRecall = 0
             for block in blockList:
                 replicas = rucioClient.list_dataset_replicas(scope='cms', name=block, deep=True)
-                blockBytes = replicas.next()['bytes']  # pick first replica for each block, they better all have same size
+                blockBytes = next(replicas)['bytes']  # pick first replica for each block, they better all have same size
                 sizeToRecall += blockBytes
             TBtoRecall = sizeToRecall // 1e12
+            # Sanity check
+            if TBtoRecall > 1e3:
+                msg += '\nDataset size %d TB. Will not trigger autoamatic recall for >1PB. Contact DataOps' % TBtoRecall
+                raise TaskWorkerException(msg)
             if TBtoRecall > 0:
                 self.logger.info("Total size of data to recall : %d TBytes", TBtoRecall)
             else:
                 self.logger.info("Total size of data to recall : %d GBytes", sizeToRecall/1e9)
 
-            if TBtoRecall > 30.:
-                grouping = 'DATASET'  # Rucio DATASET i.e. CMS block !
-                self.logger.info("Will scatter blocks on multiple sites")
-            else:
+            # make RSEs lists
+            # asking for ddm_quota>0 gets rid also of Temp and Test RSE's
+            ALL_RSES = "ddm_quota>0&(tier=1|tier=2)&rse_type=DISK"
+            rses = rucioClient.list_rses(ALL_RSES)
+            rseNames = [r['rse'] for r in rses]
+            largeRSEs = []  # a list of largish (i.e. solid) RSEs
+            freeRSEs = []  # a subset of largeRSEs which also have quite some free space
+            for rse in rseNames:
+                size = list(rucioClient.get_rse_usage(rse, filters={'source': 'static'}))[0]['used']  # bytes
+                if float(size)/1.e15 > 1.0:  # more than 1 PB
+                    largeRSEs.append(rse)
+                    availableSpace = int(rucioClient.list_rse_attributes(rse)['ddm_quota'])  # bytes
+                    if availableSpace/1e12 > 100:  # at least 100TB available
+                        freeRSEs.append(rse)
+            # use either list (largeRSEs or freeRSEs) according to dataset size:
+            if TBtoRecall < 50.:
                 grouping = 'ALL'
                 self.logger.info("Will place all blocks at a single site")
+                RSE_EXPRESSION = '|'.join(largeRSEs)  # any solid site will do, most datasets are a few TB anyhow
+            else:
+                grouping = 'DATASET'  # Rucio DATASET i.e. CMS block !
+                self.logger.info("Will scatter blocks on multiple sites")
+                # restrict the list to as many sites as there are 50TB chunks in the dataset, plus some slack
+                nRSEs = int(TBtoRecall/50) + 1
+                myRSEs = random.sample(freeRSEs, nRSEs)
+                RSE_EXPRESSION = '|'.join(myRSEs)
+            self.logger.debug('Will use RSE_EXPRESSION = %s', RSE_EXPRESSION)
 
             # create rule
-            RSE_EXPRESSION = 'ddm_quota>0&(tier=1|tier=2)&rse_type=DISK'
+            #RSE_EXPRESSION = 'ddm_quota>0&(tier=1|tier=2)&rse_type=DISK'
             #RSE_EXPRESSION = 'T3_IT_Trieste' # for testing
             WEIGHT = 'ddm_quota'
             #WEIGHT = None # for testing
@@ -165,14 +187,11 @@ class DBSDataDiscovery(DataDiscovery):
             ACCOUNT = 'crab_tape_recall'
             copies = 1
             try:
-                ruleId = rucioClient.add_replication_rule(dids=[containerDid],
-                                                  copies=copies, rse_expression=RSE_EXPRESSION,
-                                                  grouping=grouping,
-                                                  weight=WEIGHT, lifetime=LIFETIME, account=ACCOUNT,
-                                                  activity='Analysis Input',
-                                                  comment='Staged from tape for %s' % self.username,
-                                                  ask_approval=ASK_APPROVAL, asynchronous=True,
-                                                  )
+                ruleId = rucioClient.add_replication_rule(
+                    dids=[containerDid], copies=copies, rse_expression=RSE_EXPRESSION,
+                    grouping=grouping, weight=WEIGHT, lifetime=LIFETIME, account=ACCOUNT,
+                    activity='Analysis Input', comment='Staged from tape for %s' % self.username,
+                    ask_approval=ASK_APPROVAL, asynchronous=True)
             except DuplicateRule as ex:
                 # handle "A duplicate rule for this account, did, rse_expression, copies already exists"
                 # which should only happen when testing, since container name is unique like task name, anyhow...
@@ -180,10 +199,10 @@ class DBSDataDiscovery(DataDiscovery):
                 # find the existing rule id
                 ruleId = rucioClient.list_did_rules(myScope, containerName)
             except (InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage) as ex:
-                msg = "Not enough global quota to issue a tape recall request. Rucio exception:\n%s" % str(ex)
+                msg = "\nNot enough global quota to issue a tape recall request. Rucio exception:\n%s" % str(ex)
                 raise TaskWorkerException(msg)
             except Exception as ex:
-                msg += "Rucio exception creating rule: %s" %  str(ex)
+                msg += "\nRucio exception creating rule: %s" %  str(ex)
                 raise TaskWorkerException(msg)
             ruleId = str(ruleId[0])  # from list to singleId and remove unicode
 
@@ -191,6 +210,7 @@ class DBSDataDiscovery(DataDiscovery):
             msg += "\nyou can check progress via either of the following two commands:"
             msg += "\n rucio rule-info %s" % ruleId
             msg += "\n rucio list-rules %s:%s" % (myScope, containerName)
+            msg += "\nor simply check 'state' line in this page: https://cms-rucio-webui.cern.ch/rule?rule_id=%s" % ruleId
             automaticTapeRecallIsImplemented = True
             if automaticTapeRecallIsImplemented:
                 tapeRecallStatus = 'TAPERECALL'
@@ -392,11 +412,25 @@ class DBSDataDiscovery(DataDiscovery):
 
         # From now on code is not dependent from having used Rucio or PhEDEx
 
-        blocksWithLocation = locationsMap.keys()
+        # make a copy of locationsMap dictionary, so that manipulating it in keeOnlyDiskRSE
+        # does not touch blocksWithLocation
+        blocksWithLocation = locationsMap.copy().keys()
         if secondaryDataset:
-            secondaryBlocksWithLocation = secondaryLocationsMap.keys()
+            secondaryBlocksWithLocation = secondaryLocationsMap.copy().keys()
 
         # filter out TAPE locations
+        # temporary hack until we have a new config. parameter: allow user to accpet a partial dataset
+        # by inserting '0' as (first element of) runRange
+        usePartialDataset = False
+        runRange = kwargs['task']['tm_split_args']['runs']
+        if runRange and runRange[0] == '0':
+            usePartialDataset = True
+            # remove initial '0' from run list
+            # note that it caused an extra entry to be created in lumilis as well
+            kwargs['task']['tm_split_args']['runs'] = kwargs['task']['tm_split_args']['runs'][1:]
+            kwargs['task']['tm_split_args']['lumis'] = kwargs['task']['tm_split_args']['lumis'][1:]
+            runRange = kwargs['task']['tm_split_args']['runs']
+
         self.keepOnlyDiskRSEs(locationsMap)
         if not locationsMap:
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
@@ -408,7 +442,12 @@ class DBSDataDiscovery(DataDiscovery):
                 self.requestTapeRecall(blockList=blocksWithLocation, system='Rucio', msgHead=msg)
         if set(locationsMap.keys()) != set(blocksWithLocation):
             dataTier = inputDataset.split('/')[3]
-            if dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []):
+            if usePartialDataset:
+                msg = "Some blocks are on TAPE only and can not be reaed."
+                msg += "\nSince you specified to accept a partial dataset, only blocks on disk will be processed"
+                self.logger.warning(msg)
+                self.uploadWarning(msg, self.userproxy, self.taskName)
+            elif dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []):
                 msg = "Task could not be submitted because not all blocks of dataset %s are on DISK" % inputDataset
                 msg += "\nWill try to request a full disk copy for you. See"
                 msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
@@ -423,7 +462,6 @@ class DBSDataDiscovery(DataDiscovery):
         # will not need lumi info if user has asked for split by file with no run/lumi mask
         splitAlgo = kwargs['task']['tm_split_algo']
         lumiMask = kwargs['task']['tm_split_args']['lumis']
-        runRange = kwargs['task']['tm_split_args']['runs']
 
         needLumiInfo = splitAlgo != 'FileBased' or lumiMask != [] or runRange != []
         # secondary dataset access relies on run/lumi info
@@ -479,13 +517,10 @@ class DBSDataDiscovery(DataDiscovery):
 
 if __name__ == '__main__':
     ###
-    # Usage: python DBSDataDiscovery.py dbs_instance dbsDataset [secondaryDataset]
+    # Usage: python3 DBSDataDiscovery.py dbs_instance dbsDataset [secondaryDataset]
     # where dbs_instance should be either prod/global or prod/phys03
-    # Needs to define first:
-    # export X509_USER_CERT=/data/certs/servicecert.pem
-    # export X509_USER_KEY=/data/certs/servicekey.pem
     #
-    # Example: python ~/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/global /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
+    # Example: python3 /data/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/global /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
     ###
     dbsInstance = sys.argv[1]
     dbsDataset = sys.argv[2]
@@ -499,13 +534,17 @@ if __name__ == '__main__':
     config = ConfigurationEx()
     config.section_("Services")
     config.section_("TaskWorker")
-    # will use X509_USER_PROXY var for this test
-    #config.TaskWorker.cmscert = os.environ["X509_USER_PROXY"]
-    #config.TaskWorker.cmskey = os.environ["X509_USER_PROXY"]
 
     # will user service cert as defined for TW
-    config.TaskWorker.cmscert = os.environ["X509_USER_CERT"]
-    config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
+    if "X509_USER_CERT" in os.environ:
+        config.TaskWorker.cmscert = os.environ["X509_USER_CERT"]
+    else:
+        config.TaskWorker.cmscert = '/data/certs/servicecert.pem'
+    if "X509_USER_KEY" in os.environ:
+        config.TaskWorker.cmscert = os.environ["X509_USER_KEY"]
+    else:
+        config.TaskWorker.cmscert = '/data/certs/servicekey.pem'
+
     config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=config.TaskWorker.cmscert,
                                                 X509_USER_KEY=config.TaskWorker.cmskey)
 
@@ -523,7 +562,7 @@ if __name__ == '__main__':
                           'tm_taskname': 'pippo1', 'tm_username':config.Services.Rucio_account,
                           'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
                           'tm_dbs_url': DBSUrl}, tempDir='')
-    
+
 #===============================================================================
 #    Some interesting datasets for testing
 #    dataset = '/DoubleMuon/Run2018B-PromptReco-v2/AOD'       # on tape

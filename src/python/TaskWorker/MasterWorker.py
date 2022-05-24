@@ -9,7 +9,6 @@ import sys
 import time
 import signal
 import logging
-from base64 import b64encode
 
 from http.client import HTTPException
 from MultiProcessingLog import MultiProcessingLog
@@ -20,7 +19,6 @@ if sys.version_info < (3, 0):
     from urllib import urlencode
 
 #WMcore dependencies
-from Utils.Utilities import encodeUnicodeToBytes
 from WMCore.Configuration import loadConfigurationFile
 
 #CRAB dependencies
@@ -357,7 +355,9 @@ class MasterWorker(object):
                 failstatus = 'FAILED'
             self.updateWork(taskname, command, failstatus)
             warning = 'username %s banned in CRAB TaskWorker configuration' % task['tm_username']
-            configreq = {'subresource': 'addwarning', 'workflow': taskname, 'warning': warning}
+            configreq = {'subresource': 'addwarning', 
+                         'workflow': taskname, 
+                         'warning': warning}
             try:
                 self.crabserver.post(api='task', data=urlencode(configreq))
             except Exception as e:
@@ -385,7 +385,7 @@ class MasterWorker(object):
             if command == 'KILL':  # ignore, i.e. leave in status 'SUBMITTED'
                 self.updateWork(taskname, command, 'SUBMITTED')
             warning = 'command %s disabled in CRAB TaskWorker configuration' % command
-            configreq = {'subresource': 'addwarning', 'workflow': taskname, 'warning': b64encode(encodeUnicodeToBytes(warning))}
+            configreq = {'subresource': 'addwarning', 'workflow': taskname, 'warning': warning}
             try:
                 self.crabserver.post(api='task', data=urlencode(configreq))
             except Exception as e:

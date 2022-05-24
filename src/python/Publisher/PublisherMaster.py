@@ -23,6 +23,7 @@ import pickle
 import tempfile
 from datetime import datetime
 import time
+from pathlib import Path
 from multiprocessing import Process
 from MultiProcessingLog import MultiProcessingLog
 
@@ -164,6 +165,7 @@ class Master(object):
         # these are used for talking to DBS
         os.putenv('X509_USER_CERT', self.config.serviceCert)
         os.putenv('X509_USER_KEY', self.config.serviceKey)
+
         self.block_publication_timeout = self.config.block_closure_timeout
         self.lfn_map = {}
         self.force_publication = False
@@ -172,6 +174,9 @@ class Master(object):
         self.taskFilesDir = self.config.taskFilesDir
         createLogdir(self.taskFilesDir)
         createLogdir(os.path.join(self.taskFilesDir, 'FailedBlocks'))
+        # need a persistent place on disk to communicate among slaves
+        self.blackListedTaskDir = os.path.join(self.taskFilesDir, 'BlackListedTasks')
+        createLogdir(self.blackListedTaskDir)
 
         self.logger = setRootLogger(self.config.logsDir, quiet=quiet, debug=debug, console=self.TestMode)
 
@@ -214,6 +219,9 @@ class Master(object):
                                    userAgent='CRABPublisher')
         self.crabServer.setDbInstance(dbInstance=dbInstance)
         self.startTime = time.time()
+
+        # tasks which are too loarge for us to deal with are
+        self.taskBlackList = []
 
     def active_tasks(self, crabServer):
         """
@@ -280,32 +288,55 @@ class Master(object):
     def getPublDescFiles(self, workflow, lfn_ready, logger):
         """
         Download and read the files describing what needs to be published
-        CRAB REST does not have any good way to select from the DB only what we need
-        most efficient way is to get full list for the task, and then trim it here
-        see: https://github.com/dmwm/CRABServer/issues/6124
+        do on a small number of LFNs at a time (numFilesAtOneTime) to avoid
+        hitting the URL length limit in CMSWEB/Apache
         """
         out = []
-
+        metadataList = []
         dataDict = {}
         dataDict['taskname'] = workflow
-        dataDict['filetype'] = 'EDM'
-        data = encodeRequest(dataDict)
-        try:
-            res = self.crabServer.get(api='filemetadata', data=data)
-            # res is a 3-plu: (result, exit code, status)
-            res = res[0]
-        except Exception as ex:
-            logger.error("Error during metadata retrieving from crabserver:\n%s", ex)
-            return out
-
-        metadataList = [json.loads(md) for md in res['result']]  # CRAB REST returns a list of JSON objects
-        for md in metadataList:
-            # pick only the metadata we need
-            if md['lfn'] in lfn_ready:
+        i = 0
+        numFilesAtOneTime = 10
+        logger.debug('FMDATA: will retrieve data for %d files', len(lfn_ready))
+        while i < len(lfn_ready):
+            dataDict['lfnList'] = lfn_ready[i:i+numFilesAtOneTime]
+            data = encodeRequest(dataDict)
+            i += numFilesAtOneTime
+            try:
+                t1 = time.time()
+                res = self.crabServer.get(api='filemetadata', data=data)
+                # res is a 3-plu: (result, exit code, status)
+                res = res[0]
+                t2 = time.time()
+                elapsed = int(t2-t1)
+                fmdata = int(len(str(res))/1e6) # convert dict. to string to get actual length in HTTP call
+                logger.debug('FMDATA: retrieved data for %d files', len(res['result']))
+                logger.debug('FMDATA: retrieved: %d MB in %d sec for %s', fmdata, elapsed, workflow)
+                if elapsed > 60 and fmdata > 100:  # more than 1 minute and more than 100MB
+                    self.taskBlackList.append(workflow)  # notify this slave
+                    filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
+                    filepath.touch()  # notify other slaves
+                    logger.debug('++++++++ BLACKLIST2 TASK %s ++', workflow)
+            except Exception as ex:
+                t2 = time.time()
+                elapsed = int(t2-t1)
+                logger.error("Error during metadata2 retrieving from crabserver:\n%s", ex)
+                if elapsed > 290:
+                    logger.debug('FMDATA gave error after > 290 secs. Most likely it timed out')
+                    self.taskBlackList.append(workflow)  # notify this slave
+                    filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
+                    filepath.touch()  # notify other slaves
+                    logger.debug('++++++++ BLACKLIST TASK %s ++', workflow)
+                return []
+            metadataList = [json.loads(md) for md in res['result']]  # CRAB REST returns a list of JSON objects
+            for md in metadataList:
                 out.append(md)
 
         logger.info('Got filemetadata for %d LFNs', len(out))
-        return out
+        # sort the list by jobId, makes it easier to compare https://stackoverflow.com/a/73050
+        # sort by jobid as strings w/o converting to int becasue of https://github.com/dmwm/CRABServer/issues/7246
+        sortedOut = sorted(out, key=lambda md: md['jobid'])
+        return sortedOut
 
     def getTaskStatusFromSched(self, workflow, logger):
 
@@ -366,7 +397,7 @@ class Master(object):
             return 'KILLED'
         proxiedWebDir = getProxiedWebDir(crabserver=self.crabServer, task=workflow, logFunction=logger)
         # Download status_cache file
-        _, local_status_cache_pkl = tempfile.mkstemp(dir='/tmp', prefix='status-cache-', suffix='.pkl')
+        local_status_cache_fd, local_status_cache_pkl = tempfile.mkstemp(dir='/tmp', prefix='status-cache-', suffix='.pkl')
         url = proxiedWebDir + "/status_cache.pkl"
         # this host is dummy since we will pass full url to downloadFile but WMCore.Requests needs it
         host = 'https://cmsweb.cern.ch'
@@ -377,6 +408,8 @@ class Master(object):
             raise Exception('download attempt returned HTTP code %d' % ret.status)
         with open(local_status_cache_pkl, 'rb') as fp:
             statusCache = pickle.load(fp)
+        os.close(local_status_cache_fd)
+        os.remove(local_status_cache_pkl)
         # get DAG status from downloaded cache_status file
         statusCacheInfo = statusCache['nodes']
         dagInfo = statusCacheInfo['DagStatus']
@@ -404,6 +437,8 @@ class Master(object):
 
         maxSlaves = self.config.max_slaves
         self.logger.info('kicking off pool for %s tasks using up to %s concurrent slaves', len(tasks), maxSlaves)
+        self.taskBlackList = os.listdir(self.blackListedTaskDir)
+        self.logger.debug('++++++ Using this taskBlackList: %s', self.taskBlackList)
         # print one line per task with the number of files to be published. Allow to find stuck tasks
         self.logger.debug(' # of acquired files : taskname')
         for task in tasks:
@@ -471,6 +506,9 @@ class Master(object):
 
         self.force_publication = False
         workflow = str(task[0][3])
+
+        self.taskBlackList = os.listdir(self.blackListedTaskDir)
+        logger.debug('==== inside SLAVE for %s using blacklist %s', workflow, self.taskBlackList)
 
         if len(task[1]) > self.max_files_per_block:
             self.force_publication = True
@@ -584,8 +622,15 @@ class Master(object):
                 # Get metadata
                 toPublish = []
                 toFail = []
-                publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready, logger)
+                if workflow in self.taskBlackList:
+                    logger.debug('++++++++ TASK %s IN BLACKLIST,SKIP FILEMETADATA RETRIEVE AND MARK FILES AS FAILED',
+                                 workflow)
+                else:
+                    publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready, logger)
                 for file_ in active_:
+                    if workflow in self.taskBlackList:
+                        toFail.append(file_["value"][1])  # mark all files as failed to avoid to look at them again
+                        continue
                     metadataFound = False
                     for doc in publDescFiles_list:
                         # logger.info(type(doc))
@@ -600,7 +645,6 @@ class Master(object):
                             toPublish.append(doc)
                             metadataFound = True
                             break
-
                     # if we failed to find metadata mark publication as failed to avoid to keep looking
                     # at same files over and over
                     if not metadataFound:
