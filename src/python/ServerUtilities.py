@@ -909,7 +909,7 @@ class MeasureTime:
         self.thread_time = time.thread_time() - self.thread_time
         self.process_time = time.process_time() - self.process_time
         self.perf_counter = time.perf_counter() - self.perf_counter
-        self.readout = 'tot={:.4f} proc={:.4f} thread={:.4f}'.format(
+        self.readout = 'tot={:.6f} proc={:.6f} thread={:.6f}'.format(
                  self.perf_counter, self.process_time, self.thread_time )
         self.logger.info("MeasureTime in second - modulename=%s label='%s' %s trace=%s",
                  self.modulename, self.label, self.readout, self.trace)
