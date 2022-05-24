@@ -280,9 +280,12 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir):
             msg += "\nRequest detail: %s" % data
             msg += "\nDBS3 exception: %s" % ex
             logger.error(msg)
+        return reqid, atDestination, alreadyQueued
     if not atDestination:
         msg = "Result of migration request: %s" % str(result)
         logger.info(msg)
+        if isinstance(result, list):
+            result = result[0] # New DBS server returns list of dicts
         reqid = result.get('migration_details', {}).get('migration_request_id')
         report = result.get('migration_report')
         migInput = result.get('migration_details', {}).get('migration_input')
@@ -321,8 +324,8 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir):
             try:
                 status = migrateApi.statusMigration(block_name=block)
                 reqid = status[0].get('migration_request_id')
-            except Exception:
-                msg = "Could not get status for already queued migration of block %s." % (block)
+            except Exception as ex:
+                msg = "Could not get status for already queued migration of block %s.\n%s" % (block, ex)
                 logger.error(msg)
     return reqid, atDestination, alreadyQueued
 
@@ -530,8 +533,8 @@ def publishInDBS3(config, taskname, verbose):
 
         if not sourceURL.endswith("/DBSReader") and not sourceURL.endswith("/DBSReader/"):
             sourceURL += "/DBSReader"
-    except Exception:
-        logger.exception("ERROR")
+    except Exception as ex:
+        logger.exception("ERROR: %s", ex)
 
     # When looking up parents may need to look in global DBS as well.
     globalURL = sourceURL
@@ -570,8 +573,8 @@ def publishInDBS3(config, taskname, verbose):
         destReadApi = dbsClient.DbsApi(url=publish_read_url)
         logger.info("DBS Migration API URL: %s", publish_migrate_url)
         migrateApi = dbsClient.DbsApi(url=publish_migrate_url)
-    except Exception:
-        logger.exception('Wrong DBS URL %s', publish_dbs_url)
+    except Exception as ex:
+        logger.exception('Error creating DBS APIs, likely wrong DBS URL %s\n%s', publish_dbs_url, ex)
         nothingToDo['result'] = 'FAIL'
         nothingToDo['reason'] = 'Error contacting DBS'
         summaryFileName = saveSummaryJson(logdir, nothingToDo)
@@ -584,11 +587,17 @@ def publishInDBS3(config, taskname, verbose):
         try:
             existing_datasets = sourceApi.listDatasets(dataset=inputDataset, detail=True, dataset_access_type='*')
             primary_ds_type = existing_datasets[0]['primary_ds_type']
-            # There's little chance this is correct, but it's our best guess for now.
-            # CRAB2 uses 'crab2_tag' for all cases
+        except Exception as ex:
+            logger.exception('Error looking up input dataset in %s\n%s', sourceApi.url, ex)
+            nothingToDo['result'] = 'FAIL'
+            nothingToDo['reason'] = 'Error looking up input dataset in DBS'
+            summaryFileName = saveSummaryJson(logdir, nothingToDo)
+            return summaryFileName
+
+        try:
             existing_output = destReadApi.listOutputConfigs(dataset=inputDataset)
-        except Exception:
-            logger.exception('Wrong DBS URL %s', publish_dbs_url)
+        except Exception as ex:
+            logger.exception('Error from listOutputConfigs in %s\n%s', destReadApi.url, ex)
             nothingToDo['result'] = 'FAIL'
             nothingToDo['reason'] = 'Error looking up input dataset in DBS'
             summaryFileName = saveSummaryJson(logdir, nothingToDo)
@@ -619,7 +628,7 @@ def publishInDBS3(config, taskname, verbose):
             acquisitionera = str(toPublish[0]['acquisitionera'])
         else:
             acquisitionera = acquisition_era_name
-    except Exception:
+    except Exception as ex:
         acquisitionera = acquisition_era_name
 
     _, primName, procName, tier = toPublish[0]['outdataset'].split('/')
@@ -630,7 +639,14 @@ def publishInDBS3(config, taskname, verbose):
     if dryRun:
         logger.info("DryRun: skip insertPrimaryDataset")
     else:
-        destApi.insertPrimaryDataset(primds_config)
+        try:
+            destApi.insertPrimaryDataset(primds_config)
+        except:
+            logger.exception('Error inserting PrimaryDataset in %s', destApi.url)
+            nothingToDo['result'] = 'FAIL'
+            nothingToDo['reason'] = 'Error looking up input dataset in DBS'
+            summaryFileName = saveSummaryJson(logdir, nothingToDo)
+            return summaryFileName
         msg = "Successfully inserted primary dataset %s." % (primName)
         logger.info(msg)
 
@@ -801,8 +817,14 @@ def publishInDBS3(config, taskname, verbose):
         if dryRun:
             logger.info("DryRun: skipping migration request")
         else:
-            statusCode, failureMsg = migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi,
-                                                        inputDataset, localParentBlocks, migrationLogDir, verbose)
+            try:
+                statusCode, failureMsg = migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi,
+                                                            inputDataset, localParentBlocks, migrationLogDir,
+                                                            verbose)
+            except Exception as ex:
+                logger.exception('Exception raised inside migrateByBlockDBS3\n%s', ex)
+                statusCode = 1
+                failureMsg = 'Exception raised inside migrateByBlockDBS3'
             if statusCode:
                 failureMsg += " Not publishing any files."
                 logger.info(failureMsg)
@@ -815,8 +837,14 @@ def publishInDBS3(config, taskname, verbose):
         if dryRun:
             logger.info("DryRun: skipping migration request")
         else:
-            statusCode, failureMsg = migrateByBlockDBS3(taskname, migrateApi, destReadApi, globalApi,
-                                                        inputDataset, globalParentBlocks, migrationLogDir, verbose)
+            try:
+                statusCode, failureMsg = migrateByBlockDBS3(taskname, migrateApi, destReadApi, globalApi,
+                                                            inputDataset, globalParentBlocks, migrationLogDir,
+                                                            verbose)
+            except Exception as ex:
+                logger.exception('Exception raised inside migrateByBlockDBS3\n%s', ex)
+                statusCode = 1
+                failureMsg = 'Exception raised inside migrateByBlockDBS3'
             if statusCode:
                 failureMsg += " Not publishing any files."
                 logger.info(failureMsg)

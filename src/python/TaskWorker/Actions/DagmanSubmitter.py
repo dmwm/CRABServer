@@ -86,8 +86,6 @@ SUBMIT_INFO = [ \
     ('MaxWallTimeMinsProbe', 'maxproberuntime'),
     ('MaxWallTimeMinsTail', 'maxtailruntime'),
     ('JobPrio', 'tm_priority'),
-    ('CRAB_ASOURL', 'tm_asourl'),
-    ('CRAB_ASODB', 'tm_asodb'),
     ('CRAB_FailedNodeLimit', 'faillimit'),
     ('CRAB_DashboardTaskType', 'taskType'),
     ('CRAB_MaxIdle', 'maxidle'),
@@ -491,9 +489,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["Environment"] = classad.ExprTree('strcat("PATH=/usr/bin:/bin CRAB3_VERSION=3.3.0-pre1 CONDOR_ID=", ClusterId, ".", ProcId," %s")' % " ".join(info['additional_environment_options'].split(";")))
         dagAd["RemoteCondorSetup"] = info['remote_condor_setup']
 
-        dagAd["CRAB_TaskSubmitTime"] = classad.ExprTree("%s" % info["start_time"].encode('ascii', 'ignore'))
+        dagAd["CRAB_TaskSubmitTime"] = info['start_time']
         dagAd['CRAB_TaskLifetimeDays'] = TASKLIFETIME // 24 // 60 // 60
-        dagAd['CRAB_TaskEndTime'] = int(info["start_time"]) + TASKLIFETIME
+        dagAd['CRAB_TaskEndTime'] = int(info['start_time']) + TASKLIFETIME
         #For task management info see https://github.com/dmwm/CRABServer/issues/4681#issuecomment-302336451
         dagAd["LeaveJobInQueue"] = classad.ExprTree("true")
         dagAd["PeriodicHold"] = classad.ExprTree("time() > CRAB_TaskEndTime")
@@ -529,7 +527,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd["TransferInput"] = str(info['inputFilesString'])
 
         condorIdDict = {}
-        with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], pickleOut=True, outputObj=condorIdDict, logger=self.logger) as (parent, rpipe):
+        tokenDir = getattr(self.config.TaskWorker, 'SEC_TOKEN_DIRECTORY', None)
+        with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], tokenDir,
+                                                   pickleOut=True, outputObj=condorIdDict,
+                                                   logger=self.logger) as (parent, rpipe):
             if not parent:
                 resultAds = []
                 condorIdDict['ClusterId'] = schedd.submit(dagAd, 1, True, resultAds)

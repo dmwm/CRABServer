@@ -43,7 +43,7 @@ class Splitter(TaskAction):
                 splitparam['files_per_job'] = (len(data.getFiles()) + numProbes - 1) // numProbes
         elif kwargs['task']['tm_job_type'] == 'PrivateMC':
             # sanity check
-            nJobs = kwargs['task']['tm_totalunits'] / splitparam['events_per_job']
+            nJobs = kwargs['task']['tm_totalunits'] // splitparam['events_per_job']
             if nJobs > maxJobs:
                 raise TaskWorkerException(
                     "Your task would generate %s jobs. The maximum number of jobs in each task is %s" %

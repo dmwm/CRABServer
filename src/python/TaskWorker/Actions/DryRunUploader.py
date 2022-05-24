@@ -136,5 +136,5 @@ class SplittingSummary(object):
                             'avg_files': sum(self.filesPerJob)/float(len(self.filesPerJob)),
                             'min_files': min(self.filesPerJob)})
 
-        with open(outname, 'wb') as f:
+        with open(outname, 'w') as f:
             json.dump(summary, f)

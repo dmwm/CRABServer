@@ -47,6 +47,7 @@ class DagmanResubmitter(TaskAction):
         if task['tm_collector']:
             self.backendurls['htcondorPool'] = task['tm_collector']
         loc = HTCondorLocator.HTCondorLocator(self.backendurls)
+        tokenDir = getattr(self.config.TaskWorker, 'SEC_TOKEN_DIRECTORY', None)
 
         schedd = ""
         dummyAddress = ""
@@ -87,24 +88,15 @@ class DagmanResubmitter(TaskAction):
         overwrite = False
         for taskparam in params.values():
             if ('resubmit_'+taskparam in task) and task['resubmit_'+taskparam] != None:
-                # In case resubmission parameters contain a list of unicode strings,
-                # convert it to a list of ascii strings because of HTCondor unicode
-                # incompatibility.
-                # Note that unicode strings that are not in a list are not handled,
-                # but so far they don't exist in this part of the code.
+                # py3: we can revert changes coming from #5317
                 if isinstance(task['resubmit_'+taskparam], list):
-                    nonUnicodeList = []
-                    for p in task['resubmit_'+taskparam]:
-                        if isinstance(p, unicode):
-                            nonUnicodeList.append(p.encode('ascii', 'ignore'))
-                        else:
-                            nonUnicodeList.append(p)
-                    ad[taskparam] = nonUnicodeList
+                    ad[taskparam] = task['resubmit_'+taskparam]
                 if taskparam != 'jobids':
                     overwrite = True
 
         if ('resubmit_jobids' in task) and task['resubmit_jobids']:
-            with HTCondorUtils.AuthenticatedSubprocess(proxy, logger=self.logger) as (parent, rpipe):
+            with HTCondorUtils.AuthenticatedSubprocess(proxy, tokenDir,
+                                                       logger=self.logger) as (parent, rpipe):
                 if not parent:
                     schedd.edit(rootConst, "HoldKillSig", 'SIGKILL')
                     ## Overwrite parameters in the os.environ[_CONDOR_JOB_AD] file. This will affect
@@ -121,7 +113,8 @@ class DagmanResubmitter(TaskAction):
                     schedd.act(htcondor.JobAction.Release, rootConst)
         elif overwrite:
             self.logger.debug("Resubmitting under condition overwrite = True")
-            with HTCondorUtils.AuthenticatedSubprocess(proxy, logger=self.logger) as (parent, rpipe):
+            with HTCondorUtils.AuthenticatedSubprocess(proxy, tokenDir,
+                                                       logger=self.logger) as (parent, rpipe):
                 if not parent:
                     for adparam, taskparam in params.items():
                         if taskparam in ad:
@@ -138,7 +131,8 @@ class DagmanResubmitter(TaskAction):
             ## starting from CRAB 3.3.16 the resubmission parameters are written to the
             ## Task DB with value != None, so the overwrite variable should never be False.
             self.logger.debug("Resubmitting under condition overwrite = False")
-            with HTCondorUtils.AuthenticatedSubprocess(proxy, logger=self.logger) as (parent, rpipe):
+            with HTCondorUtils.AuthenticatedSubprocess(proxy, tokenDir,
+                                                       logger=self.logger) as (parent, rpipe):
                 if not parent:
                     schedd.edit(rootConst, "HoldKillSig", 'SIGKILL')
                     schedd.edit(rootConst, "CRAB_ResubmitList", classad.ExprTree("true"))

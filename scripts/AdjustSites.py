@@ -210,7 +210,10 @@ def makeWebDir(ad):
     """
     Need a doc string here.
     """
-    path = os.path.expanduser("~/%s" % ad['CRAB_ReqName'])
+    if 'AuthTokenId' in ad:
+        path = os.path.expanduser("/home/grid/%s/%s" % (ad['CRAB_UserHN'], ad['CRAB_ReqName']))
+    else:
+        path = os.path.expanduser("~/%s" % ad['CRAB_ReqName'])
     try:
         ## Create the web directory.
         os.makedirs(path)
@@ -315,7 +318,7 @@ def saveProxiedWebdir(crabserver, ad):
     if proxied_webDir: # Prefer the proxied webDir to the non-proxied one
         ad[webDir_adName] = str(proxied_webDir)
 
-    if ad[webDir_adName]:
+    if webDir_adName in ad:
         # This condor_edit is required because in the REST interface we look for the webdir if the DB upload failed (or in general if we use the "old logic")
         # See https://github.com/dmwm/CRABServer/blob/3.3.1507.rc8/src/python/CRABInterface/HTCondorDataWorkflow.py#L398
         dagJobId = '%d.%d' % (ad['ClusterId'], ad['ProcId'])

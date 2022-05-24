@@ -97,8 +97,6 @@ CRAB_Id = $(count)
 +CRAB_OutTempLFNDir = "%(temp_dest)s"
 +CRAB_OutLFNDir = "%(output_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s
-+CRAB_ASOURL = %(tm_asourl)s
-+CRAB_ASODB = %(tm_asodb)s
 +CRAB_PrimaryDataset = %(primarydataset)s
 +TaskType = "Job"
 accounting_group = %(accounting_group)s
@@ -284,7 +282,7 @@ def transform_strings(data):
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'primarydataset', 'splitalgo', 'algoargs', \
                'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
-               'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', 'tm_asourl', 'tm_asodb', \
+               'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', \
                'stageoutpolicy', 'taskType', 'worker_name', 'cms_wmtool', 'cms_tasktype', 'cms_type', \
                'desired_arch', 'resthost', 'dbinstance', 'submitter_ip_addr', \
                'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
@@ -465,9 +463,6 @@ class DagmanCreator(TaskAction):
         info['tfileoutfiles'] = task['tm_tfile_outfiles']
         info['edmoutfiles'] = task['tm_edm_outfiles']
         info['oneEventMode'] = 1 if info['tm_one_event_mode'] == 'T' else 0
-        info['ASOURL'] = task['tm_asourl']
-        asodb = task.get('tm_asodb', 'asynctransfer') or 'asynctransfer'
-        info['ASODB'] = asodb
         info['taskType'] = self.getDashboardTaskType(task)
         info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
         info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
@@ -606,6 +601,8 @@ class DagmanCreator(TaskAction):
                 localOutputFiles.append("%s=%s" % (origFile, fileName))
             remoteOutputFilesStr = " ".join(remoteOutputFiles)
             localOutputFiles = ", ".join(localOutputFiles)
+            # no need to use // in the next line, thanks to integer formatting with `%d`
+            # see: https://docs.python.org/3/library/string.html#formatstrings
             counter = "%04d" % (i / 1000)
             tempDest = os.path.join(temp_dest, counter)
             directDest = os.path.join(dest, counter)

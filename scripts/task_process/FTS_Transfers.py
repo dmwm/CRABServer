@@ -81,7 +81,7 @@ def mark_transferred(ids, crabserver):
         data['list_of_ids'] = ids
         data['list_of_transfer_state'] = ["DONE" for _ in ids]
 
-        crabserver.post('/filetransfers', data=encodeRequest(data))
+        crabserver.post('filetransfers', data=encodeRequest(data))
         logging.info("Marked good %s", ids)
     except Exception:
         logging.exception("Error updating documents")
@@ -105,7 +105,7 @@ def mark_failed(ids, failures_reasons, crabserver):
         data['list_of_failure_reason'] = failures_reasons
         data['list_of_retry_value'] = [0 for _ in ids]
 
-        crabserver.post('/filetransfers', data=encodeRequest(data))
+        crabserver.post('filetransfers', data=encodeRequest(data))
         logging.info("Marked failed %s", ids)
     except Exception:
         logging.exception("Error updating documents")
@@ -451,7 +451,7 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
                 #    jobContent.write(str(f[0]))  # save the list of src_lfn's in this job
 
     for fileDoc in to_update:
-        _ = crabserver.post('/filetransfers', data=encodeRequest(fileDoc))
+        _ = crabserver.post('filetransfers', data=encodeRequest(fileDoc))
         logging.info("Marked submitted %s files", fileDoc['list_of_ids'])
 
     return jobids

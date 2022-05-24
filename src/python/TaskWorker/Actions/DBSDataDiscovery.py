@@ -259,7 +259,11 @@ class DBSDataDiscovery(DataDiscovery):
             dbsurl = dbsurl.replace(hostname, self.config.Services.DBSHostName)
         self.logger.info("will connect to DBS at URL: %s", dbsurl)
         self.dbs = DBSReader(dbsurl)
-        self.dbsInstance = self.dbs.dbs.serverinfo()["dbs_instance"]
+        # with new DBS, we can not get the instance from serverinfo api
+        # instead, we parse it from the URL
+        # if url is 'https://cmsweb.cern.ch/dbs/prod/global/DBSReader'
+        # then self.dbsInstance needs to be 'prod/global'
+        self.dbsInstance = "{}/{}".format(dbsurl.split("//")[1].split("/")[2], dbsurl.split("//")[1].split("/")[3])
 
         self.taskName = kwargs['task']['tm_taskname']           # pylint: disable=W0201
         self.username = kwargs['task']['tm_username']           # pylint: disable=W0201

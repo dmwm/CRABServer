@@ -33,7 +33,7 @@ if sys.version_info < (3, 0):
     from urllib import urlencode, quote
 
 BOOTSTRAP_CFGFILE_DUMP = 'PSetDump.py'
-FEEDBACKMAIL = 'hn-cms-computing-tools@cern.ch'
+FEEDBACKMAIL = 'cmstalk+computing-tools@dovecotmta.cern.ch'
 
 # Parameters for User File Cache
 # 120 MB is the maximum allowed size of a single file

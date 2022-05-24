@@ -5,7 +5,6 @@ via periodical partition dropping, but is kept as reference of how to use
 the filemetadata delete API
 """
 import sys
-import urllib
 import logging
 from http.client import HTTPException
 
