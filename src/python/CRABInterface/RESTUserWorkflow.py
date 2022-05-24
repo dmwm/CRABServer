@@ -452,10 +452,6 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("publication", param, safe, optional=True)
 
         elif method in ['GET']:
-            # obsolete, but need to be here as long as client can use them in URL's
-            validate_str("asourl", param, safe, RX_ANYTHING, optional=True)
-            validate_str("asodb", param, safe, RX_ANYTHING, optional=True)
-
             validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
             validate_str('subresource', param, safe, RX_SUBRESTAT, optional=True)
             validate_str('username', param, safe, RX_USERNAME, optional=True)
@@ -605,10 +601,7 @@ class RESTUserWorkflow(RESTEntity):
             return self.userworkflowmgr.proceed(workflow=workflow)
 
     @restcall
-    #def get(self, workflow, subresource, username, limit, shortformat, exitcode, jobids, verbose, timestamp):
-    # ref #6844 once CRAB Client is updated to stop usign obsolete asourl/asodb  params, uncomment line above
-    # and delete line below. At the same remove validation of asourl/asodb from the validate method above
-    def get(self, workflow, subresource, username, limit, shortformat, exitcode, jobids, verbose, timestamp, asourl, asodb):
+    def get(self, workflow, subresource, username, limit, shortformat, exitcode, jobids, verbose, timestamp):
         """Retrieves the workflow information, like a status summary, in case the workflow unique name is specified.
            Otherwise returns all workflows since (now - age) for which the user is the owner.
            The caller needs to be a valid CMS user.
