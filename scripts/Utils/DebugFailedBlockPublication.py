@@ -35,7 +35,7 @@ def main():
     #migUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSMigrate'
     phy3Url = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSReader'
     #globUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/global/DBSReader'
-    destUrl = 'https://cmsweb-prod.cernprod.ch/dbs/prod/phys03/DBSWriter'
+    destUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSWriter'
     #apiG = DbsApi(url=globUrl)
     apiP3 = DbsApi(url=phy3Url)
     #apiMig = DbsApi(url=migUrl)
