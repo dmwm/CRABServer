@@ -43,6 +43,9 @@ def main():
 
     with open(filePath) as fp:
         blockData = fp.read()
+    if '//' in blockData:
+        print('New DBS does not like "//" in LFN, replacing with single "/"')
+        blockData = blockData.replace('//', '/')
     # from pprint.pprint format to a dictionary (slow, unsafe, but handy)
     block = eval(blockData)  # pylint: disable=eval-used
 
