@@ -746,7 +746,7 @@ def publishInDBS3(config, taskname, verbose):
                     try:
                         blocksDict = destReadApi.listBlocks(logical_file_name=parentFile)
                     except:
-                        parentsToSkip.add(parentFile)
+                        file_['parents'].remove(parentFile)
                         continue
                     if not blocksDict:
                         # No, this parent file is not in the destination DBS instance.
