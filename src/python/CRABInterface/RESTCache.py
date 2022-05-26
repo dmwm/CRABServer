@@ -85,10 +85,6 @@ class RESTCache(RESTEntity):
         cacheSSL = cacheSSL.rstrip('/')
         bucket = cacheSSL.split('/')[-1]
         endpoint = 'https://s3.cern.ch'  # hardcode this. In case it can be moved to the s3Dict in config
-        # next 3 lines are a hack for #7268 , until IPV6 connectiviyt in K8s is fixed
-        import socket
-        s3ip = socket.gethostbyname('s3.cern.ch')  # gets only IPV4 addresses
-        endpoint = 'https://' + s3ip
         self.s3_bucket = bucket
         self.s3_client = boto3.client('s3', endpoint_url=endpoint, aws_access_key_id=access_key,
                                       aws_secret_access_key=secret_key)
