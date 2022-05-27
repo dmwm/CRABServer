@@ -2,9 +2,9 @@ from __future__ import division
 import os
 import uuid
 import logging
-import cherrypy
 import boto3
 from botocore.exceptions import ClientError
+import cherrypy
 
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
@@ -86,6 +86,11 @@ class RESTCache(RESTEntity):
         bucket = cacheSSL.split('/')[-1]
         endpoint = 'https://s3.cern.ch'  # hardcode this. In case it can be moved to the s3Dict in config
         self.s3_bucket = bucket
+        # hack to force IPV4 (requires validate=False in boto3.client instantiation)
+        import socket
+        s3IpNum = socket.gethostbyname('s3.cern.ch')
+        endpoint = 'https://' + s3IpNum
+        self.s3IpNum = s3IpNum  # need to remember which IP was used
         self.s3_client = boto3.client('s3', endpoint_url=endpoint, aws_access_key_id=access_key,
                                       aws_secret_access_key=secret_key, verify=False)
 
@@ -112,7 +117,7 @@ class RESTCache(RESTEntity):
             if objecttype == 'sandbox':
                 if not tarballname:
                     raise MissingParameter("tarballname is missing")
-                ownerName = authenticatedUserName if subresource=='upload' else username
+                ownerName = authenticatedUserName if subresource == 'upload' else username
                 # sandbox goes in bucket/username/sandboxes/
                 objectPath = ownerName + '/sandboxes/' + tarballname
             else:
@@ -155,12 +160,14 @@ class RESTCache(RESTEntity):
                 preSignedUrl = response
             except ClientError as e:
                 raise ExecutionError("Connection to s3.cern.ch failed:\n%s" % str(e))
+            # when using hack to force IPV4, need to remove it in URL passed to client
+            preSignedUrl['url'] = preSignedUrl['url'].replace(self.s3IpNum, 's3.cern.ch')
             # somehow it does not work to return preSignedUrl as a single object
             return [preSignedUrl['url'], preSignedUrl['fields']]
 
         if subresource == 'download':
             authz_operator(username=ownerName, group='crab3', role='operator')
-            if subresource=='sandbox' and not username:
+            if subresource == 'sandbox' and not username:
                 raise MissingParameter("username is missing")
             # returns a PreSignedUrl to download the file within the expiration time
             expiration = 60 * 60  # 1 hour default is good for retries and debugging
@@ -168,12 +175,14 @@ class RESTCache(RESTEntity):
                 expiration = 60*60 * 24 * 30 # for logs make url valid as long as we keep files (1 month)
             try:
                 with MeasureTime(self.logger, modulename=__name__, label="get.download.generate_presigned_post") as _:
-                    response = self.s3_client.generate_presigned_url('get_object',
-                                            Params={'Bucket': self.s3_bucket, 'Key': s3_objectKey},
-                                            ExpiresIn=expiration)
+                    response = self.s3_client.generate_presigned_url(
+                        'get_object', Params={'Bucket': self.s3_bucket, 'Key': s3_objectKey},
+                        ExpiresIn=expiration)
                 preSignedUrl = response
             except ClientError as e:
                 raise ExecutionError("Connection to s3.cern.ch failed:\n%s" % str(e))
+            # when using hack to force IPV4, need to remove it in URL passed to client
+            preSignedUrl = preSignedUrl.replace(self.s3IpNum, 's3.cern.ch')
             return preSignedUrl
 
         if subresource == 'retrieve':
