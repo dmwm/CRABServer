@@ -28,6 +28,8 @@ class Create(DBCreator):
         # // Define create statements for each table
         #//
         #  //255 chars for tm_task_status is even too much
+        # tm_asourl and tm_asodb are not used anymore, keep them here until we rename/reuse
+        #  or remove from DB
         self.create['b_tasks'] = """
         CREATE TABLE tasks(
         tm_taskname VARCHAR(255) NOT NULL,

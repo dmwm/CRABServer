@@ -18,7 +18,7 @@ from CRABInterface.DataUserWorkflow import DataUserWorkflow
 from CRABInterface.RESTExtensions import authz_owner_match
 from CRABInterface.Regexps import (RX_TASKNAME, RX_ACTIVITY, RX_JOBTYPE, RX_GENERATOR, RX_LUMIEVENTS, RX_CMSSW, RX_ARCH, RX_DATASET,
     RX_CMSSITE, RX_SPLIT, RX_CACHENAME, RX_CACHEURL, RX_LFN, RX_USERFILE, RX_VOPARAMS, RX_DBSURL, RX_LFNPRIMDS, RX_OUTFILES,
-    RX_RUNS, RX_LUMIRANGE, RX_ASOURL, RX_ASODB, RX_SCRIPTARGS, RX_SCHEDD_NAME, RX_COLLECTOR, RX_SUBRESTAT, RX_JOBID, RX_ADDFILE,
+    RX_RUNS, RX_LUMIRANGE, RX_SCRIPTARGS, RX_SCHEDD_NAME, RX_COLLECTOR, RX_SUBRESTAT, RX_JOBID, RX_ADDFILE,
     RX_ANYTHING, RX_USERNAME, RX_DATE, RX_MANYLINES_SHORT)
 from CRABInterface.Utilities import CMSSitesCache, conn_handler, getDBinstance
 from ServerUtilities import checkOutLFN, generateTaskName
@@ -221,67 +221,6 @@ class RESTUserWorkflow(RESTEntity):
             setattr(invalidp, 'trace', '')
             raise invalidp
 
-    def _getAsoConfig(self, asourl, asodb):
-        """ Figures out which asourl and asodb to use. Here some rules:
-            1) If ASOURL is set up in the client then use it. If ASODB is None then default to 'asynctransfer' (for old clients).
-               If ASODB is defined but ASOURL is not, then give an error (somebody is doing it wrong!).
-            2) If ASOURL is not defined in the client then look at the external configuration of the server which looks like:
-                ...
-                "ASOURL" : "https://cmsweb.cern.ch/couchdb",
-                "asoConfig" : [
-                    {"couchURL" : "https://cmsweb.cern.ch/couchdb", "couchDBName" : "asynctransfer"},
-                    {"couchURL" : "https://cmsweb-testbed.cern.ch/couchdb2", "couchDBName" : "asynctransfer1"}
-                ]
-                ...
-
-                2.1) The external configuration contains asoConfig (the new and default thing now):
-                     Pick up a random element from the list and figures out the asourl and asodb.
-                     No validation of the configuration is done,
-                     we assume asocConfig is a list that contains dicts (at least one),
-                     and each dict has both couchURL and couchDBName.
-                     Documentation about the external conf is here:
-                         https://twiki.cern.ch/twiki/bin/view/CMSPublic/CMSCrabRESTInterface#External_dynamic_configuration
-                2.2) Else if the external configuration contains the old key ASOURL:
-                     ASOURL could either be a string (the value for asourl that we need to use) or a list (in which case
-                     we will use a random element)
-            3) If asourl is not defined in the client nor in the external config give an error.
-        """
-
-        ASYNC_DEFAULT_DB = 'asynctransfer'
-
-        #1) The user is trying to pass something to us
-        if asourl:
-            self.logger.info("ASO url and database defined in the client configuration")
-            if not asodb:
-                asodb = ASYNC_DEFAULT_DB
-        if asodb and not asourl:
-            raise ExecutionError("You set up Debug.ASODB but you did not set up Debug.ASOURL. Please specify ASOURL as well or remove ASODB.")
-
-        #2) We need to figure out the values ourselves
-        if not asourl: #just checking asourl here because either both asourl and asodb are set, or neither are
-            extconf = self.centralcfg.centralconfig.get("backend-urls", {})
-            #2.1) Get asourl and asodb from the new extrnal configuration (that's what we usually do for most of the users)
-            if 'asoConfig' in extconf:
-                asoconf = random.choice(extconf['asoConfig'])
-                asourl = asoconf['couchURL']
-                asodb = asoconf['couchDBName']
-            #2.2) No asoConfig defined, let's look for the old ASOURL.
-            elif 'ASOURL' in extconf:
-                msg = "You are using the old ASOURL parameter in your external configuration, please use asoConfig instead."
-                msg += "\nSee https://twiki.cern.ch/twiki/bin/view/CMSPublic/CMSCrabRESTInterface#External_dynamic_configuration"
-                self.logger.warning(msg)
-                if isinstance(extconf['ASOURL'], list):
-                    asourl = random.choice(asourl)
-                else:
-                    asourl = extconf['ASOURL']
-                asodb = ASYNC_DEFAULT_DB
-
-        #3) Give an error if we cannot figure out aso configuration
-        if not (asourl and asodb):
-            raise ExecutionError("The server configuration is wrong (asoConfig missing): cannot figure out ASO urls.")
-
-        return asourl, asodb
-
     def _checkSite(self, site, pnn=False):
         """ Check a single site like T2_IT_Something against known CMS site names
         """
@@ -469,9 +408,6 @@ class RESTUserWorkflow(RESTEntity):
             if len(safe.kwargs["runs"]) != len(safe.kwargs["lumis"]):
                 raise InvalidParameter("The number of runs and the number of lumis lists are different")
             validate_strlist("adduserfiles", param, safe, RX_ADDFILE)
-            validate_str("asourl", param, safe, RX_ASOURL, optional=True)
-            validate_str("asodb", param, safe, RX_ASODB, optional=True)
-            safe.kwargs["asourl"], safe.kwargs["asodb"] = self._getAsoConfig(safe.kwargs["asourl"], safe.kwargs["asodb"])
             validate_str("scriptexe", param, safe, RX_ADDFILE, optional=True)
             validate_strlist("scriptargs", param, safe, RX_SCRIPTARGS)
             validate_str("scheddname", param, safe, RX_SCHEDD_NAME, optional=True)
@@ -531,10 +467,6 @@ class RESTUserWorkflow(RESTEntity):
             ## used by errors and report (short format in report means we do not query DBS)
             validate_num('shortformat', param, safe, optional=True)
 
-            # used by publicationStatus
-            validate_str("asourl", param, safe, RX_ASOURL, optional=True)
-            validate_str("asodb", param, safe, RX_ASODB, optional=True)
-
             ## validation parameters
             if not safe.kwargs['workflow'] and safe.kwargs['subresource']:
                 raise InvalidParameter("Invalid input parameters")
@@ -553,7 +485,7 @@ class RESTUserWorkflow(RESTEntity):
             savelogsflag, publication, publishname, publishname2, publishgroupname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup,
             tfileoutfiles, edmoutfiles, runs, lumis,
             totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
-            faillimit, ignorelocality, userfiles, asourl, asodb, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun, ignoreglobalblacklist):
+            faillimit, ignorelocality, userfiles, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun, ignoreglobalblacklist):
         """Perform the workflow injection
 
            :arg str workflow: request name defined by the user;
@@ -601,8 +533,6 @@ class RESTUserWorkflow(RESTEntity):
            :arg int faillimit: the maximum number of failed jobs which triggers a workflow abort.
            :arg int ignorelocality: whether to ignore file locality in favor of the whitelist.
            :arg str userfiles: The files to process instead of a DBS-based dataset.
-           :arg str asourl: ASO url to be used in place of the one in the ext configuration.
-           :arg str asodb: ASO db to be used in place of the one in the ext configuration. Default to asynctransfer.
            :arg str scriptexe: script to execute in place of cmsrun.
            :arg str scriptargs: arguments to be passed to the scriptexe script.
            :arg str scheddname: Schedd Name used for debugging.
@@ -623,7 +553,7 @@ class RESTUserWorkflow(RESTEntity):
                                            dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,
                                            edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
                                            maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfn=lfn,
-                                           ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles, asourl=asourl, asodb=asodb,
+                                           ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles,
                                            scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname, extrajdl=extrajdl, collector=collector, dryrun=dryrun,
                                            submitipaddr=cherrypy.request.headers['X-Forwarded-For'], ignoreglobalblacklist=ignoreglobalblacklist)
 
@@ -663,7 +593,7 @@ class RESTUserWorkflow(RESTEntity):
             return self.userworkflowmgr.proceed(workflow=workflow)
 
     @restcall
-    def get(self, workflow, subresource, username, limit, shortformat, exitcode, jobids, verbose, timestamp, asourl, asodb):
+    def get(self, workflow, subresource, username, limit, shortformat, exitcode, jobids, verbose, timestamp):
         """Retrieves the workflow information, like a status summary, in case the workflow unique name is specified.
            Otherwise returns all workflows since (now - age) for which the user is the owner.
            The caller needs to be a valid CMS user.
@@ -696,7 +626,7 @@ class RESTUserWorkflow(RESTEntity):
             elif subresource == 'report2':
                 result = self.userworkflowmgr.report2(workflow, userdn=userdn, usedbs=shortformat)
             elif subresource == 'publicationstatus':
-                result = self.userworkflowmgr.publicationStatus(workflow, asourl, asodb, username)
+                result = self.userworkflowmgr.publicationStatus(workflow, username)
             elif subresource == 'taskads':
                 result = self.userworkflowmgr.taskads(workflow)
             # if here means that no valid subresource has been requested

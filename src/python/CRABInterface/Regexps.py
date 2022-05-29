@@ -98,9 +98,6 @@ RX_STATUS = re.compile(r"^[A-Za-z_]{1,20}$")
 RX_USERNAME = re.compile(r"^[A-Za-z_:0-9]{1,100}$")
 RX_DATE = re.compile(r"^(19|20)\d\d[- /.](0[1-9]|1[012])[- /.](0[1-9]|[12][0-9]|3[01])$")
 
-RX_ASOURL = RX_DBSURL
-RX_ASODB = RX_USERNAME
-
 ## user dn
 RX_DN = re.compile(r"^/(?:C|O|DC)=.*/CN=.")
 ## worker subresources
