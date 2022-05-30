@@ -29,6 +29,10 @@ def parse_result(listOfTasks):
 
     for task in listOfTasks:
         if task['dbStatus'] == 'SUBMITTED' and task['status'] != 'FAILED':
+            # remove failed probe jobs (job id of X-Y kind) if any from count
+            for job in task['jobs'].keys():
+                if '-' in job and task['jobs'][job]['State'] == 'failed':
+                    task['jobsPerStatus']['failed'] -= 1
             total_jobs = sum(task['jobsPerStatus'].values())
 
             if ('finished', total_jobs) in task['jobsPerStatus'].items():
