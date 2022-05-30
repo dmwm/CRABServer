@@ -29,6 +29,11 @@ def parse_result(listOfTasks):
 
     for task in listOfTasks:
         if task['dbStatus'] == 'SUBMITTED' and task['status'] != 'FAILED':
+            # remove failed probe jobs (job id of X-Y kind) if any from count
+            for job in task['jobs'].keys():
+                if '-' in job and task['jobs'][job]['State'] == 'failed':
+                    task['jobsPerStatus']['failed'] -= 1
+
             total_jobs = sum(task['jobsPerStatus'].values())
 
             if ('finished', total_jobs) in task['jobsPerStatus'].items():
@@ -60,7 +65,6 @@ def main():
     for task in tasks:
         remake_dict = {'task': task, 'instance': instance}
         remake_dir = crab_cmd({'cmd': 'remake', 'args': remake_dict})
-
         status_dict = {'dir': remake_dir}
         status_command_output = crab_cmd({'cmd': 'status', 'args': status_dict})
         status_command_output.update({'taskName': task.rstrip()})
