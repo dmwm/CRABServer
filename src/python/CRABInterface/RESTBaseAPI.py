@@ -114,7 +114,7 @@ class TraceIDFilter(logging.Filter):
     """
     def filter(self, record):
         try:
-            record.trace_id = cherrypy.request.db['handle']['trace']
+            record.trace_id = cherrypy.request.db['handle']['trace'].replace('RESTSQL:','')
         except KeyError:
             record.trace_id = ""
         return True
