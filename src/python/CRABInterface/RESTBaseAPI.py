@@ -96,9 +96,25 @@ class RESTBaseAPI(DatabaseRESTApi):
         logger = logging.getLogger('CRABLogger')
         if loglevel:
             hdlr = logging.handlers.TimedRotatingFileHandler(logfile, when='D', interval=1, backupCount=keptDays)
-            formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(module)s:%(message)s')
+            formatter = logging.Formatter('%(asctime)s:%(trace_id)s:%(levelname)s:%(module)s:%(message)s')
             hdlr.setFormatter(formatter)
+            # add trace_id to log with filter class
+            f = TraceIDFilter()
+            hdlr.addFilter(f)
+
             logger.addHandler(hdlr)
             logger.setLevel(loglevel)
         else:
             logger.addHandler( NullHandler() )
+
+
+class TraceIDFilter(logging.Filter):
+    """
+    Add trace_id to log record and use it in formatter.
+    """
+    def filter(self, record):
+        try:
+            record.trace_id = cherrypy.request.db['handle']['trace']
+        except KeyError:
+            record.trace_id = ""
+        return True
