@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 import logging
+import traceback
 
 import cherrypy
 from subprocess import getstatusoutput
@@ -115,6 +116,7 @@ class TraceIDFilter(logging.Filter):
     def filter(self, record):
         try:
             record.trace_id = cherrypy.request.db['handle']['trace'].replace('RESTSQL:','')
-        except KeyError:
+        except Exception:  # pylint: disable=broad-except
+            traceback.print_exc()
             record.trace_id = ""
         return True
