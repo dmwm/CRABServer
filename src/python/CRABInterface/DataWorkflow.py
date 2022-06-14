@@ -2,6 +2,7 @@ import copy
 import time
 import logging
 import datetime
+import json
 from ast import literal_eval
 
 ## WMCore dependecies
@@ -96,7 +97,7 @@ class DataWorkflow(object):
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, scriptexe=None, scriptargs=None,
                scheddname=None, extrajdl=None, collector=None, dryrun=False, publishgroupname=False, nonvaliddata=False, inputdata=None, primarydataset=None,
-               debugfilename=None, submitipaddr=None, ignoreglobalblacklist=False):
+               debugfilename=None, submitipaddr=None, ignoreglobalblacklist=False, user_config={}):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -170,6 +171,73 @@ class DataWorkflow(object):
 
         arguments = {}
 
+        # construct user config kv
+        user_config_default = {
+            #'task_name': workflow,
+            #'task_activity': activity, # HammerCloud
+            #'task_status': 'NEW',
+            #'task_command': 'SUBMIT',
+            #'task_failure': '',
+            'tm_job_sw': jobsw, # job_sw
+            'tm_job_arch': jobarch, # job_arch
+            'tm_input_dataset': inputdata, # input_dataset
+            'tm_primary_dataset': primarydataset, # primary_dataset
+            'tm_nonvalid_input_dataset': 'T' if nonvaliddata else 'F', # nonvalid_data
+            'tm_use_parent': use_parent,
+            'tm_secondary_input_dataset': secondarydata, # secondary_dataset
+            'tm_generator': generator, # generator
+            'tm_events_per_lumi': events_per_lumi, #events_per_lumi
+            'tm_site_blacklist': dbSerializer(sitewhitelist), #site_whitelist
+            'tm_site_blacklist': dbSerializer(siteblacklist), #'site_blacklist'
+            'tm_split_algo': splitalgo, # split_algo
+            'tm_split_args': dbSerializer({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName: algoargs, 'runs': runs, 'lumis': lumis}), #split_args
+            'tm_totalunits': totalunits, # total_units
+            'tm_user_sandbox': cachefilename, # user_sandbox
+            'tm_debug_files': debugfilename, # debug_files
+            'tm_cache_url': cacheurl, # cache_url
+            #'username': username,
+            #'user_dn': userdn,
+            #'user_vo': 'cms',
+            #'user_role': vorole,
+            #'user_group': vogroup,
+            'tm_publish_name': publishname2, # publish_name
+            'tm_publish_groupname': 'T' if publishgroupname else 'F', # publish_groupname
+            'tm_asyncdest': asyncdest, # asyncdest
+            'tm_dbs_url': dbsurl, # dbs_url
+            'tm_publish_dbs_url': publishdbsurl, # publish_dbs_url
+            'tm_publication': 'T' if publication else 'F', # publication
+            'tm_outfiles': dbSerializer(addoutputfiles), # outfiles
+            'tm_tfile_outfiles': dbSerializer(tfileoutfiles), # tfile_outfiles
+            'tm_edm_outfiles': dbSerializer(edmoutfiles), # edm_outfiles
+            'tm_job_type': jobtype, # job_type
+            #'arguments': dbSerializer(arguments),
+            'tm_save_logs': 'T' if savelogsflag else 'F', # save_logs
+            'tm_user_infiles': dbSerializer(adduserfiles), # user_infiles
+            'tm_maxjobruntime': maxjobruntime, # maxjobruntime
+            'tm_numcores': numcores, # numcores
+            'tm_maxmemory': maxmemory, # maxmemory
+            'tm_priority': priority, # priority
+            'tm_scriptexe': scriptexe, # scriptexe
+            'tm_scriptargs': dbSerializer(scriptargs), # scriptargs
+            'tm_extrajdl': dbSerializer(extrajdl), # extrajdl
+            'tm_collector': collector, # collector
+            #'schedd_name': scheddname,
+            #'dry_run': 'T' if dryrun else 'F',
+            'tm_user_files': dbSerializer(userfiles), # user_files
+            'tm_transfer_outputs': 'T' if saveoutput else 'F', # transfer_outputs
+            'tm_output_lfn': lfn, # output_lfn
+            'tm_ignore_locality': 'T' if ignorelocality else 'F', # ignore_locality
+            'tm_fail_limit': faillimit, # fail_limit
+            'tm_one_event_mode': 'T' if oneEventMode else 'F', # one_event_mode
+            #'submitter_ip_addr': submitipaddr,
+            'tm_ignore_global_blacklist': 'T' if ignoreglobalblacklist else 'F', # ignore_global_blacklist
+            # new config
+        }
+        user_config_default.update(user_config)
+        user_config = user_config_default
+
+
+
         ## Insert this new task into the Tasks DB.
         self.api.modify(self.Task.New_sql,
                             task_name       = [workflow],
@@ -230,7 +298,8 @@ class DataWorkflow(object):
                             fail_limit       = [faillimit],
                             one_event_mode   = ['T' if oneEventMode else 'F'],
                             submitter_ip_addr= [submitipaddr],
-                            ignore_global_blacklist = ['T' if ignoreglobalblacklist else 'F']
+                            ignore_global_blacklist = ['T' if ignoreglobalblacklist else 'F'],
+                            user_config     = [json.dumps(user_config)],
         )
 
         return [{'RequestName': workflow}]
@@ -429,4 +498,3 @@ class DataWorkflow(object):
         binds['new_publication_state'] = [PUBLICATIONDB_STATUSES['NEW']]
         self.api.modifynocheck(self.transferDB.RetryUserPublication_sql, **binds)
         return
-
