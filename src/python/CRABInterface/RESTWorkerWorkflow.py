@@ -93,7 +93,7 @@ class RESTWorkerWorkflow(RESTEntity):
         for row in rows:
             import pdb; pdb.set_trace()
             row_list = list(row)
-            row_list[-1] = json.loads(row[-1])
+            row_list[-1] = json.loads(row[-1].read())
             newtask = self.Task.GetReadyTasks_tuple(*row_list)
             yield fixupTask(newtask)
 
