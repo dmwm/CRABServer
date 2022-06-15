@@ -418,6 +418,7 @@ class DBSDataDiscovery(DataDiscovery):
         if secondaryDataset:
             secondaryBlocksWithLocation = secondaryLocationsMap.copy().keys()
 
+        self.logger.debug("kwargs['task']['tm_user_config']['partial_dataset'] = %s" % str(kwargs['task']['tm_user_config']['partial_dataset']))
         # filter out TAPE locations
         # temporary hack until we have a new config. parameter: allow user to accpet a partial dataset
         # by inserting '0' as (first element of) runRange

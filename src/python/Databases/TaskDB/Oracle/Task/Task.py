@@ -70,7 +70,8 @@ class Task(object):
                        "tm_scriptexe", "tm_scriptargs", "tm_extrajdl", "tm_generator", "tm_events_per_lumi", \
                        "tm_use_parent", "tm_collector", "tm_schedd", "tm_dry_run", \
                        "tm_user_files", "tm_transfer_outputs", "tm_output_lfn", "tm_ignore_locality", "tm_fail_limit", "tm_one_event_mode", \
-                       "tm_publish_groupname", "tm_nonvalid_input_dataset", "tm_secondary_input_dataset", "tm_primary_dataset", "tm_submitter_ip_addr", "tm_ignore_global_blacklist"])
+                       "tm_publish_groupname", "tm_nonvalid_input_dataset", "tm_secondary_input_dataset", "tm_primary_dataset", \
+                       "tm_submitter_ip_addr", "tm_ignore_global_blacklist", "tm_user_config"])
     #GetReadyTasks
     GetReadyTasks_sql = """SELECT tm_taskname, tm_task_status, tm_task_command, \
                        tm_start_time, tm_start_injection, tm_end_injection, \
@@ -84,7 +85,8 @@ class Task(object):
                        tm_scriptexe, tm_scriptargs, tm_extrajdl, tm_generator, tm_events_per_lumi, \
                        tm_use_parent, tm_collector, tm_schedd, tm_dry_run, \
                        tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode, \
-                       tm_publish_groupname, tm_nonvalid_input_dataset, tm_secondary_input_dataset, tm_primary_dataset, tm_submitter_ip_addr, tm_ignore_global_blacklist \
+                       tm_publish_groupname, tm_nonvalid_input_dataset, tm_secondary_input_dataset, tm_primary_dataset, \
+                       tm_submitter_ip_addr, tm_ignore_global_blacklist, tm_user_config \
                        FROM tasks WHERE tm_task_status = :get_status AND ROWNUM <= :limit AND tw_name LIKE :tw_name
                        ORDER BY tm_start_time ASC"""
 

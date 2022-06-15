@@ -15,6 +15,7 @@ from CRABInterface.Regexps import (RX_MANYLINES_SHORT, RX_TASKNAME, RX_WORKER_NA
 
 # external dependecies here
 from ast import literal_eval
+import json
 
 
 class RESTWorkerWorkflow(RESTEntity):
@@ -91,6 +92,7 @@ class RESTWorkerWorkflow(RESTEntity):
         rows = self.api.query(None, None, self.Task.GetReadyTasks_sql, **binds)
         for row in rows:
             newtask = self.Task.GetReadyTasks_tuple(*row)
+            newtask['tm_user_config'] = json.loads(newtask['tm_user_config'])
             yield fixupTask(newtask)
 
 
