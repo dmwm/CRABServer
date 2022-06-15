@@ -420,17 +420,7 @@ class DBSDataDiscovery(DataDiscovery):
 
         self.logger.debug("kwargs['task']['tm_user_config']['partial_dataset'] = %s" % str(kwargs['task']['tm_user_config']['partial_dataset']))
         # filter out TAPE locations
-        # temporary hack until we have a new config. parameter: allow user to accpet a partial dataset
-        # by inserting '0' as (first element of) runRange
-        usePartialDataset = False
         runRange = kwargs['task']['tm_split_args']['runs']
-        if runRange and runRange[0] == '0':
-            usePartialDataset = True
-            # remove initial '0' from run list
-            # note that it caused an extra entry to be created in lumilis as well
-            kwargs['task']['tm_split_args']['runs'] = kwargs['task']['tm_split_args']['runs'][1:]
-            kwargs['task']['tm_split_args']['lumis'] = kwargs['task']['tm_split_args']['lumis'][1:]
-            runRange = kwargs['task']['tm_split_args']['runs']
 
         self.keepOnlyDiskRSEs(locationsMap)
         if not locationsMap:
@@ -443,7 +433,7 @@ class DBSDataDiscovery(DataDiscovery):
                 self.requestTapeRecall(blockList=blocksWithLocation, system='Rucio', msgHead=msg)
         if set(locationsMap.keys()) != set(blocksWithLocation):
             dataTier = inputDataset.split('/')[3]
-            if usePartialDataset:
+            if kwargs['task']['tm_user_config']['partial_dataset']:
                 msg = "Some blocks are on TAPE only and can not be reaed."
                 msg += "\nSince you specified to accept a partial dataset, only blocks on disk will be processed"
                 self.logger.warning(msg)
@@ -463,6 +453,7 @@ class DBSDataDiscovery(DataDiscovery):
         # will not need lumi info if user has asked for split by file with no run/lumi mask
         splitAlgo = kwargs['task']['tm_split_algo']
         lumiMask = kwargs['task']['tm_split_args']['lumis']
+        runRange = kwargs['task']['tm_split_args']['runs']
 
         needLumiInfo = splitAlgo != 'FileBased' or lumiMask != [] or runRange != []
         # secondary dataset access relies on run/lumi info
