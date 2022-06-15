@@ -91,9 +91,11 @@ class RESTWorkerWorkflow(RESTEntity):
         binds = {"limit": limit, "tw_name": workername, "get_status": getstatus}
         rows = self.api.query(None, None, self.Task.GetReadyTasks_sql, **binds)
         for row in rows:
-            import pdb; pdb.set_trace()
+            # get index of tm_user_config to load data from clob and load json string
+            row_namedtuple = self.Task.GetReadyTasks_tuple(*row)
             row_list = list(row)
-            row_list[63] = json.loads(row_list[63].read())
+            user_config_index = row_namedtuple.index(row_namedtuple.tm_user_config)
+            row_list[user_config_index] = json.loads(row_list[user_config_index].read())
             newtask = self.Task.GetReadyTasks_tuple(*row_list)
             yield fixupTask(newtask)
 
