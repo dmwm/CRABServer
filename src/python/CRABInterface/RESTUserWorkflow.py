@@ -545,7 +545,7 @@ class RESTUserWorkflow(RESTEntity):
 
         #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
         user_config = {
-            'partial_dataset': partialdataset
+            'partial_dataset': True if partialdataset else False
         }
         return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch,
                                            inputdata=inputdata, primarydataset=primarydataset, nonvaliddata=nonvaliddata, use_parent=useparent,
