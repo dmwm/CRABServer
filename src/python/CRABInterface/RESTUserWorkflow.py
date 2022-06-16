@@ -543,10 +543,10 @@ class RESTUserWorkflow(RESTEntity):
            :arg int dryrun: enable dry run mode (initialize but do not submit request).
            :returns: a dict which contaians details of the request"""
 
-        #print 'cherrypy headers: %s' % cherrypy.request.headers['Ssl-Client-Cert']
         user_config = {
-            'partial_dataset': True if partialdataset else False
+            'partialdataset': True if partialdataset else False
         }
+
         return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch,
                                            inputdata=inputdata, primarydataset=primarydataset, nonvaliddata=nonvaliddata, use_parent=useparent,
                                            secondarydata=secondarydata, generator=generator, events_per_lumi=eventsperlumi,

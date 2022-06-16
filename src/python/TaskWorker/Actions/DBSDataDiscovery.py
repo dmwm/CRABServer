@@ -418,10 +418,7 @@ class DBSDataDiscovery(DataDiscovery):
         if secondaryDataset:
             secondaryBlocksWithLocation = secondaryLocationsMap.copy().keys()
 
-        self.logger.debug("kwargs['task']['tm_user_config']['partial_dataset'] = %s" % str(kwargs['task']['tm_user_config']['partial_dataset']))
         # filter out TAPE locations
-        runRange = kwargs['task']['tm_split_args']['runs']
-
         self.keepOnlyDiskRSEs(locationsMap)
         if not locationsMap:
             msg = "Task could not be submitted because there is no DISK replica for dataset %s" % inputDataset
@@ -433,7 +430,7 @@ class DBSDataDiscovery(DataDiscovery):
                 self.requestTapeRecall(blockList=blocksWithLocation, system='Rucio', msgHead=msg)
         if set(locationsMap.keys()) != set(blocksWithLocation):
             dataTier = inputDataset.split('/')[3]
-            if kwargs['task']['tm_user_config']['partial_dataset']:
+            if kwargs['task']['tm_user_config']['partialdataset']:
                 msg = "Some blocks are on TAPE only and can not be reaed."
                 msg += "\nSince you specified to accept a partial dataset, only blocks on disk will be processed"
                 self.logger.warning(msg)
