@@ -297,7 +297,7 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir):
             logger.debug("Migration terminally failed, log to %s", failedMigrationsLog)
             # FiledMigFile format is CSV: id,creationDate,creationTime,block(s)
             with open(failedMigrationsLog, 'a') as fp:
-                line = "%d,%s,%s\n" % (reqid, migCreation, migInput)
+                line = "%d,%s,%s,%s\n" % (reqid, migCreation, migInput, taskname)
                 fp.write(line)
             # in May 2019 has a storm of failed migration which needed the following cleanup
             # keep the code in case we ever need to do the same again, but do not activate it
