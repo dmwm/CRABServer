@@ -1795,10 +1795,10 @@ class PostJob():
             def valid(fi):
                 return fi['input_source_class'] == 'PoolSource' and fi.get('input_type', '') == "primaryFiles"
 
-            outsize = sum(fi['outsize'] for fi in self.output_files_info)
+            outsize = sum(fi['outsize'] for fi in self.output_files_info)  # in bytes
             events = sum(fi.get('events', 0) for fi in report['input']['source'] if valid(fi))
 
-            eventsize = (outsize // events) if events > 0 else 0
+            eventsize = (outsize // events + 1) if events > 0 else 0  # do not round to zero small eventsize
 
             json.dump([throughput, eventsize], fd)
 
