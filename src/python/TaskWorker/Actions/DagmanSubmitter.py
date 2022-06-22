@@ -38,6 +38,10 @@ except ImportError:
     classad = None
     htcondor = None
 
+# FIXME
+# WARNING! THE NEXT LINE IS BROKEN ON PURPOSE TO TEST JENKINS PYLINT PIPELINE
+except
+
 
 ## These are the CRAB attributes that we want to add to the job class ad when
 ## using the submitDirect() method.

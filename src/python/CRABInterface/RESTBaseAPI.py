@@ -24,6 +24,10 @@ from CRABInterface.DataFileMetadata import DataFileMetadata
 from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
 
+# FIXME
+# WARNING! THE NEXT LINE IS BROKEN ON PURPOSE TO TEST JENKINS PYLINT PIPELINE
+except
+
 #In case the log level is not specified in the configuration we use the NullHandler and we do not print messages
 #The NullHandler is included as of python 3.1
 class NullHandler(logging.Handler):
