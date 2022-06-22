@@ -3,6 +3,8 @@
 from __future__ import division
 from __future__  import print_function
 import os
+import json
+import subprocess
 import argparse
 
 from dbs.apis.dbsClient import DbsApi
@@ -26,12 +28,13 @@ def main():
     # if X509 vars are not defined, use default Publisher location
     userProxy = os.getenv('X509_USER_PROXY')
     if userProxy:
-        os.environ['X509_USER_CERT'] = userProxy
-        os.environ['X509_USER_KEY'] = userProxy
-    if not os.getenv('X509_USER_CERT'):
-        os.environ['X509_USER_CERT'] = '/data/certs/servicecert.pem'
-    if not os.getenv('X509_USER_KEY'):
-        os.environ['X509_USER_KEY'] = '/data/certs/servicekey.pem'
+        x509Cert = userProxy
+        x509Key = userProxy
+    else:
+        x509Cert = os.getenv('X509_USER_CERT') if os.getenv('X509_USER_CERT') else '/data/certs/servicecert.pem'
+        x509Key = os.getenv('X509_USER_KEY') if os.getenv('X509_USER_KEY') else '/data/certs/servicekey.pem'
+    os.environ['X509_USER_CERT'] = x509Cert
+    os.environ['X509_USER_KEY'] = x509Key
     #migUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSMigrate'
     phy3Url = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSReader'
     #globUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/global/DBSReader'
@@ -101,10 +104,32 @@ def main():
         apiDest.insertBulkBlock(block)
     except Exception as ex:
         print("Publication failed with exception:\n%s" % str(ex))
+        print('Make one more try using direct curl POST')
+        jsonFile = '/tmp/block.json'
+        with open(jsonFile, 'w') as fp:
+            json.dump(block, fp)
+        print('block dumped to %s' % jsonFile)
+        # if json is big, zip it
+        gzip = os.stat(jsonFile).st_size > 1024*1024  # 1 MByte
+        if gzip:
+            cmd = 'gzip %s' % jsonFile
+            subprocess.call(cmd, shell=True)
+            print('json file was over 1MB, zipped')
+        cmd = 'curl -sS --cert %s  --key %s -H "Content-type: application/json" ' % (x509Cert, x509Key)
+        if gzip:
+            cmd += ' -H "Content-Encoding: gzip" --data-binary  @%s  ' % (jsonFile + '.gz')
+        else:
+            cmd += ' -d@%s  ' % jsonFile
+        cmd += destUrl + '/bulkblocks'
+        print('will execute:\n%s' % cmd)
+        ret = subprocess.call(cmd, shell=True)
+        if ret == 0:
+            print("\nBlock publication done OK")
         return
     print("Block publication done OK")
 
     return
 
 if __name__ == '__main__':
+
     main()
