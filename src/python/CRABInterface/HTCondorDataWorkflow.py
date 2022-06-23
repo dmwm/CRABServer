@@ -156,8 +156,8 @@ class HTCondorDataWorkflow(DataWorkflow):
         res['runsAndLumis'] = {}
         for row in rows:
             jobidstr = row[GetFromTaskAndType.JOBID]
-            retRow = {'parents': row[GetFromTaskAndType.PARENTS],
-                      'runlumi': row[GetFromTaskAndType.RUNLUMI],
+            retRow = {'parents': row[GetFromTaskAndType.PARENTS].read(),
+                      'runlumi': row[GetFromTaskAndType.RUNLUMI].read(),
                       'events': row[GetFromTaskAndType.INEVENTS],
                       'type': row[GetFromTaskAndType.TYPE],
                       'lfn': row[GetFromTaskAndType.LFN],
