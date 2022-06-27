@@ -73,7 +73,7 @@ def main():
     #if answer != 'Yes':
     #    return
     print("\nSubmitting new migration request...")
-    globUrl = 'https://cmsweb-prod.cern.ch/dbsold/prod/global/DBSReader'
+    globUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/global/DBSReader'
     data = {'migration_url': globUrl, 'migration_input': block}
     result = apiMig.submitMigration(data)
     newId = result.get('migration_details', {}).get('migration_request_id')
