@@ -99,9 +99,9 @@ class CRAB3ProxyRenewer(object):
         role = ''
         if 'CRAB_UserVO' in ad and ad['CRAB_UserVO']:
             vo = ad['CRAB_UserVO']
-        if 'CRAB_UserGroup' in ad and ad['CRAB_UserGroup'] and ad['CRAB_UserGroup'] != classad.Value.Undefined:
+        if 'CRAB_UserGroup' in ad and ad['CRAB_UserGroup'] and ad['CRAB_UserGroup'] is not classad.Value.Undefined:
             group = ad['CRAB_UserGroup']
-        if 'CRAB_UserRole' in ad and ad['CRAB_UserRole'] and ad['CRAB_UserRole'] != classad.Value.Undefined:
+        if 'CRAB_UserRole' in ad and ad['CRAB_UserRole'] and ad['CRAB_UserRole'] is not classad.Value.Undefined:
             role = ad['CRAB_UserRole']
         username = ad['CRAB_UserHN']
         proxycfg = {'vo': vo,
@@ -179,9 +179,9 @@ class CRAB3ProxyRenewer(object):
             role = ''
             if 'CRAB_UserVO' in ad and ad['CRAB_UserVO']:
                 vo = ad['CRAB_UserVO']
-            if 'CRAB_UserGroup' in ad and ad['CRAB_UserGroup'] and ad['CRAB_UserGroup'] != classad.Value.Undefined:
+            if 'CRAB_UserGroup' in ad and ad['CRAB_UserGroup'] and ad['CRAB_UserGroup'] is not classad.Value.Undefined:
                 group = ad['CRAB_UserGroup']
-            if 'CRAB_UserRole' in ad and ad['CRAB_UserRole'] and ad['CRAB_UserRole'] != classad.Value.Undefined:
+            if 'CRAB_UserRole' in ad and ad['CRAB_UserRole'] and ad['CRAB_UserRole'] is not classad.Value.Undefined:
                 role = ad['CRAB_UserRole']
             key = (user, vo, group, role)
             ad_list = ads.setdefault(key, [])
