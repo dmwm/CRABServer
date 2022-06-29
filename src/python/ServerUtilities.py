@@ -892,8 +892,15 @@ class MeasureTime:
     with MeasureTime(logger, modulename=__name__, label="myfuncname") as _:
         myfuncname()
 
+    You can access contextmanager's variable outside "with" statement to
+    get the elapsed time and use in your own code like this:
+
+    with MeasureTime() as mt:
+        ret = c.executemany(None, *binds, **kwbinds)
+    cherrypy.log("%s executemany time: %6f" % (trace, mt.perf_counter,))
+
     """
-    def __init__(self, logger, modulename="", label=""):
+    def __init__(self, logger=None, modulename="", label=""):
         self.logger = logger
         self.modulename = modulename
         self.label = label
@@ -910,8 +917,9 @@ class MeasureTime:
         self.perf_counter = time.perf_counter() - self.perf_counter
         self.readout = 'tot={:.4f} proc={:.4f} thread={:.4f}'.format(
                  self.perf_counter, self.process_time, self.thread_time )
-        self.logger.info("MeasureTime:seconds - modulename=%s label='%s' - %s",
-                 self.modulename, self.label, self.readout)
+        if self.logger:
+            self.logger.info("MeasureTime:seconds - modulename=%s label='%s' - %s",
+                    self.modulename, self.label, self.readout)
 
 
 def get_size(obj, seen=None):

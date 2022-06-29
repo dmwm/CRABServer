@@ -4,11 +4,8 @@ import re
 import json
 import time
 import copy
-import tarfile
 import io
 import tempfile
-import calendar
-import cherrypy
 from ast import literal_eval
 
 import pycurl

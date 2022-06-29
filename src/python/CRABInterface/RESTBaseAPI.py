@@ -3,7 +3,6 @@ import logging
 import traceback
 
 import cherrypy
-import time
 from subprocess import getstatusoutput
 from time import mktime, gmtime
 
@@ -92,7 +91,7 @@ class RESTBaseAPI(DatabaseRESTApi):
     def execute(self, sql, *binds, **kwbinds):
         """overrides WMCore/REST/Server.py/DatabaseRESTApi.execute() function
            in order to measure time used by cursor.execute(). Code is copied
-           from WMCore but we sandwich cursor.execute() with time.perf_counter().
+           from WMCore but we sandwich cursor.execute() with MeasureTime().
         """
         c = self.prepare(sql)
         trace = cherrypy.request.db["handle"]["trace"]
@@ -100,10 +99,9 @@ class RESTBaseAPI(DatabaseRESTApi):
         trace and cherrypy.log("%s execute: %s %s" % (trace, binds, kwbinds))
         if cherrypy.request.db['type'].__name__ == 'MySQLdb':
             return c, c.execute(sql, kwbinds)
-        start_time = time.perf_counter()
-        ret = c.execute(None, *binds, **kwbinds)
-        elapsed_time = time.perf_counter() - start_time
-        cherrypy.log("%s execute time: %6f" % (trace, elapsed_time,))
+
+        with MeasureTime(self.logger, modulename=__name__, label="RESTBaseAPI.execute") as mt:
+            ret = c.execute(None, *binds, **kwbinds)
         return c, ret
 
     def executemany(self, sql, *binds, **kwbinds):
@@ -117,10 +115,8 @@ class RESTBaseAPI(DatabaseRESTApi):
         trace and cherrypy.log("%s executemany: %s %s" % (trace, binds, kwbinds))
         if cherrypy.request.db['type'].__name__ == 'MySQLdb':
             return c, c.executemany(sql, binds[0])
-        start_time = time.perf_counter()
-        ret = c.executemany(None, *binds, **kwbinds)
-        elapsed_time = time.perf_counter() - start_time
-        cherrypy.log("%s executemany time: %6f" % (trace, elapsed_time,))
+        with MeasureTime(self.logger, modulename=__name__, label="RESTBaseAPI.executemany") as mt:
+            ret = c.executemany(None, *binds, **kwbinds)
         return c, ret
 
     def query_load_all_rows(self, match, select, sql, *binds, **kwbinds):
@@ -150,7 +146,15 @@ class RESTBaseAPI(DatabaseRESTApi):
                             tmp = _FakeLOB(new_row[i].read())
                             new_row[i] = tmp
                     ret.append(new_row)
-                self.logger.info('query_size=%d strlen=%d' % (get_size(ret), len(str(ret))))
+                # Temporary add strlen and MeasureTime to see how much difference
+                # between get_size and strlen and and how long does it take in
+                    # production env.
+                with MeasureTime() as size_time:
+                    size = get_size(ret)
+                with MeasureTime() as strlen_time:
+                    strlen = len(str(ret))
+                self.logger.info('query_size=%d strlen=%d query_size_time=%.6f strlen_time=%.6f',
+                                 size, strlen, size_time.perf_counter, strlen_time.perf_counter)
                 all_rows = iter(ret)  # return as iterable object
         return all_rows
 
