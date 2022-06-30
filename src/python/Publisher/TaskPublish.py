@@ -555,9 +555,9 @@ def publishInDBS3(config, taskname, verbose):
 
     # create DBS API objects
     logger.info("DBS Source API URL: %s", sourceURL)
-    sourceApi = dbsClient.DbsApi(url=sourceURL)
+    sourceApi = dbsClient.DbsApi(url=sourceURL, debug=True)
     logger.info("DBS Global API URL: %s", globalURL)
-    globalApi = dbsClient.DbsApi(url=globalURL)
+    globalApi = dbsClient.DbsApi(url=globalURL, debug=True)
 
     if publish_dbs_url.endswith('/DBSWriter'):
         publish_read_url = publish_dbs_url[:-len('/DBSWriter')] + '/DBSReader'
@@ -568,11 +568,11 @@ def publishInDBS3(config, taskname, verbose):
         publish_dbs_url += '/DBSWriter'
     try:
         logger.info("DBS Destination API URL: %s", publish_dbs_url)
-        destApi = dbsClient.DbsApi(url=publish_dbs_url)
+        destApi = dbsClient.DbsApi(url=publish_dbs_url, debug=True)
         logger.info("DBS Destination read API URL: %s", publish_read_url)
-        destReadApi = dbsClient.DbsApi(url=publish_read_url)
+        destReadApi = dbsClient.DbsApi(url=publish_read_url, debug=True)
         logger.info("DBS Migration API URL: %s", publish_migrate_url)
-        migrateApi = dbsClient.DbsApi(url=publish_migrate_url)
+        migrateApi = dbsClient.DbsApi(url=publish_migrate_url, debug=True)
     except Exception as ex:
         logger.exception('Error creating DBS APIs, likely wrong DBS URL %s\n%s', publish_dbs_url, ex)
         nothingToDo['result'] = 'FAIL'
