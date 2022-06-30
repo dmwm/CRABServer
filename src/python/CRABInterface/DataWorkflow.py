@@ -390,8 +390,6 @@ class DataWorkflow(object):
         warnings = str(warnings)
 
         if row.task_status in ['SUBMITTED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED', 'KILLED', 'TAPERECALL']:
-            #Set arguments first so in case of failure we don't do any "damage"
-            self.api.modify(self.Task.SetArgumentsTask_sql, taskname = [workflow])
             self.api.modify(self.Task.SetStatusWarningTask_sql, status = ["NEW"], command = ["KILL"], taskname = [workflow], warnings = [str(warnings)])
         elif row.task_status == 'NEW' and row.task_command == 'SUBMIT':
             #if the task has just been submitted and not acquired by the TW
