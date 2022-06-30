@@ -44,7 +44,7 @@ def main():
     #apiMig = DbsApi(url=migUrl, debug=True)
     apiDest = DbsApi(url=destUrl, debug=True)
 
-    with open(filePath, 'r', , encoding='utf8') as fp:
+    with open(filePath, 'r', encoding='utf8') as fp:
         blockData = fp.read()
     if '//' in blockData:
         print('New DBS does not like "//" in LFN, replacing with single "/"')

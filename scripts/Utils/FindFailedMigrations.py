@@ -23,7 +23,7 @@ def readAndParse(csvFile, apiMig):
 
     failedMigrations = []
     ids = set()
-    with open(csvFile, 'r',, encoding='utf8') as fp:
+    with open(csvFile, 'r', encoding='utf8') as fp:
         lines = fp.readlines()
 
     for line in lines:
