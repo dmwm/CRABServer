@@ -72,7 +72,7 @@ def createBulkBlock(output_config, processing_era_config, primds_config, \
         'file_parent_list': file_parent_list
     }
     blockDump['block']['file_count'] = len(files)
-    blockDump['block']['block_size'] = sum([int(file_[u'file_size']) for file_ in files])
+    blockDump['block']['block_size'] = sum([int(file_['file_size']) for file_ in files])
     return blockDump
 
 
@@ -296,7 +296,7 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir):
             failedMigrationsLog = os.path.join(migLogDir, 'TerminallyFailedLog.txt')
             logger.debug("Migration terminally failed, log to %s", failedMigrationsLog)
             # FiledMigFile format is CSV: id,creationDate,creationTime,block(s)
-            with open(failedMigrationsLog, 'a') as fp:
+            with open(failedMigrationsLog, 'a', encoding='utf8') as fp:
                 line = "%d,%s,%s,%s\n" % (reqid, migCreation, migInput, taskname)
                 fp.write(line)
             # in May 2019 has a storm of failed migration which needed the following cleanup
@@ -429,7 +429,7 @@ def publishInDBS3(config, taskname, verbose):
         while os.path.exists(summaryFileName):
             counter += 1
             summaryFileName = os.path.join(logdir, taskname + '-%d.json' % counter)
-        with open(summaryFileName, 'w') as fd:
+        with open(summaryFileName, 'w', encoding='utf8') as fd:
             json.dump(summary, fd)
         return summaryFileName
 
@@ -463,7 +463,7 @@ def publishInDBS3(config, taskname, verbose):
     toPublish = []
     # TODO move from new to done when processed
     fname = taskFilesDir + taskname + ".json"
-    with open(fname) as f:
+    with open(fname, 'r', encoding='utf8') as f:
         toPublish = json.load(f)
 
     if not toPublish:
@@ -478,7 +478,7 @@ def publishInDBS3(config, taskname, verbose):
     # CRABServer REST API's (see CRABInterface)
     try:
         instance = config.General.instance
-    except:
+    except Exception:
         msg = "No instance provided: need to specify config.General.instance in the configuration"
         raise ConfigException(msg)
 
@@ -494,7 +494,7 @@ def publishInDBS3(config, taskname, verbose):
         try:
             restHost = config.General.restHost
             dbInstance = config.General.dbInstance
-        except:
+        except Exception:
             msg = "Need to specify config.General.restHost and dbInstance in the configuration"
             raise ConfigException(msg)
 
@@ -641,7 +641,7 @@ def publishInDBS3(config, taskname, verbose):
     else:
         try:
             destApi.insertPrimaryDataset(primds_config)
-        except:
+        except Exception:
             logger.exception('Error inserting PrimaryDataset in %s', destApi.url)
             nothingToDo['result'] = 'FAIL'
             nothingToDo['reason'] = 'Error looking up input dataset in DBS'
@@ -745,7 +745,7 @@ def publishInDBS3(config, taskname, verbose):
                     # some parent files are illegal DBS names (GH issue #6771), skip them
                     try:
                         blocksDict = destReadApi.listBlocks(logical_file_name=parentFile)
-                    except:
+                    except Exception:
                         file_['parents'].remove(parentFile)
                         continue
                     if not blocksDict:
@@ -870,7 +870,7 @@ def publishInDBS3(config, taskname, verbose):
     # https://github.com/dmwm/CRABServer/issues/6670#issuecomment-965837566
     maxLumisPerBlock = 1.e6  # 1 Million
     nBlocks = float(len(dbsFiles))/float(max_files_per_block)
-    if nLumis > maxLumisPerBlock * nBlocks :
+    if nLumis > maxLumisPerBlock * nBlocks:
         logger.info('Trying to publish %d lumis in %d blocks', nLumis, nBlocks)
         reduction = (nLumis/maxLumisPerBlock)/nBlocks
         max_files_per_block = int(max_files_per_block/reduction)
@@ -920,7 +920,7 @@ def publishInDBS3(config, taskname, verbose):
             failure_reason = str(ex)
             taskFilesDir = config.General.taskFilesDir
             fname = os.path.join(taskFilesDir, 'FailedBlocks', 'failed-block-at-%s.txt' % time.time())
-            with open(fname, 'w') as fd:
+            with open(fname, 'w', encoding='utf8') as fd:
                 fd.write(pprint.pformat(blockDump))
             dumpList.append(fname)
             failedBlocks += 1
@@ -932,7 +932,7 @@ def publishInDBS3(config, taskname, verbose):
             logger.info(msg)
             logsDir = config.General.logsDir
             fname = os.path.join(logsDir, 'STATS.txt')
-            with open(fname, 'a+') as fd:
+            with open(fname, 'a+', encoding='utf8') as fd:
                 fd.write(str(msg+'\n'))
 
         count += max_files_per_block
