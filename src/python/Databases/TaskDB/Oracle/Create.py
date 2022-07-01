@@ -28,8 +28,6 @@ class Create(DBCreator):
         # // Define create statements for each table
         #//
         #  //255 chars for tm_task_status is even too much
-        # tm_asourl and tm_asodb are not used anymore, keep them here until we rename/reuse
-        #  or remove from DB
         self.create['b_tasks'] = """
         CREATE TABLE tasks(
         tm_taskname VARCHAR(255) NOT NULL,
@@ -83,7 +81,6 @@ class Create(DBCreator):
         tm_scriptexe VARCHAR(255),
         tm_scriptargs VARCHAR(4000),
         tm_extrajdl VARCHAR(1000),
-        tm_asourl VARCHAR(4000),
         tm_collector VARCHAR(1000),
         tm_schedd VARCHAR(255),
         tm_dry_run VARCHAR(1),
@@ -98,7 +95,6 @@ class Create(DBCreator):
         tm_last_publication TIMESTAMP,
         tm_debug_files VARCHAR(255),
         clusterid NUMBER(10),
-        tm_asodb VARCHAR(20),
         tm_ignore_global_blacklist VARCHAR(1),
         tm_submitter_ip_addr VARCHAR(45),
         tm_DDM_reqid VARCHAR(32),
