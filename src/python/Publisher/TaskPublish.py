@@ -382,7 +382,7 @@ def publishInDBS3(config, taskname, verbose):
         for lfn in files:
             source_lfn = lfn
             docId = getHashLfn(source_lfn)
-            data = dict()
+            data = {}
             data['asoworker'] = config.General.asoworker
             data['subresource'] = 'updatePublication'
             data['list_of_ids'] = [docId]
@@ -507,7 +507,7 @@ def publishInDBS3(config, taskname, verbose):
                           userAgent='CRABPublisher')
     crabServer.setDbInstance(dbInstance=dbInstance)
 
-    data = dict()
+    data = {}
     data['subresource'] = 'search'
     data['workflow'] = taskname
 
