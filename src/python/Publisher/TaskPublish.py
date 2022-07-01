@@ -883,6 +883,11 @@ def publishInDBS3(config, taskname, verbose):
         nIter += 1
         block_name = "%s#%s" % (dataset, str(uuid.uuid4()))
         files_to_publish = dbsFiles[count:count+max_files_per_block]
+        # makes sure variabled defined in try/except/finally are defined for later use
+        t1 = 0
+        blockSize = '0'
+        didPublish = 'OK'
+        failure_reason = ''
         try:
             block_config = {'block_name': block_name, 'origin_site_name': pnn, 'open_for_writing': 0}
             if verbose:
