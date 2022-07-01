@@ -2,9 +2,9 @@
 
 #Script can be used to setup CRABClient:
 # 1. dev - CRABClient from Intergration Build (IB);
-# 2. GH - CRABClient from CRABClient GH repository master branch. This option requires to set DBS, WMCore and CRABServer tags to use;
+# 2. GH - CRABClient from CRABClient GH repository master branch. This option requires to set which CRABServer tag to use;
 # 3. prod - production CRABClient from cvmfs;
-#Variables ${SCRAM_ARCH}, ${CMSSW_release}, ${CRABServer_tag}, ${CRABClient_version}, ${WMCore_tag}, ${DBS_tag}
+# Variables ${SCRAM_ARCH}, ${CMSSW_release}, ${CRABServer_tag}, ${CRABClient_version}
 # comes from Jenkins job CRABServer_ExecuteTests configuration.
 
 source /cvmfs/cms-ib.cern.ch/latest/cmsset_default.sh
@@ -48,20 +48,20 @@ case $CRABClient_version in
 		git checkout -f ${COMMIT}
 		cd ..
 	fi
-	git clone https://github.com/dmwm/WMCore
-	cd WMCore; git checkout ${WMCore_tag}; cd ..
-	git clone https://github.com/dmwm/DBS
-	cd DBS; git checkout ${DBS_tag}
 	cd ${WORK_DIR}
 	GitDir=${WORK_DIR}
 
-	MY_DBS=${GitDir}/DBS
 	MY_CRAB=${GitDir}/CRABClient
-	MY_WMCORE=${GitDir}/WMCore
 
-	export PYTHONPATH=${MY_DBS}/Client/src/python:${MY_DBS}/PycurlClient/src/python:$PYTHONPATH
-	export PYTHONPATH=${MY_WMCORE}/src/python:$PYTHONPATH
+	# install the fake WMCore dependency for CRABClient, taking inspiration from
+	# https://github.com/cms-sw/cmsdist/blob/b38a4b3339f12706513917153a2ec6cdcb23741c/crab-build.file#L37
+	mkdir -p ${GitDir}/WMCore/src/python/WMCore
+	touch ${GitDir}/WMCore/src/python/__init__.py
+	touch ${GitDir}/WMCore/src/python/WMCore/__init__.py
+	cp ${GitDir}/CRABClient/src/python/CRABClient/WMCoreConfiguration.py ${GitDir}/WMCore/src/python/WMCore/Configuration.py 
+
 	export PYTHONPATH=${MY_CRAB}/src/python:$PYTHONPATH
+	export PYTHONPATH=${GitDir}/WMCore/src/python:$PYTHONPATH
 
 	export PATH=${MY_CRAB}/bin:$PATH
 	source ${MY_CRAB}/etc/crab-bash-completion.sh
