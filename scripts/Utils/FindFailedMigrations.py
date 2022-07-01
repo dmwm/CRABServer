@@ -33,7 +33,7 @@ def readAndParse(csvFile, apiMig):
     print(f"Found {len(uniqueIDs)} unique migration IDs logged as terminally failed")
     for migId in uniqueIDs:
         print(f" {migId}")
-    print(f"Check current status")
+    print("Check current status")
     for migId in uniqueIDs:
         status = apiMig.statusMigration(migration_rqst_id=migId)
         if not status:
@@ -79,7 +79,7 @@ def main():
 
     print(f"Found {len(failedMigrations)} terminally failed migrations")
     if failedMigrations:
-        print(f"   ID\t\tcreated\t\t\tblock")
+        print("   ID\t\tcreated\t\t\tblock")
         for migDict in failedMigrations:
             print(f"{migDict['id']}\t{migDict['created']}\t{migDict['block']}")
 
