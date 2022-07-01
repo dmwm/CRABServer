@@ -23,28 +23,28 @@ def readAndParse(csvFile, apiMig):
 
     failedMigrations = []
     ids = set()
-    with open(csvFile) as fp:
+    with open(csvFile, 'r', encoding='utf8') as fp:
         lines = fp.readlines()
 
     for line in lines:
         items = line.strip().split(',')
         ids.add(int(items[0]))
     uniqueIDs = list(ids)
-    print("Found %d unique migration IDs logged as terminally failed" % len(uniqueIDs))
+    print(f"Found {len(uniqueIDs)} unique migration IDs logged as terminally failed")
     for migId in uniqueIDs:
-        print(" %d" % migId)
+        print(f" {migId}")
     print("Check current status")
     for migId in uniqueIDs:
         status = apiMig.statusMigration(migration_rqst_id=migId)
         if not status:
-            print(" %d has been removed" % migId)
+            print(f"{migId} has been removed")
             continue
         state = status[0].get("migration_status")
         # values for state:
         # 0-request created; 1-in process; 2-succeeded;
         # 3-failed, but has three chances to try; 9-Permanently failed
         if not state == 9:
-            print("%id is in state %d, not 9" % (migId, state))
+            print(f"{migId} is in state {state}, not 9")
             continue
         tFromEpoch = status[0].get("creation_date")
         created = datetime.fromtimestamp(tFromEpoch).strftime('%Y-%m-%d %H:%M:%S')
@@ -73,15 +73,15 @@ def main():
         os.environ['X509_USER_KEY'] = '/data/certs/servicekey.pem'
 
     migUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSMigrate'
-    apiMig = DbsApi(url=migUrl)
+    apiMig = DbsApi(url=migUrl, debug=True)
 
     failedMigrations = readAndParse(logFile, apiMig)
 
-    print("Found %d terminally failed migrations" % len(failedMigrations))
+    print(f"Found {len(failedMigrations)} terminally failed migrations")
     if failedMigrations:
         print("   ID\t\tcreated\t\t\tblock")
         for migDict in failedMigrations:
-            print(" %d\t%s\t%s" % (migDict['id'], migDict['created'], migDict['block']))
+            print(f"{migDict['id']}\t{migDict['created']}\t{migDict['block']}")
 
 if __name__ == '__main__':
     main()

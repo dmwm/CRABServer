@@ -39,12 +39,12 @@ def main():
     phy3Url = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSReader'
     #globUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/global/DBSReader'
     destUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSWriter'
-    #apiG = DbsApi(url=globUrl)
-    apiP3 = DbsApi(url=phy3Url)
-    #apiMig = DbsApi(url=migUrl)
-    apiDest = DbsApi(url=destUrl)
+    #apiG = DbsApi(url=globUrl, debug=True)
+    apiP3 = DbsApi(url=phy3Url, debug=True)
+    #apiMig = DbsApi(url=migUrl, debug=True)
+    apiDest = DbsApi(url=destUrl, debug=True)
 
-    with open(filePath) as fp:
+    with open(filePath, 'r', encoding='utf8') as fp:
         blockData = fp.read()
     if '//' in blockData:
         print('New DBS does not like "//" in LFN, replacing with single "/"')
@@ -106,7 +106,7 @@ def main():
         print("Publication failed with exception:\n%s" % str(ex))
         print('Make one more try using direct curl POST')
         jsonFile = '/tmp/block.json'
-        with open(jsonFile, 'w') as fp:
+        with open(jsonFile, 'w', encoding='utf8') as fp:
             json.dump(block, fp)
         print('block dumped to %s' % jsonFile)
         # if json is big, zip it
