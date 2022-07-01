@@ -478,9 +478,9 @@ def publishInDBS3(config, taskname, verbose):
     # CRABServer REST API's (see CRABInterface)
     try:
         instance = config.General.instance
-    except Exception:
+    except Exception as ex:
         msg = "No instance provided: need to specify config.General.instance in the configuration"
-        raise ConfigException(msg)
+        raise ConfigException(msg) from ex
 
     if instance in SERVICE_INSTANCES:
         logger.info('Will connect to CRAB service: %s', instance)
@@ -494,9 +494,9 @@ def publishInDBS3(config, taskname, verbose):
         try:
             restHost = config.General.restHost
             dbInstance = config.General.dbInstance
-        except Exception:
+        except Exception as ex:
             msg = "Need to specify config.General.restHost and dbInstance in the configuration"
-            raise ConfigException(msg)
+            raise ConfigException(msg) from ex
 
     restURInoAPI = '/crabserver/' + dbInstance
     logger.info('Will connect to CRAB Data Base via URL: https://%s/%s', restHost, restURInoAPI)
