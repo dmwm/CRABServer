@@ -430,6 +430,9 @@ class DBSDataDiscovery(DataDiscovery):
             kwargs['task']['tm_split_args']['runs'] = kwargs['task']['tm_split_args']['runs'][1:]
             kwargs['task']['tm_split_args']['lumis'] = kwargs['task']['tm_split_args']['lumis'][1:]
             runRange = kwargs['task']['tm_split_args']['runs']
+        # or use Data.partialDataset configuration option in client
+        elif kwargs['task']['tm_user_config']['partialdataset']:
+            usePartialDataset = True
 
         self.keepOnlyDiskRSEs(locationsMap)
         if not locationsMap:

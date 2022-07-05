@@ -102,6 +102,7 @@ class Create(DBCreator):
         tm_ignore_global_blacklist VARCHAR(1),
         tm_submitter_ip_addr VARCHAR(45),
         tm_DDM_reqid VARCHAR(32),
+        tm_user_config CLOB,
         CONSTRAINT taskname_pk PRIMARY KEY(tm_taskname),
         CONSTRAINT check_tm_publication CHECK (tm_publication IN ('T', 'F')),
         CONSTRAINT check_tm_publish_groupname CHECK (tm_publish_groupname IN ('T', 'F')),
