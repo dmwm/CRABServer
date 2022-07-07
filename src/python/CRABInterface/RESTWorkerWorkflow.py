@@ -119,7 +119,7 @@ def fixupTask(task):
         fixedCurr = current if (current is None or isinstance(current, str)) else current.read()
         result[field] = fixedCurr
 
-    # fliter_evaluate values
+    # liter_evaluate values
     for field in ['tm_site_whitelist', 'tm_site_blacklist', 'tm_split_args', 'tm_outfiles', 'tm_tfile_outfiles',
                   'tm_edm_outfiles', 'tm_user_infiles', 'tm_arguments', 'tm_scriptargs',
                   'tm_user_files']:
