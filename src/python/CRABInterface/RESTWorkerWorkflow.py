@@ -92,11 +92,7 @@ class RESTWorkerWorkflow(RESTEntity):
         rows = self.api.query(None, None, self.Task.GetReadyTasks_sql, **binds)
         for row in rows:
             # get index of tm_user_config to load data from clob and load json string
-            row_namedtuple = self.Task.GetReadyTasks_tuple(*row)
-            row_list = list(row)
-            user_config_index = row_namedtuple.index(row_namedtuple.tm_user_config)
-            row_list[user_config_index] = json.loads(row_list[user_config_index].read())
-            newtask = self.Task.GetReadyTasks_tuple(*row_list)
+            newtask = self.Task.GetReadyTasks_tuple(*row)
             yield fixupTask(newtask)
 
 
@@ -111,19 +107,19 @@ def fixupTask(task):
 
     result = task._asdict()
 
-    #fixup timestamps
+    # fixup timestamps
     for field in ['tm_start_time', 'tm_start_injection', 'tm_end_injection']:
         current = result[field]
         result[field] = str(getEpochFromDBTime(current)) if current else ''
 
-    #fixup CLOBS values by calling read (only for Oracle)
+    # fixup CLOBS values by calling read (only for Oracle)
     for field in ['tm_task_failure', 'tm_split_args', 'tm_outfiles', 'tm_tfile_outfiles', 'tm_edm_outfiles',
-                  'tm_arguments', 'tm_scriptargs', 'tm_user_files']:
+                  'tm_arguments', 'tm_scriptargs', 'tm_user_files', 'tm_user_config']:
         current = result[field]
         fixedCurr = current if (current is None or isinstance(current, str)) else current.read()
         result[field] = fixedCurr
 
-    #liter_evaluate values
+    # fliter_evaluate values
     for field in ['tm_site_whitelist', 'tm_site_blacklist', 'tm_split_args', 'tm_outfiles', 'tm_tfile_outfiles',
                   'tm_edm_outfiles', 'tm_user_infiles', 'tm_arguments', 'tm_scriptargs',
                   'tm_user_files']:
@@ -138,7 +134,7 @@ def fixupTask(task):
         for idx, val in enumerate(result['tm_split_args'].get(arg)):
             result['tm_split_args'][arg][idx] = decodeBytesToUnicode(val)
 
-    #convert tm_arguments to the desired values
+    # convert tm_arguments to the desired values
     extraargs = result['tm_arguments']
     result['resubmit_publication'] = extraargs['resubmit_publication'] if 'resubmit_publication' in extraargs else None
     result['resubmit_jobids'] = extraargs['resubmit_jobids'] if 'resubmit_jobids' in extraargs else None
@@ -155,4 +151,11 @@ def fixupTask(task):
     result['resubmit_numcores'] = extraargs['numcores'] if 'numcores' in extraargs else None
     result['resubmit_priority'] = extraargs['priority'] if 'priority' in extraargs else None
 
+    # load json data of tm_user_config column
+    # Hard code default value of tm_user_config for backward compatibility
+    # with older task
+    if result['tm_user_config']:
+        result['tm_user_config'] = json.loads(result['tm_user_config'])
+    else:
+        result['tm_user_config'] = {'partialdataset': False}
     return result
