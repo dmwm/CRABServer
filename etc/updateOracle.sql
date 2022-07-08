@@ -120,3 +120,6 @@
 
 --Add the column to store the DDM request ID
 -- ALTER TABLE tasks modify tm_DDM_reqid VARCHAR(32);
+
+--Add new column to store generic user config as json kv
+-- ALTER TABLE tasks ADD tm_user_config CLOB;
