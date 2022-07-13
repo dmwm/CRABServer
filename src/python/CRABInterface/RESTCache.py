@@ -16,6 +16,7 @@ from CRABInterface.RESTExtensions import authz_login_valid, authz_operator
 from CRABInterface.Regexps import RX_SUBRES_CACHE, RX_CACHE_OBJECTTYPE, RX_TASKNAME, RX_USERNAME, RX_TARBALLNAME
 from ServerUtilities import getUsernameFromTaskname, MeasureTime
 
+
 class RESTCache(RESTEntity):
     """
     REST entity for accessing CRAB Cache on S3
@@ -112,7 +113,7 @@ class RESTCache(RESTEntity):
             if objecttype == 'sandbox':
                 if not tarballname:
                     raise MissingParameter("tarballname is missing")
-                ownerName = authenticatedUserName if subresource=='upload' else username
+                ownerName = authenticatedUserName if subresource == 'upload' else username
                 # sandbox goes in bucket/username/sandboxes/
                 objectPath = ownerName + '/sandboxes/' + tarballname
             else:
@@ -160,7 +161,7 @@ class RESTCache(RESTEntity):
 
         if subresource == 'download':
             authz_operator(username=ownerName, group='crab3', role='operator')
-            if subresource=='sandbox' and not username:
+            if subresource == 'sandbox' and not username:
                 raise MissingParameter("username is missing")
             # returns a PreSignedUrl to download the file within the expiration time
             expiration = 60 * 60  # 1 hour default is good for retries and debugging
@@ -168,9 +169,9 @@ class RESTCache(RESTEntity):
                 expiration = 60*60 * 24 * 30 # for logs make url valid as long as we keep files (1 month)
             try:
                 with MeasureTime(self.logger, modulename=__name__, label="get.download.generate_presigned_post") as _:
-                    response = self.s3_client.generate_presigned_url('get_object',
-                                            Params={'Bucket': self.s3_bucket, 'Key': s3_objectKey},
-                                            ExpiresIn=expiration)
+                    response = self.s3_client.generate_presigned_url(
+                        'get_object', Params={'Bucket': self.s3_bucket, 'Key': s3_objectKey},
+                        ExpiresIn=expiration)
                 preSignedUrl = response
             except ClientError as e:
                 raise ExecutionError("Connection to s3.cern.ch failed:\n%s" % str(e))
