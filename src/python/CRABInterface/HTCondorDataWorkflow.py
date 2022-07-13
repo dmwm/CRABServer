@@ -4,10 +4,8 @@ import re
 import json
 import time
 import copy
-import tarfile
 import io
 import tempfile
-import calendar
 from ast import literal_eval
 
 import pycurl
@@ -108,8 +106,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         file_type = 'log' if filetype == ['LOG'] else 'output'
 
         self.logger.debug("Retrieving the %s files of the following jobs: %s" % (file_type, jobids))
-
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow, howmany = howmany)
+        rows = self.api.query_load_all_rows(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow, howmany = howmany)
 
         for row in rows:
             yield {'jobid': row[GetFromTaskAndType.JOBID],
@@ -151,8 +148,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         ## Retrieve the filemetadata of output and input files. (The filemetadata are
         ## uploaded by the post-job after stageout has finished for all output and log
         ## files in the job.)
-        rows = self.api.query(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,FAKE,POOLIN', taskname=workflow, howmany=-1)
-
+        rows = self.api.query_load_all_rows(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype='EDM,TFILE,FAKE,POOLIN', taskname=workflow, howmany=-1)
         # Return only the info relevant to the client.
         res['runsAndLumis'] = {}
         for row in rows:
@@ -660,4 +656,3 @@ class HTCondorDataWorkflow(DataWorkflow):
 
 
     job_name_re = re.compile(r"Job(\d+)")
-

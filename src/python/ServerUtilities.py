@@ -885,15 +885,22 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
 
 class MeasureTime:
     """
-    Context manager to measure how long a portion of code takes. 
+    Context manager to measure how long a portion of code takes.
     It is intended to be used as:
 
     logger = logging.getLogger()
     with MeasureTime(logger, modulename=__name__, label="myfuncname") as _:
         myfuncname()
-    
+
+    You can access contextmanager's variable outside "with" statement to
+    get the elapsed time and use in your own code like this:
+
+    with MeasureTime() as mt:
+        ret = c.executemany(None, *binds, **kwbinds)
+    cherrypy.log("%s executemany time: %6f" % (trace, mt.perf_counter,))
+
     """
-    def __init__(self, logger, modulename="", label=""):
+    def __init__(self, logger=None, modulename="", label=""):
         self.logger = logger
         self.modulename = modulename
         self.label = label
@@ -910,5 +917,29 @@ class MeasureTime:
         self.perf_counter = time.perf_counter() - self.perf_counter
         self.readout = 'tot={:.4f} proc={:.4f} thread={:.4f}'.format(
                  self.perf_counter, self.process_time, self.thread_time )
-        self.logger.info("MeasureTime:seconds - modulename=%s label='%s' - %s", 
-                 self.modulename, self.label, self.readout)
+        if self.logger:
+            self.logger.info("MeasureTime:seconds - modulename=%s label='%s' - %s",
+                    self.modulename, self.label, self.readout)
+
+
+def get_size(obj, seen=None):
+    """Recursively finds size of objects
+    Copy from https://gist.github.com/bosswissam/a369b7a31d9dcab46b4a034be7d263b2#file-pysize-py"""
+
+    size = sys.getsizeof(obj)
+    if seen is None:
+        seen = set()
+    obj_id = id(obj)
+    if obj_id in seen:
+        return 0
+    # Important mark as seen *before* entering recursion to gracefully handle
+    # self-referential objects
+    seen.add(obj_id)
+    if isinstance(obj, dict):
+        size += sum([get_size(v, seen) for v in obj.values()])
+        size += sum([get_size(k, seen) for k in obj.keys()])
+    elif hasattr(obj, '__dict__'):
+        size += get_size(obj.__dict__, seen)
+    elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes, bytearray)):
+        size += sum([get_size(i, seen) for i in obj])
+    return size
