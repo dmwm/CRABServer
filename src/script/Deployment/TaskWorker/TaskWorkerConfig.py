@@ -74,8 +74,11 @@ config.TaskWorker.retry_interval = [30, 60, 120, 0]
 #Default False. If true dagman will not retry the job on ASO failures
 config.TaskWorker.retryOnASOFailures = True
 #Dafault 0. If -1 no ASO timeout, if transfer is stuck in ASO we'll retry the postjob FOREVER (well, eventually a dagman timeout for the node will be hit).
-#If 0 default timeout of 4 to 6 hours will be used. If specified the timeout set will be used (minutes).
+#If 0 default timeout of 4 to 6 hours will be used. If specified the timeout set will be used (seconds).
 config.TaskWorker.ASOTimeout = 86400
+
+#When Rucio is used for ASO, we should be prepared to wait for a longer time
+config.TaskWorker.ASORucioTimeout = 86400 * 7  # seven days
 
 # Control the ordering of stageout attempts.
 # - remote means a copy from the worker node to the final destination SE directly.
