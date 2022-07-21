@@ -15,7 +15,7 @@ import hashlib
 import tempfile
 from ast import literal_eval
 
-from ServerUtilities import insertJobIdSid, MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
+from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
 from ServerUtilities import getLock, downloadFromS3
 
 import TaskWorker.WorkerExceptions
@@ -1101,7 +1101,6 @@ class DagmanCreator(TaskAction):
 
         highPrioUsers = set()
         try:
-            from ldap import LDAPError
             for egroup in egroups:
                 highPrioUsers.update(get_egroup_users(egroup))
         except Exception as ex:
