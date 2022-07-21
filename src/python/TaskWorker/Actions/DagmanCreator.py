@@ -15,7 +15,7 @@ import hashlib
 import tempfile
 from ast import literal_eval
 
-from ServerUtilities import insertJobIdSid, MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
+from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
 from ServerUtilities import getLock, downloadFromS3
 
 import TaskWorker.WorkerExceptions
@@ -467,7 +467,11 @@ class DagmanCreator(TaskAction):
         info['taskType'] = self.getDashboardTaskType(task)
         info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
         info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
-        info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASOTimeout', 0)
+        if task['tm_output_lfn'].startswith('/store/user/rucio') or \
+            task['tm_output_lfn'].startswith('/store/group/rucio'):
+            info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASORucioTimeout', 0)
+        else:
+            info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASOTimeout', 0)
         info['submitter_ip_addr'] = task['tm_submitter_ip_addr']
         info['cms_wmtool'] = self.setCMS_WMTool(task)
         info['cms_tasktype'] = self.setCMS_TaskType(task)
@@ -1097,7 +1101,6 @@ class DagmanCreator(TaskAction):
 
         highPrioUsers = set()
         try:
-            from ldap import LDAPError
             for egroup in egroups:
                 highPrioUsers.update(get_egroup_users(egroup))
         except Exception as ex:
