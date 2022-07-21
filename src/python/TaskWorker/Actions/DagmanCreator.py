@@ -467,7 +467,11 @@ class DagmanCreator(TaskAction):
         info['taskType'] = self.getDashboardTaskType(task)
         info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
         info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
-        info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASOTimeout', 0)
+        if kwargs['task']['tm_output_lfn'].startswith('/store/user/rucio') or \
+            kwargs['task']['tm_output_lfn'].startswith('/store/group/rucio'):
+            info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASORucioTimeout', 0)
+        else:
+            info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASOTimeout', 0)
         info['submitter_ip_addr'] = task['tm_submitter_ip_addr']
         info['cms_wmtool'] = self.setCMS_WMTool(task)
         info['cms_tasktype'] = self.setCMS_TaskType(task)
