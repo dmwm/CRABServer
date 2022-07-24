@@ -224,7 +224,7 @@ def createScriptLines(opts, pklIn):
 
     # there a few more things to do which require running different EDM/CMSSW commands
     #1. enable LazyDownload of LHE files (if needed)
-    if opts.lheInputFiles:
+    if opts.lheInputFiles == 'True':
         pklOut = pklIn + '-lazy'
         procScript = "cmssw_enable_lazy_download.py"
         cmd = "%s --input_pkl %s --output_pkl %s" % (procScript, pklIn, pklOut)
@@ -235,7 +235,7 @@ def createScriptLines(opts, pklIn):
     pklOut = pklIn + '-seeds'
     procScript = "cmssw_handle_random_seeds.py"
     cmd = "%s --input_pkl %s --output_pkl %s --seeding dummy" % (procScript, pklIn, pklOut)
-    moreLines += createTweakingCommandLines(cmd, pklIn, pklOut)
+    moreLines = createTweakingCommandLines(cmd, pklIn, pklOut)
     commandLines += moreLines
 
     #3. make sure that process.maxEvents.input is propagated to Producers, see:
