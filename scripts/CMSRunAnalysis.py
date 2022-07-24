@@ -295,7 +295,7 @@ def parseArgs():
     parser.add_option('--lheInputFiles',
                       dest='lheInputFiles',
                       type='string',
-                      default=False)
+                      default='False')
     parser.add_option('--firstEvent',
                       dest='firstEvent',
                       type='string',
