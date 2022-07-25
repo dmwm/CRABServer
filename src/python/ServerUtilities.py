@@ -921,12 +921,11 @@ class MeasureTime:
             self.logger.info("MeasureTime:seconds - modulename=%s label='%s' %s",
                     self.modulename, self.label, self.readout)
 
-
-def measure_size(obj, logger=None):
+def measure_size(obj, logger=None, modulename="", label=""):
     with MeasureTime() as size_time:
         obj_size = get_size(obj)
     if logger:
-        logger.info('MeasureSize:bytes - obj_size=%d get_size_time=%.6f', obj_size, size_time.perf_counter)
+        logger.info("MeasureSize:bytes - modulename=%s label='%s' obj_size=%d get_size_time=%.6f", modulename, label, obj_size, size_time.perf_counter)
     return obj_size
 
 
