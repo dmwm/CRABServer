@@ -11,7 +11,6 @@ import stat
 import time
 import json
 import shutil
-import socket
 import pickle
 import signal
 import os.path
@@ -295,7 +294,7 @@ def parseArgs():
     parser.add_option('--lheInputFiles',
                       dest='lheInputFiles',
                       type='string',
-                      default=False)
+                      default='False')
     parser.add_option('--firstEvent',
                       dest='firstEvent',
                       type='string',

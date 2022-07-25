@@ -16,7 +16,9 @@ It is possible to run this TweakPSet script standalone. These are the requiremen
 
 Can be tested with something like:
 
-python <path-to-TweakPSet>/TweakPSet.py --inputFile='job_input_file_list_1.txt' --runAndLumis='job_lumis_1.json' --firstEvent=0 --lastEvent=-1 --firstLumi=None --firstRun=1 --seeding=None --lheInputFiles=False --oneEventMode=0
+python <path-to-TweakPSet>/TweakPSet.py --inputFile='job_input_file_list_1.txt' --runAndLumis='job_lumis_1.json' \
+             --firstEvent=0 --lastEvent=-1 --firstLumi=None --firstRun=1 --seeding=None \
+             --lheInputFiles=False --oneEventMode=0
 
 job_lumis_1.json content:
 {"1": [[669684, 669684]]}
@@ -55,17 +57,17 @@ eventsPerLumi:  start a new lumi section after the specified amount of events.  
 from __future__ import print_function
 
 import os
-import sys
 import shutil
 import tarfile
 from ast import literal_eval
 
 from PSetTweaks.PSetTweak import PSetTweak
 
+
 def readFileFromTarball(filename, tarball):
     content = '{}'
     if os.path.isfile(filename):
-        #This is only for Debugging
+        # This is only for Debugging
         print('DEBUGGING MODE!')
         with open(filename, 'r') as f:
             content = f.read()
@@ -79,11 +81,12 @@ def readFileFromTarball(filename, tarball):
             content = f.read()
             break
         except KeyError as er:
-            #Don`t exit due to KeyError, print error. EventBased and FileBased does not have run and lumis
-            print('Failed to get information from tarball %s and file %s. Error : %s' %(tarball, filename, er))
+            # Don`t exit due to KeyError, print error. EventBased and FileBased does not have run and lumis
+            print('Failed to get information from tarball %s and file %s. Error : %s' % (tarball, filename, er))
             break
     tar_file.close()
     return literal_eval(content)
+
 
 def createTweakingCommandLines(cmd, pklIn, pklOut):
     """
@@ -103,6 +106,7 @@ def createTweakingCommandLines(cmd, pklIn, pklOut):
     cmdLines += 'fi\n'
     return cmdLines
 
+
 def createScriptLines(opts, pklIn):
     """
     prepares a bash script fragment which tweaks the PSet params according to opts
@@ -115,7 +119,6 @@ def createScriptLines(opts, pklIn):
     inputFiles = {}
     if opts.inputFile:
         inputFiles = readFileFromTarball(opts.inputFile, 'input_files.tar.gz')
-
 
     # build a tweak object with the needed changes to be applied to PSet
     tweak = PSetTweak()
@@ -136,7 +139,7 @@ def createScriptLines(opts, pklIn):
     for inputFile in inputFiles:
         # make sure input is always in format 3.
         if not isinstance(inputFile, dict):
-            inputFile = {'lfn':inputFile, 'parents':[]}
+            inputFile = {'lfn': inputFile, 'parents': []}
         if inputFile["lfn"].startswith("MCFakeFile"):
             # for MC which uses "EmptySource" there must be no inputFile
             continue
@@ -197,11 +200,11 @@ def createScriptLines(opts, pklIn):
 
     # time-limited running is used by automatic splitting probe jobs
     if opts.maxRuntime:
-        maxSecondsUntilRampdown = "customTypeCms.untracked.int32(%s)" %opts.maxRuntime
+        maxSecondsUntilRampdown = "customTypeCms.untracked.int32(%s)" % opts.maxRuntime
         tweak.addParameter("process.maxSecondsUntilRampdown.input", maxSecondsUntilRampdown)
 
     # event limiter for testing
-    if opts.oneEventMode in ["1", "True", True] :
+    if opts.oneEventMode in ["1", "True", True]:
         tweak.addParameter("process.maxEvents.input", "customTypeCms.untracked.int32(1)")
 
     # make sure that FJR contains useful statistics, reuse code from
@@ -223,22 +226,22 @@ def createScriptLines(opts, pklIn):
     commandLines = createTweakingCommandLines(cmd, pklIn, pklOut)
 
     # there a few more things to do which require running different EDM/CMSSW commands
-    #1. enable LazyDownload of LHE files (if needed)
-    if opts.lheInputFiles:
+    # 1. enable LazyDownload of LHE files (if needed)
+    if opts.lheInputFiles == 'True':
         pklOut = pklIn + '-lazy'
         procScript = "cmssw_enable_lazy_download.py"
         cmd = "%s --input_pkl %s --output_pkl %s" % (procScript, pklIn, pklOut)
         moreLines = createTweakingCommandLines(cmd, pklIn, pklOut)
         commandLines += moreLines
 
-    #2. make sure random seeds are initialized
+    # 2. make sure random seeds are initialized
     pklOut = pklIn + '-seeds'
     procScript = "cmssw_handle_random_seeds.py"
     cmd = "%s --input_pkl %s --output_pkl %s --seeding dummy" % (procScript, pklIn, pklOut)
-    moreLines += createTweakingCommandLines(cmd, pklIn, pklOut)
+    moreLines = createTweakingCommandLines(cmd, pklIn, pklOut)
     commandLines += moreLines
 
-    #3. make sure that process.maxEvents.input is propagated to Producers, see:
+    # 3. make sure that process.maxEvents.input is propagated to Producers, see:
     # https://github.com/dmwm/WMCore/blob/85d6d423f0a85fdedf78b65ca8b7b81af9263789/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L448-L465
     pklOut = pklIn + '-nEvents'
     procScript = 'cmssw_handle_nEvents.py'
