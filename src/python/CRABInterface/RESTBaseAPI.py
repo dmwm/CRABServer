@@ -24,7 +24,7 @@ from CRABInterface.RESTCache import RESTCache
 from CRABInterface.DataFileMetadata import DataFileMetadata
 from CRABInterface.DataWorkflow import DataWorkflow
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
-from ServerUtilities import get_size, MeasureTime
+from ServerUtilities import measure_size, MeasureTime
 
 #In case the log level is not specified in the configuration we use the NullHandler and we do not print messages
 #The NullHandler is included as of python 3.1
@@ -146,15 +146,7 @@ class RESTBaseAPI(DatabaseRESTApi):
                             tmp = _FakeLOB(new_row[i].read())
                             new_row[i] = tmp
                     ret.append(new_row)
-                # Temporary add strlen and MeasureTime to see how much difference
-                # between get_size and strlen and and how long does it take in
-                    # production env.
-                with MeasureTime() as size_time:
-                    size = get_size(ret)
-                with MeasureTime() as strlen_time:
-                    strlen = len(str(ret))
-                self.logger.info('query_size=%d strlen=%d query_size_time=%.6f strlen_time=%.6f',
-                                 size, strlen, size_time.perf_counter, strlen_time.perf_counter)
+                measure_size(ret, self.logger)
                 all_rows = iter(ret)  # return as iterable object
         return all_rows
 

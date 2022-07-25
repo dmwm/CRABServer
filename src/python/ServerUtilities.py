@@ -918,8 +918,16 @@ class MeasureTime:
         self.readout = 'tot={:.4f} proc={:.4f} thread={:.4f}'.format(
                  self.perf_counter, self.process_time, self.thread_time )
         if self.logger:
-            self.logger.info("MeasureTime:seconds - modulename=%s label='%s' - %s",
+            self.logger.info("MeasureTime:seconds - modulename=%s label='%s' %s",
                     self.modulename, self.label, self.readout)
+
+
+def measure_size(obj, logger=None):
+    with MeasureTime() as size_time:
+        obj_size = get_size(obj)
+    if logger:
+        logger.info('MeasureSize:bytes - obj_size=%d get_size_time=%.6f', obj_size, size_time.perf_counter)
+    return obj_size
 
 
 def get_size(obj, seen=None):
