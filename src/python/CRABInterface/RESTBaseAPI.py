@@ -146,7 +146,7 @@ class RESTBaseAPI(DatabaseRESTApi):
                             tmp = _FakeLOB(new_row[i].read())
                             new_row[i] = tmp
                     ret.append(new_row)
-                measure_size(ret, self.logger)
+                measure_size(ret, logger=self.logger, modulename=__name__, label="RESTBaseAPI.query_load_all_rows")
                 all_rows = iter(ret)  # return as iterable object
         return all_rows
 
