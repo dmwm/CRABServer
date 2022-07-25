@@ -11,7 +11,6 @@ import stat
 import time
 import json
 import shutil
-import socket
 import pickle
 import signal
 import os.path
