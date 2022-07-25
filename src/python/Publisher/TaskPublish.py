@@ -80,6 +80,9 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, dataset, bl
     """
     Submit one migration request for each block that needs to be migrated.
     If blocks argument is not specified, migrate the whole dataset.
+    Returns a 2-element ntuple : (exitcode, message)
+    exit codes:  0 OK, 1 taking too long, 2 failed, 3 unknown status, 4, inconsistent status
+    those are just historical things, code which uses this method only checks if exitcode is 0
     """
     #wfnamemsg = "%s: " % taskname
     logger = logging.getLogger(taskname)
