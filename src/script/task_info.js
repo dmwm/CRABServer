@@ -820,6 +820,13 @@ $(document).ready(function() {
                 transferInfo = "https://" + document.domain + "/crabserver/dev/fileusertransfers?subresource=getTransferStatus&taskname="
                 docInfo = "https://" + document.domain + "/crabserver/dev/fileusertransfers?subresource=getById&id="
                 break;
+            case "devtwo":
+                taskInfoUrl = "https://" + document.domain + "/crabserver/devtwo/task?subresource=search&workflow=";
+                taskStatusUrl = "https://" + document.domain + "/crabserver/devtwo/workflow?workflow=";
+                webDirProxyApiUrl = "https://" + document.domain + "/crabserver/devtwo/task?subresource=webdirprx&workflow="
+                transferInfo = "https://" + document.domain + "/crabserver/devtwo/fileusertransfers?subresource=getTransferStatus&taskname="
+                docInfo = "https://" + document.domain + "/crabserver/devtwo/fileusertransfers?subresource=getById&id="
+                break;
             default:
                 break;
         }
@@ -832,6 +839,9 @@ $(document).ready(function() {
                 break;
             case "cmsweb-testbed.cern.ch":
                 $("#db-selector-box").val("preprod");
+                break;
+            case "cmsweb-test11.cern.ch":
+                $("#db-selector-box").val("devtwo");
                 break;
             default:
                 $("#db-selector-box").val("dev")
@@ -851,6 +861,8 @@ $(document).ready(function() {
                 return "prod";
             case "cmsweb-testbed.cern.ch":
                 return "preprod";
+            case "cmsweb-test11.cern.ch":
+                return "devtwo";
             default:
                 return "dev";
         }
