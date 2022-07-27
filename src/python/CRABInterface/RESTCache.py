@@ -2,9 +2,9 @@ from __future__ import division
 import os
 import uuid
 import logging
+import cherrypy
 import boto3
 from botocore.exceptions import ClientError
-import cherrypy
 
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
@@ -15,6 +15,7 @@ from WMCore.REST.Error import MissingParameter, ExecutionError
 from CRABInterface.RESTExtensions import authz_login_valid, authz_operator
 from CRABInterface.Regexps import RX_SUBRES_CACHE, RX_CACHE_OBJECTTYPE, RX_TASKNAME, RX_USERNAME, RX_TARBALLNAME
 from ServerUtilities import getUsernameFromTaskname, MeasureTime
+
 
 class RESTCache(RESTEntity):
     """
@@ -86,13 +87,8 @@ class RESTCache(RESTEntity):
         bucket = cacheSSL.split('/')[-1]
         endpoint = 'https://s3.cern.ch'  # hardcode this. In case it can be moved to the s3Dict in config
         self.s3_bucket = bucket
-        # hack to force IPV4 (requires validate=False in boto3.client instantiation)
-        import socket
-        s3IpNum = socket.gethostbyname('s3.cern.ch')
-        endpoint = 'https://' + s3IpNum
-        self.s3IpNum = s3IpNum  # need to remember which IP was used
         self.s3_client = boto3.client('s3', endpoint_url=endpoint, aws_access_key_id=access_key,
-                                      aws_secret_access_key=secret_key, verify=False)
+                                      aws_secret_access_key=secret_key)
 
     def validate(self, apiobj, method, api, param, safe):
         """Validating all the input parameter as enforced by the WMCore.REST module"""
@@ -160,8 +156,6 @@ class RESTCache(RESTEntity):
                 preSignedUrl = response
             except ClientError as e:
                 raise ExecutionError("Connection to s3.cern.ch failed:\n%s" % str(e))
-            # when using hack to force IPV4, need to remove it in URL passed to client
-            preSignedUrl['url'] = preSignedUrl['url'].replace(self.s3IpNum, 's3.cern.ch')
             # somehow it does not work to return preSignedUrl as a single object
             return [preSignedUrl['url'], preSignedUrl['fields']]
 
@@ -181,8 +175,6 @@ class RESTCache(RESTEntity):
                 preSignedUrl = response
             except ClientError as e:
                 raise ExecutionError("Connection to s3.cern.ch failed:\n%s" % str(e))
-            # when using hack to force IPV4, need to remove it in URL passed to client
-            preSignedUrl = preSignedUrl.replace(self.s3IpNum, 's3.cern.ch')
             return preSignedUrl
 
         if subresource == 'retrieve':
