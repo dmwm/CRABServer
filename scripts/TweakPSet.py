@@ -64,7 +64,6 @@ from ast import literal_eval
 from PSetTweaks.PSetTweak import PSetTweak
 from Utils.Utilities import decodeBytesToUnicode
 
-
 def readFileFromTarball(filename, tarball):
     content = '{}'
     if os.path.isfile(filename):
@@ -188,6 +187,12 @@ def createScriptLines(opts, pklIn):
     if opts.lastEvent:
         tweak.addParameter("process.source.lastEvent",
                            "customTypeCms.untracked.uint32(%s)" % opts.lastEvent)
+
+    if not inputFile["lfn"].startswith("MCFakeFile"):
+        # Set skipEvents to 0 if config.JobType.pluginName = 'Analysis'
+        # see https://github.com/dmwm/CRABServer/issues/7349
+        tweak.addParameter("process.source.skipEvents", "customTypeCms.untracked.uint32(0)")
+        print("skipEvents set to 0")
 
     # firstLumi, firstRun and eventsPerLumi are used for MC
     if opts.firstLumi:
