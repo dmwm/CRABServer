@@ -55,7 +55,10 @@ sed -i -e "s/### RPM cms crabtaskworker.*/### RPM cms crabtaskworker ${RELEASE_T
 sed -i -e "s/^\( *%define crabrepo  *\)[^ ]*\(.*\)*$/\1${CRABSERVER_REPO}\2/" -- crabtaskworker.spec crabserver.spec
 sed -i -e "s/^\( *%define wmcrepo  *\)[^ ]*\(.*\)*$/\1${WMCORE_REPO}\2/" -- crabtaskworker.spec crabserver.spec
 sed -i -e "s/^\( *%define wmcver  *\)[^ ]*\(.*\)*$/\1${WMCORE_TAG}\2/" -- crabtaskworker.spec crabserver.spec
-sed -i -e "/github.com\/%{crabrepo}\/CRABServer.git?obj/s/master/${BRANCH}/" -- crabtaskworker.spec crabserver.spec
+# we do not need to replace the branch name in the github URLs in the specfiles, for example here:
+# https://github.com/cms-sw/cmsdist/blob/aa4897a3d70514b0973008d693e3a6e1009afe4d/crabserver.spec#L22
+# i.e. we can leave `obj=master` whatever the value of $BRANCH is.
+# read https://github.com/dmwm/CRABServer/issues/7357 for more info.
 
 echo "(DEBUG) diff cms-sw/cmsdist/crabserver.spec"
 diff -u crabserver.spec.bak crabserver.spec
