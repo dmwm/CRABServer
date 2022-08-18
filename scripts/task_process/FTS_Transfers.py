@@ -406,8 +406,8 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
             dst_scheme, src_scheme, _, _ = find_matching_scheme(
                 {"protocols": rucioClient.get_protocols(dst_rse)},
                 {"protocols": rucioClient.get_protocols(src_rse)},
-                "third_party_copy",
-                "third_party_copy",
+                "third_party_copy_read",
+                "third_party_copy_write",
             )
             dst_pfn_template = rucioClient.lfns2pfns(dst_rse, [dst_did],
                                                      operation="third_party_copy", scheme=dst_scheme)
