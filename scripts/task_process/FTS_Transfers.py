@@ -410,9 +410,9 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
                 "third_party_copy_write",
             )
             dst_pfn_template = rucioClient.lfns2pfns(dst_rse, [dst_did],
-                                                     operation="write", scheme=dst_scheme)
+                                                     operation="third_party_copy_write", scheme=dst_scheme)
             src_pfn_template = rucioClient.lfns2pfns(src_rse, [src_did],
-                                                     operation="read", scheme=src_scheme)
+                                                     operation="third_party_copy_read", scheme=src_scheme)
             dst_pfn_prefix = '/'.join(dst_pfn_template[dst_did].split("/")[:-2])
             src_pfn_prefix = '/'.join(src_pfn_template[src_did].split("/")[:-2])
         except Exception as ex:

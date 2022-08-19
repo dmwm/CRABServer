@@ -45,7 +45,7 @@ def getWritePFN(rucioClient=None, siteName='', lfn='', logger=None):
     did = 'cms:' + lfn
     # we prefer to do ASO via FTS which uses 3rd party copy, fall back to protocols defined
     # for other operations in case that fails, order matters here !
-    for operation in ['third_party_copy', 'write', 'read']:
+    for operation in ['third_party_copy_write', 'write', 'third_party_copy_read', 'read']:
         try:
             logger.warning('Try Rucio lfn2pn with operation %s', operation)
             didDict = rucioClient.lfns2pfns(siteName, [did], operation=operation)
