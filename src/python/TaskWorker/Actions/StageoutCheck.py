@@ -93,7 +93,10 @@ class StageoutCheck(TaskAction):
             filename = re.sub("[:-_]", "", self.task['tm_taskname']) + '_crab3check.tmp'
             try:
                 lfn = os.path.join(self.task['tm_output_lfn'], filename)
-                pfn = getWritePFN(self.rucioClient, siteName=self.task['tm_asyncdest'], lfn=lfn, logger=self.logger)
+                # when checking the stageout, we are interested if we can use FTS for ASO.
+                # therefore, we are interested in 'third_party_copy_write' only.
+                # we should not get a PFN for 'write', which should be used for plain gfal.
+                pfn = getWritePFN(self.rucioClient, siteName=self.task['tm_asyncdest'], lfn=lfn, operations=['third_party_copy_write'], logger=self.logger)
                 cpCmd += append + os.path.abspath(filename) + " " + pfn
                 rmCmd += " " + pfn
                 createDummyFile(filename, self.logger)

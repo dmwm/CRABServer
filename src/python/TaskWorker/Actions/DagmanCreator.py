@@ -609,8 +609,12 @@ class DagmanCreator(TaskAction):
             tempDest = os.path.join(temp_dest, counter)
             directDest = os.path.join(dest, counter)
             if lastDirectDest != directDest:
+                # Since we want to compute the PFN for the direct stageout,
+                # we only care about 'write', which should be used with plain gfal.
+                # there is no need to get the PFN for 'third_party_copy_write',
+                # which should be used with FTS.
                 lastDirectPfn = getWritePFN(self.rucioClient, siteName=task['tm_asyncdest'], lfn=directDest,
-                                            logger=self.logger)
+                                            operations=['write'], logger=self.logger)
                 lastDirectDest = directDest
             pfns = ["log/cmsRun_{0}.log.tar.gz".format(count)] + remoteOutputFiles
             pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
