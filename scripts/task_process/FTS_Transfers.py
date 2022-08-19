@@ -406,13 +406,13 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
             dst_scheme, src_scheme, _, _ = find_matching_scheme(
                 {"protocols": rucioClient.get_protocols(dst_rse)},
                 {"protocols": rucioClient.get_protocols(src_rse)},
-                "third_party_copy",
-                "third_party_copy",
+                "third_party_copy_read",
+                "third_party_copy_write",
             )
             dst_pfn_template = rucioClient.lfns2pfns(dst_rse, [dst_did],
-                                                     operation="third_party_copy", scheme=dst_scheme)
+                                                     operation="write", scheme=dst_scheme)
             src_pfn_template = rucioClient.lfns2pfns(src_rse, [src_did],
-                                                     operation="third_party_copy", scheme=src_scheme)
+                                                     operation="read", scheme=src_scheme)
             dst_pfn_prefix = '/'.join(dst_pfn_template[dst_did].split("/")[:-2])
             src_pfn_prefix = '/'.join(src_pfn_template[src_did].split("/")[:-2])
         except Exception as ex:
