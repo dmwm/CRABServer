@@ -29,7 +29,8 @@ def getNativeRucioClient(config=None, logger=None):
 
     return nativeClient
 
-def getWritePFN(rucioClient=None, siteName='', lfn='', logger=None):
+def getWritePFN(rucioClient=None, siteName='', lfn='', 
+                operations=['third_party_copy_write', 'write'], logger=None):
     """
     convert a single LFN into a PFN which can be used for Writing via Rucio
     Rucio supports the possibility that at some point in the future sites may
@@ -45,7 +46,11 @@ def getWritePFN(rucioClient=None, siteName='', lfn='', logger=None):
     did = 'cms:' + lfn
     # we prefer to do ASO via FTS which uses 3rd party copy, fall back to protocols defined
     # for other operations in case that fails, order matters here !
-    for operation in ['third_party_copy', 'write', 'read']:
+    # "third_party_copy_write": provides the PFN to be used with FTS
+    # "write": provides the PFN to be used with gfal
+    # 2022-08: dario checked with felipe that every sane RSE has non-zero value
+    # for the third_party_copy_write column, which means that it is available.
+    for operation in operations:
         try:
             logger.warning('Try Rucio lfn2pn with operation %s', operation)
             didDict = rucioClient.lfns2pfns(siteName, [did], operation=operation)
