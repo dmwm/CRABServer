@@ -1,6 +1,9 @@
 FROM registry.cern.ch/cmsweb/cmsweb:20220301-stable
 MAINTAINER Daina Dirmaite daina.dirmaite@gmail.com
 
+# temporary remove egi's yum repo
+RUN rm -f /etc/yum.repos.d/egi.repo
+
 #keep only voms-proxy basded on c++
 RUN yum remove -y voms-clients-java && yum -y install strace \
 gfal2-util gfal2-all \
