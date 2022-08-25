@@ -17,6 +17,8 @@ import argparse
 import pprint
 
 from dbs.apis.dbsClient import DbsApi
+from dbs.exceptions.dbsClientException import dbsClientException
+from RestClient.ErrorHandling.RestClientExceptions import HTTPError
 from ServerUtilities import getHashLfn, encodeRequest
 from ServerUtilities import SERVICE_INSTANCES
 from TaskWorker.WorkerExceptions import ConfigException
@@ -211,10 +213,37 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir):
     logger.info(msg)
     sourceURL = sourceApi.url
     data = {'migration_url': sourceURL, 'migration_input': block}
+    result = None
     try:
         result = migrateApi.submitMigration(data)
         # N.B. a migration request is supposed never to fail. Only failure to contact server should
         # result in HTTP or curl error/exceptions. Otherwise server will always return a list of dicionaries.
+        # But there are cases where server replies with HTTP code other than 200 (e.g. 400 if migration
+        # request is invalid), in those caes client raises exception which should be handled with proper care
+    except dbsClientException as dbsEx:
+        logger.error("HTTP call to server %s failed: %s", migrateApi.url, dbsEx)
+        return False
+    except HTTPError as httpErr:
+        # this is a structured message from migrate server as per
+        #  https://github.com/dmwm/dbs2go/blob/master/docs/DBSServer.md#dbs-errors
+        # http call went through, simply server returned an HTTP code other than 200
+        code = httpErr.code
+        body = json.loads(httpErr.body)
+        reason = body[0]['error']['reason']
+        if code >= 500:
+            # something bad happened inside server
+            logger.error("HTTP error %d with msg %s", code, reason)
+            return False
+        if code >= 400:
+            # in this cases it is better to treat the migration request submission as successful
+            # and go on with status checking via checkBlockMigration where various status codes
+            # are properly handled
+            logger.error("HTTP error %d", code)
+            logger.error("A new migration request could not be submitted. Reason: %s", reason)
+            return True
+        else:
+            logger.error("Unexpected HTTP error %d", code)
+            return False
     except Exception as ex:
         msg = "Request to migrate %s failed." % block
         msg += "\nRequest detail: %s" % data
