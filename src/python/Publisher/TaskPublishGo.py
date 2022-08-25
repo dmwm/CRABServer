@@ -23,8 +23,6 @@ from TaskWorker.WorkerExceptions import ConfigException
 from RESTInteractions import CRABRest
 from WMCore.Configuration import loadConfigurationFile
 
-PARASITIC_TESTING = False
-
 def format_file_3(file_):
     """
     format file for DBS
@@ -298,9 +296,6 @@ def publishInDBS3(config, taskname, verbose):
         """
         Mark the list of files as tranferred
         """
-        if PARASITIC_TESTING:
-            # during parassitic testing we do not touch transfersdb, leave it to main thread
-            return
 
         msg = "Marking %s file(s) as published." % len(files)
         logger.info(msg)
@@ -337,9 +332,6 @@ def publishInDBS3(config, taskname, verbose):
         """
         Something failed for these files so increment the retry count
         """
-        if PARASITIC_TESTING:
-            # during parassitic testing we do not touch transfersdb, leave it to main thread
-            return
 
         msg = "Marking %s file(s) as failed" % len(files)
         logger.info(msg)
@@ -406,13 +398,9 @@ def publishInDBS3(config, taskname, verbose):
     dryRun = config.TaskPublisher.dryRun
     username = taskname.split(':')[1].split('_')[0]
     logdir = os.path.join(config.General.logsDir, 'tasks', username)
-    if PARASITIC_TESTING:
-        logdir = os.path.join(config.General.logsDir, 'tasks-testbed', username)
     logfile = os.path.join(logdir, taskname + '.log')
     createLogdir(logdir)
     migrationLogDir = os.path.join(config.General.logsDir, 'migrations')
-    if PARASITIC_TESTING:
-        migrationLogDir = os.path.join(config.General.logsDir, 'migrations-testbed')
     createLogdir(migrationLogDir)
     logger = logging.getLogger(taskname)
     logging.basicConfig(filename=logfile, level=logging.INFO, format=config.TaskPublisher.logMsgFormat)
@@ -511,14 +499,6 @@ def publishInDBS3(config, taskname, verbose):
     except Exception as ex:
         logger.exception("ERROR: %s", ex)
 
-    # at the moment can't deal with parents in phys03 ( https://github.com/dmwm/dbs2go/issues/69 )
-    if 'phys03' in sourceURL:
-        nothingToDo['result'] = 'FAIL'
-        nothingToDo['reason'] = 'Cannot migrate from Phys03 yet'
-        summaryFileName = saveSummaryJson(logdir, nothingToDo)
-        logger.error(nothingToDo['reason'])
-        return summaryFileName
-
     # When looking up parents may need to look in global DBS as well.
     globalURL = sourceURL
     globalURL = globalURL.replace('phys01', 'global')
@@ -549,10 +529,6 @@ def publishInDBS3(config, taskname, verbose):
         publish_migrate_url = publish_dbs_url + '/DBSMigrate'
         publish_read_url = publish_dbs_url + '/DBSReader'
         publish_dbs_url += '/DBSWriter'
-    # setup for testing GO server on testbed
-    publish_dbs_url = 'https://cmsweb-testbed.cern.ch/dbs/int/phys03/DBSWriter'
-    publish_read_url = 'https://cmsweb-testbed.cern.ch/dbs/int/phys03/DBSReader'
-    publish_migrate_url = 'https://cmsweb-testbed.cern.ch/dbs/int/phys03/DBSMigrate'
     try:
         logger.info("DBS Destination API URL: %s", publish_dbs_url)
         destApi = DbsApi(url=publish_dbs_url, debug=False)
@@ -912,8 +888,6 @@ def publishInDBS3(config, taskname, verbose):
             failure_reason = str(ex)
             taskFilesDir = config.General.taskFilesDir
             fname = os.path.join(taskFilesDir, 'FailedBlocks', 'failed-block-at-%s.txt' % time.time())
-            if PARASITIC_TESTING:
-                fname = os.path.join(taskFilesDir, 'FailedBlocks-testbed', 'failed-block-at-%s.txt' % time.time())
             with open(fname, 'w', encoding='utf8') as fd:
                 fd.write(pprint.pformat(blockDump))
             dumpList.append(fname)
