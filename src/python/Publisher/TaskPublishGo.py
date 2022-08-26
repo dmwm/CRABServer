@@ -17,13 +17,13 @@ import argparse
 import pprint
 
 from dbs.apis.dbsClient import DbsApi
+from dbs.exceptions.dbsClientException import dbsClientException
+from RestClient.ErrorHandling.RestClientExceptions import HTTPError
 from ServerUtilities import getHashLfn, encodeRequest
 from ServerUtilities import SERVICE_INSTANCES
 from TaskWorker.WorkerExceptions import ConfigException
 from RESTInteractions import CRABRest
 from WMCore.Configuration import loadConfigurationFile
-
-PARASITIC_TESTING = False
 
 def format_file_3(file_):
     """
@@ -213,10 +213,37 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir):
     logger.info(msg)
     sourceURL = sourceApi.url
     data = {'migration_url': sourceURL, 'migration_input': block}
+    result = None
     try:
         result = migrateApi.submitMigration(data)
         # N.B. a migration request is supposed never to fail. Only failure to contact server should
         # result in HTTP or curl error/exceptions. Otherwise server will always return a list of dicionaries.
+        # But there are cases where server replies with HTTP code other than 200 (e.g. 400 if migration
+        # request is invalid), in those caes client raises exception which should be handled with proper care
+    except dbsClientException as dbsEx:
+        logger.error("HTTP call to server %s failed: %s", migrateApi.url, dbsEx)
+        return False
+    except HTTPError as httpErr:
+        # this is a structured message from migrate server as per
+        #  https://github.com/dmwm/dbs2go/blob/master/docs/DBSServer.md#dbs-errors
+        # http call went through, simply server returned an HTTP code other than 200
+        code = httpErr.code
+        body = json.loads(httpErr.body)
+        reason = body[0]['error']['reason']
+        if code >= 500:
+            # something bad happened inside server
+            logger.error("HTTP error %d with msg %s", code, reason)
+            return False
+        if code >= 400:
+            # in this cases it is better to treat the migration request submission as successful
+            # and go on with status checking via checkBlockMigration where various status codes
+            # are properly handled
+            logger.error("HTTP error %d", code)
+            logger.error("A new migration request could not be submitted. Reason: %s", reason)
+            return True
+        else:
+            logger.error("Unexpected HTTP error %d", code)
+            return False
     except Exception as ex:
         msg = "Request to migrate %s failed." % block
         msg += "\nRequest detail: %s" % data
@@ -298,9 +325,6 @@ def publishInDBS3(config, taskname, verbose):
         """
         Mark the list of files as tranferred
         """
-        if PARASITIC_TESTING:
-            # during parassitic testing we do not touch transfersdb, leave it to main thread
-            return
 
         msg = "Marking %s file(s) as published." % len(files)
         logger.info(msg)
@@ -337,9 +361,6 @@ def publishInDBS3(config, taskname, verbose):
         """
         Something failed for these files so increment the retry count
         """
-        if PARASITIC_TESTING:
-            # during parassitic testing we do not touch transfersdb, leave it to main thread
-            return
 
         msg = "Marking %s file(s) as failed" % len(files)
         logger.info(msg)
@@ -406,13 +427,9 @@ def publishInDBS3(config, taskname, verbose):
     dryRun = config.TaskPublisher.dryRun
     username = taskname.split(':')[1].split('_')[0]
     logdir = os.path.join(config.General.logsDir, 'tasks', username)
-    if PARASITIC_TESTING:
-        logdir = os.path.join(config.General.logsDir, 'tasks-testbed', username)
     logfile = os.path.join(logdir, taskname + '.log')
     createLogdir(logdir)
     migrationLogDir = os.path.join(config.General.logsDir, 'migrations')
-    if PARASITIC_TESTING:
-        migrationLogDir = os.path.join(config.General.logsDir, 'migrations-testbed')
     createLogdir(migrationLogDir)
     logger = logging.getLogger(taskname)
     logging.basicConfig(filename=logfile, level=logging.INFO, format=config.TaskPublisher.logMsgFormat)
@@ -511,14 +528,6 @@ def publishInDBS3(config, taskname, verbose):
     except Exception as ex:
         logger.exception("ERROR: %s", ex)
 
-    # at the moment can't deal with parents in phys03 ( https://github.com/dmwm/dbs2go/issues/69 )
-    if 'phys03' in sourceURL:
-        nothingToDo['result'] = 'FAIL'
-        nothingToDo['reason'] = 'Cannot migrate from Phys03 yet'
-        summaryFileName = saveSummaryJson(logdir, nothingToDo)
-        logger.error(nothingToDo['reason'])
-        return summaryFileName
-
     # When looking up parents may need to look in global DBS as well.
     globalURL = sourceURL
     globalURL = globalURL.replace('phys01', 'global')
@@ -549,10 +558,6 @@ def publishInDBS3(config, taskname, verbose):
         publish_migrate_url = publish_dbs_url + '/DBSMigrate'
         publish_read_url = publish_dbs_url + '/DBSReader'
         publish_dbs_url += '/DBSWriter'
-    # setup for testing GO server on testbed
-    publish_dbs_url = 'https://cmsweb-testbed.cern.ch/dbs/int/phys03/DBSWriter'
-    publish_read_url = 'https://cmsweb-testbed.cern.ch/dbs/int/phys03/DBSReader'
-    publish_migrate_url = 'https://cmsweb-testbed.cern.ch/dbs/int/phys03/DBSMigrate'
     try:
         logger.info("DBS Destination API URL: %s", publish_dbs_url)
         destApi = DbsApi(url=publish_dbs_url, debug=False)
@@ -912,8 +917,6 @@ def publishInDBS3(config, taskname, verbose):
             failure_reason = str(ex)
             taskFilesDir = config.General.taskFilesDir
             fname = os.path.join(taskFilesDir, 'FailedBlocks', 'failed-block-at-%s.txt' % time.time())
-            if PARASITIC_TESTING:
-                fname = os.path.join(taskFilesDir, 'FailedBlocks-testbed', 'failed-block-at-%s.txt' % time.time())
             with open(fname, 'w', encoding='utf8') as fd:
                 fd.write(pprint.pformat(blockDump))
             dumpList.append(fname)
