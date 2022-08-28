@@ -15,6 +15,8 @@ def readAndParse(csvFile, apiMig):
     read and parse CSV file of terminally failed migrations removing duplicates
       and migrations which may have been removed from DBS, or were restarted and
       are not in terminally failed anymore
+    after migration to GO in DBS, the file format is
+    date,time,block_name,taskname
     args : file: string, full path to file name
     args : apiMig: a DbsApi object pointing to the DBSMigrate service
     returns: a list of dictionaries with keys
@@ -22,29 +24,33 @@ def readAndParse(csvFile, apiMig):
     """
 
     failedMigrations = []
-    ids = set()
+    ids = []
+    blocks = set()
     with open(csvFile, 'r', encoding='utf8') as fp:
         lines = fp.readlines()
 
     for line in lines:
         items = line.strip().split(',')
-        ids.add(int(items[0]))
-    uniqueIDs = list(ids)
-    print(f"Found {len(uniqueIDs)} unique migration IDs logged as terminally failed")
-    for migId in uniqueIDs:
-        print(f" {migId}")
+        blocks.add(items[2])
+    uniqueMigs = list(blocks)
+    print(f"Found {len(uniqueMigs)} unique block migration logged as terminally failed")
+    for block in uniqueMigs:
+        print(f" {block}")
     print("Check current status")
-    for migId in uniqueIDs:
-        status = apiMig.statusMigration(migration_rqst_id=migId)
+    for block in uniqueMigs:
+        #status = apiMig.statusMigration(migration_rqst_id=migId)
+        status = apiMig.statusMigration(block_name=block)
         if not status:
-            print(f"{migId} has been removed")
+            print(f"migration for {block} has been removed")
             continue
         state = status[0].get("migration_status")
+        migId = status[0].get("migration_request_id")
+        ids.append(migId)
         # values for state:
         # 0-request created; 1-in process; 2-succeeded;
         # 3-failed, but has three chances to try; 9-Permanently failed
         if not state == 9:
-            print(f"{migId} is in state {state}, not 9")
+            print("Migration is in state {state}, not 9")
             continue
         tFromEpoch = status[0].get("creation_date")
         created = datetime.fromtimestamp(tFromEpoch).strftime('%Y-%m-%d %H:%M:%S')
@@ -73,7 +79,7 @@ def main():
         os.environ['X509_USER_KEY'] = '/data/certs/servicekey.pem'
 
     migUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSMigrate'
-    apiMig = DbsApi(url=migUrl, debug=True)
+    apiMig = DbsApi(url=migUrl, debug=False)
 
     failedMigrations = readAndParse(logFile, apiMig)
 
