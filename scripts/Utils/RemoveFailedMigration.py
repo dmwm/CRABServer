@@ -58,9 +58,8 @@ def main():
     try:
         apiMig.removeMigration({'migration_rqst_id': migrationId})
     except Exception as ex:
-        print("Migration removal failed with this exception:\n%s" % str(ex))
-        return
-    print("Migration %d successfully removed\n" % migrationId)
+        print("Migration removal returned this exception:\n%s" % str(ex))
+    print("Migration %d removed\n" % migrationId)
     print("CRAB Publisher will issue such a migration request again as/when needed.")
     print("But if you want to re-create it now, you can by answering yes here")
     answer = input("Do you want to re-create the migration request ? Yes/[No]: ")
@@ -71,7 +70,7 @@ def main():
     print("\nSubmitting new migration request...")
     globUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/global/DBSReader'
     data = {'migration_url': globUrl, 'migration_input': block}
-    result = apiMig.submitMigration(data)
+    result = apiMig.submitMigration(data)[0]
     newId = result.get('migration_details', {}).get('migration_request_id')
     print('new migration created: %d' % newId)
     status = apiMig.statusMigration(migration_rqst_id=newId)
