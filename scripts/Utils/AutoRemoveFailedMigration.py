@@ -27,7 +27,7 @@ def main():
         os.environ['X509_USER_KEY'] = '/data/certs/servicekey.pem'
 
     migUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSMigrate'
-    apiMig = DbsApi(url=migUrl, debug=True)
+    apiMig = DbsApi(url=migUrl, debug=False)
 
     status = apiMig.statusMigration(migration_rqst_id=migrationId)
     if not status:
@@ -63,8 +63,7 @@ def main():
     try:
         apiMig.removeMigration({'migration_rqst_id': migrationId})
     except Exception as ex:
-        print("Migration removal failed with this exception:\n%s" % str(ex))
-        return
+        print("Migration removal returned this exception:\n%s" % str(ex))
     print("Migration %d successfully removed" % migrationId)
     #print("CRAB Publisher will issue such a migration request again as/when needed.")
     #print("But if you want to re-create it now, you can by answering yes here")
@@ -77,7 +76,7 @@ def main():
     globUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/global/DBSReader'
     data = {'migration_url': globUrl, 'migration_input': block}
     result = apiMig.submitMigration(data)
-    newId = result.get('migration_details', {}).get('migration_request_id')
+    newId = result[0].get('migration_details', {}).get('migration_request_id')
     print('new migration created: %d' % newId)
     status = apiMig.statusMigration(migration_rqst_id=newId)
     state = status[0].get("migration_status")
