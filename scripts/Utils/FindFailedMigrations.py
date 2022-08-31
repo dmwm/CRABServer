@@ -36,11 +36,11 @@ def readAndParse(csvFile, apiMig):
     uniqueMigs = list(blocks)
     print(f"Found {len(uniqueMigs)} unique block migration logged as terminally failed")
     # usually there's no need to print list of all blocks
-    #for block in uniqueMigs:
-    #    print(f" {block}")
+    # for block in uniqueMigs:
+    #     print(f" {block}")
     print("Check current status")
     for block in uniqueMigs:
-        #status = apiMig.statusMigration(migration_rqst_id=migId)
+        # status = apiMig.statusMigration(migration_rqst_id=migId)
         time.sleep(0.01)  # beware rate limit in DBS server in this tight loop
         status = apiMig.statusMigration(block_name=block)
         if not status:
@@ -63,10 +63,10 @@ def readAndParse(csvFile, apiMig):
             try:
                 apiMig.removeMigration({'migration_rqst_id': migId})
             except Exception as ex:
-                print("Migration removal returned this exception:\n%s" % str(ex))
+                print(f"Migration removal returned this exception:\n{ex}")
             continue
-        block = status[0].get("migration_input") # CRAB migrations are always one block at a time
-        migDict = {'id':migId, 'status':state, 'created':created, 'block':block}
+        block = status[0].get("migration_input")  # CRAB migrations are always one block at a time
+        migDict = {'id': migId, 'status': state, 'created': created, 'block': block}
         failedMigrations.append(migDict)
 
     return failedMigrations
