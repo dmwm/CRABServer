@@ -32,7 +32,7 @@ def readAndParse(csvFile, apiMig):
 
     for line in lines:
         items = line.strip().split(',')
-        blocks.add(items[2])
+        blocks.add(items[3])
     uniqueMigs = list(blocks)
     print(f"Found {len(uniqueMigs)} unique block migration logged as terminally failed")
     # usually there's no need to print list of all blocks
