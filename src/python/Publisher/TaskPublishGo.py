@@ -275,11 +275,16 @@ def checkBlockMigration(taskname, migrateApi, block, migLogDir):
         return inProgress, atDestination, failed
 
     if result:
-        status = result[0]['migration_status']
+        status = result[0].get('migration_status')
+        reqid = result[0].get('migration_request_id')
     else:
         # result can be [] if there's no migration for this block in the DB
         failed = True  # handle like failed, will be retried in next Publisher iteration
         return inProgress, atDestination, failed
+    if status is None or reqid is None:
+        msg = "Migration request failed to submit."
+        msg += "\nMigration request results: %s" % str(result)
+        logger.error(msg)
     # reference https://github.com/dmwm/dbs2go/blob/master/docs/MigrationServer.md
     # Migration states:
     #   0 = PENDING
@@ -294,22 +299,22 @@ def checkBlockMigration(taskname, migrateApi, block, migLogDir):
     beingRetried = (status == 3)
     failed = (status == 9)
     if beingRetried:  # sanity check
-        nRetries = status[0]['retry_count']
+        nRetries = result[0]['retry_count']
         if nRetries > 10:
             logger.error("too many (%d) retries. Treat as terminally failed", nRetries)
             failed = True
             return inProgress, atDestination, failed
     if failed:
         logger.error("migration terminally failed for %s\n", block)
-        logger.error("migration status details:\n%s", status)
+        logger.error("migration status details:\n%s", result)
         failedMigrationsLog = os.path.join(migLogDir, 'TerminallyFailedLog.txt')
         logger.debug("Migration terminally failed, log to %s", failedMigrationsLog)
-        creationDate = status['creation_date']
+        creationDate = result[0]['creation_date']
         # convert to human format
         migCreation = datetime.fromtimestamp(creationDate).strftime('%Y-%m-%d,%H:%M:%S')
-        # FiledMigFile format is CSV: creationDate, block, taskname
+        # FiledMigFile format is CSV: reqid,creationDate, block, taskname
         with open(failedMigrationsLog, 'a', encoding='utf8') as fp:
-            line = "%s,%s,%s\n" % (migCreation, block, taskname)
+            line = "%d,%s,%s,%s\n" % (reqid, migCreation, block, taskname)
             fp.write(line)
         return inProgress, atDestination, failed
     # all OK, we got a usable status information
