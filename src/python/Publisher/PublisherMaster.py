@@ -680,7 +680,7 @@ class Master(object):
                     logger.info('marked %d files as Failed', nMarked)
 
                 # find the location in the current environment of the script we want to run
-                import Publisher.TaskPublishGo as tp
+                import Publisher.TaskPublish as tp
                 taskPublishScript = tp.__file__
                 cmd = "python3 %s " % taskPublishScript
                 cmd += " --configFile=%s" % self.configurationFile
