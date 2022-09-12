@@ -17,6 +17,8 @@ import argparse
 import pprint
 
 from dbs.apis.dbsClient import DbsApi
+from dbs.exceptions.dbsClientException import dbsClientException
+from RestClient.ErrorHandling.RestClientExceptions import HTTPError
 from ServerUtilities import getHashLfn, encodeRequest
 from ServerUtilities import SERVICE_INSTANCES
 from TaskWorker.WorkerExceptions import ConfigException
@@ -81,8 +83,7 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, dataset, bl
     Submit one migration request for each block that needs to be migrated.
     If blocks argument is not specified, migrate the whole dataset.
     Returns a 2-element ntuple : (exitcode, message)
-    exit codes:  0 OK, 1 taking too long, 2 failed, 3 unknown status, 4, inconsistent status
-    those are just historical things, code which uses this method only checks if exitcode is 0
+    exit codes:  0 OK, 1 taking too long, 2 failure
     """
     #wfnamemsg = "%s: " % taskname
     logger = logging.getLogger(taskname)
@@ -91,168 +92,108 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, dataset, bl
     if blocks:
         blocksToMigrate = set(blocks)
     else:
-        # This is for the case to migrate the whole dataset, which we don't do
-        # at this point Feb/2015 (we always pass blocks).
-        # Make a set with the blocks that need to be migrated.
-        blocksInDestDBS = set([block['block_name'] for block in destReadApi.listBlocks(dataset=dataset)])
-        blocksInSourceDBS = set([block['block_name'] for block in sourceApi.listBlocks(dataset=dataset)])
-        blocksToMigrate = blocksInSourceDBS - blocksInDestDBS
-        msg = "Dataset %s in destination DBS with %d blocks; %d blocks in source DBS."
-        msg = msg % (dataset, len(blocksInDestDBS), len(blocksInSourceDBS))
-        logger.info(msg)
+        # migration of a full dataset is better accomplished with a separate method
+        raise NotImplementedError
+
     numBlocksToMigrate = len(blocksToMigrate)
     if numBlocksToMigrate == 0:
         msg = "No migration needed."
         logger.info(msg)
-    else:
-        msg = "Have to migrate %d blocks from %s to %s." % (numBlocksToMigrate, sourceApi.url, destReadApi.url)
-        logger.info(msg)
-        if verbose:
-            msg = "List of blocks to migrate:\n%s." % (", ".join(blocksToMigrate))
-            logger.debug(msg)
-        msg = "Submitting %d block migration requests to DBS3 ..." % (numBlocksToMigrate)
-        logger.info(msg)
-        numBlocksAtDestination = 0
-        numQueuedUnkwonIds = 0
-        numFailedSubmissions = 0
-        migrationIdsInProgress = []
-        for block in list(blocksToMigrate):
-            # Submit migration request for this block.
-            (reqid, atDestination, alreadyQueued) = requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir)
-            # If the block is already in the destination DBS instance, we don't need
-            # to monitor its migration status. If the migration request failed to be
-            # submitted, we retry it next time. Otherwise, save the migration request
-            # id in the list of migrations in progress.
-            if reqid is None:
-                blocksToMigrate.remove(block)
-                if atDestination:
-                    numBlocksAtDestination += 1
-                elif alreadyQueued:
-                    numQueuedUnkwonIds += 1
-                else:
-                    numFailedSubmissions += 1
-            else:
-                migrationIdsInProgress.append(reqid)
-        if numBlocksAtDestination > 0:
-            msg = "%d blocks already in destination DBS." % numBlocksAtDestination
-            logger.info(msg)
-        if numFailedSubmissions > 0:
-            msg = "%d block migration requests failed to be submitted." % numFailedSubmissions
-            msg += " Will retry them later."
-            logger.info(msg)
-        if numQueuedUnkwonIds > 0:
-            msg = "%d block migration requests were already queued," % numQueuedUnkwonIds
-            msg += " but could not retrieve their request id."
-            logger.info(msg)
-        numMigrationsInProgress = len(migrationIdsInProgress)
-        if numMigrationsInProgress == 0:
-            msg = "No migrations in progress."
-            logger.info(msg)
+        return 0, ""
+    msg = "Have to migrate %d blocks from %s to %s." % (numBlocksToMigrate, sourceApi.url, destReadApi.url)
+    logger.info(msg)
+    if verbose:
+        msg = "List of blocks to migrate:\n%s." % (", ".join(blocksToMigrate))
+        logger.debug(msg)
+    msg = "Submitting %d block migration requests to DBS3 ..." % (numBlocksToMigrate)
+    logger.info(msg)
+    numFailedSubmissions = 0
+    migrationsInProgress = []
+    for block in list(blocksToMigrate):
+        # Submit migration request for this block.
+        ok = requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir)
+        if ok:
+            migrationsInProgress.append(block)
         else:
-            msg = "%d block migration requests successfully submitted." % numMigrationsInProgress
-            logger.info(msg)
-            msg = "List of migration requests ids: %s" % migrationIdsInProgress
-            logger.info(msg)
-            # Wait for up to 300 seconds, then return to the main loop. Note that we
-            # don't fail or cancel any migration request, but just retry it next time.
-            # Migration states:
-            #   0 = PENDING
-            #   1 = IN PROGRESS
-            #   2 = SUCCESS
-            #   3 = FAILED (failed migrations are retried up to 3 times automatically)
-            #   9 = Terminally FAILED
-            # In the case of failure, we expect the publisher daemon to try again in
-            # the future.
-            numFailedMigrations = 0
-            numSuccessfulMigrations = 0
-            waitTime = 30
-            numTimes = 10
-            msg = "Will monitor their status for up to %d seconds." % (waitTime * numTimes)
-            logger.info(msg)
-            for _ in range(numTimes):
-                msg = "%d block migrations in progress." % numMigrationsInProgress
-                msg += " Will check migrations status in %d seconds." % waitTime
-                logger.info(msg)
-                time.sleep(waitTime)
-                # Check the migration status of each block migration request.
-                # If a block migration has succeeded or terminally failes, remove the
-                # migration request id from the list of migration requests in progress.
-                for reqid in list(migrationIdsInProgress):
-                    try:
-                        status = migrateApi.statusMigration(migration_rqst_id=reqid)
-                        state = status[0].get('migration_status')
-                        retry = status[0].get('retry_count')
-                    except Exception as ex:
-                        msg = "Could not get status for migration id %d:\n%s" % reqid, ex
-                        logger.error(msg)
-                    else:
-                        if state == 2:
-                            msg = "Migration id %d succeeded." % reqid
-                            logger.info(msg)
-                            migrationIdsInProgress.remove(reqid)
-                            numSuccessfulMigrations += 1
-                        if state == 9:
-                            msg = "Migration id %d terminally failed." % reqid
-                            logger.info(msg)
-                            msg = "Full status for migration id %d:\n%s" % (reqid, str(status))
-                            logger.info(msg)
-                            migrationIdsInProgress.remove(reqid)
-                            numFailedMigrations += 1
-                        if state == 3:
-                            if retry < 3:
-                                msg = "Migration id %d failed (retry %d), but should be retried." % (reqid, retry)
-                                logger.info(msg)
-                            else:
-                                msg = "Migration id %d failed (retry %d)." % (reqid, retry)
-                                logger.info(msg)
-                                msg = "Full status for migration id %d:\n%s" % (reqid, str(status))
-                                logger.info(msg)
-                                migrationIdsInProgress.remove(reqid)
-                                numFailedMigrations += 1
-                numMigrationsInProgress = len(migrationIdsInProgress)
-                # Stop waiting if there are no more migrations in progress.
-                if numMigrationsInProgress == 0:
-                    break
-            # If after the 300 seconds there are still some migrations in progress, return
-            # with status 1.
-            if numMigrationsInProgress > 0:
-                msg = "Migration of %s is taking too long - will delay the publication." % dataset
-                logger.info(msg)
-                return 1, "Migration of %s is taking too long." % (dataset)
-        msg = "Migration of %s has finished." % dataset
+            numFailedSubmissions += 1
+
+    numMigrationsInProgress = len(migrationsInProgress)
+    msg = "%d block migration requests successfully submitted." % numMigrationsInProgress
+    if numFailedSubmissions:
+        msg = "%d block migration requests failed to be submitted." % numFailedSubmissions
+    logger.info(msg)
+    if not migrationsInProgress:
+        return 2, "Migration of %s failed." % (dataset)
+
+    # Wait for up to 300 seconds, then return to the main loop. Note that we
+    # don't fail or cancel any migration request, but just retry it next time.
+    # In the case of failure, we expect the publisher daemon to try again in
+    # the future.
+    numFailedMigrations = 0
+    numSuccessfulMigrations = 0
+    waitTime = 30
+    numTimes = 10
+    msg = "Will monitor their status for up to %d seconds." % (waitTime * numTimes)
+    logger.info(msg)
+    for _ in range(numTimes):
+        msg = "%d block migrations in progress." % numMigrationsInProgress
+        msg += " Will check migrations status in %d seconds." % waitTime
         logger.info(msg)
-        msg = "Migration status summary (from %d input blocks to migrate):" % numBlocksToMigrate
-        msg += " at destination = %d," % numBlocksAtDestination
-        msg += " succeeded = %d," % numSuccessfulMigrations
-        msg += " failed = %d," % numFailedMigrations
-        msg += " submission failed = %d," % numFailedSubmissions
-        msg += " queued with unknown id = %d." % numQueuedUnkwonIds
+        time.sleep(waitTime)
+        # Check the migration status of each block migration request.
+        # If a block migration has succeeded or terminally failes, remove the
+        # migration request id from the list of migration requests in progress.
+        for block in migrationsInProgress.copy():  # make a copy to allow manipulating original list
+            try:
+                inProgress, atDestination, failed = checkBlockMigration(taskname, migrateApi, block, migLogDir)
+            except Exception as ex:
+                msg = "Could not get migration status for %s:\n%s" % (block, ex)
+                logger.error(msg)
+                continue  # will check status next time
+            if atDestination:
+                logger.info('Migration completed for %s', block)
+                migrationsInProgress.remove(block)
+                numSuccessfulMigrations += 1
+            if failed:
+                logger.error('Migration failed for %s', block)
+                migrationsInProgress.remove(block)
+                numFailedMigrations += 1
+            if inProgress:
+                pass  # will check again later
+        numMigrationsInProgress = len(migrationsInProgress)  # update counter at the end of loop
+        # Stop waiting if there are no more migrations in progress.
+        if numMigrationsInProgress == 0:
+            break
+    # If after the 300 seconds there are still some migrations in progress, return
+    # with status 1.
+    if numMigrationsInProgress > 0:
+        msg = "Migration of %s is taking too long - will delay the publication." % dataset
         logger.info(msg)
-        # If there were failed migrations, return with status 2.
-        if numFailedMigrations > 0 or numFailedSubmissions > 0:
-            msg = "Some blocks failed to be migrated."
-            logger.info(msg)
-            return 2, "Migration of %s failed." % (dataset)
-        # If there were no failed migrations, but we could not retrieve the request id
-        # from some already queued requests, return with status 3.
-        if numQueuedUnkwonIds > 0:
-            msg = "Some block migrations were already queued, but failed to retrieve their request id."
-            logger.info(msg)
-            return 3, "Migration of %s in unknown status." % dataset
-        if (numBlocksAtDestination + numSuccessfulMigrations) != numBlocksToMigrate:
-            msg = "Something unexpected has happened."
-            msg += " The numbers in the migration summary are not consistent."
-            msg += " Make sure there is no bug in the code."
-            logger.info(msg)
-            return 4, "Migration of %s in some inconsistent status." % dataset
-        msg = "Migration completed."
+        return 1, "Migration of %s is taking too long." % (dataset)
+    msg = "Migration of %s has finished." % dataset
+    logger.info(msg)
+    msg = "Migration status summary (from %d input blocks to migrate):" % numBlocksToMigrate
+    msg += " succeeded = %d," % numSuccessfulMigrations
+    msg += " failed = %d," % numFailedMigrations
+    msg += " submission failed = %d," % numFailedSubmissions
+    logger.info(msg)
+    # If there were failed migrations, return with status 2.
+    if numFailedMigrations > 0 or numFailedSubmissions > 0:
+        msg = "Some blocks failed to be migrated."
         logger.info(msg)
+        return 2, "Migration of %s failed." % (dataset)
+    msg = "Migration completed. Wait 5sec before verifying that migrated datesed is OK in destination DBS"
+    logger.info(msg)
+    time.sleep(5.0)
+    migratedDataset = None
     try:
         migratedDataset = destReadApi.listDatasets(dataset=dataset, detail=True, dataset_access_type='*')
         if not migratedDataset or migratedDataset[0].get('dataset', None) != dataset:
             return 4, "Migration of %s in some inconsistent status." % dataset
     except Exception as ex:
         logger.exception("Migration check failed.")
+        if migratedDataset:
+            logger.error("listDatasets returned %s", migratedDataset)
         return 4, "Migration check failed. %s" % ex
     return 0, ""
 
@@ -260,77 +201,125 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, dataset, bl
 def requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir):
     """
     Submit migration request for one block, checking the request output.
+    returns False if request could not be submitted, True otherwise
+    migration status will have to be checked later using block name as key.
+    If something went wrong, migration will have to be retried later
     """
-    logger = logging.getLogger(taskname)
-#    logging.basicConfig(filename=taskname+'.log', level=logging.INFO, format=config.General.logMsgFormat)
 
-    atDestination = False
-    alreadyQueued = False
-    reqid = None
+    logger = logging.getLogger(taskname)
+    #    logging.basicConfig(filename=taskname+'.log', level=logging.INFO, format=config.General.logMsgFormat)
+
     msg = "Submiting migration request for block %s ..." % block
     logger.info(msg)
     sourceURL = sourceApi.url
     data = {'migration_url': sourceURL, 'migration_input': block}
+    result = None
     try:
         result = migrateApi.submitMigration(data)
-    except Exception as ex:
-        if "is already at destination" in str(ex):
-            msg = "Block is already at destination."
-            logger.info(msg)
-            atDestination = True
+        # N.B. a migration request is supposed never to fail. Only failure to contact server should
+        # result in HTTP or curl error/exceptions. Otherwise server will always return a list of dicionaries.
+        # But there are cases where server replies with HTTP code other than 200 (e.g. 400 if migration
+        # request is invalid), in those caes client raises exception which should be handled with proper care
+    except dbsClientException as dbsEx:
+        logger.error("HTTP call to server %s failed: %s", migrateApi.url, dbsEx)
+        return False
+    except HTTPError as httpErr:
+        # this is a structured message from migrate server as per
+        #  https://github.com/dmwm/dbs2go/blob/master/docs/DBSServer.md#dbs-errors
+        # http call went through, simply server returned an HTTP code other than 200
+        code = httpErr.code
+        body = json.loads(httpErr.body)
+        reason = body[0]['error']['reason']
+        if code >= 500:
+            # something bad happened inside server
+            logger.error("HTTP error %d with msg %s", code, reason)
+            return False
+        if code >= 400:
+            # in this cases it is better to treat the migration request submission as successful
+            # and go on with status checking via checkBlockMigration where various status codes
+            # are properly handled
+            logger.error("HTTP error %d", code)
+            logger.error("A new migration request could not be submitted. Reason: %s", reason)
+            return True
         else:
-            msg = "Request to migrate %s failed." % block
-            msg += "\nRequest detail: %s" % data
-            msg += "\nDBS3 exception: %s" % ex
-            logger.error(msg)
-        return reqid, atDestination, alreadyQueued
-    if not atDestination:
-        msg = "Result of migration request: %s" % str(result)
-        logger.info(msg)
-        if isinstance(result, list):
-            result = result[0] # New DBS server returns list of dicts
-        reqid = result.get('migration_details', {}).get('migration_request_id')
-        report = result.get('migration_report')
-        migInput = result.get('migration_details', {}).get('migration_input')
-        creationDate = result.get('migration_details', {}).get('creation_date')
+            logger.error("Unexpected HTTP error %d", code)
+            return False
+    except Exception as ex:
+        msg = "Request to migrate %s failed." % block
+        msg += "\nRequest detail: %s" % data
+        msg += "\nDBS3 exception: %s" % ex
+        logger.error(msg)
+        return False
+    # if HTTP call succeeded a migration request was sent for this block and all its ancestors
+    logger.info('Migration request submitted. %d blocks will be migrated', len(result))
+    return True
+
+def checkBlockMigration(taskname, migrateApi, block, migLogDir):
+    """
+    returns a 3plet of booleans: (inProgress, atDestination, failed)
+    WHen something goes wrong, reports all false
+    """
+    logger = logging.getLogger(taskname)
+    # check status using block name
+
+    atDestination = False
+    failed = True
+    inProgress = False
+    try:
+        result = migrateApi.statusMigration(block_name=block)
+    except Exception as ex:
+        msg = "Migration status query for block %s failed" % block
+        msg += "\nDBS3 exception: %s" % ex
+        logger.error(msg)
+        failed = True
+        return inProgress, atDestination, failed
+
+    if result:
+        status = result[0].get('migration_status')
+        reqid = result[0].get('migration_request_id')
+    else:
+        # result can be [] if there's no migration for this block in the DB
+        failed = True  # handle like failed, will be retried in next Publisher iteration
+        return inProgress, atDestination, failed
+    if status is None or reqid is None:
+        msg = "Migration request failed to submit."
+        msg += "\nMigration request results: %s" % str(result)
+        logger.error(msg)
+    # reference https://github.com/dmwm/dbs2go/blob/master/docs/MigrationServer.md
+    # Migration states:
+    #   0 = PENDING
+    #   1 = IN PROGRESS
+    #   2 = SUCCESS
+    #   3 = FAILED (failed migrations are retried up to 3 times automatically)
+    #   4 = NOT ACCEPTED (block is already at destination)
+    #   5 = QUEUED (migration server needs to compute list of ancestors to migrate)
+    #   9 = Terminally FAILED
+    inProgress = status in (0, 1, 5)
+    atDestination = status in (2, 4)
+    beingRetried = (status == 3)
+    failed = (status == 9)
+    if beingRetried:  # sanity check
+        nRetries = result[0]['retry_count']
+        if nRetries > 10:
+            logger.error("too many (%d) retries. Treat as terminally failed", nRetries)
+            failed = True
+            return inProgress, atDestination, failed
+    if failed:
+        logger.error("migration terminally failed for %s\n", block)
+        logger.error("migration status details:\n%s", result)
+        failedMigrationsLog = os.path.join(migLogDir, 'TerminallyFailedLog.txt')
+        logger.debug("Migration terminally failed, log to %s", failedMigrationsLog)
+        creationDate = result[0]['creation_date']
         # convert to human format
         migCreation = datetime.fromtimestamp(creationDate).strftime('%Y-%m-%d,%H:%M:%S')
-        if "Migration terminally failed" in report:
-            failedMigrationsLog = os.path.join(migLogDir, 'TerminallyFailedLog.txt')
-            logger.debug("Migration terminally failed, log to %s", failedMigrationsLog)
-            # FiledMigFile format is CSV: id,creationDate,creationTime,block(s)
-            with open(failedMigrationsLog, 'a', encoding='utf8') as fp:
-                line = "%d,%s,%s,%s\n" % (reqid, migCreation, migInput, taskname)
-                fp.write(line)
-            # in May 2019 has a storm of failed migration which needed the following cleanup
-            # keep the code in case we ever need to do the same again, but do not activate it
-            # since DN of publisher changed and current one can not act on those created
-            # 2.5 years ago by long gone vocms0105.cern.ch
-            #migTime = time.gmtime(result['migration_details']['creation_date'])
-            #if migTime.tm_year == 2019 and migTime.tm_mon == 5 and migTime.tm_mday < 21:
-            #    logger.debug("Failed migration %s requested on %s. Remove it",
-            #                 reqid, time.ctime(result['migration_details']['creation_date']))
-            #    mdic = {'migration_rqst_id': reqid} # pylint: disable=unused-variable
-            #    migrateApi.removeMigration({'migration_rqst_id': reqid})
-            #    logger.debug("  and submit again")
-            #    result = migrateApi.submitMigration(data)
-            #    reqid = result.get('migration_details', {}).get('migration_request_id')
-            #    report = result.get('migration_report')
-        if reqid is None:
-            msg = "Migration request failed to submit."
-            msg += "\nMigration request results: %s" % str(result)
-            logger.error(msg)
-        if "REQUEST ALREADY QUEUED" in report:
-            # Request could be queued in another thread, then there would be
-            # no id here, so look by block and use the id of the queued request.
-            alreadyQueued = True
-            try:
-                status = migrateApi.statusMigration(block_name=block)
-                reqid = status[0].get('migration_request_id')
-            except Exception as ex:
-                msg = "Could not get status for already queued migration of block %s.\n%s" % (block, ex)
-                logger.error(msg)
-    return reqid, atDestination, alreadyQueued
+        # FiledMigFile format is CSV: reqid,creationDate, block, taskname
+        with open(failedMigrationsLog, 'a', encoding='utf8') as fp:
+            line = "%d,%s,%s,%s\n" % (reqid, migCreation, block, taskname)
+            fp.write(line)
+        return inProgress, atDestination, failed
+    # all OK, we got a usable status information
+    return inProgress, atDestination, failed
+
 
 def publishInDBS3(config, taskname, verbose):
     """
@@ -366,15 +355,18 @@ def publishInDBS3(config, taskname, verbose):
             except Exception as ex:
                 logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
                 logger.error("Error reason: %s", ex)
+                logger.error("Error reason: %s", ex)
 
             nMarked += 1
             if nMarked % 10 == 0:
                 logger.info('marked %d files', nMarked)
 
+
     def mark_failed(files, crabServer, logger, failure_reason=""):
         """
         Something failed for these files so increment the retry count
         """
+
         msg = "Marking %s file(s) as failed" % len(files)
         logger.info(msg)
         if dryRun:
@@ -405,6 +397,7 @@ def publishInDBS3(config, taskname, verbose):
             if nMarked % 10 == 0:
                 logger.info('marked %d files', nMarked)
 
+
     def createLogdir(dirname):
         """
         Create the directory dirname ignoring erors in case it exists. Exit if
@@ -417,7 +410,6 @@ def publishInDBS3(config, taskname, verbose):
                 print(str(ose))
                 print("The task worker need to access the '%s' directory" % dirname)
                 sys.exit(1)
-        return
 
     def saveSummaryJson(logdir, summary):
         """
@@ -502,7 +494,7 @@ def publishInDBS3(config, taskname, verbose):
             raise ConfigException(msg) from ex
 
     restURInoAPI = '/crabserver/' + dbInstance
-    logger.info('Will connect to CRAB Data Base via URL: https://%s/%s', restHost, restURInoAPI)
+    logger.info('Will connect to CRAB Data Base via URL: https://%s%s', restHost, restURInoAPI)
 
     # CRAB REST API's
     crabServer = CRABRest(hostname=restHost, localcert=config.General.serviceCert,
@@ -534,6 +526,8 @@ def publishInDBS3(config, taskname, verbose):
         publish_dbs_urlIndex = results[0]['desc']['columns'].index("tm_publish_dbs_url")
         publish_dbs_url = results[0]['result'][publish_dbs_urlIndex]
 
+
+
         if not sourceURL.endswith("/DBSReader") and not sourceURL.endswith("/DBSReader/"):
             sourceURL += "/DBSReader"
     except Exception as ex:
@@ -558,9 +552,9 @@ def publishInDBS3(config, taskname, verbose):
 
     # create DBS API objects
     logger.info("DBS Source API URL: %s", sourceURL)
-    sourceApi = DbsApi(url=sourceURL, debug=True)
+    sourceApi = DbsApi(url=sourceURL, debug=False)
     logger.info("DBS Global API URL: %s", globalURL)
-    globalApi = DbsApi(url=globalURL, debug=True)
+    globalApi = DbsApi(url=globalURL, debug=False)
 
     if publish_dbs_url.endswith('/DBSWriter'):
         publish_read_url = publish_dbs_url[:-len('/DBSWriter')] + '/DBSReader'
@@ -571,11 +565,11 @@ def publishInDBS3(config, taskname, verbose):
         publish_dbs_url += '/DBSWriter'
     try:
         logger.info("DBS Destination API URL: %s", publish_dbs_url)
-        destApi = DbsApi(url=publish_dbs_url, debug=True)
+        destApi = DbsApi(url=publish_dbs_url, debug=False)
         logger.info("DBS Destination read API URL: %s", publish_read_url)
-        destReadApi = DbsApi(url=publish_read_url, debug=True)
+        destReadApi = DbsApi(url=publish_read_url, debug=False)
         logger.info("DBS Migration API URL: %s", publish_migrate_url)
-        migrateApi = DbsApi(url=publish_migrate_url, debug=True)
+        migrateApi = DbsApi(url=publish_migrate_url, debug=False)
     except Exception as ex:
         logger.exception('Error creating DBS APIs, likely wrong DBS URL %s\n%s', publish_dbs_url, ex)
         nothingToDo['result'] = 'FAIL'
