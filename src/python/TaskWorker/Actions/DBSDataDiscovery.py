@@ -156,6 +156,8 @@ class DBSDataDiscovery(DataDiscovery):
             largeRSEs = []  # a list of largish (i.e. solid) RSEs
             freeRSEs = []  # a subset of largeRSEs which also have quite some free space
             for rse in rseNames:
+                if rse[2:6] == '_RU_':  # avoid fragile sites, see #7400
+                    continue
                 size = list(rucioClient.get_rse_usage(rse, filters={'source': 'static'}))[0]['used']  # bytes
                 if float(size)/1.e15 > 1.0:  # more than 1 PB
                     largeRSEs.append(rse)
