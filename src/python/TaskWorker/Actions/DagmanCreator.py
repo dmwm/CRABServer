@@ -140,6 +140,8 @@ Arguments = "-a $(CRAB_Archive) --sourceURL=$(CRAB_ISB) --jobNumber=$(CRAB_Id) -
 
 transfer_input_files = CMSRunAnalysis.sh, cmscp.py%(additional_input_file)s
 transfer_output_files = jobReport.json.$(count), WMArchiveReport.json.$(count)
+# make sure coredump (if any) is not added to output files ref: https://lists.cs.wisc.edu/archive/htcondor-users/2022-September/msg00052.shtml
+coresize = 0
 # TODO: fold this into the config file instead of hardcoding things.
 Environment = "SCRAM_ARCH=$(CRAB_JobArch) %(additional_environment_options)s"
 should_transfer_files = YES
