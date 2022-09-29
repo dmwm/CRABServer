@@ -174,6 +174,7 @@ periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) 
                                 ifThenElse(DiskUsage >  %(max_disk_space)s, "Removed due to disk usage", \
                                   ifThenElse(time() > CRAB_TaskEndTime, "Removed due to reached CRAB_TaskEndTime", \
                                   "Removed due to job being held"))))))
+%(accelerator_jdl)s
 %(extra_jdl)s
 queue
 """
@@ -183,6 +184,8 @@ SPLIT_ARG_MAP = {"Automatic": "minutes_per_job",
                  "FileBased": "files_per_job",
                  "EventAwareLumiBased": "events_per_job",}
 
+# hardcode accelerator (gpu) sites
+acceleratorsites = set([ 'T1_DE_KIT', 'T2_CH_CERN', 'T2_CH_CSCS', 'T2_UK_London_IC', 'T2_US_Florida', 'T2_US_MIT', 'T2_US_Purdue', 'T2_US_Vanderbilt', 'T2_US_Wisconsin', 'T3_UK_London_QMUL', 'T3_US_NotreDame' ])
 
 def getCreateTimestamp(taskname):
     return "_".join(taskname.split(":")[:1])
@@ -497,6 +500,11 @@ class DagmanCreator(TaskAction):
         info['accounting_group_user'] = info['userhn']
         info = transform_strings(info)
         info['faillimit'] = task['tm_fail_limit']
+        # hardcoding accelerator to GPU (SI currently only have nvidia GPU)
+        if task['tm_user_config']['require_accelerator']:
+            info['accelerator_jdl'] = '+RequiresGPU=1\nrequest_GPUs=1'
+        else:
+            info['accelerator_jdl'] = ''
         info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
 
         # info['jobarch_flatten'].split("_")[0]: extracts "slc7" from "slc7_amd64_gcc10"
@@ -780,6 +788,7 @@ class DagmanCreator(TaskAction):
 
         blocksWithNoLocations = set()
         blocksWithBannedLocations = set()
+        blocksWithNoAcceleratorLocations = set()
         allblocks = set()
 
         siteWhitelist = set(kwargs['task']['tm_site_whitelist'])
@@ -868,6 +877,18 @@ class DagmanCreator(TaskAction):
                 blocksWithBannedLocations = blocksWithBannedLocations.union(jgblocks)
                 continue
 
+            # Intersect with sites that only have accelerator (currently we only have nvidia GPU)
+            if kwargs['task']['tm_user_config']['require_accelerator']:
+                availablesites &= acceleratorsites
+                if availablesites:
+                    msg = "'Site.requireAccelerator is True. CRAB will submit %s block(s)'s jobs to %s site(s)."
+                    msg = msg % (jgblocks, list(availablesites))
+                    self.logger.warning(msg)
+                    self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+                else:
+                    blocksWithNoAcceleratorLocations = blocksWithNoAcceleratorLocations.union(jgblocks)
+                    continue
+
             # NOTE: User can still shoot themselves in the foot with the resubmit blacklist
             # However, this is the last chance we have to warn the users about an impossible task at submit time.
             available = set(availablesites)
@@ -915,10 +936,12 @@ class DagmanCreator(TaskAction):
 
         if not dagSpecs:
             msg = "No jobs created for task %s." % (kwargs['task']['tm_taskname'])
-            if blocksWithNoLocations or blocksWithBannedLocations:
+            if blocksWithNoLocations or blocksWithBannedLocations or blocksWithNoAcceleratorLocations:
                 msg = "The CRAB server backend refuses to send jobs to the Grid scheduler. "
                 msg += "No locations found for dataset '%s'. " % (kwargs['task']['tm_input_dataset'])
                 msg += "(or at least for the part of the dataset that passed the lumi-mask and/or run-range selection).\n"
+            if blocksWithNoAcceleratorLocations or kwargs['task']['tm_user_config']['require_accelerator']:
+                msg += "Some blocks have locations but no accelerator nodes on that sites (Site.requireAccelerator=True).\n"
             if blocksWithBannedLocations:
                 msg += " Found %s (out of %s) blocks present only at blacklisted sites." %\
                        (len(blocksWithBannedLocations), len(allblocks))
@@ -932,7 +955,10 @@ class DagmanCreator(TaskAction):
             msg += " because they are only present at blacklisted and/or not-whitelisted sites.\n"
             msg += " List is: %s.\n" % (sorted(list(blocksWithBannedLocations)))
             msg += getBlacklistMsg()
-        if blocksWithNoLocations or blocksWithBannedLocations:
+        if blocksWithNoAcceleratorLocations:
+            msg += " because they are only present at non-accelerator sites.\n"
+            msg += " List is: %s.\n" % (sorted(list(blocksWithNoAcceleratorLocations)))
+        if blocksWithNoLocations or blocksWithBannedLocations or blocksWithNoAcceleratorLocations:
             msg += " Dataset processing will be incomplete because %s (out of %s) blocks" %\
                    (len(blocksWithNoLocations) + len(blocksWithBannedLocations), len(allblocks))
             msg += " are only present at blacklisted and/or not whitelisted site(s)"

@@ -154,8 +154,18 @@ def fixupTask(task):
     # load json data of tm_user_config column
     # Hard code default value of tm_user_config for backward compatibility
     # with older task
+    user_config_default = {
+        'partialdataset': False,
+        'require_accelerator': False,
+    }
     if result['tm_user_config']:
         result['tm_user_config'] = json.loads(result['tm_user_config'])
+        # patch user_config that does not have keys
+        for k in user_config_default.keys():
+            # set default value to new field if it not exists
+            if not result['tm_user_config'].get(k, None):
+                result['tm_user_config'][k] = user_config_default[k]
+    # in case tm_user_config is None
     else:
-        result['tm_user_config'] = {'partialdataset': False}
+        result['tm_user_config'] = user_config_default
     return result
