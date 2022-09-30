@@ -152,6 +152,7 @@ class RESTUserWorkflow(RESTEntity):
         #saves that in kwargs since it's what we want
         kwargs['publishname2'] = outputDatasetTagToCheck
 
+        """
         ##Determine if it's a dataset that will go into a group space and therefore the (group)username prefix it will be used
         if 'publishgroupname' in kwargs and int(kwargs['publishgroupname']): #the first half of the if is for backward compatibility
             if not (outlfn.startswith('/store/group/') and outlfn.split('/')[3]):
@@ -161,8 +162,9 @@ class RESTUserWorkflow(RESTEntity):
             group_user_prefix = outlfn.split('/')[3]
         else:
             group_user_prefix = username
+        """
 
-        outputDatasetTagToCheck = "%s-%s" % (group_user_prefix, outputDatasetTagToCheck)
+        outputDatasetTagToCheck = "%s-%s" % (username, outputDatasetTagToCheck)
         try:
             userprocdataset(outputDatasetTagToCheck)
         except AssertionError:
@@ -175,7 +177,7 @@ class RESTUserWorkflow(RESTEntity):
                 param = 'Data.outputDatasetTag'
                 extrastr = ''
             msg = "Invalid CRAB configuration parameter %s." % (param)
-            msg += " The combined string '%s-%s<%s>' should not have more than 166 characters" % (group_user_prefix, extrastr, param)
+            msg += " The combined string '%s-%s<%s>' should not have more than 166 characters" % (username, extrastr, param)
             msg += " and should match the regular expression %s" % (userProcDSParts['publishdataname'])
             raise InvalidParameter(msg)
 
@@ -340,8 +342,6 @@ class RESTUserWorkflow(RESTEntity):
             ## list of validated inputs
             validate_str("publishname2", param, safe, RX_ANYTHING, optional=True)
 
-            validate_num("publishgroupname", param, safe, optional=True)
-
             if safe.kwargs['jobtype'] == 'PrivateMC':
                 if param.kwargs['inputdata']:
                     msg = "Invalid 'inputdata' parameter."
@@ -483,7 +483,7 @@ class RESTUserWorkflow(RESTEntity):
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, primarydataset, nonvaliddata, useparent, secondarydata, generator, eventsperlumi,
             siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, debugfilename, cacheurl, addoutputfiles,
-            savelogsflag, publication, publishname, publishname2, publishgroupname, asyncdest, dbsurl, publishdbsurl, vorole, vogroup,
+            savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup,
             tfileoutfiles, edmoutfiles, runs, lumis,
             totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
             faillimit, ignorelocality, userfiles, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun, ignoreglobalblacklist,
@@ -514,7 +514,6 @@ class RESTUserWorkflow(RESTEntity):
            :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication; deprecated
            :arg str publishname2: name to use for data publication;
-           :arg str publishgroupname: add groupname or username to publishname;
            :arg str asyncdest: CMS site name for storage destination of the output files;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
@@ -554,7 +553,7 @@ class RESTUserWorkflow(RESTEntity):
                                            cachefilename=cachefilename, debugfilename=debugfilename, cacheurl=cacheurl,
                                            addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],
                                            username=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
-                                           publication=publication, publishname=publishname, publishname2=publishname2, publishgroupname=publishgroupname, asyncdest=asyncdest,
+                                           publication=publication, publishname=publishname, publishname2=publishname2, asyncdest=asyncdest,
                                            dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,
                                            edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
                                            maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfn=lfn,

@@ -67,7 +67,6 @@ JOB_SUBMIT = \
 +CRAB_PostJobStatus = "NOT RUN"
 +CRAB_PostJobLastUpdate = 0
 +CRAB_PublishName = %(publishname)s
-+CRAB_PublishGroupName = %(publishgroupname)s
 +CRAB_Publish = %(publication)s
 +CRAB_PublishDBSURL = %(publishdbsurl)s
 +CRAB_ISB = %(cacheurl)s
@@ -298,7 +297,7 @@ def transform_strings(data):
     for var in 'accounting_group', 'accounting_group_user':
         info[var] = data[var]
 
-    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries', 'publishgroupname', 'jobcount':
+    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries', 'jobcount':
         info[var] = int(data[var])
 
     for var in 'siteblacklist', 'sitewhitelist', 'addoutputfiles', 'tfileoutfiles', 'edmoutfiles':
@@ -451,7 +450,6 @@ class DagmanCreator(TaskAction):
         info['cacheurl'] = info['tm_cache_url']
         info['userhn'] = info['tm_username']
         info['publishname'] = info['tm_publish_name']
-        info['publishgroupname'] = 1 if info['tm_publish_groupname'] == 'T' else 0
         info['asyncdest'] = info['tm_asyncdest']
         info['dbsurl'] = info['tm_dbs_url']
         info['publishdbsurl'] = info['tm_publish_dbs_url']

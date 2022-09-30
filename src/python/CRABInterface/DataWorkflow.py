@@ -96,7 +96,7 @@ class DataWorkflow(object):
                username, userdn, savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, scriptexe=None, scriptargs=None,
-               scheddname=None, extrajdl=None, collector=None, dryrun=False, publishgroupname=False, nonvaliddata=False, inputdata=None, primarydataset=None,
+               scheddname=None, extrajdl=None, collector=None, dryrun=False, nonvaliddata=False, inputdata=None, primarydataset=None,
                debugfilename=None, submitipaddr=None, ignoreglobalblacklist=False, user_config={}):
         """Perform the workflow injection
 
@@ -125,7 +125,6 @@ class DataWorkflow(object):
            :arg int publication: flag enabling or disabling data publication;
            :arg str publishname: name to use for data publication; deprecated
            :arg str publishname: name to use for data publication;
-           :arg str publishgroupname: add groupname or username to publishname;
            :arg str asyncdest: CMS site name for storage destination of the output files;
            :arg str dbsurl: dbs url where the input dataset is published;
            :arg str publishdbsurl: dbs url where the output data has to be published;
@@ -202,7 +201,6 @@ class DataWorkflow(object):
                             user_role       = [vorole],
                             user_group      = [vogroup],
                             publish_name    = [publishname2],
-                            publish_groupname = ['T' if publishgroupname else 'F'],
                             asyncdest       = [asyncdest],
                             dbs_url         = [dbsurl],
                             publish_dbs_url = [publishdbsurl],
