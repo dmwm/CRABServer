@@ -638,6 +638,8 @@ if __name__ == "__main__":
         preCmd = 'export X509_USER_PROXY=%s; ' % os.getenv('X509_USER_PROXY')
         # needed for root problem with $HOME/.root.mimes, #6801
         preCmd += 'export HOME=${HOME:-$PWD}; '
+        # temporary quick fix for #7413, CMSSW 12_6 requires new env variable
+        preCmd += 'export SITECONFIG_PATH=/cvmfs/cms.cern.ch/SITECONF/local; '
         # needed for accessing EOS at RAL (Echo). See https://ggus.eu/index.php?mode=ticket_info&ticket_id=155272
         if os.getenv('XrdSecGSISRVNAMES'):
             preCmd += 'export XrdSecGSISRVNAMES=%s; ' % os.getenv('XrdSecGSISRVNAMES')
