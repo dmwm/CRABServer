@@ -36,11 +36,12 @@ def retriableError(ex):
     """ Return True if the error can be retried
     """
     if isinstance(ex, HTTPException):
+        #403 Authentication failure. When CMSWEB FrontEnd is restarting
         #429 Too Many Requests. When client hits the throttling limit
         #500 Internal sever error. For some errors retries it helps
         #502 CMSWEB frontend answers with this when the CMSWEB backends are overloaded
         #503 Usually that's the DatabaseUnavailable error
-        return ex.status in [429, 500, 502, 503]
+        return ex.status in [403, 429, 500, 502, 503]
     if isinstance(ex, pycurl.error):
         #28 is 'Operation timed out...'
         #35,is 'Unknown SSL protocol error', see https://github.com/dmwm/CRABServer/issues/5102
@@ -55,12 +56,11 @@ def terminalError(ex):
     #406 NotAcceptable (server understand what client wants, but refuses)
     #405 Unsupported Method
     #404 NoSuchInstance (typically when trying a DB instance not supported by a given host)
-    #403 Forbidden (usually authentication failure)
     #401 Unauthorized (usually we do not get this but 403, but meaning is the same. Future proofing)
     #400 BadRequest (more generic refusal of this request by HTTP server)
     terminal = False
     if isinstance(ex, HTTPException) and \
-            ex.status in [400, 401, 403, 404, 405, 406]:
+            ex.status in [400, 401, 404, 405, 406]:
         terminal = True
     return terminal
 
