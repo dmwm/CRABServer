@@ -202,7 +202,7 @@ class HTTPRequests(dict):
         try:
             result = JSONRequests(idict={"pycurl" : True}).decode(datares)
         except Exception as ex:
-            msg = "Fatal error reading data from %s using %s" % (url, data)
+            msg = "Fatal error reading data from %s using %s:\n%s" % (url, data, ex)
             self.logger.error(msg)
             raise #really exit and raise exception
         return result, response.status, response.reason
