@@ -6,16 +6,10 @@ import os
 import time
 import random
 
-try:
-    from urllib import quote as urllibQuote  # Python 2.X
-except ImportError:
-    from urllib.parse import quote as urllibQuote  # Python 3+
+from urllib.parse import quote as urllibQuote
 
 import logging
-try:
-    from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
-except:  # pylint: disable=bare-except
-    from httplib import HTTPException  # old Python 2 version in CMSSW_7
+from http.client import HTTPException
 import pycurl
 
 from WMCore.Services.Requests import JSONRequests
