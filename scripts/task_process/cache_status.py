@@ -111,7 +111,7 @@ def parseJobLog(jel, nodes, nodeMap):
             node = nodeMap[event['Cluster'], event['Proc']]
             nodes[node]['EndTimes'].append(eventtime)
             # at times HTCondor does not log the ExecuteEvent and there's no StartTime
-            if nodes[node]['StartTimes'] :
+            if nodes[node]['StartTimes'] and nodes[node]['StartTimes'][-1] > 0:
                 nodes[node]['WallDurations'][-1] = nodes[node]['EndTimes'][-1] - nodes[node]['StartTimes'][-1]
             else:
                 nodes[node]['WallDurations'][-1] = 0
@@ -205,7 +205,10 @@ def parseJobLog(jel, nodes, nodeMap):
         if info['StartTimes']:
             lastStart = info['StartTimes'][-1]
         while len(info['WallDurations']) < len(info['SiteHistory']):
-            info['WallDurations'].append(now - lastStart)
+            if lastStart > 0:
+                info['WallDurations'].append(now - lastStart)
+            else:  # this means job did not start
+                info['WallDurations'].append(0)
         while len(info['WallDurations']) > len(info['SiteHistory']):
             info['SiteHistory'].append("Unknown")
 
