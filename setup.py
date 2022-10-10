@@ -275,7 +275,8 @@ setup(name='crabserver',
       package_dir={'': 'src/python'},
       data_files=['scripts/%s' % x for x in \
                         ['CMSRunAnalysis.sh', 'cmscp.py',
-                         'gWMS-CMSRunAnalysis.sh', 'dag_bootstrap_startup.sh',
+                         'gWMS-CMSRunAnalysis.sh', 'env-CMSRunAnalysis.sh', 
+                         'dag_bootstrap_startup.sh',
                          'dag_bootstrap.sh', 'AdjustSites.py']] + getWebDir(),
      )
 

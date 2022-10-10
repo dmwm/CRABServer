@@ -634,15 +634,6 @@ if __name__ == "__main__":
 
         jobExitCode = None
         applicationName = 'CMSSW JOB' if not options.scriptExe else 'ScriptEXE'
-        # no matter what we run, it is very likely to need proxy location
-        preCmd = 'export X509_USER_PROXY=%s; ' % os.getenv('X509_USER_PROXY')
-        # needed for root problem with $HOME/.root.mimes, #6801
-        preCmd += 'export HOME=${HOME:-$PWD}; '
-        # temporary quick fix for #7413, CMSSW 12_6 requires new env variable
-        preCmd += 'export SITECONFIG_PATH=/cvmfs/cms.cern.ch/SITECONF/local; '
-        # needed for accessing EOS at RAL (Echo). See https://ggus.eu/index.php?mode=ticket_info&ticket_id=155272
-        if os.getenv('XrdSecGSISRVNAMES'):
-            preCmd += 'export XrdSecGSISRVNAMES=%s; ' % os.getenv('XrdSecGSISRVNAMES')
         print("==== %s Execution started at %s ====" % (applicationName, time.asctime(time.gmtime())))
         if not options.scriptExe :
             cmd = 'cmsRun -p PSet.py -j FrameworkJobReport.xml'
@@ -652,7 +643,7 @@ if __name__ == "__main__":
             os.chmod(options.scriptExe, st.st_mode | stat.S_IEXEC)
             cmd = os.getcwd() + "/%s %s %s" %\
                   (options.scriptExe, options.jobNumber, " ".join(json.loads(options.scriptArgs)))
-        cmd = preCmd + cmd
+
         applicationExitCode = executeUserApplication(cmd, scram)
         if applicationExitCode:
             print("==== Execution FAILED at %s ====" % time.asctime(time.gmtime()))

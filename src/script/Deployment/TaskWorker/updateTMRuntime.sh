@@ -44,6 +44,7 @@ filesToCopy="$filesToCopy $CRAB_OVERRIDE_SOURCE/CRABServer/scripts/AdjustSites.p
 filesToCopy="$filesToCopy $CRAB_OVERRIDE_SOURCE/CRABServer/scripts/dag_bootstrap_startup.sh"
 filesToCopy="$filesToCopy $CRAB_OVERRIDE_SOURCE/CRABServer/scripts/dag_bootstrap.sh"
 filesToCopy="$filesToCopy $CRAB_OVERRIDE_SOURCE/CRABServer/scripts/gWMS-CMSRunAnalysis.sh"
+filesToCopy="$filesToCopy $CRAB_OVERRIDE_SOURCE/CRABServer/scripts/env-CMSRunAnalysis.sh"
 filesToCopy="$filesToCopy $CRAB_OVERRIDE_SOURCE/CRABServer/scripts/CMSRunAnalysis.sh"
 filesToCopy="$filesToCopy $CRAB_OVERRIDE_SOURCE/CRABServer/scripts/cmscp.py"
 
