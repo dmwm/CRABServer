@@ -58,6 +58,7 @@ def getWritePFN(rucioClient=None, siteName='', lfn='',
         except Exception as ex:
             msg = 'Rucio lfn2pfn resolution for %s failed with:\n%s\nTry next one.'
             logger.warning(msg, operation, str(ex))
+            didDict = None
     if not didDict:
         msg = 'lfn2pfn resolution with Rucio failed for site: %s  LFN: %s' % (siteName, lfn)
         msg += ' with exception :\n%s' % str(ex)
