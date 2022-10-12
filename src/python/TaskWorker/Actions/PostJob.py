@@ -1310,6 +1310,7 @@ class PostJob():
         self.logs_arch_file_name = None
         self.stage               = None
         self.output_files_names  = None
+        self.output_dataset      = None
         ## The crab_retry is the number of times the post-job was ran (not necessarilly
         ## completing) for this job id.
         self.crab_retry          = None
@@ -2745,6 +2746,7 @@ class PostJob():
                 edm_file_count += 1
         multiple_edm = edm_file_count > 1
         # now compute the output dataset name for each file and add it to file_info
+        outdataset = None
         for file_info in self.output_files_info:
             # use common function with ASOServerJob to ensure uniform dataset name
             if file_info['filetype'] in ['EDM', 'DQM']:
@@ -2761,6 +2763,9 @@ class PostJob():
             else:
                 outdataset = G_FAKE_OUTDATASET
             file_info['output_dataset'] = outdataset
+
+        self.output_dataset = outdataset # we do not support multiple output datasets anymore
+
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
