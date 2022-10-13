@@ -8,7 +8,19 @@
 # the swalloging of exception in abort_dag is intentional
 # pylint: disable=W0150
 # there are many assignements which are better written with column alignement
-# pylint: disable=C0326
+# pylint: disable=C0326, C0330
+# here we intentionally (!?) use snake-case instead of CamelCase
+# pylint: disable=invalid-name
+# this file is too long, too complex etc. etc. so no hope that we put
+# a docstring on all functions
+# pylint: disable=missing-function-docstring, missing-class-docstring
+# and no hope that we cleanup things, until we rewrite it
+# pylint: disable=W0511   # do not barf on "TODO" comments
+# pylint: disable=too-many-nested-blocks, too-many-branches, too-many-locals, no-self-use
+# pylint: disable=too-many-statements, too-many-instance-attributes, too-many-public-methods
+# yeah, we have a lot of try-except where we do not bother to spell specific exceptions
+# pylint: disable=broad-except
+
 """
 In the PostJob we read the FrameworkJobReport (FJR) to retrieve information
 about the output files. The FJR contains information for output files produced
