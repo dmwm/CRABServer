@@ -416,6 +416,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("dryrun", param, safe, optional=True)
             validate_num("ignoreglobalblacklist", param, safe, optional=True)
             validate_num("partialdataset", param, safe, optional=True)
+            validate_num("requireaccelerator", param, safe, optional=True)
 
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
@@ -487,7 +488,7 @@ class RESTUserWorkflow(RESTEntity):
             tfileoutfiles, edmoutfiles, runs, lumis,
             totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
             faillimit, ignorelocality, userfiles, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun, ignoreglobalblacklist,
-            partialdataset):
+            partialdataset, requireaccelerator):
         """Perform the workflow injection
 
            :arg str workflow: request name defined by the user;
@@ -544,7 +545,8 @@ class RESTUserWorkflow(RESTEntity):
            :returns: a dict which contaians details of the request"""
 
         user_config = {
-            'partialdataset': True if partialdataset else False
+            'partialdataset': True if partialdataset else False,
+            'requireaccelerator': True if requireaccelerator else False
         }
 
         return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch,
