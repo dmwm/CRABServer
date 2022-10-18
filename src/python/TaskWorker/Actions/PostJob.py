@@ -2035,6 +2035,29 @@ class PostJob():
                                    retry=2, logger=self.logger, userAgent='CRABSchedd')
         self.crabserver.setDbInstance(self.db_instance)
 
+
+        if not os.path.exists('output_datasets') and self.output_dataset:
+            self.logger.info("Uploading output_dataset %s to task DB", self.output_dataset)
+            configreq = [('subresource', 'addoutputdatasets'),
+                         ('workflow', self.reqname),
+                         ('outputdatasets', self.output_dataset)]
+            rest_api = 'task'
+            msg = "Uploading output dataset to https://%s: %s" % (self.rest_url+rest_api, configreq)
+            self.logger.debug(msg)
+            try:
+                self.crabserver.post(api=rest_api, data=encodeRequest(configreq))
+                with open('output_datasets', 'w') as f:
+                    f.write(self.output_dataset)
+            except HTTPException as hte:
+                msg = "Error uploading output dataset: %s" % (str(hte.headers))
+                self.logger.error(msg)
+            except IOError:
+                msg = "Error writing the output_datasets file"
+                self.logger.error(msg)
+        else:
+            self.logger.debug("Output dataset should be already uploaded:\n%s", output_dataset)
+
+
         ## Upload the logs archive file metadata if it was not already done from the WN.
         if self.transfer_logs and first_pj_execution():
             if self.log_needs_file_metadata_upload:
