@@ -7,6 +7,8 @@
 # pylint: disable=W0603
 # the swalloging of exception in abort_dag is intentional
 # pylint: disable=W0150
+# too many open statements here to worry about specifying and encoding
+# pylint: disable=W1514
 # there are many assignements which are better written with column alignement
 # pylint: disable=C0326, C0330
 # here we intentionally (!?) use snake-case instead of CamelCase
@@ -30,46 +32,46 @@ of these two cases.
 Example FJR['steps']['cmsRun']['output'] for an EDM file produced via
 PoolOutputModule:
 {
- u'temp_storage_site': u'T2_US_Nebraska',
- u'storage_site': u'T2_CH_CERN',
- u'pfn': u'dumper.root',
- u'checksums': {u'adler32': u'47d823c0', u'cksum': u'640736586'},
- u'size': 3582626,
- u'local_stageout': True,
- u'direct_stageout': False,
- u'ouput_module_class': u'PoolOutputModule',
- u'runs': {u'1': [666668, 666672, 666675, 666677, ...]},
- u'branch_hash': u'd41d8cd98f00b204e9800998ecf8427e',
- u'input': [u'/store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0011/404C27A2-22AE-E111-BC20-003048D373AE.root', ...],
- u'inputpfns': [u'/cms/store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0011/404C27A2-22AE-E111-BC20-003048D373AE.root', ...],
- u'lfn': u'',
- u'pset_hash': u'eede9f2e261619d27929da51104cf9d7',
- u'catalog': u'',
- u'module_label': u'o',
- u'guid': u'48C5017F-A405-E411-9BE6-00A0D1E70940',
- u'events': 30650
+ 'temp_storage_site': 'T2_US_Nebraska',
+ 'storage_site': 'T2_CH_CERN',
+ 'pfn': 'dumper.root',
+ 'checksums': {'adler32': '47d823c0', 'cksum': '640736586'},
+ 'size': 3582626,
+ 'local_stageout': True,
+ 'direct_stageout': False,
+ 'ouput_module_class': 'PoolOutputModule',
+ 'runs': {'1': [666668, 666672, 666675, 666677, ...]},
+ 'branch_hash': 'd41d8cd98f00b204e9800998ecf8427e',
+ 'input': ['/store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0011/404C27A2-22AE-E111-BC20-003048D373AE.root', ...],
+ 'inputpfns': ['/cms/store/mc/HC/GenericTTbar/GEN-SIM-RECO/CMSSW_5_3_1_START53_V5-v1/0011/404C27A2-22AE-E111-BC20-003048D373AE.root', ...],
+ 'lfn': '',
+ 'pset_hash': 'eede9f2e261619d27929da51104cf9d7',
+ 'catalog': '',
+ 'module_label': 'o',
+ 'guid': '48C5017F-A405-E411-9BE6-00A0D1E70940',
+ 'events': 30650
 }
 Example FJR['steps']['cmsRun']['output'] for a TFile produced via TFileService:
 {
- u'temp_storage_site': u'T2_US_Nebraska',
- u'storage_site': u'T2_CH_CERN',
- u'pfn': u'/tmp/1882789.vmpsched/glide_Paza70/execute/dir_27876/histo.root',
- u'checksums': {u'adler32': u'e8ed4a12', u'cksum': u'2439186609'},
- u'size': 360,
- u'local_stageout': True,
- u'direct_stageout': False,
- u'fileName': u'/tmp/1882789.vmpsched/glide_Paza70/execute/dir_27876/histo.root',
- u'Source': u'TFileService'
+ 'temp_storage_site': 'T2_US_Nebraska',
+ 'storage_site': 'T2_CH_CERN',
+ 'pfn': '/tmp/1882789.vmpsched/glide_Paza70/execute/dir_27876/histo.root',
+ 'checksums': {'adler32': 'e8ed4a12', 'cksum': '2439186609'},
+ 'size': 360,
+ 'local_stageout': True,
+ 'direct_stageout': False,
+ 'fileName': '/tmp/1882789.vmpsched/glide_Paza70/execute/dir_27876/histo.root',
+ 'Source': 'TFileService'
 }
 For other type of output files, we add in cmscp.py the basic necessary info
 about the file to the FJR. The information is:
 {
- u'temp_storage_site': u'T2_US_Nebraska',
- u'storage_site': u'T2_CH_CERN',
- u'pfn': u'out.root',
- u'size': 45124,
- u'local_stageout': True,
- u'direct_stageout': False
+ 'temp_storage_site': 'T2_US_Nebraska',
+ 'storage_site': 'T2_CH_CERN',
+ 'pfn': 'out.root',
+ 'size': 45124,
+ 'local_stageout': True,
+ 'direct_stageout': False
 }
 
 The PostJob and cmscp are the only places in CRAB3 where we should use camel_case instead of snakeCase.
@@ -81,11 +83,9 @@ import sys
 import time
 import json
 import uuid
-import errno
 import pprint
 import signal
 import tarfile
-import hashlib
 import logging
 import logging.handlers
 import subprocess
@@ -167,7 +167,7 @@ def compute_outputdataset_name(primaryDS=None, username=None, publish_name=None,
     if pset_hash:
         # replace placeholder (32*'0') with correct pset hash for this file
         publish_name = "%s-%s" % (publish_name.rsplit('-', 1)[0], pset_hash)
-    hash = pset_hash if pset_hash else 32*'0'
+    #####hash = pset_hash if pset_hash else 32*'0'
     if module_label:
         # insert output module name before the pset hash
         left, right = publish_name.rsplit('-', 1)
@@ -585,12 +585,12 @@ class ASOServerJob(object):
         for output_module in self.job_report_output.values():
             for output_file_info in output_module:
                 file_info = {}
-                file_info['pfn'] = str(output_file_info[u'pfn'])
-                file_info['checksums'] = output_file_info.get(u'checksums', {'cksum': '0', 'adler32': '0'})
-                file_info['outsize'] = output_file_info.get(u'size', 0)
-                file_info['direct_stageout'] = output_file_info.get(u'direct_stageout', False)
-                file_info['pset_hash'] = output_file_info.get(u'pset_hash', 32*'0')
-                file_info['module_label'] = output_file_info.get(u'module_label')
+                file_info['pfn'] = str(output_file_info['pfn'])
+                file_info['checksums'] = output_file_info.get('checksums', {'cksum': '0', 'adler32': '0'})
+                file_info['outsize'] = output_file_info.get('size', 0)
+                file_info['direct_stageout'] = output_file_info.get('direct_stageout', False)
+                file_info['pset_hash'] = output_file_info.get('pset_hash', 32*'0')
+                file_info['module_label'] = output_file_info.get('module_label')
                 # assign filetype based on the classification made by CRAB Client
                 if file_info['pfn'] in task['tm_edm_outfiles']:
                     file_info['filetype'] = 'EDM'
@@ -1310,6 +1310,7 @@ class PostJob():
         self.logs_arch_file_name = None
         self.stage               = None
         self.output_files_names  = None
+        self.output_dataset      = None
         ## The crab_retry is the number of times the post-job was ran (not necessarilly
         ## completing) for this job id.
         self.crab_retry          = None
@@ -2313,7 +2314,7 @@ class PostJob():
             temp_storage_site = self.executed_site
         configreq = {'taskname'        : self.reqname,
                      'jobid'      : self.job_id,
-                     'outsize'         : self.job_report.get(u'log_size', 0),
+                     'outsize'         : self.job_report.get('log_size', 0),
                      'publishdataname' : self.publish_name,
                      'appver'          : self.job_sw,
                      'outtype'         : 'LOG',
@@ -2352,12 +2353,12 @@ class PostJob():
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
         temp_storage_site = self.executed_site
-        if self.job_report.get(u'temp_storage_site', 'unknown') != 'unknown':
-            temp_storage_site = self.job_report.get(u'temp_storage_site')
+        if self.job_report.get('temp_storage_site', 'unknown') != 'unknown':
+            temp_storage_site = self.job_report.get('temp_storage_site')
         if not 'source' in self.job_report.get('steps', {}).get('cmsRun', {}).get('input', {}):
             self.logger.info("Skipping input filemetadata upload as no inputs were found")
             return
-        direct_stageout = int(self.job_report.get(u'direct_stageout', 0))
+        direct_stageout = int(self.job_report.get('direct_stageout', 0))
         for ifile in self.job_report['steps']['cmsRun']['input']['source']:
             if ifile['input_source_class'] != 'PoolSource' or ifile.get('input_type', '') != "primaryFiles":
                 continue
@@ -2395,7 +2396,7 @@ class PostJob():
             #TODO: there could be a better py3 way to get lists of outfileruns/lumis
             outfileruns = []
             outfilelumis = []
-            for run, lumis in ifile[u'runs'].items():
+            for run, lumis in ifile['runs'].items():
                 outfileruns.append(str(run))
                 outfilelumis.append(','.join(map(str, lumis)))
 
@@ -2629,15 +2630,15 @@ class PostJob():
         ## This is the job report part containing information about the output files.
         self.job_report_output = self.job_report['steps']['cmsRun']['output']
         ## Set some class variables using the job report.
-        self.log_needs_transfer = not bool(self.job_report.get(u'direct_stageout', False))
-        self.log_needs_file_metadata_upload = not bool(self.job_report.get(u'file_metadata_upload', False))
-        self.log_size = int(self.job_report.get(u'log_size', 0))
-        self.executed_site = self.job_report.get(u'executed_site', None)
+        self.log_needs_transfer = not bool(self.job_report.get('direct_stageout', False))
+        self.log_needs_file_metadata_upload = not bool(self.job_report.get('file_metadata_upload', False))
+        self.log_size = int(self.job_report.get('log_size', 0))
+        self.executed_site = self.job_report.get('executed_site', None)
         if not self.executed_site:
             msg = "Unable to determine executed site from job report."
             self.logger.error(msg)
             return 1
-        self.job_failed = bool(self.job_report.get(u'jobExitCode', 0))
+        self.job_failed = bool(self.job_report.get('jobExitCode', 0))
         if self.job_failed:
             self.source_dir = os.path.join(self.source_dir, 'failed')
             self.dest_dir = os.path.join(self.dest_dir, 'failed')
@@ -2697,33 +2698,33 @@ class PostJob():
                     file_info['filetype'] = 'FAKE'
                 else:
                     file_info['filetype'] = 'UNKNOWN'
-                file_info['module_label'] = output_file_info.get(u'module_label', 'unknown')
-                file_info['inparentlfns'] = [str(i) for i in output_file_info.get(u'input', [])]
-                file_info['events'] = output_file_info.get(u'events', 0)
-                file_info['checksums'] = output_file_info.get(u'checksums', {'cksum': '0', 'adler32': '0'})
-                file_info['outsize'] = output_file_info.get(u'size', 0)
-                if u'pset_hash' in output_file_info:
-                    file_info['pset_hash'] = output_file_info[u'pset_hash']
+                file_info['module_label'] = output_file_info.get('module_label', 'unknown')
+                file_info['inparentlfns'] = [str(i) for i in output_file_info.get('input', [])]
+                file_info['events'] = output_file_info.get('events', 0)
+                file_info['checksums'] = output_file_info.get('checksums', {'cksum': '0', 'adler32': '0'})
+                file_info['outsize'] = output_file_info.get('size', 0)
+                if 'pset_hash' in output_file_info:
+                    file_info['pset_hash'] = output_file_info['pset_hash']
                 else:
                     file_info['pset_hash'] = 32*'0'
-                if u'pfn' in output_file_info:
-                    file_info['pfn'] = str(output_file_info[u'pfn'])
-                file_info['local_stageout'] = output_file_info.get(u'local_stageout', False)
-                file_info['direct_stageout'] = output_file_info.get(u'direct_stageout', False)
+                if 'pfn' in output_file_info:
+                    file_info['pfn'] = str(output_file_info['pfn'])
+                file_info['local_stageout'] = output_file_info.get('local_stageout', False)
+                file_info['direct_stageout'] = output_file_info.get('direct_stageout', False)
                 file_info['outlocation'] = self.dest_site
-                if output_file_info.get(u'temp_storage_site', 'unknown') != 'unknown':
-                    file_info['outtmplocation'] = output_file_info.get(u'temp_storage_site')
-                elif self.job_report.get(u'temp_storage_site', 'unknown') != 'unknown':
-                    file_info['outtmplocation'] = self.job_report.get(u'temp_storage_site')
+                if output_file_info.get('temp_storage_site', 'unknown') != 'unknown':
+                    file_info['outtmplocation'] = output_file_info.get('temp_storage_site')
+                elif self.job_report.get('temp_storage_site', 'unknown') != 'unknown':
+                    file_info['outtmplocation'] = self.job_report.get('temp_storage_site')
                 else:
                     file_info['outtmplocation'] = self.executed_site
                 file_info['outlfn'] = os.path.join(self.dest_dir, filename)
                 file_info['outtmplfn'] = os.path.join(self.source_dir, filename)
-                if u'runs' not in output_file_info:
+                if 'runs' not in output_file_info:
                     continue
                 file_info['outfileruns'] = []
                 file_info['outfilelumis'] = []
-                for run, lumis in output_file_info[u'runs'].items():
+                for run, lumis in output_file_info['runs'].items():
                     file_info['outfileruns'].append(str(run))
                     # Creating a string like '100:20,101:21,105:20...'
                     # where the lumi is followed by a colon and number of events in that lumi.
@@ -2745,6 +2746,7 @@ class PostJob():
                 edm_file_count += 1
         multiple_edm = edm_file_count > 1
         # now compute the output dataset name for each file and add it to file_info
+        outdataset = None
         for file_info in self.output_files_info:
             # use common function with ASOServerJob to ensure uniform dataset name
             if file_info['filetype'] in ['EDM', 'DQM']:
@@ -2762,6 +2764,9 @@ class PostJob():
                 outdataset = G_FAKE_OUTDATASET
             file_info['output_dataset'] = outdataset
 
+        self.output_dataset = outdataset # we do not support multiple output datasets anymore
+
+
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def set_dashboard_state(self, state, reason=None, exitCode=None):
@@ -2777,7 +2782,6 @@ class PostJob():
                        'FINISHED'     : 'Done'
                       }
         state = states_dict.get(state, state)
-        msg = "Setting state for monitor reporting to %s." % (state)
         params = {'MonitorID': self.reqname,
                   'MonitorJobID': "%s_https://glidein.cern.ch/%s/%s_%d" \
                                    % (self.job_id, self.job_id, \
@@ -2876,8 +2880,8 @@ class PostJob():
             ifile = get_file_index(file_name, self.output_files_info)
         if ifile is not None and self.output_files_info[ifile].get('outtmplocation'):
             return self.output_files_info[ifile]['outtmplocation']
-        if self.job_report.get(u'temp_storage_site', 'unknown') != 'unknown':
-            return self.job_report.get(u'temp_storage_site')
+        if self.job_report.get('temp_storage_site', 'unknown') != 'unknown':
+            return self.job_report.get('temp_storage_site')
         return self.executed_site
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
