@@ -2055,7 +2055,7 @@ class PostJob():
                 msg = "Error writing the output_datasets file"
                 self.logger.error(msg)
         else:
-            self.logger.debug("Output dataset should be already uploaded:\n%s", output_dataset)
+            self.logger.debug("Output dataset should be already uploaded:\n%s", self.output_dataset)
 
 
         ## Upload the logs archive file metadata if it was not already done from the WN.
