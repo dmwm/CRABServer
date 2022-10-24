@@ -184,8 +184,6 @@ SPLIT_ARG_MAP = {"Automatic": "minutes_per_job",
                  "FileBased": "files_per_job",
                  "EventAwareLumiBased": "events_per_job",}
 
-# hardcode accelerator (gpu) sites
-acceleratorsites = set([ 'T1_DE_KIT', 'T2_CH_CERN', 'T2_CH_CSCS', 'T2_UK_London_IC', 'T2_US_Florida', 'T2_US_MIT', 'T2_US_Purdue', 'T2_US_Vanderbilt', 'T2_US_Wisconsin', 'T3_UK_London_QMUL', 'T3_US_NotreDame' ])
 
 def getCreateTimestamp(taskname):
     return "_".join(taskname.split(":")[:1])
@@ -761,8 +759,12 @@ class DagmanCreator(TaskAction):
         os.chmod("CMSRunAnalysis.sh", 0o755)
 
         # This config setting acts as a global black list
-        global_blacklist = set(self.getBlacklistedSites())
+        global_blacklist = set(self.loadJSONFromFileInScratchDir('blacklistedSites.txt'))
         self.logger.debug("CRAB site blacklist: %s", list(global_blacklist))
+
+        # Get accleratorsites from GetAcceleratorSite recurring action.
+        acceleratorsites = set(self.loadJSONFromFileInScratchDir('acceleratorSites.txt'))
+        self.logger.debug("Accelerator site from pilot pool: %s", list(acceleratorsites))
 
         # This is needed for Site Metrics
         # It should not block any site for Site Metrics and if needed for other activities
