@@ -499,7 +499,7 @@ class DagmanCreator(TaskAction):
         info = transform_strings(info)
         info['faillimit'] = task['tm_fail_limit']
         # hardcoding accelerator to GPU (SI currently only have nvidia GPU)
-        if task['tm_user_config']['require_accelerator']:
+        if task['tm_user_config']['requireaccelerator']:
             info['accelerator_jdl'] = '+RequiresGPU=1\nrequest_GPUs=1'
         else:
             info['accelerator_jdl'] = ''
@@ -763,7 +763,7 @@ class DagmanCreator(TaskAction):
         self.logger.debug("CRAB site blacklist: %s", list(global_blacklist))
 
         # Get accleratorsites from GetAcceleratorSite recurring action.
-        acceleratorsites = set(self.loadJSONFromFileInScratchDir('acceleratorSites.txt'))
+        acceleratorsites = set(self.loadJSONFromFileInScratchDir('acceleratorSites.json'))
         self.logger.debug("Accelerator site from pilot pool: %s", list(acceleratorsites))
 
         # This is needed for Site Metrics
@@ -790,7 +790,6 @@ class DagmanCreator(TaskAction):
 
         blocksWithNoLocations = set()
         blocksWithBannedLocations = set()
-        blocksWithNoAcceleratorLocations = set()
         allblocks = set()
 
         siteWhitelist = set(kwargs['task']['tm_site_whitelist'])
@@ -880,15 +879,15 @@ class DagmanCreator(TaskAction):
                 continue
 
             # Intersect with sites that only have accelerator (currently we only have nvidia GPU)
-            if kwargs['task']['tm_user_config']['require_accelerator']:
+            if kwargs['task']['tm_user_config']['requireaccelerator']:
                 availablesites &= acceleratorsites
                 if availablesites:
-                    msg = "'Site.requireAccelerator is True. CRAB will submit %s block(s)'s jobs to %s site(s)."
-                    msg = msg % (jgblocks, list(availablesites))
+                    msg = "Site.requireAccelerator is True. CRAB will restrict sites to run the jobs to %s."
+                    msg = msg % (list(availablesites), )
                     self.logger.warning(msg)
                     self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
                 else:
-                    blocksWithNoAcceleratorLocations = blocksWithNoAcceleratorLocations.union(jgblocks)
+                    blocksWithBannedLocations = blocksWithBannedLocations.union(jgblocks)
                     continue
 
             # NOTE: User can still shoot themselves in the foot with the resubmit blacklist
@@ -938,12 +937,10 @@ class DagmanCreator(TaskAction):
 
         if not dagSpecs:
             msg = "No jobs created for task %s." % (kwargs['task']['tm_taskname'])
-            if blocksWithNoLocations or blocksWithBannedLocations or blocksWithNoAcceleratorLocations:
+            if blocksWithNoLocations or blocksWithBannedLocations:
                 msg = "The CRAB server backend refuses to send jobs to the Grid scheduler. "
                 msg += "No locations found for dataset '%s'. " % (kwargs['task']['tm_input_dataset'])
                 msg += "(or at least for the part of the dataset that passed the lumi-mask and/or run-range selection).\n"
-            if blocksWithNoAcceleratorLocations or kwargs['task']['tm_user_config']['require_accelerator']:
-                msg += "Some blocks have locations but no accelerator nodes on that sites (Site.requireAccelerator=True).\n"
             if blocksWithBannedLocations:
                 msg += " Found %s (out of %s) blocks present only at blacklisted sites." %\
                        (len(blocksWithBannedLocations), len(allblocks))
@@ -954,13 +951,10 @@ class DagmanCreator(TaskAction):
             msgBlocklist = sorted(list(blocksWithNoLocations)[:10]) + ['...']
             msg += " because they have no locations.\n List is (first 10 elements only): %s.\n" % msgBlocklist
         if blocksWithBannedLocations:
-            msg += " because they are only present at blacklisted and/or not-whitelisted sites.\n"
+            msg += " because they are only present at blacklisted, not-whitelisted, and/or non-accelerator sites.\n"
             msg += " List is: %s.\n" % (sorted(list(blocksWithBannedLocations)))
             msg += getBlacklistMsg()
-        if blocksWithNoAcceleratorLocations:
-            msg += " because they are only present at non-accelerator sites.\n"
-            msg += " List is: %s.\n" % (sorted(list(blocksWithNoAcceleratorLocations)))
-        if blocksWithNoLocations or blocksWithBannedLocations or blocksWithNoAcceleratorLocations:
+        if blocksWithNoLocations or blocksWithBannedLocations:
             msg += " Dataset processing will be incomplete because %s (out of %s) blocks" %\
                    (len(blocksWithNoLocations) + len(blocksWithBannedLocations), len(allblocks))
             msg += " are only present at blacklisted and/or not whitelisted site(s)"

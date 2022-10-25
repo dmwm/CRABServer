@@ -7,9 +7,14 @@ import htcondor
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 
 class GetAcceleratorSite(BaseRecurringAction):
+    """
+    Recurring action to get the list of accelerator sites from glidein pool,
+    then saving to `scratchDir/acceleratorSites.json`
+    """
     pollingTime = 1  # testing #60 * 12 #minutes
 
     def _execute(self, config, task):  # pylint: disable=unused-argument
+        # get glidein url from taskworker config
         collector_url = config.TaskWorker.glideinPool
         collector = htcondor.Collector(collector_url)
         try:
@@ -20,8 +25,8 @@ class GetAcceleratorSite(BaseRecurringAction):
             traceback.print_exc()
             self.logger.error('Cannot fetch accelerator site from collector %s.', collector_url)
             return
-        sites = sorted({x.get('GLIDEIN_CMSSite') for x in result})
-        saveLocation = os.path.join(config.TaskWorker.scratchDir, "acceleratorSites.txt")
+        sites = list({x.get('GLIDEIN_CMSSite') for x in result})
+        saveLocation = os.path.join(config.TaskWorker.scratchDir, "acceleratorSites.json")
         tmpLocation = saveLocation + ".tmp"
         with open(tmpLocation, 'w', encoding='utf-8') as fd:
             json.dump(sites, fd)
