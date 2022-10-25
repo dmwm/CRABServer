@@ -156,7 +156,7 @@ def fixupTask(task):
     # with older task
     user_config_default = {
         'partialdataset': False,
-        'require_accelerator': False,
+        'requireaccelerator': False,
     }
     if result['tm_user_config']:
         result['tm_user_config'] = json.loads(result['tm_user_config'])

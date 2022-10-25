@@ -6,31 +6,27 @@ import traceback
 import htcondor
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 
-
 class GetAcceleratorSite(BaseRecurringAction):
-    pollingTime = 1 # testing #60 * 12 #minutes
-
-
+    pollingTime = 1  # testing #60 * 12 #minutes
 
     def _execute(self, config, task):  # pylint: disable=unused-argument
-        collector_host = 'vocms0207.cern.ch'
-        htcondor.param['COLLECTOR_HOST'] = collector_host
-        collector = htcondor.Collector()
+        collector_url = config.TaskWorker.glideinPool
+        collector = htcondor.Collector(collector_url)
         try:
             result = collector.query(htcondor.AdTypes.Any,
                                      'mytype=="glidefactory" && stringlistmember("CMSGPU", GLIDEIN_Supported_VOs)',
                                      ['GLIDEIN_CMSSite'])
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             traceback.print_exc()
-            self.logger.error('Cannot fetch accelerator site from collector %s.',collector_host)
+            self.logger.error('Cannot fetch accelerator site from collector %s.', collector_url)
             return
         sites = sorted({x.get('GLIDEIN_CMSSite') for x in result})
         saveLocation = os.path.join(config.TaskWorker.scratchDir, "acceleratorSites.txt")
-
         tmpLocation = saveLocation + ".tmp"
         with open(tmpLocation, 'w', encoding='utf-8') as fd:
             json.dump(sites, fd)
         shutil.move(tmpLocation, saveLocation)
+
 
 if __name__ == '__main__':
     # Simple main to execute the action standalone.

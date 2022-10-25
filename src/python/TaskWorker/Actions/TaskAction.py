@@ -75,8 +75,9 @@ class TaskAction(object):
         if os.path.isfile(fileLocation):
             with open(fileLocation, 'r', encoding='utf-8') as fd:
                 try:
-                    sites = json.load(fd)
+                    return json.load(fd)
                 except ValueError as e:
                     self.logger.error("Failed to load json from file %s. Error message: %s", fileLocation, e)
-                    return []
-        return sites
+                    return {}
+        # return empty dict when file does not exist.
+        return {}
