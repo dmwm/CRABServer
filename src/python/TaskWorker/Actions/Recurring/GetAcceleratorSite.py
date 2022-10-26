@@ -11,7 +11,7 @@ class GetAcceleratorSite(BaseRecurringAction):
     Recurring action to get the list of accelerator sites from glidein pool,
     then saving to `scratchDir/acceleratorSites.json`
     """
-    pollingTime = 1  # testing #60 * 12 #minutes
+    pollingTime = 60 * 12  # minutes
 
     def _execute(self, config, task):  # pylint: disable=unused-argument
         # get glidein url from taskworker config
