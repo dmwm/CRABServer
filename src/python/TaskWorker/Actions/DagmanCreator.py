@@ -523,7 +523,7 @@ class DagmanCreator(TaskAction):
             info['additional_input_file'] += ", sandbox.tar.gz"
         info['additional_input_file'] += ", run_and_lumis.tar.gz"
         info['additional_input_file'] += ", input_files.tar.gz"
-        info['additional_input_file'] += ", env-CMSRunAnalysis.sh"
+        info['additional_input_file'] += ", submit_env.sh"
 
         info['max_disk_space'] = MAX_DISK_SPACE
 
@@ -1145,7 +1145,7 @@ class DagmanCreator(TaskAction):
         transform_location = getLocation('CMSRunAnalysis.sh', 'CRABServer/scripts/')
         cmscp_location = getLocation('cmscp.py', 'CRABServer/scripts/')
         gwms_location = getLocation('gWMS-CMSRunAnalysis.sh', 'CRABServer/scripts/')
-        env_location = getLocation('env-CMSRunAnalysis.sh', 'CRABServer/scripts/')
+        env_location = getLocation('submit_env.sh', 'CRABServer/scripts/')
         dag_bootstrap_location = getLocation('dag_bootstrap_startup.sh', 'CRABServer/scripts/')
         bootstrap_location = getLocation("dag_bootstrap.sh", "CRABServer/scripts/")
         adjust_location = getLocation("AdjustSites.py", "CRABServer/scripts/")
@@ -1191,7 +1191,7 @@ class DagmanCreator(TaskAction):
         kw['task']['dbinstance'] = self.crabserver.getDbInstance()
         params = {}
 
-        inputFiles = ['gWMS-CMSRunAnalysis.sh', 'env-CMSRunAnalysis.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh',
+        inputFiles = ['gWMS-CMSRunAnalysis.sh', 'submit_env.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh',
                       'AdjustSites.py', 'site.ad', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.pkl', 'taskworkerconfig.pkl',
                       'run_and_lumis.tar.gz', 'input_files.tar.gz']
 

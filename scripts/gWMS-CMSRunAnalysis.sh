@@ -6,14 +6,14 @@
 # difficult-to-impossible to run.
 #
 
-# import some auxiliary functions from a script that is intented to be shared
-# with WMCore
-source ./env-CMSRunAnalysis.sh
-
 echo "======== Startup environment - STARTING ========"
 
-# from ./env-CMSRunAnalysis.sh
-env_save
+# import some auxiliary functions from a script that is intented to be shared
+# with WMCore
+source ./submit_env.sh
+
+# from ./submit_env.sh
+save_env
 
 echo "======== Startup environment - FINISHING ========"
 
@@ -88,7 +88,8 @@ echo "Hostname:   $(hostname -f)"
 echo "System:     $(uname -a)"
 echo "Arguments are $@"
 
-# dario: what does this do? do we need this?
+# redirect stderr to stdout, so that it all goes to job_out.*, leaving job_err.* empty
+# see https://stackoverflow.com/a/13088401
 exec 2>&1
 
 CRAB_oneEventMode=0
@@ -163,10 +164,11 @@ then
 fi
 
 echo "======== User application running completed. Prepare env. for stageout ==="
-# from ./env-CMSRunAnalysis.sh
-env_cms_load
+# from ./submit_env.sh
+setup_cmsset
 
-load_comp_python
+# from ./submit_env.sh
+setup_python_comp
 
 #echo "======== Attempting to notify HTCondor of file stageout ========"
 # wrong syntax for chirping, also needs a proper classAd name. Keep commented line for a future fix

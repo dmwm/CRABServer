@@ -24,10 +24,13 @@ echo "Local time : $(date)"
 echo "Current system : $(uname -a)"
 echo "Current processor: $(cat /proc/cpuinfo |grep name|sort|uniq)"
 
-source ./env-CMSRunAnalysis.sh
-env_cms_load
+source ./submit_env.sh
 
-load_comp_python
+# from ./submit_env.sh
+setup_cmsset
+
+# from ./submit_env.sh
+setup_python_comp
 
 echo "==== Make sure $HOME is defined ===="
 export HOME=${HOME:-$PWD}

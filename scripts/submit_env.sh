@@ -1,6 +1,6 @@
 #!/bin/bash
 
-env_save() {
+save_env() {
     # save the current environment to the file startup_environment.sh 
     # this is intended to be the first function run by 
     # - gWMS-CMSRunAnalysis.sh: when running a job on the global pool
@@ -32,7 +32,7 @@ env_save() {
 
 }
 
-env_set_local () {
+setup_local_env () {
     # when running a job locally, we need to set manually some variables that 
     # are set for us when running on the global pool.
 
@@ -44,7 +44,7 @@ env_set_local () {
 
 }
 
-env_cms_load() {
+setup_cmsset() {
     ### source the CMSSW stuff using either OSG or LCG style entry env. or CVMFS
     echo "======== CMS environment load starting at $(TZ=GMT date) ========"
     CMSSET_DEFAULT_PATH=""
@@ -71,11 +71,13 @@ env_cms_load() {
         exit 11003
     fi
     . $CMSSET_DEFAULT_PATH
-    echo "export CMSSET_DEFAULT_PATH=$CMSSET_DEFAULT_PATH" >> startup_environment.sh
+    # # (dario FIXME): I think I added the folowing line for debugging only,
+    # # (dario FIXME): I will remove it and see if anything breaks
+    # echo "export CMSSET_DEFAULT_PATH=$CMSSET_DEFAULT_PATH" >> startup_environment.sh
     echo -e "========  CMS environment load finished at $(TZ=GMT date) ========\n"
 }
 
-load_comp_python() {
+setup_python_comp() {
     echo "======== python bootstrap for stageout at $(TZ=GMT date) STARTING ========"
     # Python library required for Python2/Python3 compatibility through "future"
     PY3_FUTURE_VERSION=0.18.2
