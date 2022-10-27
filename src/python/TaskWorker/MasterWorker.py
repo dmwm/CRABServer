@@ -240,11 +240,15 @@ class MasterWorker(object):
             self.slaves = Worker(self.config, self.restHost, self.dbInstance)
         self.slaves.begin()
         recurringActionsNames = getattr(self.config.TaskWorker, 'recurringActions', [])
-        self.recurringActions = [self.getRecurringActionInst(name) for name in recurringActionsNames]
+        self.recurringActions = [m for m in [self.getRecurringActionInst(name) for name in recurringActionsNames] if m is not None]
 
 
     def getRecurringActionInst(self, actionName):
-        mod = __import__('TaskWorker.Actions.Recurring.%s' % actionName, fromlist=actionName)
+        try:
+            mod = __import__('TaskWorker.Actions.Recurring.%s' % actionName, fromlist=actionName)
+        except ModuleNotFoundError:
+            self.logger.error('Recurring Action module "<%s>" not found, skipping', actionName)
+            return
         return getattr(mod, actionName)(self.config.TaskWorker.logsDir)
 
 
@@ -355,8 +359,8 @@ class MasterWorker(object):
                 failstatus = 'FAILED'
             self.updateWork(taskname, command, failstatus)
             warning = 'username %s banned in CRAB TaskWorker configuration' % task['tm_username']
-            configreq = {'subresource': 'addwarning', 
-                         'workflow': taskname, 
+            configreq = {'subresource': 'addwarning',
+                         'workflow': taskname,
                          'warning': warning}
             try:
                 self.crabserver.post(api='task', data=urlencode(configreq))
