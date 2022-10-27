@@ -174,6 +174,7 @@ periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) 
                                 ifThenElse(DiskUsage >  %(max_disk_space)s, "Removed due to disk usage", \
                                   ifThenElse(time() > CRAB_TaskEndTime, "Removed due to reached CRAB_TaskEndTime", \
                                   "Removed due to job being held"))))))
+%(accelerator_jdl)s
 %(extra_jdl)s
 queue
 """
@@ -497,6 +498,11 @@ class DagmanCreator(TaskAction):
         info['accounting_group_user'] = info['userhn']
         info = transform_strings(info)
         info['faillimit'] = task['tm_fail_limit']
+        # hardcoding accelerator to GPU (SI currently only have nvidia GPU)
+        if task['tm_user_config']['requireaccelerator']:
+            info['accelerator_jdl'] = '+RequiresGPU=1\nrequest_GPUs=1'
+        else:
+            info['accelerator_jdl'] = ''
         info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
 
         # info['jobarch_flatten'].split("_")[0]: extracts "slc7" from "slc7_amd64_gcc10"
@@ -753,8 +759,12 @@ class DagmanCreator(TaskAction):
         os.chmod("CMSRunAnalysis.sh", 0o755)
 
         # This config setting acts as a global black list
-        global_blacklist = set(self.getBlacklistedSites())
+        global_blacklist = set(self.loadJSONFromFileInScratchDir('blacklistedSites.txt'))
         self.logger.debug("CRAB site blacklist: %s", list(global_blacklist))
+
+        # Get accleratorsites from GetAcceleratorSite recurring action.
+        acceleratorsites = set(self.loadJSONFromFileInScratchDir('acceleratorSites.json'))
+        self.logger.debug("Accelerator site from pilot pool: %s", list(acceleratorsites))
 
         # This is needed for Site Metrics
         # It should not block any site for Site Metrics and if needed for other activities
@@ -868,6 +878,18 @@ class DagmanCreator(TaskAction):
                 blocksWithBannedLocations = blocksWithBannedLocations.union(jgblocks)
                 continue
 
+            # Intersect with sites that only have accelerator (currently we only have nvidia GPU)
+            if kwargs['task']['tm_user_config']['requireaccelerator']:
+                availablesites &= acceleratorsites
+                if availablesites:
+                    msg = "Site.requireAccelerator is True. CRAB will restrict sites to run the jobs to %s."
+                    msg = msg % (list(availablesites), )
+                    self.logger.warning(msg)
+                    self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+                else:
+                    blocksWithBannedLocations = blocksWithBannedLocations.union(jgblocks)
+                    continue
+
             # NOTE: User can still shoot themselves in the foot with the resubmit blacklist
             # However, this is the last chance we have to warn the users about an impossible task at submit time.
             available = set(availablesites)
@@ -929,7 +951,7 @@ class DagmanCreator(TaskAction):
             msgBlocklist = sorted(list(blocksWithNoLocations)[:10]) + ['...']
             msg += " because they have no locations.\n List is (first 10 elements only): %s.\n" % msgBlocklist
         if blocksWithBannedLocations:
-            msg += " because they are only present at blacklisted and/or not-whitelisted sites.\n"
+            msg += " because they are only present at blacklisted, not-whitelisted, and/or non-accelerator sites.\n"
             msg += " List is: %s.\n" % (sorted(list(blocksWithBannedLocations)))
             msg += getBlacklistMsg()
         if blocksWithNoLocations or blocksWithBannedLocations:

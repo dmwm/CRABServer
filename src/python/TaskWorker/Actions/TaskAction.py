@@ -70,15 +70,14 @@ class TaskAction(object):
             self.logger.error("Error deleting warnings: %s", str(hte))
             self.logger.warning("Can not delete warnings from REST interface.")
 
-
-    def getBlacklistedSites(self):
-        bannedSites = []
-        fileLocation = os.path.join(self.config.TaskWorker.scratchDir, "blacklistedSites.txt")
+    def loadJSONFromFileInScratchDir(self, path):
+        fileLocation = os.path.join(self.config.TaskWorker.scratchDir, path)
         if os.path.isfile(fileLocation):
-            with open(fileLocation) as fd:
+            with open(fileLocation, 'r', encoding='utf-8') as fd:
                 try:
-                    bannedSites = json.load(fd)
+                    return json.load(fd)
                 except ValueError as e:
                     self.logger.error("Failed to load json from file %s. Error message: %s", fileLocation, e)
-                    return []
-        return bannedSites
+                    return {}
+        # return empty dict when file does not exist.
+        return {}
