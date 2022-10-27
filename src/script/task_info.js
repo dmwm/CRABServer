@@ -16,7 +16,7 @@ $(document).ready(function() {
         autoWidth: false,
         });
 
-    // initialize table for document 
+    // initialize table for document
     var doctable= $("#doc-table").DataTable({"dom": '<"top"i>rt<"bottom"flp><"clear">',
                                              "paging":   false,
                                              "ordering": false,
@@ -29,14 +29,14 @@ $(document).ready(function() {
     $('.nav-tabs a').click(function(){
         if(this.id=='transferTab' && !transferInfo_loaded){
             setupLoading();
-            displayTransferInfo(handleTransferInfoErr);       
+            displayTransferInfo(handleTransferInfoErr);
             transferInfo_loaded = true;
 
         }
     });
 
     // setup spinning animation for transfer info table
-    function setupLoading() {    
+    function setupLoading() {
         $('<div id="divSpin" />').appendTo(document.body);
 
         var target = document.getElementById("divSpin");
@@ -197,7 +197,7 @@ $(document).ready(function() {
         var xmlhttp = new XMLHttpRequest();
         // var url = "https://mmascher-mon.cern.ch/crabserver/dev/task?subresource=search&workflow=";
         var url = taskInfoUrl + inputTaskName;
-        
+
         function queryApi(url) {
             $.ajax(url)
                 .done(function(data) {
@@ -293,7 +293,7 @@ $(document).ready(function() {
             S3=true;
         else
             S3=false;
-        
+
         if(S3==true)
             url=cacheUrl.split("S3")[0]  + "crabserver/" + dbVersion + "/cache?subresource=download&objecttype=twlog&taskname="+inputTaskName;
         else
@@ -309,7 +309,7 @@ $(document).ready(function() {
                     }
                     else
                         $("#taskworker-log-paragraph").text(data);
-                
+
                 })
                 .fail(function(xhr) {
                     var headers = xhr.getAllResponseHeaders().toLowerCase();
@@ -339,7 +339,7 @@ $(document).ready(function() {
             url=cacheUrl.split("S3")[0]  + "crabserver/" + dbVersion + "/cache?subresource=download&objecttype=clientlog&taskname="+inputTaskName;
         else
             url = cacheUrl + "/logfile?name=" + inputTaskName + ".log&username=" + username;
-    
+
         function queryApi(url) {
             $.ajax(url)
                 .done(function(data) {
@@ -350,7 +350,7 @@ $(document).ready(function() {
                 }
                 else
                     $("#upload-log-paragraph").text(data);
-                    
+
                 })
                 .fail(function(xhr) {
                     var headers = xhr.getAllResponseHeaders().toLowerCase();
@@ -429,12 +429,12 @@ $(document).ready(function() {
                     taskInfo = data;
                     // Creating table contents
                     var index = {}
-                    var content =[] 
+                    var content =[]
 
                     for (i = 0; i < data.desc.columns.length; i++) {
                         index[data.desc.columns[i]] = i
                     }
-                  
+
 
                     var duration = 0
                     var doc_url = ''
@@ -456,16 +456,16 @@ $(document).ready(function() {
                         doc_href = "<a href=" + doc_url + "> " + data.result[k][index["tm_id"]] + " </a>"
                         fts_href = null
                         if (data.result[k][index["tm_fts_instance"]]){
-                            fts_href = "<a href=" + 
-                                    data.result[k][index["tm_fts_instance"]].replace("8446","8449") + 
-                                    "/fts3/ftsmon/#/job/" + 
-                                    data.result[k][index["tm_fts_id"]] + "> " + 
-                                    data.result[k][index["tm_fts_id"]] + 
+                            fts_href = "<a href=" +
+                                    data.result[k][index["tm_fts_instance"]].replace("8446","8449") +
+                                    "/fts3/ftsmon/#/job/" +
+                                    data.result[k][index["tm_fts_id"]] + "> " +
+                                    data.result[k][index["tm_fts_id"]] +
                                 " </a>"
                         }
                         content = [
                             data.result[k][index["tm_jobid"]],
-                            data.result[k][index["tm_id"]], 
+                            data.result[k][index["tm_id"]],
                             label(tr_state[data.result[k][index["tm_transfer_state"]]]),
                             fts_href,
                         ]
@@ -474,7 +474,7 @@ $(document).ready(function() {
                         if(data.result[k][index["tm_transfer_state"]] == 3){
                            var duration = (data.result[k][index["tm_last_update"]] - data.result[k][index["tm_start_time"]])/60
                         }
-                        
+
                         if (duration) content.push(duration.toFixed(0))
                         content.push(duration)
 
@@ -510,7 +510,7 @@ $(document).ready(function() {
                     removeLoading();
                 })
         };
-        
+
         queryApi(url);
     }
 
@@ -522,7 +522,7 @@ $(document).ready(function() {
             $.ajax(url)
                 .done(function(data) {
                     // Creating table contents
-                    var content = '' 
+                    var content = ''
 
                     doctable.clear();
                     for (i = 0; i < data.desc.columns.length; i++) {
@@ -546,7 +546,7 @@ $(document).ready(function() {
 
     transtable.columns().every( function () {
         var that = this;
- 
+
         $( 'input', this.footer() ).on( 'keyup change', function () {
             if ( that.search() !== this.value ) {
                 that
@@ -561,7 +561,7 @@ $(document).ready(function() {
             else if(this.placeholder=="Transfer State") this.style["width"] = "120px";
             else if(this.placeholder=="Duration [min]") this.style["width"] = "120px";
             else if(this.placeholder=="") this.style["width"] = "120px";
-        
+
          }
         );
 
@@ -827,6 +827,13 @@ $(document).ready(function() {
                 transferInfo = "https://" + document.domain + "/crabserver/devtwo/fileusertransfers?subresource=getTransferStatus&taskname="
                 docInfo = "https://" + document.domain + "/crabserver/devtwo/fileusertransfers?subresource=getById&id="
                 break;
+            case "devthree":
+                taskInfoUrl = "https://" + document.domain + "/crabserver/devthree/task?subresource=search&workflow=";
+                taskStatusUrl = "https://" + document.domain + "/crabserver/devthree/workflow?workflow=";
+                webDirProxyApiUrl = "https://" + document.domain + "/crabserver/devthree/task?subresource=webdirprx&workflow="
+                transferInfo = "https://" + document.domain + "/crabserver/devthree/fileusertransfers?subresource=getTransferStatus&taskname="
+                docInfo = "https://" + document.domain + "/crabserver/devthree/fileusertransfers?subresource=getById&id="
+                break;
             default:
                 break;
         }
@@ -842,6 +849,9 @@ $(document).ready(function() {
                 break;
             case "cmsweb-test11.cern.ch":
                 $("#db-selector-box").val("devtwo");
+                break;
+            case "cmsweb-test12.cern.ch":
+                $("#db-selector-box").val("devthree");
                 break;
             default:
                 $("#db-selector-box").val("dev")
@@ -863,6 +873,8 @@ $(document).ready(function() {
                 return "preprod";
             case "cmsweb-test11.cern.ch":
                 return "devtwo";
+            case "cmsweb-test12.cern.ch":
+                return "devthree";
             default:
                 return "dev";
         }
