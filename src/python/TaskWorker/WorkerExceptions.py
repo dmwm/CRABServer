@@ -24,9 +24,9 @@ class ConfigException(TaskWorkerException):
     exitcode = 4000
 
 class NoAvailableSite(TaskWorkerException):
- """In case there is no site available to run the jobs
+    """In case there is no site available to run the jobs
     use this exception"""
- exitcode = 5000
+    exitcode = 5000
 
 class WorkerHandlerException(TaskWorkerException):
     """Generic exception in case slave worker action

@@ -243,7 +243,7 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir):
             # some reasons for this are known
             if 'has status PRODUCTION' in reason:
                 msg = 'Input dataset has status PRODUCTION'
-            raise CannotMigrateException(msg)
+            raise CannotMigrateException(msg) from httpErr
 
         if code > 400:
             # in this cases it is better to treat the migration request submission as successful
@@ -255,7 +255,7 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir):
         else:
             logger.error("Unexpected HTTP error %d", code)
             return False
-    except CannotMigrateException as ex:
+    except CannotMigrateException :
         raise
     except Exception as ex:
         msg = "Request to migrate %s failed." % block
@@ -836,7 +836,7 @@ def publishInDBS3(config, taskname, verbose):
             except CannotMigrateException as ex:
                 # there is nothing we can do in this case
                 failureMsg = 'Cannot migrate. ' + str(ex)
-                logger.info(failureMsg + '. Mark all files as failed')
+                logger.info('%s. Mark all files as failed', failureMsg)
                 mark_failed([file['SourceLFN'] for file in toPublish], crabServer, logger, failureMsg)
                 nothingToDo['result'] = 'FAIL'
                 nothingToDo['reason'] = failureMsg
