@@ -40,3 +40,6 @@ class WorkerHandlerException(TaskWorkerException):
 class TapeDatasetException(TaskWorkerException):
     """Returned in case the input dataset is present only on tape"""
 
+
+class CannotMigrateException(TaskWorkerException):
+    """Used by Publisher in case DBS server refuses to migrate"""

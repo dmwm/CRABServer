@@ -21,9 +21,10 @@ from dbs.exceptions.dbsClientException import dbsClientException
 from RestClient.ErrorHandling.RestClientExceptions import HTTPError
 from ServerUtilities import getHashLfn, encodeRequest
 from ServerUtilities import SERVICE_INSTANCES
-from TaskWorker.WorkerExceptions import ConfigException
+from TaskWorker.WorkerExceptions import ConfigException, CannotMigrateException
 from RESTInteractions import CRABRest
 from WMCore.Configuration import loadConfigurationFile
+
 
 def format_file_3(file_):
     """
@@ -234,7 +235,17 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir):
             # something bad happened inside server
             logger.error("HTTP error %d with msg %s", code, reason)
             return False
-        if code >= 400:
+        if code == 400:
+            # beware "not allowed for migration" error which is persistent
+            msg = "Migration request refused by server."
+            logger.error(msg)
+            # if we simply report flase, Publisher will try and fail again, forever
+            # some reasons for this are known
+            if 'has status PRODUCTION' in reason:
+                msg = 'Input dataset has status PRODUCTION'
+            raise CannotMigrateException(msg)
+
+        if code > 400:
             # in this cases it is better to treat the migration request submission as successful
             # and go on with status checking via checkBlockMigration where various status codes
             # are properly handled
@@ -244,6 +255,8 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block, migLogDir):
         else:
             logger.error("Unexpected HTTP error %d", code)
             return False
+    except CannotMigrateException as ex:
+        raise
     except Exception as ex:
         msg = "Request to migrate %s failed." % block
         msg += "\nRequest detail: %s" % data
@@ -328,7 +341,8 @@ def publishInDBS3(config, taskname, verbose):
 
     def mark_good(files, crabServer, logger):
         """
-        Mark the list of files as tranferred
+        Mark the list of files as published
+        files must be a list of SOURCE_LFN's i.e. /store/temp/user/...
         """
 
         msg = "Marking %s file(s) as published." % len(files)
@@ -364,13 +378,14 @@ def publishInDBS3(config, taskname, verbose):
 
     def mark_failed(files, crabServer, logger, failure_reason=""):
         """
-        Something failed for these files so increment the retry count
+        Something failed for these files.
+        files must be a list of SOURCE_LFN's i.e. /store/temp/user/...
         """
 
         msg = "Marking %s file(s) as failed" % len(files)
         logger.info(msg)
         if dryRun:
-            logger.debug("DryRun: skip marking failes files")
+            logger.debug("DryRun: skip marking failed files")
             return
 
         nMarked = 0
@@ -400,7 +415,7 @@ def publishInDBS3(config, taskname, verbose):
 
     def createLogdir(dirname):
         """
-        Create the directory dirname ignoring erors in case it exists. Exit if
+        Create the directory dirname ignoring errors in case it exists. Exit if
         the directory cannot be created.
         """
         try:
@@ -818,6 +833,16 @@ def publishInDBS3(config, taskname, verbose):
                 statusCode, failureMsg = migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi,
                                                             inputDataset, localParentBlocks, migrationLogDir,
                                                             verbose)
+            except CannotMigrateException as ex:
+                # there is nothing we can do in this case
+                failureMsg = 'Cannot migrate. ' + str(ex)
+                logger.info(failureMsg + '. Mark all files as failed')
+                mark_failed([file['SourceLFN'] for file in toPublish], crabServer, logger, failureMsg)
+                nothingToDo['result'] = 'FAIL'
+                nothingToDo['reason'] = failureMsg
+                nothingToDo['failedFiles'] = len(dbsFiles)
+                summaryFileName = saveSummaryJson(logdir, nothingToDo)
+                return summaryFileName
             except Exception as ex:
                 logger.exception('Exception raised inside migrateByBlockDBS3\n%s', ex)
                 statusCode = 1
