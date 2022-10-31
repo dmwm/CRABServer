@@ -2506,27 +2506,6 @@ class PostJob():
                 self.logger.error(msg)
                 raise
 
-        if not os.path.exists('output_datasets') and output_datasets:
-            configreq = [('subresource', 'addoutputdatasets'),
-                         ('workflow', self.reqname)]
-            for dset in output_datasets:
-                configreq.append(('outputdatasets', dset))
-            rest_api = 'task'
-            msg = "Uploading output datasets to https://%s: %s" % (self.rest_url+rest_api, configreq)
-            self.logger.debug(msg)
-            try:
-                self.crabserver.post(api=rest_api, data=encodeRequest(configreq))
-                with open('output_datasets', 'w') as f:
-                    f.write(' '.join(output_datasets))
-            except HTTPException as hte:
-                msg = "Error uploading output dataset: %s" % (str(hte.headers))
-                self.logger.error(msg)
-            except IOError:
-                msg = "Error writing the output_datasets file"
-                self.logger.error(msg)
-        else:
-            self.logger.debug("Output datasets considered for upload:\n%s", output_datasets)
-
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def parse_job_ad(self, job_ad_file_name):
