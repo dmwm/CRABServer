@@ -549,9 +549,9 @@ if __name__ == '__main__':
     else:
         config.TaskWorker.cmscert = '/data/certs/servicecert.pem'
     if "X509_USER_KEY" in os.environ:
-        config.TaskWorker.cmscert = os.environ["X509_USER_KEY"]
+        config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
     else:
-        config.TaskWorker.cmscert = '/data/certs/servicekey.pem'
+        config.TaskWorker.cmskey = '/data/certs/servicekey.pem'
 
     config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=config.TaskWorker.cmscert,
                                                 X509_USER_KEY=config.TaskWorker.cmskey)
