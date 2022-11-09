@@ -158,7 +158,10 @@ class DBSDataDiscovery(DataDiscovery):
             for rse in rseNames:
                 if rse[2:6] == '_RU_':  # avoid fragile sites, see #7400
                     continue
-                size = list(rucioClient.get_rse_usage(rse, filters={'source': 'static'}))[0]['used']  # bytes
+                usageDetails = list(rucioClient.get_rse_usage(rse, filters={'source': 'static'}))
+                if not usageDetails:  # some RSE's are put in the system with an empty list here, e.g. T2_FR_GRIF
+                    continue
+                size = usageDetails[0]['used']  # bytes
                 if float(size)/1.e15 > 1.0:  # more than 1 PB
                     largeRSEs.append(rse)
                     availableSpace = int(rucioClient.list_rse_attributes(rse)['ddm_quota'])  # bytes
