@@ -42,7 +42,7 @@ class Task(object):
               tm_taskname, tm_activity, tm_task_status, tm_task_command, tm_start_time, tm_task_failure, tm_job_sw, \
               tm_job_arch, tm_input_dataset, tm_primary_dataset, tm_nonvalid_input_dataset, tm_use_parent, tm_secondary_input_dataset, tm_site_whitelist, tm_site_blacklist, \
               tm_split_algo, tm_split_args, tm_totalunits, tm_user_sandbox, tm_debug_files, tm_cache_url, tm_username, tm_user_dn, \
-              tm_user_vo, tm_user_role, tm_user_group, tm_publish_name, tm_publish_groupname, tm_asyncdest, tm_dbs_url, tm_publish_dbs_url, \
+              tm_user_vo, tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, tm_publish_dbs_url, \
               tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, tm_job_type, tm_generator, tm_arguments, \
               tm_save_logs, tm_user_infiles, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority, \
               tm_scriptexe, tm_scriptargs, tm_extrajdl, tm_events_per_lumi, tm_collector, tm_schedd, tm_dry_run, \
@@ -51,7 +51,7 @@ class Task(object):
               VALUES (:task_name, :task_activity, upper(:task_status), upper(:task_command), SYS_EXTRACT_UTC(SYSTIMESTAMP), :task_failure, :job_sw, \
               :job_arch, :input_dataset, :primary_dataset, :nonvalid_data, :use_parent, :secondary_dataset, :site_whitelist, :site_blacklist, \
               :split_algo, :split_args, :total_units, :user_sandbox, :debug_files, :cache_url, :username, :user_dn, \
-              :user_vo, :user_role, :user_group, :publish_name, :publish_groupname, :asyncdest, :dbs_url, :publish_dbs_url, \
+              :user_vo, :user_role, :user_group, :publish_name, :asyncdest, :dbs_url, :publish_dbs_url, \
               :publication, :outfiles, :tfile_outfiles, :edm_outfiles, :job_type, :generator, :arguments, \
               :save_logs, :user_infiles, :maxjobruntime, :numcores, :maxmemory, :priority, \
               :scriptexe, :scriptargs, :extrajdl, :events_per_lumi, :collector, :schedd_name, :dry_run, \

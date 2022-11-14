@@ -50,7 +50,6 @@ SUBMIT_INFO = [ \
     ('DESIRED_CMSDataset', 'inputdata'),
     ('CRAB_DBSURL', 'dbsurl'),
     ('CRAB_PublishName', 'publishname'),
-    ('CRAB_PublishGroupName', 'publishgroupname'),
     ('CRAB_Publish', 'publication'),
     ('CRAB_PublishDBSURL', 'publishdbsurl'),
     ('CRAB_PrimaryDataset', 'primarydataset'),
