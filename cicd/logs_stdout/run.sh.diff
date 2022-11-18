@@ -1,0 +1,23 @@
+--- run.sh	2022-10-27 17:58:19.000000000 +0200
++++ run.sh.new	2022-11-22 16:31:07.829448669 +0100
+@@ -64,6 +64,9 @@
+ done
+ sleep 5
+
++# create fifo for crabserver logs
++mkfifo /data/srv/state/crabserver/crabserver-fifo
++
+ # start the service
+ export CRYPTOGRAPHY_ALLOW_OPENSSL_102=true
+ /data/srv/current/config/$srv/manage start 'I did read documentation'
+@@ -73,5 +76,8 @@
+     /data/monitor.sh
+ fi
+
+-# start cron daemon
+-sudo /usr/sbin/crond -n
++# cat fifo forever to read logs
++while true;
++do
++    cat /data/srv/state/crabserver/crabserver-fifo
++done

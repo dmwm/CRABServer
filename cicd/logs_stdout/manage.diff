@@ -1,0 +1,11 @@
+--- manage	2022-10-27 17:58:25.000000000 +0200
++++ manage.new	2022-11-22 16:35:08.674132124 +0100
+@@ -51,7 +51,7 @@
+ start()
+ {
+   echo "starting $ME"
+-  LD_PRELOAD=$JEMALLOC_ROOT/lib/libjemalloc.so wmc-httpd -r -d $STATEDIR -l "|rotatelogs $LOGDIR/crabserver-%Y%m%d-`hostname -s`.log 86400" $CFGFILE
++  LD_PRELOAD=$JEMALLOC_ROOT/lib/libjemalloc.so wmc-httpd -r -d $STATEDIR -l "/data/srv/state/crabserver/crabserver-fifo" $CFGFILE
+ }
+ 
+ # Stop the service.
