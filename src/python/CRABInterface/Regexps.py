@@ -138,3 +138,6 @@ RX_ASO_WORKERNAME = RX_WORKER_NAME
 
 RX_SUBGETUSERTRANSFER = re.compile(r"^(getById|getTransferStatus|getPublicationStatus)$")
 RX_SUBPOSTUSERTRANSFER = re.compile(r"^(killTransfers|retryPublication|retryTransfers|killTransfersById|updateDoc)$")
+
+# CUDAVersion style,  i.e. 11.4, 515.43.04
+RX_CUDA_VERSION = re.compile(r"^\d+\.\d+(\.\d+)?$")
