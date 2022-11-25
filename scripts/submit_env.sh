@@ -15,20 +15,10 @@ save_env() {
     # Moreover, src/python/WMCore/Storage/Backends/GFAL2Impl.py 
     # makes use of startup_environment.sh
 
-    export DMDEBUGVAR=dmdebugvalue-env-cmsrunanalysis
     export JOBSTARTDIR=$PWD
     export HOME=${HOME:-$PWD}
 
     declare -p > startup_environment.sh
-
-    # these lines are for debugging purposes only: start 
-    echo "DM DEBUG: cat startup_environment.sh"
-    # basename -- "$0"
-    # dirname -- "$0"
-    # echo $PWD
-    # ls -lrth
-    cat startup_environment.sh
-    # these lines are for debugging purposes only: end 
 
 }
 
@@ -71,9 +61,6 @@ setup_cmsset() {
         exit 11003
     fi
     . $CMSSET_DEFAULT_PATH
-    # # (dario FIXME): I think I added the folowing line for debugging only,
-    # # (dario FIXME): I will remove it and see if anything breaks
-    # echo "export CMSSET_DEFAULT_PATH=$CMSSET_DEFAULT_PATH" >> startup_environment.sh
     echo -e "========  CMS environment load finished at $(TZ=GMT date) ========\n"
 }
 
