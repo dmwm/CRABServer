@@ -128,3 +128,6 @@
 alter table filetransfersdb modify TM_REST_URI varchar(1000) NULL;
 alter table filetransfersdb modify TM_REST_HOST varchar(1000) NULL;
 
+-- Add new columns to allow RUCIO_Transfers communications with Publisher
+ALTER TABLE filetransfersdb ADD tm_dbs_blockname VARCHAR(1000);
+ALTER TABLE filetransfersdb ADD tm_block_complete VARCHAR(10);
