@@ -62,6 +62,7 @@ import tarfile
 from ast import literal_eval
 
 from PSetTweaks.PSetTweak import PSetTweak
+from Utils.Utilities import decodeBytesToUnicode
 
 
 def readFileFromTarball(filename, tarball):
@@ -79,6 +80,7 @@ def readFileFromTarball(filename, tarball):
         try:
             f = tar_file.extractfile(filename)
             content = f.read()
+            content = decodeBytesToUnicode(content)
             break
         except KeyError as er:
             # Don`t exit due to KeyError, print error. EventBased and FileBased does not have run and lumis

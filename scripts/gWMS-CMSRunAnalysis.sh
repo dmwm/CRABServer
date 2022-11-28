@@ -6,15 +6,16 @@
 # difficult-to-impossible to run.
 #
 
-# On some sites we know there was some problems with environment cleaning
-# with using 'env -i'. To overcome this issue, whenever we start a job, we have
-# to save full current environment into file, and whenever it is needed we can load
-# it. Be aware, that there are some read-only variables, like: BASHOPTS, BASH_VERSINFO,
-# EUID, PPID, SHELLOPTS, UID, etc.
-set > startup_environment.sh
-sed -e 's/^/export /' startup_environment.sh > tmp_env.sh
-mv tmp_env.sh startup_environment.sh
-export JOBSTARTDIR=$PWD
+echo "======== Startup environment - STARTING ========"
+
+# import some auxiliary functions from a script that is intented to be shared
+# with WMCore
+source ./submit_env.sh
+
+# from ./submit_env.sh
+save_env
+
+echo "======== Startup environment - FINISHING ========"
 
 # Saving START_TIME and when job finishes, check if runtime is not lower than 20m
 # If it is lower, sleep the difference. Will not sleep if CRAB3_RUNTIME_DEBUG is set.
@@ -87,11 +88,10 @@ echo "Hostname:   $(hostname -f)"
 echo "System:     $(uname -a)"
 echo "Arguments are $@"
 
+# redirect stderr to stdout, so that it all goes to job_out.*, leaving job_err.* empty
+# see https://stackoverflow.com/a/13088401
 exec 2>&1
-touch jobReport.json
-touch WMArchiveReport.json
 
-echo "SCRAM_ARCH=$SCRAM_ARCH"
 CRAB_oneEventMode=0
 if [ "X$_CONDOR_JOB_AD" != "X" ];
 then
@@ -124,6 +124,8 @@ then
    echo "======== HTCONDOR JOB SUMMARY at $(TZ=GMT date) FINISH ========"
 fi
 
+touch jobReport.json
+touch WMArchiveReport.json
 #MM: Are these two lines needed?
 touch jobReport.json.$CRAB_Id
 touch WMArchiveReport.json.$CRAB_Id
@@ -137,7 +139,7 @@ time sh ./CMSRunAnalysis.sh "$@" --oneEventMode=$CRAB_oneEventMode
 EXIT_STATUS=$?
 echo "CMSRunAnalysis.sh complete at $(TZ=GMT date) with (short) exit status $EXIT_STATUS"
 
-echo "======== CMSRunAnalsysis.sh at $(TZ=GMT date) FINISHING ========"
+echo "======== CMSRunAnalysis.sh at $(TZ=GMT date) FINISHING ========"
 
 mv jobReport.json jobReport.json.$CRAB_Id
 mv WMArchiveReport.json WMArchiveReport.json.$CRAB_Id
@@ -162,82 +164,11 @@ then
 fi
 
 echo "======== User application running completed. Prepare env. for stageout ==="
-echo "======== WMAgent CMS environment load starting at $(TZ=GMT date) ========"
-if [ -f "$VO_CMS_SW_DIR"/cmsset_default.sh ]
-then  #   LCG style --
-    echo "WN with a LCG style environment, thus using VO_CMS_SW_DIR=$VO_CMS_SW_DIR"
-    . $VO_CMS_SW_DIR/cmsset_default.sh
-elif [ -f "$OSG_APP"/cmssoft/cms/cmsset_default.sh ]
-then  #   OSG style --
-    echo "WN with an OSG style environment, thus using OSG_APP=$OSG_APP"
-    . $OSG_APP/cmssoft/cms/cmsset_default.sh CMSSW_3_3_2
-elif [ -f "$CVMFS"/cms.cern.ch/cmsset_default.sh ]
-then
-    echo "WN with CVMFS environment, thus using CVMFS=$CVMFS"
-    . $CVMFS/cms.cern.ch/cmsset_default.sh
-elif [ -f /cvmfs/cms.cern.ch/cmsset_default.sh ]
-then  # ok, lets call it CVMFS then
-    export CVMFS=/cvmfs/cms.cern.ch
-    echo "WN missing VO_CMS_SW_DIR/OSG_APP/CVMFS environment variable, forcing it to CVMFS=$CVMFS"
-    . $CVMFS/cmsset_default.sh
-else
-    echo "Error during job bootstrap: VO_CMS_SW_DIR, OSG_APP, CVMFS or /cvmfs were not found." >&2
-    echo "  Because of this, we can't load CMSSW. Not good." >&2
-    exit 11003
-fi
-echo "WMAgent bootstrap: WMAgent thinks it found the correct CMSSW setup script"
-echo -e "======== WMAgent CMS environment load finished at $(TZ=GMT date) ========\n"
+# from ./submit_env.sh
+setup_cmsset
 
-echo "======== python bootstrap for stageout at $(TZ=GMT date) STARTING ========"
-# use python from COMP
-# Python library required for Python2/Python3 compatibility through "future"
-PY_FUTURE_VERSION=0.18.2
-# First, decide which COMP ScramArch to use based on the required OS
-if [ "$REQUIRED_OS" = "rhel7" ];
-then
-    WMA_SCRAM_ARCH=slc7_amd64_gcc630
-else
-    WMA_SCRAM_ARCH=slc6_amd64_gcc493
-fi
-echo "Job requires OS: $REQUIRED_OS, thus setting ScramArch to: $WMA_SCRAM_ARCH"
-
-suffix=etc/profile.d/init.sh
-if [ -d "$VO_CMS_SW_DIR"/COMP/"$WMA_SCRAM_ARCH"/external/python ]
-then
-    prefix="$VO_CMS_SW_DIR"/COMP/"$WMA_SCRAM_ARCH"/external/python
-elif [ -d "$OSG_APP"/cmssoft/cms/COMP/"$WMA_SCRAM_ARCH"/external/python ]
-then
-    prefix="$OSG_APP"/cmssoft/cms/COMP/"$WMA_SCRAM_ARCH"/external/python
-elif [ -d "$CVMFS"/COMP/"$WMA_SCRAM_ARCH"/external/python ]
-then
-    prefix="$CVMFS"/COMP/"$WMA_SCRAM_ARCH"/external/python
-else
-    echo "Error during job bootstrap: job environment does not contain the init.sh script." >&2
-    echo "  Because of this, we can't load CMSSW. Not good." >&2
-    exit 11004
-fi
-
-compPythonPath=`echo $prefix | sed 's|/python||'`
-echo "WMAgent bootstrap: COMP Python path is: $compPythonPath"
-latestPythonVersion=`ls -t "$prefix"/*/"$suffix" | head -n1 | sed 's|.*/external/python/||' | cut -d '/' -f1`
-pythonMajorVersion=`echo $latestPythonVersion | cut -d '.' -f1`
-pythonCommand="python"${pythonMajorVersion}
-echo "WMAgent bootstrap: latest python release is: $latestPythonVersion"
-source "$prefix/$latestPythonVersion/$suffix"
-source "$compPythonPath/py2-future/$PY_FUTURE_VERSION/$suffix"
-
-command -v $pythonCommand > /dev/null
-rc=$?
-if [[ $rc != 0 ]]
-then
-    echo "Error during job bootstrap: python isn't available on the worker node." >&2
-    echo "  WMCore/WMAgent REQUIRES at least python2" >&2
-    exit 11005
-else
-    echo "WMAgent bootstrap: found $pythonCommand at.."
-    echo `which $pythonCommand`
-fi
-echo "======== python bootstrap for stageout at $(TZ=GMT date) FINISHED ========"
+# from ./submit_env.sh
+setup_python_comp
 
 #echo "======== Attempting to notify HTCondor of file stageout ========"
 # wrong syntax for chirping, also needs a proper classAd name. Keep commented line for a future fix
@@ -246,7 +177,7 @@ echo "======== python bootstrap for stageout at $(TZ=GMT date) FINISHED ========
 echo "======== Stageout at $(TZ=GMT date) STARTING ========"
 rm -f wmcore_initialized
 # Note we prevent buffering of stdout/err -- this is due to observed issues in mixing of out/err for stageout plugins
-PYTHONUNBUFFERED=1 python2.7 cmscp.py
+PYTHONUNBUFFERED=1 $pythonCommand cmscp.py
 STAGEOUT_EXIT_STATUS=$?
 
 if [ ! -e wmcore_initialized ];

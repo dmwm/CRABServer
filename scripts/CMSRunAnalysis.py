@@ -15,7 +15,7 @@ import pickle
 import signal
 import os.path
 import logging
-import commands
+import subprocess
 import traceback
 from ast import literal_eval
 from optparse import OptionParser, BadOptionError, AmbiguousOptionError
@@ -384,7 +384,7 @@ def prepSandbox(opts):
     print("==== Sandbox untarring STARTING at %s ====" % time.asctime(time.gmtime()))
 
     #The user sandbox.tar.gz has to be unpacked no matter what (even in DEBUG mode)
-    print(commands.getoutput('tar xfm %s' % opts.archiveJob))
+    print(subprocess.getoutput('tar xfm %s' % opts.archiveJob))
     print("==== Sandbox untarring FINISHED at %s ====" % time.asctime(time.gmtime()))
 
     #move the pset in the right place
@@ -408,7 +408,7 @@ def extractUserSandbox(archiveJob, cmsswVersion):
     # will be executed from the job working directory, so we move "up"
     # the PSet which is also in the user sandbox
     os.chdir(cmsswVersion)
-    print(commands.getoutput('tar xfm %s ' % os.path.join('..', archiveJob)))
+    print(subprocess.getoutput('tar xfm %s ' % os.path.join('..', archiveJob)))
     os.rename('PSet.py','../PSet.py')
     os.rename('PSet.pkl','../PSet.pkl')
     os.chdir('..')
@@ -426,14 +426,14 @@ def getProv(filename, scram):
     output = scram.getStdout()
     return output
 
-def executeUserApplication(command, scram):
+def executeUserApplication(command, scram, cleanEnv=True):
     """
     cmsRun failures will appear in FJR but do not raise exceptions
     exception can only be raised by unexpected failures of the Scram wrapper itself
     Scram() never raises and returns the exit code from executing 'command'
     """
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
-        ret = scram(command, runtimeDir=os.getcwd())
+        ret = scram(command, runtimeDir=os.getcwd(), cleanEnv=cleanEnv)
     if ret > 0:
         with open('cmsRun-stdout.log', 'w') as fh:
             fh.write(scram.diagnostic())
@@ -634,15 +634,6 @@ if __name__ == "__main__":
 
         jobExitCode = None
         applicationName = 'CMSSW JOB' if not options.scriptExe else 'ScriptEXE'
-        # no matter what we run, it is very likely to need proxy location
-        preCmd = 'export X509_USER_PROXY=%s; ' % os.getenv('X509_USER_PROXY')
-        # needed for root problem with $HOME/.root.mimes, #6801
-        preCmd += 'export HOME=${HOME:-$PWD}; '
-        # temporary quick fix for #7413, CMSSW 12_6 requires new env variable
-        preCmd += 'export SITECONFIG_PATH=/cvmfs/cms.cern.ch/SITECONF/local; '
-        # needed for accessing EOS at RAL (Echo). See https://ggus.eu/index.php?mode=ticket_info&ticket_id=155272
-        if os.getenv('XrdSecGSISRVNAMES'):
-            preCmd += 'export XrdSecGSISRVNAMES=%s; ' % os.getenv('XrdSecGSISRVNAMES')
         print("==== %s Execution started at %s ====" % (applicationName, time.asctime(time.gmtime())))
         if not options.scriptExe :
             cmd = 'cmsRun -p PSet.py -j FrameworkJobReport.xml'
@@ -652,8 +643,8 @@ if __name__ == "__main__":
             os.chmod(options.scriptExe, st.st_mode | stat.S_IEXEC)
             cmd = os.getcwd() + "/%s %s %s" %\
                   (options.scriptExe, options.jobNumber, " ".join(json.loads(options.scriptArgs)))
-        cmd = preCmd + cmd
-        applicationExitCode = executeUserApplication(cmd, scram)
+
+        applicationExitCode = executeUserApplication(cmd, scram, cleanEnv=False)
         if applicationExitCode:
             print("==== Execution FAILED at %s ====" % time.asctime(time.gmtime()))
         print("==== %s Execution completed at %s ====" % (applicationName, time.asctime(time.gmtime())))
@@ -672,7 +663,7 @@ if __name__ == "__main__":
                 # e.g. from xroot https://github.com/dmwm/CRABServer/issues/6640#issuecomment-909362639
                 print("Sanitize FJR")
                 cmd = 'cat -v FrameworkJobReport.xml > sane; mv sane FrameworkJobReport.xml'
-                print(commands.getoutput(cmd))
+                print(subprocess.getoutput(cmd))
                 # parse FJR
                 rep = Report("cmsRun")
                 rep.parse('FrameworkJobReport.xml', "cmsRun")
@@ -702,7 +693,7 @@ if __name__ == "__main__":
         # e.g. from xroot https://github.com/dmwm/CRABServer/issues/6640#issuecomment-909362639
         print("Sanitize FJR")
         cmd = 'cat -v FrameworkJobReport.xml > sane; mv sane FrameworkJobReport.xml'
-        print(commands.getoutput(cmd))
+        print(subprocess.getoutput(cmd))
         # parse FJR
         rep = Report("cmsRun")
         rep.parse('FrameworkJobReport.xml', "cmsRun")
