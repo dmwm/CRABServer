@@ -419,7 +419,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("requireaccelerator", param, safe, optional=True)
             # validate optional acceleratorparams
             if param.kwargs.get("acceleratorparams", None):
-                if not safe.kwargs["requireaccelerator"] and safe.kwargs["acceleratorparams"]:
+                if not safe.kwargs["requireaccelerator"]:
                     raise InvalidParameter("There are accelerator parameters but requireAccelerator is False")
                 with validate_dict("acceleratorparams", param, safe) as (accParams, accSafe):
                     validate_num("GPUMemoryMB", accParams, accSafe, minval=0, optional=True)

@@ -498,7 +498,7 @@ class DagmanCreator(TaskAction):
         info['faillimit'] = task['tm_fail_limit']
         if task['tm_user_config']['requireaccelerator']:
             # hardcoding accelerator to GPU (SI currently only have nvidia GPU)
-            info['accelerator_jdl'] = '+RequiresGPU=1\nRequestGPUs=1'
+            info['accelerator_jdl'] = '+RequiresGPU=1\nrequest_GPUs=1'
             if task['tm_user_config']['acceleratorparams']:
                 gpuMemoryMB = task['tm_user_config']['acceleratorparams'].get('GPUMemoryMB', None)
                 cudaCapabilities = task['tm_user_config']['acceleratorparams'].get('CUDACapabilities', None)
