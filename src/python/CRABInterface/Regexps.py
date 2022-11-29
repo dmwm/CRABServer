@@ -108,10 +108,8 @@ RX_SCHEDULER = re.compile(r"^(condor)$")
 
 
 
-
-
 # File Transfers api
-RX_SUBPOSTTRANSFER = re.compile(r"^(acquireTransfers|acquirePublication|updateTransfers|updatePublication|retryPublication|retryTransfers|killTransfers)$")
+RX_SUBPOSTTRANSFER = re.compile(r"^(acquireTransfers|acquirePublication|updateTransfers|updateRucioInfo|updatePublication|retryPublication|retryTransfers|killTransfers)$")
 RX_SUBGETTRANSFER = re.compile(r"^(acquiredTransfers|acquiredPublication|getVOMSAttributesForTask|groupedTransferStatistics|groupedPublishStatistics|activeUsers|getTransfersToKill)$")
 
 RX_USERGROUP = RX_ANYTHING

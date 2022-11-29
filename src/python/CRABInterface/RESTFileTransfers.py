@@ -48,6 +48,8 @@ class RESTFileTransfers(RESTEntity):
             validate_str("list_of_retry_value", param, safe, RX_ANYTHING, optional=True)
             validate_str("list_of_fts_instance", param, safe, RX_ANYTHING, optional=True)
             validate_str("list_of_fts_id", param, safe, RX_ANYTHING, optional=True)
+            validate_str("list_of_dbs_blockname", param, safe, RX_ANYTHING, optional=True)
+            validate_str("list_of_block_complete", param, safe, RX_ANYTHING, optional=True)
             validate_str("list_of_publication_state", param, safe, RX_ANYTHING, optional=True)
             validate_num("time_to", param, safe, optional=True)
             validate_num("publish_flag", param, safe, optional=True)
@@ -180,6 +182,21 @@ class RESTFileTransfers(RESTEntity):
                     binds['fail_reason'] = [reasons[num]]
                     binds['retry_value'] = [int(retry[num])]
                     self.api.modifynocheck(self.transferDB.UpdateTransfers_sql, **binds)
+
+        elif subresource == 'updateRucioInfo':
+            binds['last_update'] = [timeNow]
+            ids = makeList(kwargs['list_of_ids'])
+            blocknames = [None for x in ids]
+            blockcompletes = [None for x in ids]
+            if kwargs['list_of_dbs_blockname'] is not None:
+                blocknames = makeList(kwargs['list_of_dbs_blockname'])
+            if kwargs['list_of_block_complete'] is not None:
+                blockcompletes = makeList(kwargs['list_of_block_complete'])
+            for num in range(len(ids)):
+                binds['id'] = [ids[num]]
+                binds['dbs_blockname'] = [blocknames[num]]
+                binds['block_complete'] = [blockcompletes[num]]
+                self.api.modifynocheck(self.transferDB.UpdateRucioInfo_sql, **binds)
 
         elif subresource == 'updatePublication':
             ###############################################

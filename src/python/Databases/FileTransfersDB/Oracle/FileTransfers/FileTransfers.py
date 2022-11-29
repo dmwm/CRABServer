@@ -9,11 +9,11 @@ class FileTransfers(object):
     AddNewFileTransfer_sql = "INSERT INTO filetransfersdb ( \
                tm_id, tm_username, tm_taskname, tm_destination, tm_destination_lfn, \
                tm_source, tm_source_lfn, tm_filesize, tm_publish, tm_jobid, tm_job_retry_count, tm_type, \
-               tm_rest_host, tm_rest_uri, tm_transfer_state, tm_publication_state, tm_last_update, \
+               tm_rest_host, tm_rest_uri, tm_dbs_blockname, tm_block_complete, tm_transfer_state, tm_publication_state, tm_last_update, \
                tm_transfer_max_retry_count, tm_publication_max_retry_count, tm_start_time, tm_creation_time) \
                VALUES (:id, :username, :taskname, :destination, :destination_lfn, \
                        :source, :source_lfn, :filesize, :publish, :job_id, :job_retry_count, :type, \
-                       :rest_host, :rest_uri, :transfer_state, :publication_state, :last_update, \
+                       :rest_host, :rest_uri, :dbs_blockname, :block_complete, :transfer_state, :publication_state, :last_update, \
                        :transfer_max_retry_count, :publication_max_retry_count, :start_time, SYS_EXTRACT_UTC(SYSTIMESTAMP))"
 
     AcquireTransfers_sql = "UPDATE filetransfersdb SET tm_aso_worker = :asoworker, \
@@ -41,12 +41,18 @@ class FileTransfers(object):
                                                       tm_fts_instance = CASE WHEN :fts_instance is NULL THEN tm_fts_instance ELSE :fts_instance END\
                                                   WHERE tm_id = :id"
 
-    UpdateTransfers1_sql = "UPDATE filetransfersdb SET tm_transfer_state = :transfer_state, \
-                                                       tm_last_update = :last_update, \
-                                                       tm_fts_instance = :fts_instance, \
-                                                       tm_fts_id = :fts_id \
-                            WHERE tm_id = :id AND \
-                                  tm_aso_worker = :asoworker"
+    UpdateRucioInfo_sql = "UPDATE filetransfersdb SET tm_last_update = :last_update, \
+                                                      tm_aso_worker = :asoworker, \
+                                                      tm_dbs_blockname = CASE WHEN :dbs_blockname is NULL THEN tm_dbs_blockname ELSE :dbs_blockname END,\
+                                                      tm_block_complete = CASE WHEN :block_complete is NULL THEN tm_block_complete ELSE :block_complete END\
+                                                  WHERE tm_id = :id"
+# AFAICT this is never used (StefanoB)
+#    UpdateTransfers1_sql = "UPDATE filetransfersdb SET tm_transfer_state = :transfer_state, \
+#                                                       tm_last_update = :last_update, \
+#                                                       tm_fts_instance = :fts_instance, \
+#                                                       tm_fts_id = :fts_id \
+#                            WHERE tm_id = :id AND \
+#                                  tm_aso_worker = :asoworker"
 
     UpdatePublication_sql = "UPDATE filetransfersdb SET tm_publication_state = :publication_state, \
                                                         tm_last_update = :last_update, \
@@ -213,6 +219,8 @@ class FileTransfers(object):
                                                               tm_source_lfn = :source_lfn, \
                                                               tm_filesize = :filesize, \
                                                               tm_publish = :publish, \
+                                                              tm_dbs_blockname = :dbs_blockname, \
+                                                              tm_block_complete = :block_complete, \
                                                               tm_publication_state = :publication_state, \
                                                               tm_transfer_retry_count = CASE WHEN :transfer_retry_count = NULL THEN tm_transfer_retry_count ELSE :transfer_retry_count END, \
                                                               tm_jobid = :job_id, \
@@ -237,7 +245,7 @@ class FileTransfers(object):
                           tm_jobid, tm_job_retry_count, tm_type, tm_aso_worker, tm_transfer_retry_count, tm_transfer_max_retry_count, \
                           tm_publication_retry_count, tm_publication_max_retry_count, tm_rest_host, tm_rest_uri, tm_transfer_state, \
                           tm_publication_state, tm_transfer_failure_reason, tm_publication_failure_reason, tm_fts_id, tm_fts_instance, \
-                          tm_last_update, tm_start_time, tm_end_time \
+                          tm_last_update, tm_start_time, tm_end_time, tm_dbs_blockname, tm_block_complete \
                    FROM filetransfersdb where tm_id = :id"
 
 # As jobs can be retried we should look only at the last ones. For that specific case this needs to be relooked.
