@@ -33,7 +33,7 @@ class RESTFileUserTransfers(RESTEntity):
         authz_login_valid()
         if method in ['PUT']:
             # P.S. Validation is done in function and it double check if all required keys are available
-            print (param, safe)
+            print(param, safe)
             validate_str("id", param, safe, RX_ANYTHING, optional=False)
             validate_str("username", param, safe, RX_ANYTHING, optional=False)
             validate_str("taskname", param, safe, RX_ANYTHING, optional=False)
@@ -52,8 +52,8 @@ class RESTFileUserTransfers(RESTEntity):
             validate_num("publication_retry_count", param, safe, optional=True)
             validate_num("publication_max_retry_count", param, safe, optional=True)
             validate_num("start_time", param, safe, optional=False)
-            validate_str("rest_host", param, safe, RX_ANYTHING, optional=False)
-            validate_str("rest_uri", param, safe, RX_ANYTHING, optional=False)
+            validate_str("rest_host", param, safe, RX_ANYTHING, optional=True)
+            validate_str("rest_uri", param, safe, RX_ANYTHING, optional=True)
             validate_str("transfer_state", param, safe, RX_ANYTHING, optional=False)
             validate_str("publication_state", param, safe, RX_ANYTHING, optional=False)
             validate_str("fts_id", param, safe, RX_ANYTHING, optional=True)
@@ -111,9 +111,9 @@ class RESTFileUserTransfers(RESTEntity):
         # publication_state: This file publication status. It will be always NEW, and will not be published if publish flag is False
         # job_id: Job ID
         # job_retry_count: Job run retry count
-        # type: Job output type
-        # rest_host: rest host in which look for filemetadata
-        # rest_uri: rest uri in which look for filemetadata
+        ## type: Job output type
+        # rest_host: rest host in which look for filemetadata OBSOLETE
+        # rest_uri: rest uri in which look for filemetadata OBSOLETE
         ###############################################
         # Also we need to ensure that specific variables are defined which are needed to store
         binds = {}
