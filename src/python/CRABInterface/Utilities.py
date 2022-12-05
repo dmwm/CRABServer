@@ -2,6 +2,7 @@ from __future__ import division
 from __future__ import print_function
 import logging
 import os
+from contextlib import contextmanager, nullcontext
 from collections import namedtuple
 from time import mktime, gmtime
 import re
@@ -10,11 +11,13 @@ import cherrypy
 import pycurl
 import io
 import json
+import copy
 
 from WMCore.WMFactory import WMFactory
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.Services.pycurl_manager import ResponseHeader
+from WMCore.REST.Server import RESTArgs
 
 from Utils.Utilities import encodeUnicodeToBytes
 
@@ -113,9 +116,9 @@ def getCentralConfig(extconfigurl, mode):
                 return centralCfgFallback
             else:
                 cherrypy.log(msg)
-                raise ExecutionError("Internal issue when retrieving external configuration from %s" % externalLink)        
-        jsonConfig = bbuf.getvalue() 
-        
+                raise ExecutionError("Internal issue when retrieving external configuration from %s" % externalLink)
+        jsonConfig = bbuf.getvalue()
+
         return jsonConfig
 
     extConfCommon = json.loads(retrieveConfig(extconfigurl))
@@ -151,7 +154,7 @@ def getCentralConfig(extconfigurl, mode):
     else:
         extConfCommon["backend-urls"]["htcondorSchedds"] = extConfSchedds
     centralCfgFallback = extConfCommon
-        
+
     return centralCfgFallback
 
 
@@ -174,3 +177,58 @@ def conn_handler(services):
         return wrapped_func
     return wrap
 
+
+@contextmanager
+def validate_dict(argname, param, safe, maxjsonsize=1024):
+    """
+    Provide context manager to validate kv of DictType argument.
+
+    validate_dict first checks that if an argument named `argname` is
+    JSON-like dict object, check if json-string exceeds `maxjsonsize`
+    before deserialize with json.loads()
+
+    Then, as contextmanager, validate_dict yield a tuple of RESTArgs
+    (dictParam, dictSafe) and execute the block nested in "with" statement,
+    which expected `validate_*` to validate all keys inside json, in the
+ same way as
+    `param`/`safe` do in DatabaseRESETApi.validate(), but against
+    dictParam/dictSafe instead.
+
+    If all keys pass validation, the dict object (not the string) is copied
+    into `safe.kwargs` and the original string value is removed from
+    `param.kwargs`. If not all keys are validated, it will raise an
+    exception.
+
+    Note that validate_dict itself does not support optional argument.
+
+    Example in DatabaseRESTApi.validate() to validate "acceleratorparams"
+    optional dict parameter with 1 mandatory and 2 optional key
+
+    if param.kwargs.get("acceleratorparams", None):
+        with validate_dict("acceleratorparams", param, safe) as (accParams, accSafe):
+            custom_err = "Incorrect '{}' parameter. Parameter is also required when Site.requireAccelerator is True"
+            validate_num("GPUMemoryMB", accParams, accSafe, minval=0, custom_err=custom_err.format("GPUMemoryMB"))
+            validate_strlist("CUDACapabilities", accParams, accSafe, RX_CUDA_VERSION)
+            validate_str("CUDARuntime", accParams, accSafe, RX_CUDA_VERSION, optional=True)
+    else:
+        safe.kwargs["acceleratorparams"] = None
+    """
+
+    val = param.kwargs.get(argname, None)
+    if len(val) > maxjsonsize:
+        raise InvalidParameter(f"Param is larger than {maxjsonsize} bytes")
+    try:
+        data = json.loads(val)
+    except Exception as e:
+        raise InvalidParameter("Param is not valid JSON-like dict object") from e
+    if data is None:
+        raise InvalidParameter("Param is not defined")
+    if not isinstance(data, dict):
+        raise InvalidParameter("Param is not a dictionary encoded as JSON object")
+    dictParam = RESTArgs([], copy.deepcopy(data))
+    dictSafe = RESTArgs([], {})
+    yield (dictParam, dictSafe)
+    if dictParam.kwargs:
+        raise InvalidParameter(f"Excess keyword arguments inside keyword argument, not validated kwargs={{'{argname}': {dictParam.kwargs}}}")
+    safe.kwargs[argname] = data
+    del param.kwargs[argname]

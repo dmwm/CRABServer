@@ -496,13 +496,23 @@ class DagmanCreator(TaskAction):
         info['accounting_group_user'] = info['userhn']
         info = transform_strings(info)
         info['faillimit'] = task['tm_fail_limit']
-        # hardcoding accelerator to GPU (SI currently only have nvidia GPU)
         if task['tm_user_config']['requireaccelerator']:
+            # hardcoding accelerator to GPU (SI currently only have nvidia GPU)
             info['accelerator_jdl'] = '+RequiresGPU=1\nrequest_GPUs=1'
+            if task['tm_user_config']['acceleratorparams']:
+                gpuMemoryMB = task['tm_user_config']['acceleratorparams'].get('GPUMemoryMB', None)
+                cudaCapabilities = task['tm_user_config']['acceleratorparams'].get('CUDACapabilities', None)
+                cudaRuntime = task['tm_user_config']['acceleratorparams'].get('CUDARuntime', None)
+                if gpuMemoryMB:
+                    info['accelerator_jdl'] += f"\n+GPUMemoryMB={gpuMemoryMB}"
+                if cudaCapabilities:
+                    cudaCapability = ','.join(sorted(cudaCapabilities))
+                    info['accelerator_jdl'] += f"\n+CUDACapability={classad.quote(cudaCapability)}"
+                if cudaRuntime:
+                    info['accelerator_jdl'] += f"\n+CUDARuntime={classad.quote(cudaRuntime)}"
         else:
             info['accelerator_jdl'] = ''
         info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
-
         # info['jobarch_flatten'].split("_")[0]: extracts "slc7" from "slc7_amd64_gcc10"
         required_os_list = ARCH_TO_OS.get(info['jobarch_flatten'].split("_")[0])
         # ARCH_TO_OS.get("slc7") gives a list with one item only: ['rhel7']
