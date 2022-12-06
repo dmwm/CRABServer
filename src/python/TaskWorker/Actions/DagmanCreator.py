@@ -29,7 +29,7 @@ import classad
 
 import WMCore.WMSpec.WMTask
 from WMCore.Services.CRIC.CRIC import CRIC
-from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS
+from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS, SCRAM_TO_ARCH
 
 DAG_HEADER = """
 
@@ -370,8 +370,12 @@ class DagmanCreator(TaskAction):
         m = re.match("([a-z]+)(\d+)_(\w+)_(\w+)", scram_arch)
         if m:
             _, _, arch, _ = m.groups()
-            if arch == "amd64":
-                info['desired_arch'] = "X86_64"
+            if arch not in SCRAM_TO_ARCH:
+                msg = "Job configured to a ScramArch: '{}' not supported in TaskWorker".format(item)
+                raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
+            info['desired_arch'] = SCRAM_TO_ARCH.get(arch)
+            # if arch == "amd64":
+            #     info['desired_arch'] = "X86_64"
 
 
     def getDashboardTaskType(self, task):
