@@ -169,10 +169,13 @@ class RESTBaseAPI(DatabaseRESTApi):
                 hdlr = logging.handlers.TimedRotatingFileHandler(logfile, when='D', interval=1, backupCount=keptDays)
                 formatter = logging.Formatter('%(asctime)s:%(trace_id)s:%(levelname)s:%(module)s:%(message)s')
             else:
-
                 hdlr = logging.StreamHandler()
+                # change log format of crabrest to append "Type=crablog"
                 formatter = logging.Formatter('%(asctime)s:%(trace_id)s:%(levelname)s:%(module)s:%(message)s Type=crablog')
-                # change log format of cherry to append "Type=cherrypylog"
+                # Use internal cherrypy._cplogging API to get StreamHandler
+                # from cherrypy logger and change log format to append
+                # "Type=cherrypylog".
+                # Ref: https://docs.cherrypy.dev/en/latest/_modules/cherrypy/_cplogging.html#LogManager._get_builtin_handler
                 logfmt = logging.Formatter('%(message)s Type=cherrypylog')
                 h = cherrypy.log._get_builtin_handler(cherrypy.log.access_log, 'screen')
                 h.setFormatter(logfmt)
