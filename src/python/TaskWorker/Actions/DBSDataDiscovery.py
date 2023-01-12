@@ -6,7 +6,7 @@ import copy
 from http.client import HTTPException
 
 import sys
-from urllib.parse import urlencode  # pylint: disable=no-name-in-module (for pylint2 compat.)
+from urllib.parse import urlencode  # pylint: disable=no-name-in-module  # for pylint2 compat.
 
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.DBS.DBSReader import DBSReader
