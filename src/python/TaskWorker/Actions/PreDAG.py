@@ -43,7 +43,6 @@ from RESTInteractions import CRABRest
 from RucioUtils import getNativeRucioClient
 from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
-from TaskWorker.Actions.PostJob import PostJob
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from TaskWorker.Worker import failTask
 
@@ -66,6 +65,7 @@ class PreDAG(object):
         self.logger.addHandler(handler)
         self.logger.setLevel(logging.DEBUG)
         self.logger.propagate = False
+        self.crabserver = None
 
     def setupCRABRest(self):
         """
