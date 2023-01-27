@@ -14,7 +14,7 @@ sigterm() {
   ls -lnh
   if [ ! -e logCMSSWSaved.txt ];
   then
-    python -c "import CMSRunAnalysis; logCMSSW()"
+    python3 -c "import CMSRunAnalysis; CMSRunAnalysis.logCMSSW()"
   fi
 }
 
