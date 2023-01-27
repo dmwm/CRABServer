@@ -808,8 +808,6 @@ class ASOServerJob(object):
                         input_dataset_or_primary_dataset = '/'+'NotDefined' # Adding the '/' until we fix ASO
                     doc = {'_id': doc_id,
                            'inputdataset': input_dataset_or_primary_dataset,
-                           'rest_host': str(self.job_ad['CRAB_RestHost']),
-                           'rest_uri': str('/crabserver/'+self.job_ad['CRAB_DbInstance']),
                            'lfn': source_lfn,
                            'source_lfn': source_lfn,
                            'destination_lfn': dest_lfn,
@@ -909,8 +907,7 @@ class ASOServerJob(object):
                       'job_id': doc['jobid'],
                       'job_retry_count': doc['job_retry_count'],
                       'type': doc['type'],
-                      'rest_host': doc['rest_host'],
-                      'rest_uri': doc['rest_uri']}
+                      }
             try:
                 self.crabserver.put(api='fileusertransfers', data=encodeRequest(newDoc))
             except HTTPException as hte:
@@ -993,9 +990,6 @@ class ASOServerJob(object):
                             'proxyfile': self.proxy}
                 with open('task_process/RestInfoForFileTransfers.json', 'w') as fp:
                     json.dump(restInfo, fp)
-                #with open('task_process/rest_filetransfers.txt', 'w+') as rest_file:
-                #    rest_file.write(self.rest_url + '\n')
-                #    rest_file.write(self.proxy)
         else:
             if not 'publishname' in newDoc:
                 newDoc['publishname'] = self.publishname
@@ -1015,9 +1009,6 @@ class ASOServerJob(object):
                             'proxyfile': self.proxy}
                 with open('task_process/RestInfoForFileTransfers.json','w') as fp:
                     json.dump(restInfo, fp)
-                #with open('task_process/rest_filetransfers.txt', 'w+') as rest_file:
-                #    rest_file.write(self.rest_host + self.rest_url + '\n')
-                #    rest_file.write(self.proxy)
         return returnMsg
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
