@@ -8,12 +8,11 @@ from WMCore.REST.Error import InvalidParameter, UnsupportedMethod
 from CRABInterface.Utilities import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_operator_without_raise
 from CRABInterface.Regexps import RX_USERNAME, RX_VOPARAMS, RX_TASKNAME, RX_SUBGETTRANSFER, RX_SUBPOSTTRANSFER, \
-                                  RX_USERGROUP, RX_USERROLE, RX_CMSSITE, RX_ASO_WORKERNAME, RX_ANYTHING
+                                  RX_CMSSITE, RX_ASO_WORKERNAME, RX_ANYTHING
 
 from ServerUtilities import TRANSFERDB_STATUSES, PUBLICATIONDB_STATUSES
 # external dependecies here
 import time, logging
-import cherrypy
 
 
 class RESTFileTransfers(RESTEntity):

@@ -1,5 +1,7 @@
 """ Add me
 """
+# pylint: disable=W0622  # allow using "id" as variable even if it redefines a built-in
+
 from __future__ import print_function
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
@@ -204,7 +206,7 @@ class RESTFileUserTransfers(RESTEntity):
                 binds['id'] = [item]
                 try:
                     self.api.modify(self.transferDB.KillUserTransfersById_sql, **binds)
-                except:
+                except:  # pylint: disable=bare-except
                     killStatus['failedKill'].append(item)
                     continue
                 killStatus['killed'].append(item)
@@ -242,7 +244,7 @@ class RESTFileUserTransfers(RESTEntity):
             # in database.
             # ---------------------------------------------
             # Always required variables:
-            # id: id
+            # id: id of this file record in DB table (relic of CouchDB times..)
             ###############################################
             binds['id'] = id
             return self.api.query(None, None, self.transferDB.GetById_sql, **binds)
