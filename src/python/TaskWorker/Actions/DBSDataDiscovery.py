@@ -571,6 +571,7 @@ if __name__ == '__main__':
                           'tm_input_dataset': dbsDataset, 'tm_secondary_input_dataset': dbsSecondaryDataset,
                           'tm_taskname': 'pippo1', 'tm_username':config.Services.Rucio_account,
                           'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
+                          'tm_user_config':{'partialdataset':False},
                           'tm_dbs_url': DBSUrl}, tempDir='')
 
 #===============================================================================
