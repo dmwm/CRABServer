@@ -3,7 +3,6 @@
 
 # external dependecies here
 import re
-import random
 import logging
 import cherrypy
 # WMCore dependecies here
@@ -19,7 +18,7 @@ from CRABInterface.RESTExtensions import authz_owner_match
 from CRABInterface.Regexps import (RX_TASKNAME, RX_ACTIVITY, RX_JOBTYPE, RX_GENERATOR, RX_LUMIEVENTS, RX_CMSSW, RX_ARCH, RX_DATASET,
     RX_CMSSITE, RX_SPLIT, RX_CACHENAME, RX_CACHEURL, RX_LFN, RX_USERFILE, RX_VOPARAMS, RX_DBSURL, RX_LFNPRIMDS, RX_OUTFILES,
     RX_RUNS, RX_LUMIRANGE, RX_SCRIPTARGS, RX_SCHEDD_NAME, RX_COLLECTOR, RX_SUBRESTAT, RX_JOBID, RX_ADDFILE,
-    RX_ANYTHING, RX_USERNAME, RX_DATE, RX_MANYLINES_SHORT, RX_CUDA_VERSION)
+    RX_ANYTHING, RX_USERNAME, RX_DATE, RX_MANYLINES_SHORT, RX_CUDA_VERSION, RX_BLOCK)
 from CRABInterface.Utilities import CMSSitesCache, conn_handler, getDBinstance, validate_dict
 from ServerUtilities import checkOutLFN, generateTaskName
 
@@ -343,7 +342,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("publishname2", param, safe, RX_ANYTHING, optional=True)
 
             if safe.kwargs['jobtype'] == 'PrivateMC':
-                if param.kwargs['inputdata']:
+                if param.kwargs['inputdata'] or 'inputblocks' in param.kwargs:
                     msg = "Invalid 'inputdata' parameter."
                     msg += " Job type PrivateMC does not take any input dataset."
                     msg += " If you really intend to run over an input dataset, then you must use job type Analysis."
@@ -427,6 +426,15 @@ class RESTUserWorkflow(RESTEntity):
                     validate_str("CUDARuntime", accParams, accSafe, RX_CUDA_VERSION, optional=True)
             else:
                 safe.kwargs["acceleratorparams"] = None
+            # Validate Data.inputBlocks
+            validate_strlist("inputblocks", param, safe, RX_BLOCK)
+            # Reject it if the blocks are not from its dataset.
+            if safe.kwargs["inputblocks"]:
+                for block in safe.kwargs['inputblocks']:
+                    if block.find(safe.kwargs['inputdata']) != 0:
+                        msg = f'Block "{block}" is not from Dataset "{safe.kwargs["inputdata"]}"'
+                        raise InvalidParameter(msg)
+
 
         elif method in ['POST']:
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
@@ -498,7 +506,7 @@ class RESTUserWorkflow(RESTEntity):
             tfileoutfiles, edmoutfiles, runs, lumis,
             totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
             faillimit, ignorelocality, userfiles, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun, ignoreglobalblacklist,
-            partialdataset, requireaccelerator, acceleratorparams):
+            partialdataset, requireaccelerator, acceleratorparams, inputblocks):
         """Perform the workflow injection
 
            :arg str workflow: request name defined by the user;
@@ -557,8 +565,8 @@ class RESTUserWorkflow(RESTEntity):
             'partialdataset': True if partialdataset else False,
             'requireaccelerator': True if requireaccelerator else False,
             'acceleratorparams': acceleratorparams if acceleratorparams else None,
+            'inputblocks': inputblocks if inputblocks else [],
         }
-
 
         return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch,
                                            inputdata=inputdata, primarydataset=primarydataset, nonvaliddata=nonvaliddata, use_parent=useparent,
