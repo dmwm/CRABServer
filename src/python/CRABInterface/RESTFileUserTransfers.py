@@ -1,5 +1,7 @@
 """ Add me
 """
+# pylint: disable=W0622  # allow using "id" as variable even if it redefines a built-in
+
 from __future__ import print_function
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
@@ -8,7 +10,8 @@ from WMCore.REST.Error import InvalidParameter, UnsupportedMethod
 
 from CRABInterface.Utilities import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import RX_USERNAME, RX_TASKNAME, RX_SUBGETUSERTRANSFER, RX_SUBPOSTUSERTRANSFER, RX_JOBID, RX_ANYTHING
+from CRABInterface.Regexps import RX_USERNAME, RX_TASKNAME, RX_SUBGETUSERTRANSFER, RX_SUBPOSTUSERTRANSFER,\
+    RX_JOBID, RX_ANYTHING, RX_BLOCK, RX_STATUS
 
 from ServerUtilities import TRANSFERDB_STATUSES, PUBLICATIONDB_STATUSES
 # external dependecies here
@@ -54,12 +57,15 @@ class RESTFileUserTransfers(RESTEntity):
             validate_num("start_time", param, safe, optional=False)
             validate_str("rest_host", param, safe, RX_ANYTHING, optional=True)
             validate_str("rest_uri", param, safe, RX_ANYTHING, optional=True)
+            validate_str("dbs_blockname", param, safe, RX_BLOCK, optional=True)
+            validate_str("block_complete", param, safe, RX_STATUS, optional=True)
             validate_str("transfer_state", param, safe, RX_ANYTHING, optional=False)
             validate_str("publication_state", param, safe, RX_ANYTHING, optional=False)
             validate_str("fts_id", param, safe, RX_ANYTHING, optional=True)
             validate_str("fts_instance", param, safe, RX_ANYTHING, optional=True)
         if method in ['POST']:
             # POST is for update, so we should allow anyone anything?
+            # as of Feb 2023 this is only used inside PostJob
             # Of Course no, but there are multiple combinations, so we are not validating here
             # and all validation is in post function
             validate_str("subresource", param, safe, RX_SUBPOSTUSERTRANSFER, optional=False)
@@ -72,6 +78,8 @@ class RESTFileUserTransfers(RESTEntity):
             validate_num("filesize", param, safe, optional=True)
             validate_str("transfer_state", param, safe, RX_ANYTHING, optional=True)
             validate_num("transfer_retry_count", param, safe, optional=True)
+            validate_str("dbs_blockname", param, safe, RX_BLOCK, optional=True)
+            validate_str("block_complete", param, safe, RX_STATUS, optional=True)
             validate_num("publish", param, safe, optional=False)
             validate_str("publication_state", param, safe, RX_ANYTHING, optional=True)
             validate_str("job_id", param, safe, RX_JOBID, optional=True)
@@ -119,7 +127,8 @@ class RESTFileUserTransfers(RESTEntity):
         binds = {}
         for key in ['id', 'username', 'taskname', 'destination', 'destination_lfn',
                     'source', 'source_lfn', 'filesize', 'publish', 'start_time',
-                    'job_id', 'job_retry_count', 'type', 'rest_host', 'rest_uri']:
+                    'job_id', 'job_retry_count', 'type', 'rest_host', 'rest_uri',
+                    'dbs_blockname', 'block_complete']:
             binds[key] = [kwargs[key]]
             del kwargs[key]
         # Make a change to a number for TRANSFER_STATE and PUBLICATION_STATE
@@ -143,7 +152,7 @@ class RESTFileUserTransfers(RESTEntity):
 
     @restcall
     def post(self, subresource, id, username, taskname, start_time, source, source_lfn, filesize,
-             transfer_state, transfer_retry_count, publish, publication_state, job_id, job_retry_count, listOfIds):
+             transfer_state, transfer_retry_count, dbs_blockname, block_complete, publish, publication_state, job_id, job_retry_count, listOfIds):
         """This is used for user to allow kill transfers for specific task, retryPublication or retryTransfers.
             So far we do not allow retryPublications or retryTransfers for themselfs."""
         binds = {}
@@ -157,6 +166,8 @@ class RESTFileUserTransfers(RESTEntity):
             binds['source_lfn'] = [source_lfn]
             binds['filesize'] = [filesize]
             binds['transfer_state'] = [TRANSFERDB_STATUSES[transfer_state]]
+            binds['dbs_blockname'] = [dbs_blockname]
+            binds['block_complete'] = [block_complete]
             binds['publish'] = [publish]
             binds['publication_state'] = [PUBLICATIONDB_STATUSES[publication_state]]
             binds['transfer_retry_count'] = [transfer_retry_count]
@@ -195,7 +206,7 @@ class RESTFileUserTransfers(RESTEntity):
                 binds['id'] = [item]
                 try:
                     self.api.modify(self.transferDB.KillUserTransfersById_sql, **binds)
-                except:
+                except:  # pylint: disable=bare-except
                     killStatus['failedKill'].append(item)
                     continue
                 killStatus['killed'].append(item)
@@ -233,7 +244,7 @@ class RESTFileUserTransfers(RESTEntity):
             # in database.
             # ---------------------------------------------
             # Always required variables:
-            # id: id
+            # id: id of this file record in DB table (relic of CouchDB times..)
             ###############################################
             binds['id'] = id
             return self.api.query(None, None, self.transferDB.GetById_sql, **binds)
