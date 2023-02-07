@@ -1,6 +1,8 @@
 from __future__ import absolute_import
 import logging
+import logging.handlers
 import traceback
+import socket
 
 import cherrypy
 from subprocess import getstatusoutput
@@ -157,17 +159,31 @@ class RESTBaseAPI(DatabaseRESTApi):
         RESTEntities and other parts of the code can retrieve it by calling: logging.getLogger('CRABLogger.ChildName')
         ChildName is the specific name of the logger (child of CRABLogger). Using childs in that way we can configure
         the logging in a flexible way (a module logs at DEBUG level to a file, another module logs at INFO level to stdout, etc)
+
+        In case `logfile=None`, we setup logger to stream to stdout/stderr
+        instead. Cherrypy and CRAB log message will have "Type=cherrypylog"
+        and "Type=crablog" suffix respectively.
         """
-        import logging.handlers
         logger = logging.getLogger('CRABLogger')
         if loglevel:
-            hdlr = logging.handlers.TimedRotatingFileHandler(logfile, when='D', interval=1, backupCount=keptDays)
-            formatter = logging.Formatter('%(asctime)s:%(trace_id)s:%(levelname)s:%(module)s:%(message)s')
-            hdlr.setFormatter(formatter)
-            # add trace_id to log with filter class
+            if logfile:
+                hdlr = logging.handlers.TimedRotatingFileHandler(logfile, when='D', interval=1, backupCount=keptDays)
+                formatter = logging.Formatter('%(asctime)s:%(trace_id)s:%(levelname)s:%(module)s:%(message)s')
+            else:
+                # Use hostname as pod name
+                podname = socket.gethostname()
+                hdlr = logging.StreamHandler()
+                formatter = logging.Formatter(f'%(asctime)s:%(trace_id)s:%(levelname)s:%(module)s:%(message)s - Podname={podname} Type=crablog')
+                # change log format of cherry to append "Type=cherrypylog"
+                logfmt = logging.Formatter(f'%(message)s - Podname={podname} Type=cherrypylog')
+                h = cherrypy.log._get_builtin_handler(cherrypy.log.access_log, 'screen')
+                h.setFormatter(logfmt)
+                h = cherrypy.log._get_builtin_handler(cherrypy.log.error_log, 'screen')
+                h.setFormatter(logfmt)
+                hdlr.setFormatter(formatter)
+                # add trace_id to log with filter class
             f = TraceIDFilter()
             hdlr.addFilter(f)
-
             logger.addHandler(hdlr)
             logger.setLevel(loglevel)
         else:
@@ -181,10 +197,13 @@ class TraceIDFilter(logging.Filter):
     def filter(self, record):
         try:
             record.trace_id = cherrypy.request.db['handle']['trace'].replace('RESTSQL:','')
+        except (TypeError, AttributeError):
+            record.trace_id = ""
         except Exception:  # pylint: disable=broad-except
             traceback.print_exc()
             record.trace_id = ""
         return True
+
 
 class _FakeLOB:
     """Simplest way to mock LOB object inside tuple return by DatabaseRESTApi.query(),
