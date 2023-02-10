@@ -951,3 +951,25 @@ def get_size(obj, seen=None):
     elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes, bytearray)):
         size += sum([get_size(i, seen) for i in obj])
     return size
+
+
+def parseDBSInstance(dbsurl):
+    """Parse `tm_dbs_url` to get dbsInstance in `<dbsenv>/<instance>` format.
+
+    >>> url = 'https://cmsweb.cern.ch/dbs/prod/global/DBSReader'
+    >>> parseDBSInstance(url)
+    'prod/global'
+    """
+    return "{}/{}".format(dbsurl.split("//")[1].split("/")[2], dbsurl.split("//")[1].split("/")[3])
+
+
+def isDatasetUserDataset(inputDataset, dbsInstance):
+    """Return `True` if it is USER dataset.
+
+    >>> dbs = 'prod/phys03'
+    >>> dataset = '/JPsiToMuMuGun/JPsiToMuMuGun_Pt0To30withTail/USER'
+    >>> isDatasetUserDataset(dataset, dbs)
+    True
+    """
+    return (dbsInstance.split('/')[1] != 'global') and \
+                (inputDataset.split('/')[-1] == 'USER')
