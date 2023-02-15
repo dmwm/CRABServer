@@ -194,7 +194,13 @@ class HTTPRequests(dict):
             else:
                 break
         try:
-            result = JSONRequests(idict={"pycurl" : True}).decode(datares)
+            idict = {
+                "pycurl": True,
+                # WMCore's Requests object (parent of JSONRequests) requires the following two lines as well
+                "cert": self['cert'],
+                "key": self['key'],
+            }
+            result = JSONRequests(idict=idict).decode(datares)
         except Exception as ex:
             msg = "Fatal error reading data from %s using %s:\n%s" % (url, data, ex)
             self.logger.error(msg)
