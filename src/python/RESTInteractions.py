@@ -196,7 +196,7 @@ class HTTPRequests(dict):
         try:
             idict = {
                 "pycurl": True,
-                # Required by Requests object (parent of JSONRequests)
+                # WMCore's Requests object (parent of JSONRequests) requires the following two lines as well
                 "cert": self['cert'],
                 "key": self['key'],
             }
