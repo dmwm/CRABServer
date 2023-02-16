@@ -474,7 +474,7 @@ class DBSDataDiscovery(DataDiscovery):
                 self.logger.warning(msg)
                 self.uploadWarning(msg, self.userproxy, self.taskName)
             elif dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []):
-                msg = "Task could not be submitted because not all blocks of dataset %s are on DISK" % inputDataset
+                msg = f"Task could not be submitted because not all blocks of dataset {inputDataset} are on DISK"
                 msg += "\nWill try to request a full disk copy for you. See"
                 msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
                 self.requestTapeRecall(blockList=blocksWithLocation, system='Rucio', msgHead=msg)
@@ -483,21 +483,21 @@ class DBSDataDiscovery(DataDiscovery):
                 maxTierToBlockRecallSizeTB = getattr(self.config.TaskWorker, 'maxTierToBlockRecallSizeTB', 0)
                 maxTierToBlockRecallSize = maxTierToBlockRecallSizeTB * 1e12
                 if blocksSizeToRecall < maxTierToBlockRecallSize:
-                    msg = "Task could not be submitted because blocks specified in Data.inputBlocks are not on disk."
+                    msg = "Task could not be submitted because blocks specified in 'Data.inputBlocks' are not on disk."
                     msg += "\nWill try to request disk copy for you. See"
                     msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
                     self.requestTapeRecall(blockList=blocksWithLocation, system='Rucio', msgHead=msg)
                 else:
                     msg = "Some blocks are on TAPE only and will not be processed."
-                    msg += f"\nThere is no automatic recall from TAPE for data tier '{datatier}' if 'Data.inputBlocks' is provided,"
+                    msg += f"\nThere is no automatic recall from TAPE for data tier '{dataTier}' if 'Data.inputBlocks' is provided,"
                     msg += f"\nbut the recall size ({blocksSizeToRecall/1e12:.3f} TB) is larger than the maximum allowed size ({maxTierToBlockRecallSizeTB} TB)."
-                    msg += '\nIf you need these blocks, contact Data Transfer team via %s' % FEEDBACKMAIL
+                    msg += f"\nIf you need these blocks, contact Data Transfer team via {FEEDBACKMAIL}"
                     self.logger.warning(msg)
                     self.uploadWarning(msg, self.userproxy, self.taskName)
             else:
                 msg = "Some blocks are on TAPE only and will not be processed."
-                msg += "\nThere is no automatic recall from tape for data tier '%s' if 'Data.inputBlocks' is not provided." % dataTier
-                msg += '\nIf you need the full dataset, contact Data Transfer team via %s' % FEEDBACKMAIL
+                msg += f"\nThere is no automatic recall from tape for data tier '{dataTier}' if 'Data.inputBlocks' is not provided."
+                msg += f"\nIf you need the full dataset, contact Data Transfer team via {FEEDBACKMAIL}"
                 self.logger.warning(msg)
                 self.uploadWarning(msg, self.userproxy, self.taskName)
 
