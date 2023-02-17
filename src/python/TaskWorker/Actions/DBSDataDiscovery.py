@@ -89,10 +89,11 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\nhttps://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ"
                 raise TaskWorkerException(msg)
 
-    def requestTapeRecall(self, blockList, sizeToRecall, system='Dynamo', msgHead=''):   # pylint: disable=W0102
+    def requestTapeRecall(self, blockList, sizeToRecall, system='Rucio', msgHead=''):   # pylint: disable=W0102
         """
         :param blockList: a list of blocks to recall from Tape to Disk
-        :param system: a string identifying the DDM system to use 'Dynamo' or 'Rucio' or 'None'
+        :param sizeToRecall: an integer of blockList's total size in bytes.
+        :param system: a string identifying the DDM system to use 'Rucio' or 'None'
         :param msgHead: a string with the initial part of a message to be used for exceptions
         :return: nothing: Since data on tape means no submission possible, this function will
             always raise a TaskWorkerException to stop the action flow.
@@ -241,9 +242,6 @@ class DBSDataDiscovery(DataDiscovery):
             msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
             raise TaskWorkerException(msg)
 
-        if system == 'Dynamo':
-            raise NotImplementedError
-
     def execute(self, *args, **kwargs):
         """
         This is a convenience wrapper around the executeInternal function
@@ -366,7 +364,7 @@ class DBSDataDiscovery(DataDiscovery):
                 msg = "No locations found with Rucio for this dataset"
                 self.logger.warning(msg)
 
-        self.logger.debug("Dataset size in bytes: %s", totalSizeBytes)
+        self.logger.debug("Dataset size in GBytes: %s", totalSizeBytes/1e9)
 
         if not locationsFoundWithRucio:
             self.logger.info("No locations found with Rucio for %s", inputDataset)
