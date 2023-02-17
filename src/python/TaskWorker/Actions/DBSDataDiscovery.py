@@ -20,8 +20,6 @@ from RucioUtils import getNativeRucioClient
 from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent,
                                     InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage)
 
-from dbs.exceptions.dbsClientException import dbsClientException
-
 
 class DBSDataDiscovery(DataDiscovery):
     """Performing the data discovery through CMS DBS service.
@@ -91,7 +89,7 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\nhttps://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ"
                 raise TaskWorkerException(msg)
 
-    def requestTapeRecall(self, blockList=[], system='Dynamo', msgHead=''):   # pylint: disable=W0102
+    def requestTapeRecall(self, blockList, sizeToRecall, system='Dynamo', msgHead=''):   # pylint: disable=W0102
         """
         :param blockList: a list of blocks to recall from Tape to Disk
         :param system: a string identifying the DDM system to use 'Dynamo' or 'Rucio' or 'None'
@@ -130,12 +128,6 @@ class DBSDataDiscovery(DataDiscovery):
                 raise TaskWorkerException(msg)
             self.logger.info("Rucio container %s:%s created with %d blocks", myScope, containerName, len(blockList))
 
-            # Compute size of recall request
-            sizeToRecall = 0
-            for block in blockList:
-                replicas = rucioClient.list_dataset_replicas(scope='cms', name=block, deep=True)
-                blockBytes = next(replicas)['bytes']  # pick first replica for each block, they better all have same size
-                sizeToRecall += blockBytes
             TBtoRecall = sizeToRecall // 1e12
             # Sanity check
             if TBtoRecall > 1e3:
@@ -252,25 +244,6 @@ class DBSDataDiscovery(DataDiscovery):
         if system == 'Dynamo':
             raise NotImplementedError
 
-    def getBlocksSizeBytes(self, dataset, blocks=None):
-        """
-        Get block size of dataset from DBS and return the total size of all blocks or blocks in `blocks` argument.
-        """
-        self.dbs.checkDatasetPath(dataset)
-        args = {'dataset': dataset, 'detail': True}
-        try:
-            blocksSummaries = self.dbs.dbs.listBlockSummaries(**args)
-        except dbsClientException as ex:
-            msg = "Error in DBSReader.listFileBlocks(%s)\n" % dataset
-            msg += "%s\n" % ex
-            raise DBSReaderError(msg) from None
-
-        size = 0
-        for block in blocksSummaries:
-            if not blocks or block['block_name'] in blocks:
-                size += block['file_size']
-        return size
-
     def execute(self, *args, **kwargs):
         """
         This is a convenience wrapper around the executeInternal function
@@ -357,6 +330,8 @@ class DBSDataDiscovery(DataDiscovery):
         if not useRucioForLocations:
             self.logger.info("Will not use Rucio for this dataset")
 
+        totalSizeBytes = 0
+
         if useRucioForLocations:
             scope = "cms"
             # If the dataset is a USER one, use the Rucio user scope to find it
@@ -369,14 +344,17 @@ class DBSDataDiscovery(DataDiscovery):
                 for blockName in list(blocks):
                     replicas = set()
                     response = self.rucioClient.list_dataset_replicas(scope=scope, name=blockName, deep=True)
+                    sizeBytes = 0
                     for item in response:
                         if 'T2_UA_KIPT' in item['rse']:
                             continue  # skip Ucrainan T2 until further notice
                         # same as complete='y' used for PhEDEx
                         if item['state'].upper() == 'AVAILABLE':
                             replicas.add(item['rse'])
+                            sizeBytes = item['bytes']
                     if replicas:  # only fill map for blocks which have at least one location
                         locationsMap[blockName] = replicas
+                        totalSizeBytes += sizeBytes
             except Exception as exc:
                 msg = "Rucio lookup failed with\n%s" % str(exc)
                 self.logger.warning(msg)
@@ -387,6 +365,8 @@ class DBSDataDiscovery(DataDiscovery):
             else:
                 msg = "No locations found with Rucio for this dataset"
                 self.logger.warning(msg)
+
+        self.logger.debug("Dataset size in bytes: %s", totalSizeBytes)
 
         if not locationsFoundWithRucio:
             self.logger.info("No locations found with Rucio for %s", inputDataset)
@@ -468,6 +448,8 @@ class DBSDataDiscovery(DataDiscovery):
         self.keepOnlyDiskRSEs(locationsMap)
         if set(locationsMap.keys()) != set(blocksWithLocation):
             dataTier = inputDataset.split('/')[3]
+            maxTierToBlockRecallSizeTB = getattr(self.config.TaskWorker, 'maxTierToBlockRecallSizeTB', 0)
+            maxTierToBlockRecallSize = maxTierToBlockRecallSizeTB * 1e12
             if usePartialDataset:
                 msg = "Some blocks are on TAPE only and can not be read."
                 msg += "\nSince you specified to accept a partial dataset, only blocks on disk will be processed"
@@ -477,20 +459,17 @@ class DBSDataDiscovery(DataDiscovery):
                 msg = f"Task could not be submitted because not all blocks of dataset {inputDataset} are on DISK"
                 msg += "\nWill try to request a full disk copy for you. See"
                 msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
-                self.requestTapeRecall(blockList=blocksWithLocation, system='Rucio', msgHead=msg)
+                self.requestTapeRecall(blocksWithLocation, totalSizeBytes, system='Rucio', msgHead=msg)
             elif inputBlocks:
-                blocksSizeToRecall = self.getBlocksSizeBytes(inputDataset, list(blocksWithLocation))
-                maxTierToBlockRecallSizeTB = getattr(self.config.TaskWorker, 'maxTierToBlockRecallSizeTB', 0)
-                maxTierToBlockRecallSize = maxTierToBlockRecallSizeTB * 1e12
-                if blocksSizeToRecall < maxTierToBlockRecallSize:
+                if totalSizeBytes < maxTierToBlockRecallSize:
                     msg = "Task could not be submitted because blocks specified in 'Data.inputBlocks' are not on disk."
                     msg += "\nWill try to request disk copy for you. See"
                     msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
-                    self.requestTapeRecall(blockList=blocksWithLocation, system='Rucio', msgHead=msg)
+                    self.requestTapeRecall(blocksWithLocation, totalSizeBytes, system='Rucio', msgHead=msg)
                 else:
                     msg = "Some blocks are on TAPE only and will not be processed."
                     msg += f"\nThere is no automatic recall from TAPE for data tier '{dataTier}' if 'Data.inputBlocks' is provided,"
-                    msg += f"\nbut the recall size ({blocksSizeToRecall/1e12:.3f} TB) is larger than the maximum allowed size ({maxTierToBlockRecallSizeTB} TB)."
+                    msg += f"\nbut the recall size ({sizeToRecall/1e12:.3f} TB) is larger than the maximum allowed size ({maxTierToBlockRecallSizeTB} TB)."
                     msg += f"\nIf you need these blocks, contact Data Transfer team via {FEEDBACKMAIL}"
                     self.logger.warning(msg)
                     self.uploadWarning(msg, self.userproxy, self.taskName)
