@@ -3,6 +3,7 @@ import logging
 import logging.handlers
 import traceback
 import socket
+import os
 
 import cherrypy
 from subprocess import getstatusoutput
@@ -166,10 +167,7 @@ class RESTBaseAPI(DatabaseRESTApi):
         """
         logger = logging.getLogger('CRABLogger')
         if loglevel:
-            if logfile:
-                hdlr = logging.handlers.TimedRotatingFileHandler(logfile, when='D', interval=1, backupCount=keptDays)
-                formatter = logging.Formatter('%(asctime)s:%(trace_id)s:%(levelname)s:%(module)s:%(message)s')
-            else:
+            if os.environ.get('CRABSERVER_LOGSTDOUT') == 't':
                 # Use hostname as pod name
                 podname = socket.gethostname()
                 hdlr = logging.StreamHandler()
@@ -181,7 +179,11 @@ class RESTBaseAPI(DatabaseRESTApi):
                 h = cherrypy.log._get_builtin_handler(cherrypy.log.error_log, 'screen')
                 h.setFormatter(logfmt)
                 hdlr.setFormatter(formatter)
-                # add trace_id to log with filter class
+            else:
+                hdlr = logging.handlers.TimedRotatingFileHandler(logfile, when='D', interval=1, backupCount=keptDays)
+                formatter = logging.Formatter('%(asctime)s:%(trace_id)s:%(levelname)s:%(module)s:%(message)s')
+                hdlr.setFormatter(formatter)
+            # add trace_id to log with filter class
             f = TraceIDFilter()
             hdlr.addFilter(f)
             logger.addHandler(hdlr)
