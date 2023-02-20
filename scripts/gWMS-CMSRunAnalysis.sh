@@ -44,6 +44,7 @@ function chirp_exit_code {
     #and is successfully loaded. It is taken from the EXIT_STATUS variable
     #instead (which contains the short exit coce)
 
+    echo "======== Figuring out long exit code of the job for condor_chirp at $(TZ=GMT date)========"
     #check if the command condor_chirp exists
     command -v condor_chirp > /dev/null 2>&1
     if [ $? -ne 0 ]; then
@@ -51,7 +52,6 @@ function chirp_exit_code {
         return
     fi
     #check if exitCode is in there and report it
-    echo "======== Figuring out long exit code of the job for condor_chirp ========"
     #any error or exception will be printed to stderr and cause $? <> 0
     LONG_EXIT_CODE=$(python << END
 from __future__ import print_function
