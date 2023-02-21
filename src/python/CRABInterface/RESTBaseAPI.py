@@ -161,9 +161,10 @@ class RESTBaseAPI(DatabaseRESTApi):
         ChildName is the specific name of the logger (child of CRABLogger). Using childs in that way we can configure
         the logging in a flexible way (a module logs at DEBUG level to a file, another module logs at INFO level to stdout, etc)
 
-        In case `logfile=None`, we setup logger to stream to stdout/stderr
-        instead. Cherrypy and CRAB log message will have "Type=cherrypylog"
-        and "Type=crablog" suffix respectively.
+        When `CRABSERVER_LOGSTDOUT` environment variable is set to `t`
+        (usually via k8s-manifests), we setup log handler to stream log to
+        stdout/stderr instead. Cherrypy and CRAB log message will have
+        "Type=cherrypylog" and "Type=crablog" suffix respectively.
         """
         logger = logging.getLogger('CRABLogger')
         if loglevel:
