@@ -3,6 +3,7 @@ import logging
 import logging.handlers
 import traceback
 import socket
+import os
 
 import cherrypy
 from subprocess import getstatusoutput
@@ -160,16 +161,14 @@ class RESTBaseAPI(DatabaseRESTApi):
         ChildName is the specific name of the logger (child of CRABLogger). Using childs in that way we can configure
         the logging in a flexible way (a module logs at DEBUG level to a file, another module logs at INFO level to stdout, etc)
 
-        In case `logfile=None`, we setup logger to stream to stdout/stderr
-        instead. Cherrypy and CRAB log message will have "Type=cherrypylog"
-        and "Type=crablog" suffix respectively.
+        When `CRABSERVER_LOGSTDOUT` environment variable is set to `t`
+        (usually via k8s-manifests), we setup log handler to stream log to
+        stdout/stderr instead. Cherrypy and CRAB log message will have
+        "Podname=<podname> Type=<cherrypylog/crablog>" suffix.
         """
         logger = logging.getLogger('CRABLogger')
         if loglevel:
-            if logfile:
-                hdlr = logging.handlers.TimedRotatingFileHandler(logfile, when='D', interval=1, backupCount=keptDays)
-                formatter = logging.Formatter('%(asctime)s:%(trace_id)s:%(levelname)s:%(module)s:%(message)s')
-            else:
+            if os.environ.get('CRABSERVER_LOGSTDOUT') == 't':
                 # Use hostname as pod name
                 podname = socket.gethostname()
                 hdlr = logging.StreamHandler()
@@ -181,7 +180,11 @@ class RESTBaseAPI(DatabaseRESTApi):
                 h = cherrypy.log._get_builtin_handler(cherrypy.log.error_log, 'screen')
                 h.setFormatter(logfmt)
                 hdlr.setFormatter(formatter)
-                # add trace_id to log with filter class
+            else:
+                hdlr = logging.handlers.TimedRotatingFileHandler(logfile, when='D', interval=1, backupCount=keptDays)
+                formatter = logging.Formatter('%(asctime)s:%(trace_id)s:%(levelname)s:%(module)s:%(message)s')
+                hdlr.setFormatter(formatter)
+            # add trace_id to log with filter class
             f = TraceIDFilter()
             hdlr.addFilter(f)
             logger.addHandler(hdlr)
