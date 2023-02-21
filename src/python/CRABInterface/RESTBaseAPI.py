@@ -164,7 +164,7 @@ class RESTBaseAPI(DatabaseRESTApi):
         When `CRABSERVER_LOGSTDOUT` environment variable is set to `t`
         (usually via k8s-manifests), we setup log handler to stream log to
         stdout/stderr instead. Cherrypy and CRAB log message will have
-        "Type=cherrypylog" and "Type=crablog" suffix respectively.
+        "Podname=<podname> Type=<cherrypylog/crablog>" suffix.
         """
         logger = logging.getLogger('CRABLogger')
         if loglevel:
