@@ -139,6 +139,9 @@ class DataUserWorkflow(object):
            :arg str list userfiles: The files to process instead of a DBS-based dataset.
            :arg str scheddname: Schedd name used for debugging.
            :arg str collector: Collector name used for debugging.
+           :arg int dryrun: enable dry run mode (initialize but do not submit request).
+           :arg str ignoreglobalblacklist: flag to ignore site blacklist from SiteSupport
+           :arg dict userconfig: a dictionary of config.params which do not have a separate DB column
            :returns: a dict which contaians details of the request"""
 
         return self.workflow.submit(*args, **kwargs)

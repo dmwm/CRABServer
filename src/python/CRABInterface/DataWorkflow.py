@@ -1,7 +1,6 @@
 import copy
 import time
 import logging
-import datetime
 import json
 from ast import literal_eval
 
@@ -97,7 +96,7 @@ class DataWorkflow(object):
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, scriptexe=None, scriptargs=None,
                scheddname=None, extrajdl=None, collector=None, dryrun=False, nonvaliddata=False, inputdata=None, primarydataset=None,
-               debugfilename=None, submitipaddr=None, ignoreglobalblacklist=False, user_config={}):
+               debugfilename=None, submitipaddr=None, ignoreglobalblacklist=False, user_config=None):
         """Perform the workflow injection
 
            :arg str workflow: workflow name requested by the user;
@@ -146,6 +145,8 @@ class DataWorkflow(object):
            :arg str scheddname: Schedd Name used for debugging.
            :arg str collector: Collector Name used for debugging.
            :arg int dryrun: enable dry run mode (initialize but do not submit task).
+           :arg str ignoreglobalblacklist: flag to ignore site blacklist from SiteSupport
+           :arg dict userconfig: a dictionary of config.params which do not have a separate DB column
            :returns: a dict which contaians details of the request"""
 
         backend_urls = copy.deepcopy(self.centralcfg.centralconfig.get("backend-urls", {}))

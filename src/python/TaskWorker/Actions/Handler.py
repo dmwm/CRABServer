@@ -4,7 +4,6 @@ import time
 import logging
 import tempfile
 import traceback
-from http.client import HTTPException
 
 from RESTInteractions import CRABRest
 from RucioUtils import getNativeRucioClient
@@ -20,6 +19,7 @@ from TaskWorker.Actions.MakeFakeFileSet import MakeFakeFileSet
 from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
 from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
 from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
+from TaskWorker.Actions.RucioDataDiscovery import RucioDataDiscovery
 from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
 from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException, TaskWorkerException
 
@@ -157,6 +157,8 @@ def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
     if task['tm_job_type'] == 'Analysis':
         if task.get('tm_user_files'):
             handler.addWork(UserDataDiscovery(config=config, crabserver=crabserver, procnum=procnum))
+        elif ':' in task.get('tm_input_dataset'):  # Rucio DID is scope:name
+            handler.addWork(RucioDataDiscovery(config=config, crabserver=crabserver, procnum=procnum, rucioClient=rucioClient))
         else:
             handler.addWork(DBSDataDiscovery(config=config, crabserver=crabserver, procnum=procnum, rucioClient=rucioClient))
     elif task['tm_job_type'] == 'PrivateMC':
