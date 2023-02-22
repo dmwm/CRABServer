@@ -469,6 +469,7 @@ class DBSDataDiscovery(DataDiscovery):
         # will not need lumi info if user has asked for split by file with no run/lumi mask
         splitAlgo = kwargs['task']['tm_split_algo']
         lumiMask = kwargs['task']['tm_split_args']['lumis']
+        runRange = kwargs['task']['tm_split_args']['runs']
 
         needLumiInfo = splitAlgo != 'FileBased' or lumiMask != [] or runRange != []
         # secondary dataset access relies on run/lumi info
