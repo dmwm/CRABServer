@@ -14,12 +14,15 @@ def getNativeRucioClient(config=None, logger=None):
     logger.info("Initializing native Rucio client")
     from rucio.client import Client
 
+    rucio_cert = getattr(config.Services, "Rucio_cert", config.TaskWorker.cmscert)
+    rucio_key = getattr(config.Services, "Rucio_key", config.TaskWorker.cmskey)
+    logger.debug("Using cert [%s]\n and key [%s] for rucio client.", rucio_cert, rucio_key)
     nativeClient = Client(
         rucio_host=config.Services.Rucio_host,
         auth_host=config.Services.Rucio_authUrl,
         ca_cert=config.Services.Rucio_caPath,
         account=config.Services.Rucio_account,
-        creds={"client_cert": config.TaskWorker.cmscert, "client_key": config.TaskWorker.cmskey},
+        creds={"client_cert": rucio_cert, "client_key": rucio_key},
         auth_type='x509'
     )
     ret = nativeClient.ping()
@@ -29,7 +32,7 @@ def getNativeRucioClient(config=None, logger=None):
 
     return nativeClient
 
-def getWritePFN(rucioClient=None, siteName='', lfn='', 
+def getWritePFN(rucioClient=None, siteName='', lfn='',
                 operations=['third_party_copy_write', 'write'], logger=None):
     """
     convert a single LFN into a PFN which can be used for Writing via Rucio
