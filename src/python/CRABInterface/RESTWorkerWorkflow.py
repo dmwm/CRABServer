@@ -153,11 +153,12 @@ def fixupTask(task):
 
     # load json data of tm_user_config column
     # Hard code default value of tm_user_config for backward compatibility
-    # with older task
+    # with tasks submit from the old REST
     user_config_default = {
         'partialdataset': False,
         'requireaccelerator': False,
         'accceleratorparams': None,
+        'inputblocks': None,
     }
     if result['tm_user_config']:
         result['tm_user_config'] = json.loads(result['tm_user_config'])
