@@ -100,6 +100,10 @@ class DBSDataDiscovery(DataDiscovery):
             The exception message contains details and an attempt is done to upload it to TaskDB
             so that crab status can report it
         """
+        if not blockList:
+            return
+        # beware blockList being not subscriptable (e.g. dict_keys type)
+        dbsDatasetName = next(iter(blockList)).split('#')[0]
         msg = msgHead
         if system == 'Rucio':
             # need to use crab_tape_recall Rucio account to create containers and create rules
@@ -119,25 +123,24 @@ class DBSDataDiscovery(DataDiscovery):
                 self.logger.debug("Container name already exists in Rucio. Keep going")
             except Exception as ex:
                 msg += "\nRucio exception creating container: %s" %  (str(ex))
-                raise TaskWorkerException(msg)
+                raise TaskWorkerException(msg) from ex
             try:
                 rucioClient.attach_dids(myScope, containerName, dids)
             except DuplicateContent:
                 self.logger.debug("Some dids are already in this container. Keep going")
             except Exception as ex:
                 msg += "\nRucio exception adding blocks to container: %s" %  (str(ex))
-                raise TaskWorkerException(msg)
+                raise TaskWorkerException(msg) from ex
             self.logger.info("Rucio container %s:%s created with %d blocks", myScope, containerName, len(blockList))
 
             TBtoRecall = sizeToRecall // 1e12
+            # a friendly-formatted string to print the size
+            recallSize = f"{TBtoRecall:.0f} TBytes" if TBtoRecall>0 else f"{sizeToRecall/1e9:.0f} GBytes"
             # Sanity check
             if TBtoRecall > 1e3:
-                msg += '\nDataset size %d TB. Will not trigger autoamatic recall for >1PB. Contact DataOps' % TBtoRecall
+                msg += '\nDataset size %d TB. Will not trigger automatic recall for >1PB. Contact DataOps' % TBtoRecall
                 raise TaskWorkerException(msg)
-            if TBtoRecall > 0:
-                self.logger.info("Total size of data to recall : %d TBytes", TBtoRecall)
-            else:
-                self.logger.info("Total size of data to recall : %d GBytes", sizeToRecall/1e9)
+            self.logger.info("Total size of data to recall : %s", recallSize)
 
             # make RSEs lists
             # asking for ddm_quota>0 gets rid also of Temp and Test RSE's
@@ -186,7 +189,8 @@ class DBSDataDiscovery(DataDiscovery):
                 ruleId = rucioClient.add_replication_rule(
                     dids=[containerDid], copies=copies, rse_expression=RSE_EXPRESSION,
                     grouping=grouping, weight=WEIGHT, lifetime=LIFETIME, account=ACCOUNT,
-                    activity='Analysis Input', comment='Staged from tape for %s' % self.username,
+                    activity='Analysis Input',
+                    comment=f"Recall {recallSize} for user: {self.username} dataset: {dbsDatasetName}",
                     ask_approval=ASK_APPROVAL, asynchronous=True)
             except DuplicateRule as ex:
                 # handle "A duplicate rule for this account, did, rse_expression, copies already exists"
@@ -196,10 +200,10 @@ class DBSDataDiscovery(DataDiscovery):
                 ruleId = rucioClient.list_did_rules(myScope, containerName)
             except (InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage) as ex:
                 msg = "\nNot enough global quota to issue a tape recall request. Rucio exception:\n%s" % str(ex)
-                raise TaskWorkerException(msg)
+                raise TaskWorkerException(msg) from ex
             except Exception as ex:
                 msg += "\nRucio exception creating rule: %s" %  str(ex)
-                raise TaskWorkerException(msg)
+                raise TaskWorkerException(msg) from ex
             ruleId = str(ruleId[0])  # from list to singleId and remove unicode
 
             msg += "\nA disk replica has been requested to Rucio (rule ID: %s )" % ruleId
@@ -226,7 +230,7 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\nStoring of %s status and ruleId (%s) failed for task %s" % (
                     tapeRecallStatus, ruleId, self.taskName)
                 msg += "\nHTTP Headers are: %s" % hte.headers
-                raise TaskWorkerException(msg, retry=True)
+                raise TaskWorkerException(msg, retry=True) from hte
             if tapeRecallStatusSet[2] == "OK":
                 self.logger.info("Status for task %s set to '%s'", self.taskName, tapeRecallStatus)
             if automaticTapeRecallIsImplemented:
@@ -309,7 +313,9 @@ class DBSDataDiscovery(DataDiscovery):
         except DBSReaderError as dbsexc:
             # dataset not found in DBS is a known use case
             if str(dbsexc).find('No matching data'):
-                raise TaskWorkerException("CRAB could not find dataset %s in this DBS instance: %s" % inputDataset, dbsurl)
+                raise TaskWorkerException(
+                    "CRAB could not find dataset %s in this DBS instance: %s" % inputDataset, dbsurl
+                ) from dbsexc
             raise
         ## Create a map for block's locations: for each block get the list of locations.
         ## Note: listFileBlockLocation() gets first the locations from PhEDEx, and if no
@@ -377,7 +383,7 @@ class DBSDataDiscovery(DataDiscovery):
                         "CRAB server could not get file locations from DBS for a USER dataset.\n"+\
                         "This is could be a temporary DBS glitch, please try to submit a new task (resubmit will not work)"+\
                         " and contact the experts if the error persists.\nError reason: %s" % str(ex)
-                    )
+                    ) from ex
             else:
                 # datasets other than USER *must* be in Rucio
                 raise TaskWorkerException(
@@ -396,7 +402,7 @@ class DBSDataDiscovery(DataDiscovery):
                         "CRAB server could not get file locations from DBS for secondary dataset of USER tier.\n"+\
                         "This is could be a temporary DBS glitch, please try to submit a new task (resubmit will not work)"+\
                         " and contact the experts if the error persists.\nError reason: %s" % str(ex)
-                    )
+                    ) from ex
             else:
                 self.logger.info("Trying data location of secondary dataset blocks with Rucio")
                 secondaryLocationsMap = {}
@@ -513,14 +519,17 @@ class DBSDataDiscovery(DataDiscovery):
                 kwargs['task']['tm_use_parent'] = 1
         except Exception as ex: #TODO should we catch HttpException instead?
             self.logger.exception(ex)
-            raise TaskWorkerException("The CRAB3 server backend could not contact DBS to get the files details (Lumis, events, etc).\n"+\
-                                "This is could be a temporary DBS glitch. Please try to submit a new task (resubmit will not work)"+\
-                                " and contact the experts if the error persists.\nError reason: %s" % str(ex))
+            raise TaskWorkerException(
+                "The CRAB3 server backend could not contact DBS to get the files details (Lumis, events, etc).\n"+\
+                "This is could be a temporary DBS glitch. Please try to submit a new task (resubmit will not work)"+\
+                " and contact the experts if the error persists.\nError reason: %s" % str(ex)
+            ) from ex
         if not filedetails:
-            raise TaskWorkerException(("Cannot find any file inside the dataset. Please, check your dataset in DAS, %s.\n" +\
-                                "Aborting submission. Resubmitting your task will not help.") %\
-                                ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") %\
-                                (self.dbsInstance, inputDataset))
+            raise TaskWorkerException(
+                ("Cannot find any file inside the dataset. Please, check your dataset in DAS\n%s\n" +
+                 "Aborting submission. Resubmitting your task will not help.") %
+                ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s" % (self.dbsInstance, inputDataset))
+            )
 
         ## Format the output creating the data structures required by WMCore. Filters out invalid files,
         ## files whose block has no location, and figures out the PSN
