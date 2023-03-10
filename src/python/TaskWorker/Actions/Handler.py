@@ -79,15 +79,15 @@ class TaskHandler(object):
         try:
             output = work.execute(nextinput, task=self._task, tempDir=self.tempDir)
         except TapeDatasetException as tde:
-            raise TapeDatasetException(str(tde))
+            raise TapeDatasetException(str(tde)) from tde
         except TaskWorkerException as twe:
-            self.logger.debug(str(traceback.format_exc())) #print the stacktrace only in debug mode
-            raise WorkerHandlerException(str(twe), retry=twe.retry) #TaskWorker error, do not add traceback to the error propagated to the REST
+            self.logger.debug(str(traceback.format_exc()))  # print the stacktrace only in debug mode
+            raise WorkerHandlerException(str(twe), retry=twe.retry) from twe  # TaskWorker error, do not add traceback
         except Exception as exc:
             msg = "Problem handling %s because of %s failure, traceback follows\n" % (self.taskname, str(exc))
             msg += str(traceback.format_exc())
             self.logger.error(msg)
-            raise WorkerHandlerException(msg) #Errors not foreseen. Print everything!
+            raise WorkerHandlerException(msg) from exc  # Errors not foreseen. Print everything!
         finally:
             #TODO: we need to do that also in Worker.py otherwise some messages might only be in the TW file but not in the crabcache.
             logpath = self.config.TaskWorker.logsDir+'/tasks/%s/%s.log' % (self._task['tm_username'], self.taskname)

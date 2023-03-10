@@ -67,7 +67,7 @@ class RucioDataDiscovery(DataDiscovery):
         except Exception as ex:
             # dataset not found is a known use case
             if str(ex).find('No Dids found'):
-                raise TaskWorkerException(f"Did not find container {rucioContainer} in scope {rucioScope}:")
+                raise TaskWorkerException(f"Did not find container {rucioContainer} in scope {rucioScope}:") from ex
             raise
         if not blocks:
             raise TaskWorkerException(f"Rucio DID {rucioScope}:{rucioContainer} not existing or empty")
@@ -92,9 +92,9 @@ class RucioDataDiscovery(DataDiscovery):
                 for item in response:
                     if 'T2_UA_KIPT' in item['rse']:
                         continue  # skip Ucrainan T2 until further notice
-                    if 'Tape' in rse:
+                    if 'Tape' in item['rse']:
                         continue  # skip tape locations
-                    if 'T3_CH_CERN_OpenData' in rse:
+                    if 'T3_CH_CERN_OpenData' in item['rse']:
                         continue  # ignore OpenData until it is accessible by CRAB
                     if item['state'].upper() == 'AVAILABLE':  # means all files in the block are on disk
                         replicas.add(item['rse'])

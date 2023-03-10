@@ -258,7 +258,7 @@ class DataWorkflow(object):
             #just one row is picked up by the previous query
             row = self.Task.ID_tuple(*next(row))
         except StopIteration:
-            raise ExecutionError("Impossible to find task %s in the database." % workflow)
+            raise ExecutionError("Impossible to find task %s in the database." % workflow) from StopIteration
 
         submissionTime = getEpochFromDBTime(row.start_time)
 
@@ -384,7 +384,7 @@ class DataWorkflow(object):
             #just one row is picked up by the previous query
             row = self.Task.ID_tuple(*next(row))
         except StopIteration:
-            raise ExecutionError("Impossible to find task %s in the database." % workflow)
+            raise ExecutionError("Impossible to find task %s in the database." % workflow) from StopIteration
         warnings = literal_eval(row.task_warnings.read() if row.task_warnings else '[]') #there should actually is a default, but just in case
         if killwarning:
             warnings += [killwarning]

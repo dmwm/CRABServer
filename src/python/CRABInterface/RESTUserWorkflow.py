@@ -126,7 +126,7 @@ class RESTUserWorkflow(RESTEntity):
             msg = "Invalid CRAB configuration parameter %s." % (param)
             msg += " The combined string '%s-%s<%s>' should not have more than 166 characters" % (group_user_prefix, extrastr, param)
             msg += " and should match the regular expression %s" % (userProcDSParts['publishdataname'])
-            raise InvalidParameter(msg)
+            raise InvalidParameter(msg) from AssertionError
 
 
     ## Basically copy and pasted from _checkPublishDataName which will be eventually removed
@@ -178,7 +178,7 @@ class RESTUserWorkflow(RESTEntity):
             msg = "Invalid CRAB configuration parameter %s." % (param)
             msg += " The combined string '%s-%s<%s>' should not have more than 166 characters" % (username, extrastr, param)
             msg += " and should match the regular expression %s" % (userProcDSParts['publishdataname'])
-            raise InvalidParameter(msg)
+            raise InvalidParameter(msg) from AssertionError
 
 
     @staticmethod
@@ -205,7 +205,7 @@ class RESTUserWorkflow(RESTEntity):
             msg = "Invalid 'primarydataset' parameter."
             msg += " The parameter should not have more than 99 characters"
             msg += " and should match the regular expression [a-zA-Z][a-zA-Z0-9\-_]*"
-            raise InvalidParameter(msg)
+            raise InvalidParameter(msg) from AssertionError
 
 
     def _checkASODestination(self, site):
@@ -370,7 +370,7 @@ class RESTUserWorkflow(RESTEntity):
                     if not RX_RUCIOSCOPE.match(scope):
                         raise InvalidParameter(f"Invalid Rucio scope: {scope}")
                     if not RX_DATASET.match(containerName):
-                        raise InvalidParameter(f"Invalid dataset name: {dataset}")
+                        raise InvalidParameter(f"Invalid dataset name: {containerName}")
                 else:
                     validate_str("inputdata", param, safe, RX_DATASET, optional=True)
             else:
