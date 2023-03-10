@@ -4,7 +4,6 @@ import time
 import logging
 import tempfile
 import traceback
-from http.client import HTTPException
 
 from RESTInteractions import CRABRest
 from RucioUtils import getNativeRucioClient
@@ -20,6 +19,7 @@ from TaskWorker.Actions.MakeFakeFileSet import MakeFakeFileSet
 from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
 from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
 from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
+from TaskWorker.Actions.RucioDataDiscovery import RucioDataDiscovery
 from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
 from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException, TaskWorkerException
 
@@ -79,15 +79,15 @@ class TaskHandler(object):
         try:
             output = work.execute(nextinput, task=self._task, tempDir=self.tempDir)
         except TapeDatasetException as tde:
-            raise TapeDatasetException(str(tde))
+            raise TapeDatasetException(str(tde)) from tde
         except TaskWorkerException as twe:
-            self.logger.debug(str(traceback.format_exc())) #print the stacktrace only in debug mode
-            raise WorkerHandlerException(str(twe), retry=twe.retry) #TaskWorker error, do not add traceback to the error propagated to the REST
+            self.logger.debug(str(traceback.format_exc()))  # print the stacktrace only in debug mode
+            raise WorkerHandlerException(str(twe), retry=twe.retry) from twe  # TaskWorker error, do not add traceback
         except Exception as exc:
             msg = "Problem handling %s because of %s failure, traceback follows\n" % (self.taskname, str(exc))
             msg += str(traceback.format_exc())
             self.logger.error(msg)
-            raise WorkerHandlerException(msg) #Errors not foreseen. Print everything!
+            raise WorkerHandlerException(msg) from exc  # Errors not foreseen. Print everything!
         finally:
             #TODO: we need to do that also in Worker.py otherwise some messages might only be in the TW file but not in the crabcache.
             logpath = self.config.TaskWorker.logsDir+'/tasks/%s/%s.log' % (self._task['tm_username'], self.taskname)
@@ -157,6 +157,8 @@ def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
     if task['tm_job_type'] == 'Analysis':
         if task.get('tm_user_files'):
             handler.addWork(UserDataDiscovery(config=config, crabserver=crabserver, procnum=procnum))
+        elif ':' in task.get('tm_input_dataset'):  # Rucio DID is scope:name
+            handler.addWork(RucioDataDiscovery(config=config, crabserver=crabserver, procnum=procnum, rucioClient=rucioClient))
         else:
             handler.addWork(DBSDataDiscovery(config=config, crabserver=crabserver, procnum=procnum, rucioClient=rucioClient))
     elif task['tm_job_type'] == 'PrivateMC':

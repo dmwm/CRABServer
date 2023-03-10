@@ -18,7 +18,7 @@ from CRABInterface.RESTExtensions import authz_owner_match
 from CRABInterface.Regexps import (RX_TASKNAME, RX_ACTIVITY, RX_JOBTYPE, RX_GENERATOR, RX_LUMIEVENTS, RX_CMSSW, RX_ARCH, RX_DATASET,
     RX_CMSSITE, RX_SPLIT, RX_CACHENAME, RX_CACHEURL, RX_LFN, RX_USERFILE, RX_VOPARAMS, RX_DBSURL, RX_LFNPRIMDS, RX_OUTFILES,
     RX_RUNS, RX_LUMIRANGE, RX_SCRIPTARGS, RX_SCHEDD_NAME, RX_COLLECTOR, RX_SUBRESTAT, RX_JOBID, RX_ADDFILE,
-    RX_ANYTHING, RX_USERNAME, RX_DATE, RX_MANYLINES_SHORT, RX_CUDA_VERSION, RX_BLOCK)
+    RX_ANYTHING, RX_USERNAME, RX_DATE, RX_MANYLINES_SHORT, RX_CUDA_VERSION, RX_BLOCK, RX_RUCIODID, RX_RUCIOSCOPE)
 from CRABInterface.Utilities import CMSSitesCache, conn_handler, getDBinstance, validate_dict
 from ServerUtilities import checkOutLFN, generateTaskName
 
@@ -126,7 +126,7 @@ class RESTUserWorkflow(RESTEntity):
             msg = "Invalid CRAB configuration parameter %s." % (param)
             msg += " The combined string '%s-%s<%s>' should not have more than 166 characters" % (group_user_prefix, extrastr, param)
             msg += " and should match the regular expression %s" % (userProcDSParts['publishdataname'])
-            raise InvalidParameter(msg)
+            raise InvalidParameter(msg) from AssertionError
 
 
     ## Basically copy and pasted from _checkPublishDataName which will be eventually removed
@@ -178,7 +178,7 @@ class RESTUserWorkflow(RESTEntity):
             msg = "Invalid CRAB configuration parameter %s." % (param)
             msg += " The combined string '%s-%s<%s>' should not have more than 166 characters" % (username, extrastr, param)
             msg += " and should match the regular expression %s" % (userProcDSParts['publishdataname'])
-            raise InvalidParameter(msg)
+            raise InvalidParameter(msg) from AssertionError
 
 
     @staticmethod
@@ -205,7 +205,7 @@ class RESTUserWorkflow(RESTEntity):
             msg = "Invalid 'primarydataset' parameter."
             msg += " The parameter should not have more than 99 characters"
             msg += " and should match the regular expression [a-zA-Z][a-zA-Z0-9\-_]*"
-            raise InvalidParameter(msg)
+            raise InvalidParameter(msg) from AssertionError
 
 
     def _checkASODestination(self, site):
@@ -362,7 +362,17 @@ class RESTUserWorkflow(RESTEntity):
             ## we can uncomment the 1st line below and delete the next 4 lines.
             #validate_str("inputdata", param, safe, RX_DATASET, optional=True)
             if safe.kwargs['jobtype'] == 'Analysis' and not safe.kwargs['userfiles'] and 'inputdata' in param.kwargs:
-                validate_str("inputdata", param, safe, RX_DATASET, optional=True)
+                inputDataFromRucio = ':' in param.kwargs['inputdata']  # scope:name format
+                if inputDataFromRucio:
+                    validate_str("inputdata", param, safe, RX_RUCIODID, optional=True)
+                    scope = safe.kwargs["inputdata"].split(':')[0]
+                    containerName = safe.kwargs["inputdata"].split(':')[1]
+                    if not RX_RUCIOSCOPE.match(scope):
+                        raise InvalidParameter(f"Invalid Rucio scope: {scope}")
+                    if not RX_DATASET.match(containerName):
+                        raise InvalidParameter(f"Invalid dataset name: {containerName}")
+                else:
+                    validate_str("inputdata", param, safe, RX_DATASET, optional=True)
             else:
                 validate_str("inputdata", param, safe, RX_ANYTHING, optional=True)
 
@@ -371,7 +381,10 @@ class RESTUserWorkflow(RESTEntity):
             ## the LFN of the output/log files and for publication. We want to have it well
             ## defined even if publication and/or transfer to storage are off.
             if safe.kwargs['inputdata']:
-                param.kwargs['primarydataset'] = safe.kwargs['inputdata'].split('/')[1]
+                if inputDataFromRucio:
+                    param.kwargs['primarydataset'] = containerName.split('/')[1]
+                else:
+                    param.kwargs['primarydataset'] = safe.kwargs['inputdata'].split('/')[1]
             if not param.kwargs.get('primarydataset', None):
                 if safe.kwargs['jobtype'] == 'PrivateMC':
                     param.kwargs['primarydataset'] = "CRAB_PrivateMC"
@@ -559,6 +572,11 @@ class RESTUserWorkflow(RESTEntity):
            :arg str extrajdl: extra Job Description Language parameters to be added.
            :arg str collector: Collector Name used for debugging.
            :arg int dryrun: enable dry run mode (initialize but do not submit request).
+           :arg str ignoreglobalblacklist: flag to ignore site blacklist from SiteSupport
+           :arg str partialdataset: to submit even if dataset is partially on disk
+           :arg str requireaccelerator: to require jobs to run on CPU with hardwre accelerators
+           :arg dict acceleratorparams: key:value pairs to define which exact accelerators
+           :arg str list inputblocks: the blocks to process instead of the full dataset
            :returns: a dict which contaians details of the request"""
 
         user_config = {
