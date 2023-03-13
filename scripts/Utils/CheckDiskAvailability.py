@@ -1,7 +1,36 @@
 #
 import argparse
-# ensure environment
 import os
+import subprocess
+import json
+
+def createBlockMaps(locationsMap={}, blackList=[]):
+    # creates 2 maps: nReplicas-->nBlocks and rse-->nBlocks
+    # locationsMap is a dictionary {block:[replica1, replica2..]}
+    nbFORnr = {}
+    nbFORnr[0] = 0  # this will not be filled in the loop if every block has locations
+    nbFORrse = {}
+    for block in locationsMap:
+        replicas = locationsMap[block]
+        if replicas:
+            for rse in replicas.copy():
+                if rse in blackList:
+                    replicas.remove(rse)
+            try:
+                nbFORnr[len(replicas)] += 1
+            except:
+                nbFORnr[len(replicas)] = 1
+            for rse in locationsMap[block]:
+                try:
+                    nbFORrse[rse] += 1
+                except:
+                    nbFORrse[rse] = 1
+        else:
+            nbFORnr[0] += 1
+    return (nbFORnr, nbFORrse)
+
+
+# ensure environment
 if os.getenv("CMSSW_BASE"):
     print("Must use a shell w/o CMSSW environent")
     exit()
@@ -43,6 +72,15 @@ else:
     print(f"dataset has {len(blocks)} blocks")
 
 # OK. Real work starts here
+# let's makle a list of sites where CRAB will not run
+usableSitesUrl = 'https://cmssst.web.cern.ch/cmssst/analysis/usableSites.json'
+result = subprocess.run(f"curl -s {usableSitesUrl}", shell=True, stdout=subprocess.PIPE)
+usableSites = json.loads(result.stdout.decode('utf-8'))
+blackListedSites=[]
+for site in usableSites:
+    if 'value' in site and site['value'] == 'not_usable':
+        blackListedSites.append(site['name'])
+
 
 # following loop is copied from CRAB DBSDataDiscovery
 # locationsMap is a dictionary: key=blockName, value=list of RSEs}
@@ -72,33 +110,47 @@ for blockName in blocks:
             continue  # ignore OpenData until it is accessible by CRAB
         if item['state'].upper() == 'AVAILABLE':  # means all files in the block are on disk
             replicas.add(item['rse'])
-    if replicas:  # only fill map for blocks which have at least one location
-        locationsMap[blockName] = replicas
-        try:
-            nbFORnr[len(replicas)] += 1
-        except:
-            nbFORnr[len(replicas)] = 1
-        for rse in replicas:
-            try:
-                nbFORrse[rse] +=1
-            except:
-                nbFORrse[rse] = 1
-    else:
-        nbFORnr[0] += 1
-print()
+    locationsMap[blockName] = replicas
+
+(nbFORnr, nbFORrse) = createBlockMaps(locationsMap=locationsMap, blackList=[])
 
 # this should be rewritten as a series of print, no need to create a msg
 print(f"dataset has {len(locationsMap)} available blocks")
 msg = ""
 for nr in sorted(list(nbFORnr.keys())):
     msg += f"\n {nbFORnr[nr]:3} blocks have {nr:2} disk replicas"
+    if nr == 0 and nbFORnr[0]>0:
+        msg += " *THESE BLOCKS WILL NOT BE ACCESSIBLE*"
 if not nbFORnr[0]:
     msg += f"\n Dataset is fully available on disk\n"
 msg += f"\n Site location"
 for rse in nbFORrse.keys():
     msg += f"\n {rse:15} hosts {nbFORrse[rse]:3} blocks"
+    if rse in blackListedSites:
+        msg += "  *SITE BLACKLISTED IN CRAB*"
 msg += f"\n "
 print(msg)
+
+print("NOW APPLY CRAB SITE BLACKLIST")
+(nbFORnr, nbFORrse) = createBlockMaps(locationsMap=locationsMap, blackList=blackListedSites)
+
+#print(f"dataset has {len(locationsMap)} available blocks")
+msg = ""
+for nr in sorted(list(nbFORnr.keys())):
+    msg += f"\n {nbFORnr[nr]:3} blocks have {nr:2} disk replicas"
+    if nr == 0 and nbFORnr[0]>0:
+        msg += " *THESE BLOCKS WILL NOT BE ACCESSIBLE*"
+if not nbFORnr[0]:
+    msg += f"\n Dataset is fully available on disk\n"
+msg += f"\n Site location"
+for rse in nbFORrse.keys():
+    msg += f"\n {rse:15} hosts {nbFORrse[rse]:3} blocks"
+    if rse in blackListedSites:
+        msg += "  *SITE BLACKLISTED IN CRAB*"
+msg += f"\n "
+print(msg)
+
+
 
 print("Rules on this dataset:")
 rule_gens=rucio.list_did_rules(scope=scope, name=dbsDataset)
@@ -110,3 +162,4 @@ if rules:
         print(pattern.format(r['id'],r['account'],r['state'], str(r['expires_at']), r['rse_expression']))
 else:
     print("NONE")
+
