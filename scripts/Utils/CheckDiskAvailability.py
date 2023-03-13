@@ -1,9 +1,19 @@
-
+#
 import argparse
-
-from rucio.client import Client
+# ensure environment
+import os
+if os.getenv("CMSSW_BASE"):
+    print("Must use a shell w/o CMSSW environent")
+    exit()
+try:
+    from rucio.client import Client
+except ModuleNotFoundError:
+    print("Setup Rucio first via:\n source /cvmfs/cms.cern.ch/rucio/setup-py3.sh; export RUCIO_ACCOUNT=`whoami`")
+    exit()
+# make sure Rucio client is initialized
 rucio = Client()
 
+# get name of object to test and check what it is
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', help='DBS dataset (or block) name, or Rucio DID (scope:name)', required=True)
 args = parser.parse_args()
@@ -32,8 +42,14 @@ else:
     blocks = [ds['name'] for ds in dss]
     print(f"dataset has {len(blocks)} blocks")
 
+# OK. Real work starts here
+
+# following loop is copied from CRAB DBSDataDiscovery
 # locationsMap is a dictionary: key=blockName, value=list of RSEs}
 # nbFORnr is dictionary: key= number of RSEs with a block, value=number of blocks with that # or RSEs
+# nbFORrse is a dictionary: key=RSEname, value=number of blocks available at that RSE
+# this should be rewritten so that the two dicionaries are filled via a separate loop on
+# locationsMap content. Makes it easier to read, debug, improve
 locationsMap = {}
 nbFORnr = {}
 nbFORnr[0] = 0  # this will not be filled in the loop if every block has locations
@@ -71,6 +87,7 @@ for blockName in blocks:
         nbFORnr[0] += 1
 print()
 
+# this should be rewritten as a series of print, no need to create a msg
 print(f"dataset has {len(locationsMap)} available blocks")
 msg = ""
 for nr in sorted(list(nbFORnr.keys())):
