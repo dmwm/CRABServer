@@ -28,7 +28,7 @@ nbFORrse = {}
 nb=0
 for blockName in blocks:
     nb += 1
-    print(f'  block: {nb}',end='\r')
+    print(f'  block: {nb}', end='\r')
     replicas = set()
     response = rucio.list_dataset_replicas(scope=scope, name=blockName, deep=True)
     for item in response:
@@ -62,8 +62,21 @@ msg = "\n"
 for nr in sorted(list(nbFORnr.keys())):
     msg += f"\n {nbFORnr[nr]:3} blocks have {nr:2} disk replicas"
 msg += f"\n "
+if not nbFORnr[0]:
+    msg += f"\n Dataset is fully available on disk\n"
 msg += f"\n Site location"
 for rse in nbFORrse.keys():
     msg += f"\n {rse:15} hosts {nbFORrse[rse]:3} blocks"
 msg += f"\n "
 print(msg)
+
+print("Rules on this dataset:")
+rule_gens=rucio.list_did_rules(scope='cms', name=dbsDataset)
+rules = list(rule_gens)
+if rules:
+    pattern = '{:^32}{:^20}{:^10}{:^12}{:^20}'
+    print(pattern.format('ID','account','state','expiration','RSEs'))
+    for r in rules:
+        print(pattern.format(r['id'],r['account'],r['state'], str(r['expires_at']), r['rse_expression']))
+else:
+    print("NONE")
