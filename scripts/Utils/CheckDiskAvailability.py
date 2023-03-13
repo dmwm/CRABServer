@@ -1,36 +1,67 @@
-
+#
 import argparse
+# ensure environment
+import os
+if os.getenv("CMSSW_BASE"):
+    print("Must use a shell w/o CMSSW environent")
+    exit()
+try:
+    from rucio.client import Client
+except ModuleNotFoundError:
+    print("Setup Rucio first via:\n source /cvmfs/cms.cern.ch/rucio/setup-py3.sh; export RUCIO_ACCOUNT=`whoami`")
+    exit()
+# make sure Rucio client is initialized
+rucio = Client()
 
-from rucio.client import Client
-rucio=Client()
-
+# get name of object to test and check what it is
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', help='DBS dataset name', required=True)
+parser.add_argument('--dataset', help='DBS dataset (or block) name, or Rucio DID (scope:name)', required=True)
 args = parser.parse_args()
-dbsDataset = args.dataset
 
-print(f"Checking disk availability of dataset: {dbsDataset}")
-print(" only blocks fully replicated are listed ")
+if ':' in args.dataset:
+    scope = args.dataset.split(':')[0]
+    dbsDataset = args.dataset.split(':')[1]
+    datasetKind = 'Container'
+else:
+    scope = 'cms'
+    dbsDataset = args.dataset
+    datasetKind = 'Container'
+if scope == 'cms':
+    print(f"Checking disk availability of dataset: {dbsDataset}")
+else:
+    print(f"Checking disk availability of container: {args.dataset}")
+if scope != 'cms':
+    print(" container in USER scope. Assume it contains datasets(blocks) in CMS scope")
+print(" only fully available (i.e. complete) block replicas are considered ")
 
-scope = 'cms'
-dss = rucio.list_content(scope, dbsDataset)
-blocks = [ds['name'] for ds in dss]
+if '#' in dbsDataset:
+    print("Input is a DBS-block (Rucio-dataset) will check that one")
+    blocks=[dbsDataset]
+else:
+    dss = rucio.list_content(scope, dbsDataset)
+    blocks = [ds['name'] for ds in dss]
+    print(f"dataset has {len(blocks)} blocks")
 
+# OK. Real work starts here
 
+# following loop is copied from CRAB DBSDataDiscovery
 # locationsMap is a dictionary: key=blockName, value=list of RSEs}
 # nbFORnr is dictionary: key= number of RSEs with a block, value=number of blocks with that # or RSEs
+# nbFORrse is a dictionary: key=RSEname, value=number of blocks available at that RSE
+# this should be rewritten so that the two dicionaries are filled via a separate loop on
+# locationsMap content. Makes it easier to read, debug, improve
 locationsMap = {}
 nbFORnr = {}
 nbFORnr[0] = 0  # this will not be filled in the loop if every block has locations
 nbFORrse = {}
 
-#pbar = tqdm.tqdm(total=len(blocks))
+print("Checking blocks availabiliyt on disk...")
 nb=0
 for blockName in blocks:
     nb += 1
     print(f'  block: {nb}', end='\r')
     replicas = set()
-    response = rucio.list_dataset_replicas(scope=scope, name=blockName, deep=True)
+    response = rucio.list_dataset_replicas(scope='cms', name=blockName, deep=True)
     for item in response:
         #print(f"{blockName}...")
         if 'T2_UA_KIPT' in item['rse']:
@@ -54,14 +85,13 @@ for blockName in blocks:
                 nbFORrse[rse] = 1
     else:
         nbFORnr[0] += 1
-#    pbar.update()
 print()
 
-print(f"dataset has {len(locationsMap)} blocks")
-msg = "\n"
+# this should be rewritten as a series of print, no need to create a msg
+print(f"dataset has {len(locationsMap)} available blocks")
+msg = ""
 for nr in sorted(list(nbFORnr.keys())):
     msg += f"\n {nbFORnr[nr]:3} blocks have {nr:2} disk replicas"
-msg += f"\n "
 if not nbFORnr[0]:
     msg += f"\n Dataset is fully available on disk\n"
 msg += f"\n Site location"
@@ -71,10 +101,10 @@ msg += f"\n "
 print(msg)
 
 print("Rules on this dataset:")
-rule_gens=rucio.list_did_rules(scope='cms', name=dbsDataset)
+rule_gens=rucio.list_did_rules(scope=scope, name=dbsDataset)
 rules = list(rule_gens)
 if rules:
-    pattern = '{:^32}{:^20}{:^10}{:^12}{:^20}'
+    pattern = '{:^32}{:^20}{:^10}{:^20}{:^30}'
     print(pattern.format('ID','account','state','expiration','RSEs'))
     for r in rules:
         print(pattern.format(r['id'],r['account'],r['state'], str(r['expires_at']), r['rse_expression']))
