@@ -4,6 +4,40 @@ import os
 import subprocess
 import json
 
+def main():
+    rucio = ensure_environment()
+    scope, dataset, blocks = get_inputs(rucio)
+    blackListedSites = get_crab_blacklist()
+    nBlocks = len(blocks)
+    print("Checking blocks availabiliyt on disk ...")
+    locationsMap = create_locations_map(blocks, rucio)
+    (nbFORnr, nbFORrse) = createBlockMaps(locationsMap=locationsMap, blackList=[])
+    print_blocks_per_replica_map(nbFORnr)
+
+    print("\n Block locations:")
+    for rse in nbFORrse.keys():
+        msg = f" {rse:15} hosts {nbFORrse[rse]:3} blocks"
+        if rse in blackListedSites:
+            msg += "  *SITE BLACKLISTED IN CRAB*"
+        print(msg)
+    print("")
+
+    print("AFTER APPLYING CRAB SITE BLACKLIST:")
+    (nbFORnr, nbFORrse) = createBlockMaps(locationsMap=locationsMap, blackList=blackListedSites)
+    print_blocks_per_replica_map(nbFORnr)
+
+    print("\nRules on this dataset:")
+    rule_gens=rucio.list_did_rules(scope=scope, name=dataset)
+    rules = list(rule_gens)
+    if rules:
+        pattern = '{:^32}{:^20}{:^10}{:^20}{:^30}'
+        print(pattern.format('ID','account','state','expiration','RSEs'))
+        for r in rules:
+            print(pattern.format(r['id'],r['account'],r['state'], str(r['expires_at']), r['rse_expression']))
+    else:
+        print("NONE")
+
+
 def createBlockMaps(locationsMap={}, blackList=[]):
     # creates 2 maps: nReplicas-->nBlocks and rse-->nBlocks
     # locationsMap is a dictionary {block:[replica1, replica2..]}
@@ -30,136 +64,109 @@ def createBlockMaps(locationsMap={}, blackList=[]):
     return (nbFORnr, nbFORrse)
 
 
-# ensure environment
-if os.getenv("CMSSW_BASE"):
-    print("Must use a shell w/o CMSSW environent")
-    exit()
-try:
-    from rucio.client import Client
-except ModuleNotFoundError:
-    print("Setup Rucio first via:\n source /cvmfs/cms.cern.ch/rucio/setup-py3.sh; export RUCIO_ACCOUNT=`whoami`")
-    exit()
-# make sure Rucio client is initialized
-rucio = Client()
-
-# get name of object to test and check what it is
-parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', help='DBS dataset (or block) name, or Rucio DID (scope:name)', required=True)
-args = parser.parse_args()
-
-if ':' in args.dataset:
-    scope = args.dataset.split(':')[0]
-    dbsDataset = args.dataset.split(':')[1]
-    datasetKind = 'Container'
-else:
-    scope = 'cms'
-    dbsDataset = args.dataset
-    datasetKind = 'Container'
-if scope == 'cms':
-    print(f"Checking disk availability of dataset: {dbsDataset}")
-else:
-    print(f"Checking disk availability of container: {args.dataset}")
-if scope != 'cms':
-    print(" container in USER scope. Assume it contains datasets(blocks) in CMS scope")
-print(" only fully available (i.e. complete) block replicas are considered ")
-
-if '#' in dbsDataset:
-    print("Input is a DBS-block (Rucio-dataset) will check that one")
-    blocks=[dbsDataset]
-else:
-    dss = rucio.list_content(scope, dbsDataset)
-    blocks = [ds['name'] for ds in dss]
-    print(f"dataset has {len(blocks)} blocks")
-
-# OK. Real work starts here
-# let's makle a list of sites where CRAB will not run
-usableSitesUrl = 'https://cmssst.web.cern.ch/cmssst/analysis/usableSites.json'
-result = subprocess.run(f"curl -s {usableSitesUrl}", shell=True, stdout=subprocess.PIPE)
-usableSites = json.loads(result.stdout.decode('utf-8'))
-blackListedSites=[]
-for site in usableSites:
-    if 'value' in site and site['value'] == 'not_usable':
-        blackListedSites.append(site['name'])
+def ensure_environment():
+    if os.getenv("CMSSW_BASE"):
+        print("Must use a shell w/o CMSSW environent")
+        exit()
+    try:
+        from rucio.client import Client
+    except ModuleNotFoundError:
+        print("Setup Rucio first via:\n source /cvmfs/cms.cern.ch/rucio/setup-py3.sh; export RUCIO_ACCOUNT=`whoami`")
+        exit()
+    # make sure Rucio client is initialized
+    rucio = Client()
+    return(rucio)
 
 
-# following loop is copied from CRAB DBSDataDiscovery
-# locationsMap is a dictionary: key=blockName, value=list of RSEs}
-# nbFORnr is dictionary: key= number of RSEs with a block, value=number of blocks with that # or RSEs
-# nbFORrse is a dictionary: key=RSEname, value=number of blocks available at that RSE
-# this should be rewritten so that the two dicionaries are filled via a separate loop on
-# locationsMap content. Makes it easier to read, debug, improve
-locationsMap = {}
-nbFORnr = {}
-nbFORnr[0] = 0  # this will not be filled in the loop if every block has locations
-nbFORrse = {}
+def get_inputs(rucio):
+    # get name of object to test and check what it is
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', help='DBS dataset (or block) name, or Rucio DID (scope:name)', required=True)
+    args = parser.parse_args()
 
-print("Checking blocks availabiliyt on disk...")
-nb=0
-for blockName in blocks:
-    nb += 1
-    print(f'  block: {nb}', end='\r')
-    replicas = set()
-    response = rucio.list_dataset_replicas(scope='cms', name=blockName, deep=True)
-    for item in response:
-        #print(f"{blockName}...")
-        if 'T2_UA_KIPT' in item['rse']:
-            continue  # skip Ucrainan T2 until further notice
-        if 'Tape' in item['rse']:
-            continue  # skip tape locations
-        if 'T3_CH_CERN_OpenData' in item['rse']:
-            continue  # ignore OpenData until it is accessible by CRAB
-        if item['state'].upper() == 'AVAILABLE':  # means all files in the block are on disk
-            replicas.add(item['rse'])
-    locationsMap[blockName] = replicas
+    if ':' in args.dataset:
+        scope = args.dataset.split(':')[0]
+        dataset = args.dataset.split(':')[1]
+        datasetKind = 'Container'
+    else:
+        scope = 'cms'
+        dataset = args.dataset
+        datasetKind = 'Container'
+    if scope == 'cms':
+        print(f"Checking disk availability of dataset: {dataset}")
+    else:
+        print(f"Checking disk availability of container: {args.dataset}")
+    if scope != 'cms':
+        print(" container in USER scope. Assume it contains datasets(blocks) in CMS scope")
+    print(" only fully available (i.e. complete) block replicas are considered ")
 
-(nbFORnr, nbFORrse) = createBlockMaps(locationsMap=locationsMap, blackList=[])
-
-# this should be rewritten as a series of print, no need to create a msg
-print(f"dataset has {len(locationsMap)} available blocks")
-msg = ""
-for nr in sorted(list(nbFORnr.keys())):
-    msg += f"\n {nbFORnr[nr]:3} blocks have {nr:2} disk replicas"
-    if nr == 0 and nbFORnr[0]>0:
-        msg += " *THESE BLOCKS WILL NOT BE ACCESSIBLE*"
-if not nbFORnr[0]:
-    msg += f"\n Dataset is fully available on disk\n"
-msg += f"\n Site location"
-for rse in nbFORrse.keys():
-    msg += f"\n {rse:15} hosts {nbFORrse[rse]:3} blocks"
-    if rse in blackListedSites:
-        msg += "  *SITE BLACKLISTED IN CRAB*"
-msg += f"\n "
-print(msg)
-
-print("NOW APPLY CRAB SITE BLACKLIST")
-(nbFORnr, nbFORrse) = createBlockMaps(locationsMap=locationsMap, blackList=blackListedSites)
-
-#print(f"dataset has {len(locationsMap)} available blocks")
-msg = ""
-for nr in sorted(list(nbFORnr.keys())):
-    msg += f"\n {nbFORnr[nr]:3} blocks have {nr:2} disk replicas"
-    if nr == 0 and nbFORnr[0]>0:
-        msg += " *THESE BLOCKS WILL NOT BE ACCESSIBLE*"
-if not nbFORnr[0]:
-    msg += f"\n Dataset is fully available on disk\n"
-msg += f"\n Site location"
-for rse in nbFORrse.keys():
-    msg += f"\n {rse:15} hosts {nbFORrse[rse]:3} blocks"
-    if rse in blackListedSites:
-        msg += "  *SITE BLACKLISTED IN CRAB*"
-msg += f"\n "
-print(msg)
+    # get list of blocks (datasets in Rucio)
+    if '#' in dataset:
+        print("Input is a DBS-block (Rucio-dataset) will check that one")
+        blocks = [dataset]
+    else:
+        dss = rucio.list_content(scope, dataset)
+        blocks = [ds['name'] for ds in dss]
+        print(f"dataset has {len(blocks)} blocks")
+        
+    return (scope, dataset, blocks)
 
 
+def get_crab_blacklist():
+    # let's makle a list of sites where CRAB will not run
+    usableSitesUrl = 'https://cmssst.web.cern.ch/cmssst/analysis/usableSites.json'
+    result = subprocess.run(f"curl -s {usableSitesUrl}", shell=True, stdout=subprocess.PIPE)
+    usableSites = json.loads(result.stdout.decode('utf-8'))
+    blackListedSites=[]
+    for site in usableSites:
+        if 'value' in site and site['value'] == 'not_usable':
+            blackListedSites.append(site['name'])
+    return(blackListedSites)
 
-print("Rules on this dataset:")
-rule_gens=rucio.list_did_rules(scope=scope, name=dbsDataset)
-rules = list(rule_gens)
-if rules:
-    pattern = '{:^32}{:^20}{:^10}{:^20}{:^30}'
-    print(pattern.format('ID','account','state','expiration','RSEs'))
-    for r in rules:
-        print(pattern.format(r['id'],r['account'],r['state'], str(r['expires_at']), r['rse_expression']))
-else:
-    print("NONE")
 
+def create_locations_map(blocks, rucio):
+    # following loop is copied from CRAB DBSDataDiscovery
+    # locationsMap is a dictionary: key=blockName, value=list of RSEs}
+    # nbFORnr is dictionary: key= number of RSEs with a block, value=number of blocks with that # or RSEs
+    # nbFORrse is a dictionary: key=RSEname, value=number of blocks available at that RSE
+    # this should be rewritten so that the two dicionaries are filled via a separate loop on
+    # locationsMap content. Makes it easier to read, debug, improve
+    locationsMap = {}
+    nb=0
+    for blockName in blocks:
+        nb += 1
+        print(f'  block: {nb}', end='\r')
+        replicas = set()
+        response = rucio.list_dataset_replicas(scope='cms', name=blockName, deep=True)
+        for item in response:
+            if 'T2_UA_KIPT' in item['rse']:
+                continue  # skip Ucrainan T2 until further notice
+            if 'Tape' in item['rse']:
+                continue  # skip tape locations
+            if 'T3_CH_CERN_OpenData' in item['rse']:
+                continue  # ignore OpenData until it is accessible by CRAB
+            if item['state'].upper() == 'AVAILABLE':  # means all files in the block are on disk
+                replicas.add(item['rse'])
+        locationsMap[blockName] = replicas
+    print("")
+    return(locationsMap)
+
+
+def print_blocks_per_replica_map(nbFORnr):
+    nBlocks = 0
+    for nr in sorted(list(nbFORnr.keys())):
+        nBlocks += nbFORnr[nr]
+        msg = f" {nbFORnr[nr]:3} blocks have {nr:2} disk replicas"
+        if nr == 0 and nbFORnr[0]>0:
+            msg += " *THESE BLOCKS WILL NOT BE ACCESSIBLE*"
+        print(msg)
+    if not nbFORnr[0]:
+        print(" Dataset is fully available")
+    else:
+        nAvail = nBlocks - nbFORnr[0]
+        print(f" Only {nAvail}/{nBlocks} are available")
+    return
+
+
+if __name__ == '__main__':
+    main()
