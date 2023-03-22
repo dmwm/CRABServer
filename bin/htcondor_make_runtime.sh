@@ -19,6 +19,7 @@ CRABSERVERREPO=dmwm
 
 [[ -d $STARTDIR ]] || mkdir -p $STARTDIR
 
+cp $BASEDIR/../scripts/cmscp.sh $STARTDIR || exit 3
 cp $BASEDIR/../scripts/submit_env.sh $STARTDIR || exit 3
 cp $BASEDIR/../scripts/gWMS-CMSRunAnalysis.sh $STARTDIR || exit 3
 

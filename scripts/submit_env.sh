@@ -22,6 +22,11 @@ save_env() {
 
 }
 
+load_startup_env() {
+    # load the startup environment, as it is saved at the beginning of the job.
+    .  $JOBSTARTDIR/startup_environment.sh
+}
+
 setup_local_env () {
     # when running a job locally, we need to set manually some variables that 
     # are set for us when running on the global pool.
