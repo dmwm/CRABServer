@@ -434,22 +434,11 @@ class DBSDataDiscovery(DataDiscovery):
             secondaryBlocksWithLocation = secondaryLocationsMap.copy().keys()
 
         # filter out TAPE locations
-        # temporary hack until we have a new config. parameter: allow user to accpet a partial dataset
-        # by inserting '0' as (first element of) runRange
-        usePartialDataset = False
-        runRange = kwargs['task']['tm_split_args']['runs']
-        if runRange and runRange[0] == '0':
-            usePartialDataset = True
-            # remove initial '0' from run list
-            # note that it caused an extra entry to be created in lumilis as well
-            kwargs['task']['tm_split_args']['runs'] = kwargs['task']['tm_split_args']['runs'][1:]
-            kwargs['task']['tm_split_args']['lumis'] = kwargs['task']['tm_split_args']['lumis'][1:]
-            runRange = kwargs['task']['tm_split_args']['runs']
-        # or use Data.partialDataset configuration option in client
-        elif kwargs['task']['tm_user_config']['partialdataset']:
-            usePartialDataset = True
-
         self.keepOnlyDiskRSEs(locationsMap)
+
+        # use Data.partialDataset configuration option in client to decide if to recall data on tape
+        usePartialDataset = kwargs['task']['tm_user_config']['partialdataset']
+
         if set(locationsMap.keys()) != set(blocksWithLocation):
             dataTier = inputDataset.split('/')[3]
             maxTierToBlockRecallSizeTB = getattr(self.config.TaskWorker, 'maxTierToBlockRecallSizeTB', 0)
