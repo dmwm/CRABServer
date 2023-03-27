@@ -293,6 +293,7 @@ class DBSDataDiscovery(DataDiscovery):
             self.uploadWarning(msg, self.userproxy, self.taskName)
             self.logger.info(msg)
         secondaryDataset = kwargs['task'].get('tm_secondary_input_dataset', None)
+        runRange = kwargs['task']['tm_split_args']['runs']
 
         # the isUserDataset flag is used to look for data location in DBS instead of Rucio
         isUserDataset = isDatasetUserDataset(inputDataset, self.dbsInstance)
