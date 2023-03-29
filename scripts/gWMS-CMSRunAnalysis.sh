@@ -6,6 +6,13 @@
 # difficult-to-impossible to run.
 #
 
+#
+# We decided that it is cleaner if we do not change the environment in this script
+# If a command needs a different environment, just call it in a subprocess with `time sh script.sh`
+# as we do already for CMSRunAnalysis.sh and cmscp.sh
+# It should not be needed, but in case something goes wrong and you need 
+# 
+
 echo "======== Startup environment - STARTING ========"
 
 # import some auxiliary functions from a script that is intented to be shared
@@ -45,6 +52,7 @@ function chirp_exit_code {
     #instead (which contains the short exit coce)
 
     echo "======== Figuring out long exit code of the job for condor_chirp at $(TZ=GMT date)========"
+
     #check if the command condor_chirp exists
     command -v condor_chirp > /dev/null 2>&1
     if [ $? -ne 0 ]; then
@@ -87,6 +95,13 @@ echo "Local time: $(date)"
 echo "Hostname:   $(hostname -f)"
 echo "System:     $(uname -a)"
 echo "Arguments are $@"
+
+# In the future, we could use condor_chirp to add a classad which records which
+# is the current status of a job. 
+# For example, we could set "bootstrap", "running", "stageout", "finished"
+# We do not do it because we currently have no use for it.
+#echo "======== Attempting to notify HTCondor of job bootstrap ========"
+#condor_chirp set_job_attr_delayed Chirp_CRAB3_Job_Phase bootstrap
 
 # redirect stderr to stdout, so that it all goes to job_out.*, leaving job_err.* empty
 # see https://stackoverflow.com/a/13088401
@@ -163,21 +178,11 @@ then
   exit $EXIT_STATUS
 fi
 
+
+
 echo "======== User application running completed. Prepare env. for stageout ==="
-# from ./submit_env.sh
-setup_cmsset
-
-# from ./submit_env.sh
-setup_python_comp
-
-#echo "======== Attempting to notify HTCondor of file stageout ========"
-# wrong syntax for chirping, also needs a proper classAd name. Keep commented line for a future fix
-#condor_chirp phase output
-
-echo "======== Stageout at $(TZ=GMT date) STARTING ========"
 rm -f wmcore_initialized
-# Note we prevent buffering of stdout/err -- this is due to observed issues in mixing of out/err for stageout plugins
-PYTHONUNBUFFERED=1 $pythonCommand cmscp.py
+time sh ./cmscp.sh
 STAGEOUT_EXIT_STATUS=$?
 
 if [ ! -e wmcore_initialized ];

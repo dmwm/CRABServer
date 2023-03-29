@@ -47,6 +47,7 @@ filesToCopy="$filesToCopy $CRAB_OVERRIDE_SOURCE/CRABServer/scripts/gWMS-CMSRunAn
 filesToCopy="$filesToCopy $CRAB_OVERRIDE_SOURCE/CRABServer/scripts/submit_env.sh"
 filesToCopy="$filesToCopy $CRAB_OVERRIDE_SOURCE/CRABServer/scripts/CMSRunAnalysis.sh"
 filesToCopy="$filesToCopy $CRAB_OVERRIDE_SOURCE/CRABServer/scripts/cmscp.py"
+filesToCopy="$filesToCopy $CRAB_OVERRIDE_SOURCE/CRABServer/scripts/cmscp.sh"
 
 # clean backup of previous Runtime files
 rm -rf  $CRABTASKWORKER_ROOT/data/PreviousRuntime/*
