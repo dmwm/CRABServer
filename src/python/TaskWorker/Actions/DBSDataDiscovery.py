@@ -294,6 +294,7 @@ class DBSDataDiscovery(DataDiscovery):
             self.logger.info(msg)
         secondaryDataset = kwargs['task'].get('tm_secondary_input_dataset', None)
         runRange = kwargs['task']['tm_split_args']['runs']
+        usePartialDataset = kwargs['task']['tm_user_config']['partialdataset']
 
         # the isUserDataset flag is used to look for data location in DBS instead of Rucio
         isUserDataset = isDatasetUserDataset(inputDataset, self.dbsInstance)
@@ -345,9 +346,11 @@ class DBSDataDiscovery(DataDiscovery):
                 scope = "user.%s" % self.username
             self.logger.info("Looking up data location with Rucio in %s scope.", scope)
             locationsMap = {}
+            partialLocationsMap = {}
             try:
                 for blockName in list(blocks):
-                    replicas = set()
+                    partialReplicas = set()
+                    fullReplicas = set()
                     response = self.rucioClient.list_dataset_replicas(scope=scope, name=blockName, deep=True)
                     sizeBytes = 0
                     for item in response:
@@ -355,11 +358,16 @@ class DBSDataDiscovery(DataDiscovery):
                             continue  # skip Ucrainan T2 until further notice
                         # same as complete='y' used for PhEDEx
                         if item['state'].upper() == 'AVAILABLE':
-                            replicas.add(item['rse'])
-                            sizeBytes = item['bytes']
-                    if replicas:  # only fill map for blocks which have at least one location
-                        locationsMap[blockName] = replicas
-                        totalSizeBytes += sizeBytes
+                            fullReplicas.add(item['rse'])
+                        else:
+                            partialReplicas.add(item['rse'])
+                        sizeBytes = item['bytes']
+                    if fullReplicas:  # only fill map for blocks which have at least one location
+                        locationsMap[blockName] = fullReplicas
+                        totalSizeBytes += sizeBytes  # this will be used for tapeRecall
+                    if partialReplicas:
+                        partialLocationsMap[blockName] = partialReplicas
+
             except Exception as exc:
                 msg = "Rucio lookup failed with\n%s" % str(exc)
                 self.logger.warning(msg)
@@ -437,19 +445,27 @@ class DBSDataDiscovery(DataDiscovery):
         # filter out TAPE locations
         self.keepOnlyDiskRSEs(locationsMap)
 
-        # use Data.partialDataset configuration option in client to decide if to recall data on tape
-        usePartialDataset = kwargs['task']['tm_user_config']['partialdataset']
+        notAllOnDisk = set(locationsMap.keys()) != set(blocksWithLocation)
+        requestTapeRecall = notAllOnDisk and not usePartialDataset
 
-        if set(locationsMap.keys()) != set(blocksWithLocation):
+        if notAllOnDisk and usePartialDataset:
+            msg = "Some blocks are on TAPE only and can not be read."
+            msg += "\nYou specified to accept a partial dataset, so all"
+            msg += "blocks on disk will be processed even if partially replicated"
+            self.logger.warning(msg)
+            self.uploadWarning(msg, self.userproxy, self.taskName)
+            for block in blocksWithLocation:  # all blocks known to Rucio
+                if not block in locationsMap:  # no available disk replica for this block
+                    if block in partialLocationsMap:
+                        locationsMap[block] = partialLocationsMap[block]  # use partial replicas
+
+        # check for tape recall
+        #if set(locationsMap.keys()) != set(blocksWithLocation):
+        if requestTapeRecall:
             dataTier = inputDataset.split('/')[3]
             maxTierToBlockRecallSizeTB = getattr(self.config.TaskWorker, 'maxTierToBlockRecallSizeTB', 0)
             maxTierToBlockRecallSize = maxTierToBlockRecallSizeTB * 1e12
-            if usePartialDataset:
-                msg = "Some blocks are on TAPE only and can not be read."
-                msg += "\nSince you specified to accept a partial dataset, only blocks on disk will be processed"
-                self.logger.warning(msg)
-                self.uploadWarning(msg, self.userproxy, self.taskName)
-            elif dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []):
+            if dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []):
                 msg = f"Task could not be submitted because not all blocks of dataset {inputDataset} are on DISK"
                 msg += "\nWill try to request a full disk copy for you. See"
                 msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
@@ -571,6 +587,7 @@ if __name__ == '__main__':
                                                 X509_USER_KEY=config.TaskWorker.cmskey)
 
     config.TaskWorker.instance = 'prod'
+    config.TaskWorker.maxTierToBlockRecallSizeTB = 10
 
     config.Services.Rucio_host = 'https://cms-rucio.cern.ch'
     config.Services.Rucio_account = 'crab_server'
@@ -579,11 +596,14 @@ if __name__ == '__main__':
     rucioClient = getNativeRucioClient(config=config, logger=logging.getLogger())
 
     fileset = DBSDataDiscovery(config=config, rucioClient=rucioClient)
+    userConfig = {'partialdataset':False,
+                  'inputblocks':[]
+                  }
     fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, 'user_proxy': 'None',
                           'tm_input_dataset': dbsDataset, 'tm_secondary_input_dataset': dbsSecondaryDataset,
                           'tm_taskname': 'pippo1', 'tm_username':config.Services.Rucio_account,
                           'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
-                          'tm_user_config':{'partialdataset':False},
+                          'tm_user_config': userConfig,
                           'tm_dbs_url': DBSUrl}, tempDir='')
 
 #===============================================================================
