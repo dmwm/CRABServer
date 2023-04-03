@@ -1,4 +1,43 @@
 #
+"""
+Standalone (rucio dependent) script to check if a dataset is available
+for processing via CRAB, i.e. on disk on non black-listed RSE's
+usage:  pythpn3 ./CheckDiskAvailability.py -h 
+example output:
+
+Checking disk availability of dataset: /DPS_Bottomonium_Charmonium_UpsilonToMuMu_JPsiToMuMu_4MuFilter_TuneCP5_13TeV-pythia8/RunIISummer20UL17RECO-106X_mc2017_realistic_v6-v2/AODSIM
+ only fully available (i.e. complete) block replicas are considered 
+dataset has 14 blocks
+Checking blocks availabiliyt on disk ...
+  block: 14
+   0 blocks have  0 disk replicas
+   5 blocks have  1 disk replicas
+   6 blocks have  2 disk replicas
+   3 blocks have  3 disk replicas
+ Dataset is fully available
+
+ Block locations:
+ T1_US_FNAL_Disk hosts  14 blocks
+ T2_UK_London_IC hosts   3 blocks
+ T2_US_UCSD      hosts   2 blocks
+ T2_CH_CERN      hosts   2 blocks
+ T1_IT_CNAF_Disk hosts   1 blocks
+ T1_RU_JINR_Disk hosts   1 blocks
+ T2_DE_DESY      hosts   1 blocks
+ T1_ES_PIC_Disk  hosts   1 blocks
+ T2_RU_JINR      hosts   1 blocks
+
+AFTER APPLYING CRAB SITE BLACKLIST:
+   0 blocks have  0 disk replicas
+   5 blocks have  1 disk replicas
+   6 blocks have  2 disk replicas
+   3 blocks have  3 disk replicas
+ Dataset is fully available
+
+Rules on this dataset:
+               ID                     account         state        expiration                  RSEs             
+8bd6221520a547599b87bd327efea03b   wmcore_output        OK            None               T0_CH_CERN_Tape
+"""
 import argparse
 import os
 import subprocess
