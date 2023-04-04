@@ -47,6 +47,11 @@ class TaskHandler(object):
             self.tempDir = self.createTempDir()
             self._task['scratch'] = self.tempDir
 
+        # tm_start_time will be used to set task end time. Make sure
+        # it is up to date, in case task site a while in DB e.g. for tape recall.
+        # self._task is passed in input to all actions
+        self._task['tm_start_time'] = int(time.time())
+
 
     def createTempDir(self):
         if hasattr(self.config, 'TaskWorker') and hasattr(self.config.TaskWorker, 'scratchDir'):
