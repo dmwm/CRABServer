@@ -182,6 +182,16 @@ class RESTTask(RESTEntity):
 
         return rows
 
+    def counttasksbyuserandstatus(self, **kwargs):
+        """Count jobs for every user and status in the last :minutes
+           curl -X GET 'https://cmsweb-test11.cern.ch/crabserver/dev/task?subresource=counttasksbyuserandstatus&minutes=100'\
+                        --cert $X509_USER_PROXY --key $X509_USER_PROXY
+        """
+        if 'minutes' not in kwargs or not kwargs['minutes']:
+            raise InvalidParameter("The parameter minutes is mandatory for the tasksbystatus api")
+        rows = self.api.query(None, None, self.Task.CountLastTasksByUserAndStatus_sql, minutes=kwargs["minutes"])
+
+        return rows
 
     def lastfailures(self, **kwargs):
         """Retrieves all jobs of the specified user with the specified status

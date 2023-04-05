@@ -32,6 +32,8 @@ class Task(object):
     TaskByStatus_sql = "SELECT tm_task_status,tm_taskname FROM tasks WHERE tm_task_status = :taskstatus AND tm_username=:username_"
     #get all the tasks in a certain state in the last :minutes minutes
     CountLastTasksByStatus = "SELECT tm_task_status, count(*) FROM tasks WHERE tm_start_time > SYS_EXTRACT_UTC(SYSTIMESTAMP) - (:minutes/1440)  GROUP BY tm_task_status"
+    #get all the tasks in a certain state submitted by which user in the last :minutes minutes
+    CountLastTasksByUserAndStatus_sql = "SELECT tm_username, tm_task_status, count(*) FROM tasks WHERE tm_start_time > SYS_EXTRACT_UTC(SYSTIMESTAMP) - (:minutes/1440)  group by tm_username, tm_task_status order by count(*) desc"
     #get all the task failures sorted by username in the last :minutes minutes
     LastFailures = "SELECT tm_username, tm_taskname, tm_task_failure from tasks WHERE tm_start_time > SYS_EXTRACT_UTC(SYSTIMESTAMP) - (:minutes/1440) and (tm_task_status='FAILED' \
                     OR tm_task_status='SUBMITFAILED' OR tm_task_status='KILLFAILED' OR tm_task_status='RESUBMITFAILED') \
