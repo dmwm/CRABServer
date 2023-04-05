@@ -713,8 +713,12 @@ if __name__ == "__main__":
             # - the FWJR.xml does not contain an exit code if the application completed successfully
             # - getExitCode() will default to 0 if it can not find an exit code
             #   in a syntactically correct valid FWJR.
-            # - For CMSSW versions earlier than 12_6_X, it is possible that the
-            #   framework fails abnormally leaving no exit code its job report.
+            # - For CMSSW versions earlier than 12_6, when the framework fails abnormally 
+            #   it is very likely that it leaves behind an invalid FWJR.xml. 
+            #   This is not guaranteed.
+            # - For any CMSSW version, there is a slight chance that
+            #   framework process all data, produces a valid FWJR.xml, but exits
+            #   with a non-zero unix exit code.
             jobExitCode = applicationExitCode
             print("The application failed with exit code %s" % applicationExitCode)
             print("but WMCore.FwkJobReport.Report:getExitCode() returned 0 from FWJR.xml")
