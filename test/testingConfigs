@@ -1,7 +1,6 @@
 CMSSW_release=CMSSW_13_0_2;SCRAM_ARCH=el8_amd64_gcc11;inputDataset=/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM;master=no;
 CMSSW_release=CMSSW_12_6_4;SCRAM_ARCH=el8_amd64_gcc10;inputDataset=/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM;master=no;
-CMSSW_release=CMSSW_12_5_2_patch1;SCRAM_ARCH=el8_amd64_gcc10;inputDataset=/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM;master=no;
-CMSSW_release=CMSSW_12_0_1;SCRAM_ARCH=slc7_amd64_gcc900;inputDataset=/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM;master=no;
+CMSSW_release=CMSSW_12_3_4;SCRAM_ARCH=el8_amd64_gcc10;inputDataset=/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM;master=no;
 CMSSW_release=CMSSW_11_3_4;SCRAM_ARCH=slc7_amd64_gcc900;inputDataset=/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM;master=no;
 CMSSW_release=CMSSW_10_6_26;SCRAM_ARCH=slc7_amd64_gcc700;inputDataset=/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM;master=yes;
 CMSSW_release=CMSSW_9_4_21;SCRAM_ARCH=slc7_amd64_gcc630;inputDataset=/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM;master=no;
