@@ -1,0 +1,2 @@
+class RucioTransferException(Exception):
+    pass
