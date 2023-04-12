@@ -24,17 +24,17 @@ def mock_rucioClient():
     with patch('rucio.client.client.Client', autospec=True) as m_rucioClient:
         return m_rucioClient
 
-def test_check_or_create_container_create_new_container(mock_rucioClient, mock_Transfer):
+def test_checkOrCreateContainer_create_new_container(mock_rucioClient, mock_Transfer):
     b = BuildTaskDataset(mock_Transfer, mock_rucioClient)
-    b.check_or_create_container()
+    b.checkOrCreateContainer()
     mock_rucioClient.add_container.assert_called_with(mock_Transfer.rucioScope, mock_Transfer.publishname)
 
-def test_check_or_create_container_container_exist(mock_rucioClient, mock_Transfer):
+def test_checkOrCreateContainer_container_exist(mock_rucioClient, mock_Transfer):
     def mock_raise_DataIdentifierAlreadyExists():
         raise DataIdentifierAlreadyExists
     mock_Transfer.add_container = mock_raise_DataIdentifierAlreadyExists
     b = BuildTaskDataset(mock_Transfer, mock_rucioClient)
-    b.check_or_create_container()
+    b.checkOrCreateContainer()
 
 
 # NOTE:

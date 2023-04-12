@@ -7,6 +7,11 @@ from ASO.Rucio.exception import RucioTransferException
 import ASO.Rucio.config as config
 
 class Transfer:
+    """
+    Use Transfer object to store state of process in memory.
+    It responsible for read info from file and set its attribute.
+    This object will pass to Actions class as mutable input.
+    """
     def __init__(self):
         self.logger = logging.getLogger('RucioTransfer.Transfer')
 
@@ -24,6 +29,9 @@ class Transfer:
         self.currentDataset = ''
 
     def readInfo(self):
+        """
+        Read the information from input files using path from configuration.
+        """
         try:
             with open(config.config.rest_info_path, 'r', encoding='utf-8') as r:
                 restInfo = json.load(r)

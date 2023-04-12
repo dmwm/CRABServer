@@ -9,14 +9,28 @@ from ASO.Rucio.Transfer import Transfer
 from ASO.Rucio.exception import RucioTransferException
 
 class RunTransfer:
+    """
+    RunTransfer describe 10000 foot view of actions that need to be
+    done, as describe in algorithm method.  Action is small set of
+    work that consume input, do some processing, and produce output.
+    The input is mainly consist of Transfer object and rucio/crabrest
+    client.  But output in this case is modified Transfer object and
+    state change in RUCIO server instead.
+    """
     def __init__(self):
         self.logger = logging.getLogger("RucioTransfer.RunTransfer")
-
-        self.transfer = Transfer()
-
-        self.rucio = self._initRucioClient(self.transfer.username, self.transfer.proxypath)
+        self.transfer = None
+        self.rucio = None
 
     def algorithm(self):
+        """
+        Instantiate the action class, and execute it inside algorithm
+        method.  Also, initialized Transfer object, and rucioClient to
+        use across process.
+        """
+        # init
+        self.transfer = Transfer()
+        self.rucio = self._initRucioClient(self.transfer.username, self.transfer.proxypath)
         # do nothing
         BuildTaskDataset(self.transfer, self.rucio).execute()
         # do 1

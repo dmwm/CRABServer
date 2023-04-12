@@ -7,22 +7,35 @@ from ASO.Rucio.exception import RucioTransferException
 from ASO.Rucio.config import config
 
 class BuildTaskDataset():
+    """
+    Create Rucio's container and dataset.
+
+    :param transfer: Transfer Object to get infomation.
+    :type object: class:`ASO.Rucio.Transfer`
+    :param rucioClient: Rucio Client object.
+    :type object: class:`rucio.client.client.Client`
+    """
     def __init__(self, transfer, rucioClient):
         self.logger = logging.getLogger("RucioTransfer.Actions.BuildTaskDataset")
         self.rucioClient = rucioClient
         self.transfer = transfer
 
     def execute(self):
-        self.check_or_create_container()
+        """
+        Main method.
+        """
+        self.checkOrCreateContainer()
         # create log dataset
         self.createDataset(self.transfer.logsDataset)
         self.transfer.currentDataset = self.getOrCreateDataset()
 
-    def check_or_create_container(self):
+    def checkOrCreateContainer(self):
         """
-        creating container
-         - check if container already exists
-         - otherwise create it
+        Creating container. Check if container already exists,
+        otherwise create it.
+
+        :returns: None :raises RucioTransferException: wrapping
+        generic Exception and add message.
         """
         try:
             self.rucioClient.add_container(self.transfer.rucioScope, self.transfer.publishname)
@@ -33,18 +46,24 @@ class BuildTaskDataset():
             raise RucioTransferException('Failed to create container') from ex
 
     def getOrCreateDataset(self):
-        # Check if there are open datasets and then start from there:
-        # - if open with less than max file go ahead and use it
-        # - if max file is reached, close the currente ds and open a new one
-        # - if force_create = True, create a new one anyway
+        """
+        Get or create new dataset.
+        - If open more than 2, choose one and close other.
+        - If only one is open, go ahead and use it.
+        - if none, create new one.
+        Note that this method always call createDataset to check if
+        rule and container of dataset are attach properly
 
-        # TODO: create #LOGS dataset if does not exists
-        # Can we simply avoid transferring LOGS with RUCIO?
+        :returns: dataset name
+        :rtype: str
+        """
+
         datasets = self.rucioClient.list_content(self.transfer.rucioScope, self.transfer.publishname)
         # remove log dataset
         datasets = [ds for ds in datasets if not ds['name'].endswith('#LOG')]
         # get_metadata_bulk "Always" raise InvalidObject.
-        # probably a bug on rucio server, even production block.
+        # Probably a bug on rucio server, even production block.
+
         try:
             metadata = self.rucioClient.get_metadata_bulk(datasets)
         except InvalidObject:
@@ -71,6 +90,14 @@ class BuildTaskDataset():
         return currentDatasetName
 
     def createDataset(self, datasetName):
+        """
+        Creating Rucio container, add replication rule, attach to container.
+        Ignore error if it already done.
+
+        :param datasetName: dataset name to create.
+        :returns: None :raises RucioTransferException: wrapping
+            generic Exception and add message.
+        """
         self.logger.debug(f'Creating dataset {datasetName}')
         try:
             self.rucioClient.add_dataset(self.transfer.rucioScope, datasetName)
