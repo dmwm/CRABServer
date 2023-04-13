@@ -7,9 +7,15 @@ example output:
 
 """
 import os
+import sys
+import time
 import pandas as pd
 
 def main():
+    """
+        get all rules for this account, find pending ones,
+        order, pretty format, print them and write an HTML file
+    """
     rucio = ensure_environment()
     account = 'crab_tape_recall'
 
@@ -23,10 +29,10 @@ def main():
     print(df.groupby('state').size())  # count by state
 
     # use standard compact format (OK/Rep/Stucl) for lock counts
-    df['locks'] = df.apply(lambda x:f"{x['locks_ok_cnt']}/{x['locks_replicating_cnt']}/{x['locks_stuck_cnt']}",axis=1)
+    df['locks'] = df.apply(lambda x: f"{x.locks_ok_cnt}/{x.locks_replicating_cnt}/{x.locks_stuck_cnt}", axis=1)
 
     # extract CRAB user name from rule comment (ouch ! FRAGILE !)
-    df['user'] = df.apply(lambda x: x['comments'].replace("Staged from tape for ",""), axis=1)
+    df['user'] = df.apply(lambda x: x.comments.replace("Staged from tape for ", ""), axis=1)
 
     # transform created_at to number of days
     today = pd.Timestamp.now()
@@ -34,27 +40,32 @@ def main():
 
     # add and URL pointing to rule in Rucio UI
     urlBase = '<a href="https://cms-rucio-webui.cern.ch/rule?rule_id=%s">%s</a>'
-    df['idUrl'] = df.apply(lambda x: (urlBase%(x['id'],x['id'])), axis=1)
+    df['idUrl'] = df.apply(lambda x: (urlBase % (x.id, x.id)), axis=1)
 
     # select non-OK states
-    stuck = df[df['state']=='STUCK'].sort_values(by=['days'],ascending=False)
-    replicating = df[df['state']=='REPLICATING'].sort_values(by=['days'],ascending=False)
+    stuck = df[df['state'] == 'STUCK'].sort_values(by=['days'], ascending=False)
+    replicating = df[df['state'] == 'REPLICATING'].sort_values(by=['days'], ascending=False)
 
     # combine all pending rules in a single dataframe
-    pending = pd.concat([stuck,replicating])
+    pending = pd.concat([stuck, replicating]).reset_index(drop=True)
 
     # add tape locations
     print("finding tape source for all pending rules (takes some time...)")
-    pending['tape'] = pending.apply(lambda x: findTapesForRule(rucio, x['id']), axis=1)
+    pending['tape'] = pending.apply(lambda x: findTapesForRule(rucio, x.id), axis=1)
     print("Done!")
 
     # select interesting columns
-    rulesToPrint = pending[['id', 'state', 'user','locks','days', 'tape']]
-    print(rulesToPrint.to_string(index=False))
+    rulesToPrint = pending[['id', 'state', 'user', 'locks', 'days', 'tape']]
+    print(rulesToPrint.to_string())
 
     # create an HTML table
-    rulesToHtml = pending[['idUrl', 'state', 'user','locks','days', 'tape']].to_html(index=False, escape=False)
+    #rulesToHtml = pending[['idUrl', 'state', 'user', 'locks', 'days', 'tape']].to_html(index=False, escape=False)
+    rulesToHtml = pending[['idUrl', 'state', 'user', 'locks', 'days', 'tape']].to_html(escape=False)
+    now = time.strftime("%Y-%m-%d %H:%M:%S %Z")
+    title = f"Status of CRAB Tape Recall rules at {now}"
+    header = f"<center><b>{title}</b></center><hr>\n"
     with open('RecallRules.html', 'w') as fh:
+        fh.write(header)
         fh.write(rulesToHtml)
 
 
@@ -64,11 +75,11 @@ def findTapesForRule(rucioClient=None, ruleId=None):
     Assumes that all files in the container described in the rule have the same origin
     so it will be enough to look up the first file
     """
-    rule=rucioClient.get_replication_rule(ruleId)
-    aFile=next(rucioClient.list_files(scope=rule['scope'], name=rule['name']))
-    aDID={'scope': aFile['scope'], 'name': aFile['name']}
+    rule = rucioClient.get_replication_rule(ruleId)
+    aFile = next(rucioClient.list_files(scope=rule['scope'], name=rule['name']))
+    aDID = {'scope': aFile['scope'], 'name': aFile['name']}
     aReplica = next(rucioClient.list_replicas([aDID]))
-    tapes=[]
+    tapes = []
     for rse in aReplica['rses']:
         if 'Tape' in rse:
             tapes.append(rse.replace("_Tape", ""))
@@ -76,17 +87,18 @@ def findTapesForRule(rucioClient=None, ruleId=None):
 
 
 def ensure_environment():
+    """ make sure we can run Rucio client """
     if os.getenv("CMSSW_BASE"):
         print("Must use a shell w/o CMSSW environent")
-        exit()
+        sys.exit()
     try:
         from rucio.client import Client
     except ModuleNotFoundError:
         print("Setup Rucio first via:\n source /cvmfs/cms.cern.ch/rucio/setup-py3.sh; export RUCIO_ACCOUNT=`whoami`")
-        exit()
+        sys.exit()
     # make sure Rucio client is initialized
     rucio = Client()
-    return(rucio)
+    return rucio
 
 
 
