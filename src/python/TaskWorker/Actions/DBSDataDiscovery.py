@@ -180,7 +180,7 @@ class DBSDataDiscovery(DataDiscovery):
             #RSE_EXPRESSION = 'T3_IT_Trieste' # for testing
             WEIGHT = 'ddm_quota'
             #WEIGHT = None # for testing
-            LIFETIME = 14 * 24 * 3600  # 14 days
+            LIFETIME = 30 * 24 * 3600  # 30 days
             ASK_APPROVAL = False
             #ASK_APPROVAL = True # for testing
             ACCOUNT = 'crab_tape_recall'
