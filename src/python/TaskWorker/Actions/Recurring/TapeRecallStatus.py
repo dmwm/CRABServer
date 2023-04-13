@@ -96,6 +96,9 @@ class TapeRecallStatus(BaseRecurringAction):
             if ddmRequest['state'] == 'OK':
                 self.logger.info("Request %s is completed, setting status of task %s to NEW", reqId, taskName)
                 mw.updateWork(taskName, recallingTask['tm_task_command'], 'NEW')
+                self.logger.info("Extending rule lifetime to 30 days starting now")
+                newLifetime = 30 * 24 * 60 * 60  # 30 days in seconds
+                self.rucioClient.update_replication_rule(reqId, {'lifetime': newLifetime})
                 # Delete all task warnings (the tapeRecallStatus added a dataset warning which is no longer valid now)
                 if user_proxy: mpl.deleteWarnings(recallingTask['user_proxy'], taskName)
             else:
