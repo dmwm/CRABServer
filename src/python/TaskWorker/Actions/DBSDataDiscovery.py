@@ -576,7 +576,7 @@ if __name__ == '__main__':
     # Usage: python3 DBSDataDiscovery.py dbs_instance dbsDataset [secondaryDataset]
     # where dbs_instance should be either prod/global or prod/phys03
     #
-    # Example: python3 /data/repos/CRABServer/src/python/TaskWorker/Actions/DBSDataDiscovery.py prod/global /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
+    # Example:  /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
     ###
     dbsInstance = sys.argv[1]
     dbsDataset = sys.argv[2]
@@ -626,7 +626,7 @@ if __name__ == '__main__':
 
 #===============================================================================
 #    Some interesting datasets for testing
-#    dataset = '/DoubleMuon/Run2018B-PromptReco-v2/AOD'       # on tape
+#    dataset = '/DoubleMuon/Run2018B-17Sep2018-v1/AOD'        # on tape
 #    dataset = '/DoubleMuon/Run2018B-02Apr2020-v1/NANOAOD'    # isNano
 #    dataset = '/DoubleMuon/Run2018B-17Sep2018-v1/MINIAOD'    # parent of above NANOAOD (for secondaryDataset lookup)
 #    dataset = '/MuonEG/Run2016B-07Aug17_ver2-v1/AOD'         # no Nano on disk (at least atm)
