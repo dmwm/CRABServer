@@ -150,11 +150,11 @@ class DBSDataDiscovery(DataDiscovery):
             if tapeLocations:
                 if 'T1_RU_JINR_Tape' in tapeLocations and len(tapeLocations) > 1:
                     tapeLocations.remove('T1_RU_JINR_Tape')  # JINR tape data are often duplicated
-            if len(tapeLocations) == 1:
-                if 'US' in tapeLocations:
-                    ALL_RSES += "&(country=US|country=BR)"
-                else:
-                    ALL_RSES += "\country=US\country=BR"  # note the set complement operator \
+                if len(tapeLocations) == 1:
+                    if 'US' in tapeLocations:
+                        ALL_RSES += "&(country=US|country=BR)"
+                    else:
+                        ALL_RSES += "\country=US\country=BR"  # note the set complement operator \
             rses = rucioClient.list_rses(ALL_RSES)
             rseNames = [r['rse'] for r in rses]
             largeRSEs = []  # a list of largish (i.e. solid) RSEs
