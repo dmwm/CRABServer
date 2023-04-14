@@ -154,7 +154,7 @@ class DBSDataDiscovery(DataDiscovery):
                     if 'US' in tapeLocations:
                         ALL_RSES += "&(country=US|country=BR)"
                     else:
-                        ALL_RSES += "\country=US\country=BR"  # note the set complement operator \
+                        ALL_RSES += "\country=US\country=BR"  # Rucio wants the set complement operator \
             rses = rucioClient.list_rses(ALL_RSES)
             rseNames = [r['rse'] for r in rses]
             largeRSEs = []  # a list of largish (i.e. solid) RSEs
