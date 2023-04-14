@@ -714,18 +714,13 @@ if __name__ == "__main__":
             # - getExitCode() will default to 0 if it can not find an exit code
             #   in a syntactically correct valid FWJR.
             # - For CMSSW versions earlier than 12_6, when the framework fails abnormally 
-            #   it is very likely that it leaves behind an invalid FWJR.xml. 
-            #   This is not guaranteed.
-            # - For any CMSSW version, there is a slight chance that
-            #   framework process all data, produces a valid FWJR.xml, but exits
-            #   with a non-zero unix exit code.
+            #   it leaves behind an invalid FWJR.xml. 
+            # - For any CMSSW version 12_6 and higher, cmsRun always creates a syntactically correct
+            #   FWJR.xml (possibly with empty content) also when it exits with non-zero exit code.
             jobExitCode = applicationExitCode
             print("The application failed with exit code %s" % applicationExitCode)
             print("but WMCore.FwkJobReport.Report:getExitCode() returned 0 from FWJR.xml")
-            print("This is likely cmsRun that failed so badly that it left an empty or")
-            print("corrupted FWJR.xml. However, there is a slight chance that the application")
-            print("failed at the very end, after having properly processed all the events.")
-            print("In any case, this job will be marked as failed.")
+            print("This job will be marked as failed.")
             print("In order to help with debugging, we print the content of FrameworkJobReport.xml")
             print("== Start FrameworkJobReport.xml ==")
             with open('FrameworkJobReport.xml', 'r') as fwjr:
