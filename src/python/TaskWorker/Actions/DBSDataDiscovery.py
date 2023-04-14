@@ -89,7 +89,7 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\nhttps://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ"
                 raise TaskWorkerException(msg)
 
-    def requestTapeRecall(self, blockList, sizeToRecall, system='Rucio', msgHead=''):   # pylint: disable=W0102
+    def requestTapeRecall(self, blockList, sizeToRecall, tapeLocations=None, system='Rucio', msgHead=''):   # pylint: disable=W0102
         """
         :param blockList: a list of blocks to recall from Tape to Disk
         :param sizeToRecall: an integer of blockList's total size in bytes.
@@ -145,6 +145,16 @@ class DBSDataDiscovery(DataDiscovery):
             # make RSEs lists
             # asking for ddm_quota>0 gets rid also of Temp and Test RSE's
             ALL_RSES = "ddm_quota>0&(tier=1|tier=2)&rse_type=DISK"
+            # tune list according to where tapes are, we expect a single location
+            # if there are more... let Rucio deal with them to find best route
+            if tapeLocations:
+                if 'T1_RU_JINR_Tape' in tapeLocations and len(tapeLocations) > 1:
+                    tapeLocations.remove('T1_RU_JINR_Tape')  # JINR tape data are often duplicated
+            if len(tapeLocations) == 1:
+                if 'US' in tapeLocations:
+                    ALL_RSES += "&(country=US|country=BR)"
+                else:
+                    ALL_RSES += "\country=US\country=BR"  # note the set complement operator \
             rses = rucioClient.list_rses(ALL_RSES)
             rseNames = [r['rse'] for r in rses]
             largeRSEs = []  # a list of largish (i.e. solid) RSEs
@@ -442,7 +452,13 @@ class DBSDataDiscovery(DataDiscovery):
         if secondaryDataset:
             secondaryBlocksWithLocation = secondaryLocationsMap.copy().keys()
 
-        # filter out TAPE locations
+        # take note of where tapes are
+        tapeLocations = []
+        for block, locations in locationsMap.items():
+            for rse in locations:
+                if 'Tape' in rse:
+                    tapeLocations.append(rse)
+        # then filter out TAPE locations
         self.keepOnlyDiskRSEs(locationsMap)
 
         notAllOnDisk = set(locationsMap.keys()) != set(blocksWithLocation)
@@ -469,13 +485,15 @@ class DBSDataDiscovery(DataDiscovery):
                 msg = f"Task could not be submitted because not all blocks of dataset {inputDataset} are on DISK"
                 msg += "\nWill try to request a full disk copy for you. See"
                 msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
-                self.requestTapeRecall(blocksWithLocation, totalSizeBytes, system='Rucio', msgHead=msg)
+                self.requestTapeRecall(blocksWithLocation, totalSizeBytes,
+                                       tapeLocations=tapeLocations, system='Rucio', msgHead=msg)
             elif inputBlocks:
                 if totalSizeBytes < maxTierToBlockRecallSize:
                     msg = "Task could not be submitted because blocks specified in 'Data.inputBlocks' are not on disk."
                     msg += "\nWill try to request disk copy for you. See"
                     msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
-                    self.requestTapeRecall(blocksWithLocation, totalSizeBytes, system='Rucio', msgHead=msg)
+                    self.requestTapeRecall(blocksWithLocation, totalSizeBytes,
+                                           tapeLocations=tapeLocations, system='Rucio', msgHead=msg)
                 else:
                     msg = "Some blocks are on TAPE only and will not be processed."
                     msg += f"\nThere is no automatic recall from TAPE for data tier '{dataTier}' if 'Data.inputBlocks' is provided,"
