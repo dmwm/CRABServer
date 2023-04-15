@@ -466,8 +466,8 @@ class DBSDataDiscovery(DataDiscovery):
 
         if notAllOnDisk and usePartialDataset:
             msg = "Some blocks are on TAPE only and can not be read."
-            msg += "\nYou specified to accept a partial dataset, so all"
-            msg += "blocks on disk will be processed even if partially replicated"
+            msg += "\nYou specified to accept a partial dataset, so all blocks"
+            msg += "\n on disk will be processed even if only partially replicated"
             self.logger.warning(msg)
             self.uploadWarning(msg, self.userproxy, self.taskName)
             for block in blocksWithLocation:  # all blocks known to Rucio
