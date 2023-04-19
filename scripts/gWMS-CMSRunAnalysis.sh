@@ -31,6 +31,8 @@ function finish {
   chirp_exit_code
   END_TIME=$(date +%s)
   DIFF_TIME=$((END_TIME-START_TIME))
+  echo "Job started:  " $START_TIME ", " $(TZ=GMT date -d @$START_TIME)
+  echo "Job finished: " $END_TIME ", " $(TZ=GMT date -d @$END_TIME)
   echo "Job Running time in seconds: " $DIFF_TIME
   if [ "X$CRAB3_RUNTIME_DEBUG" = "X" ];
   then
