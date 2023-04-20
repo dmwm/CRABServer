@@ -58,7 +58,6 @@ def main():
     print('Add dataset name ...')
     # add (DBS) dataset name
     pending['dataset'] = pending.apply(lambda x: findDatasetForRule(rucio, x.id), axis=1)
-    print('Add dataset name and size')
 
     print('... and size')
     # add size of recalled container
@@ -144,8 +143,6 @@ def findDatasetForRule(rucioClient=None, ruleId=None):
     for ds in datasets:
         if ds['scope'] == 'cms':
             dataset = ds['name']
-    if not dataset:
-        dataset = f"No dataset in Rucio for file: {aFile}"
     return dataset
 
 
