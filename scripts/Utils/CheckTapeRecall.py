@@ -141,7 +141,7 @@ def findDatasetForRule(rucioClient=None, ruleId=None):
         if ds['scope'] == 'cms':
             dataset = ds['name']
     if not dataset:
-	dataset = f"No dataset in Rucio for file: {aFile}"
+        dataset = f"No dataset in Rucio for file: {aFile}"
     return dataset
 
 
