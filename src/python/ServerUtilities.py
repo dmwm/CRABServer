@@ -79,8 +79,8 @@ MAX_POST_JOBS = 20
 TASKLIFETIME = 30*24*60*60
 ## Number of days where the resubmission is not possible if the task is expiring
 NUM_DAYS_FOR_RESUBMITDRAIN = 7
-## Maximum number of days a task can stay in TAPERECALL status for
-MAX_DAYS_FOR_TAPERECALL = 30
+## Maximum number of days a task can stay in TAPERECALL status
+MAX_DAYS_FOR_TAPERECALL = 15
 
 ## These are all possible statuses of a task in the TaskDB.
 TASKDBSTATUSES_TMP = ['NEW', 'HOLDING', 'QUEUED']
