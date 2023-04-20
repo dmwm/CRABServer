@@ -9,6 +9,7 @@ import traceback
 import subprocess
 import errno
 import signal
+import random
 
 from socket import gethostname
 from pprint import pprint
@@ -283,6 +284,7 @@ class CRAB3CreateJson(object):
         self.jsonDoc['total_running_tasks'] = totalRunningTasks
         self.jsonDoc['total_idle_tasks'] = totalIdleTasks
         self.jsonDoc['total_running_tp'] = totalRunningTP
+        self.jsonDoc['tape_recall_total_TB'] = int(random.uniform(10,20))
 
         return self.jsonDoc
 

@@ -88,6 +88,10 @@ def main():
 
 
 def findUserNameForRule(rucioClient=None, ruleId=None):
+    """
+    find which username was this rule created for
+    takes care of different formats of comments field in rule
+    """
     if not ruleId:
         return None
     rule = rucioClient.get_replication_rule(ruleId)
@@ -129,15 +133,19 @@ def findDatasetForRule(rucioClient=None, ruleId=None):
     so it will be enough to look up the first one:
     """
     dataset = None
+    datasets = []
     rule = rucioClient.get_replication_rule(ruleId)
     aFile = next(rucioClient.list_files(scope=rule['scope'], name=rule['name']))
     # to find original dataset need to travel up from file to block to dataset
-    # the container level and make sure to pick scope cms:
+    # at the container level and make sure to pick scope cms:
     block = next(rucioClient.list_parent_dids(scope=aFile['scope'], name=aFile['name']))
-    datasets = rucioClient.list_parent_dids(scope=block['scope'], name=block['name'])
+    if block:
+        datasets = rucioClient.list_parent_dids(scope=block['scope'], name=block['name'])
     for ds in datasets:
         if ds['scope'] == 'cms':
             dataset = ds['name']
+    if not dataset:
+        dataset = f"No dataset in Rucio for file: {aFile}"
     return dataset
 
 
@@ -169,6 +177,10 @@ def ensureEnvironment():
     return rucio
 
 def htmlHeader():
+    """
+    something to make a prettier HTML table, stolen from Ceyhun's
+    https://cmsdatapop.web.cern.ch/cmsdatapop/eos-path-size/size.html
+    """
     head = """<head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- prepared using https://datatables.net/download/ -->

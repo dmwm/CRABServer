@@ -72,10 +72,11 @@ setup_python_comp() {
     echo "======== python bootstrap for stageout at $(TZ=GMT date) STARTING ========"
     # Python library required for Python2/Python3 compatibility through "future"
     PY3_FUTURE_VERSION=0.18.2
-    # Saving START_TIME and when job finishes END_TIME.
-    START_TIME=$(date +%s)
     WMA_DEFAULT_OS=rhel7
-    export JOBSTARTDIR=$PWD
+
+    # # the two following variables should be set elsewhere
+    # START_TIME=$(date +%s)
+    # export JOBSTARTDIR=$PWD
 
     # First, decide which COMP ScramArch to use based on the required OS and Architecture
     THIS_ARCH=`uname -m`  # if it's PowerPC, it returns `ppc64le`
