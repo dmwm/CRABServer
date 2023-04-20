@@ -88,6 +88,10 @@ def main():
 
 
 def findUserNameForRule(rucioClient=None, ruleId=None):
+    """
+    find which username was this rule created for
+    takes care of different formats of comments field in rule
+    """
     if not ruleId:
         return None
     rule = rucioClient.get_replication_rule(ruleId)
@@ -173,6 +177,10 @@ def ensureEnvironment():
     return rucio
 
 def htmlHeader():
+    """
+    something to make a prettier HTML table, stolen from Ceyhun's
+    https://cmsdatapop.web.cern.ch/cmsdatapop/eos-path-size/size.html
+    """
     head = """<head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- prepared using https://datatables.net/download/ -->
