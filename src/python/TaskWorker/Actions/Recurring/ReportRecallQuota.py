@@ -8,7 +8,7 @@ from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 from RucioUtils import getNativeRucioClient
 
 
-class reportQuota(BaseRecurringAction):
+class ReportRecallQuota(BaseRecurringAction):
     """
     Recurring action to get every hour the used disk quota for crab_tape_recall account,
     then save it to `logsDir/tape_recall_quota.json`
@@ -53,5 +53,5 @@ if __name__ == '__main__':
     from WMCore.Configuration import loadConfigurationFile
     cfg = loadConfigurationFile(twconfig)
 
-    rq = reportQuota(cfg.TaskWorker.logsDir)
+    rq = ReportRecallQuota(cfg.TaskWorker.logsDir)
     rq._execute(cfg, None)  # pylint: disable=protected-access
