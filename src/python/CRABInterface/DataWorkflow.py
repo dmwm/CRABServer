@@ -397,6 +397,7 @@ class DataWorkflow(object):
         if row.task_status == 'TAPERECALL':
             self.api.modify(self.Task.SetStatusWarningTask_sql, status=["KILLRECALL"], command=["KILL"],
                             taskname=[workflow], warnings=[str(warnings)])
+
         elif row.task_status == 'NEW' and row.task_command == 'SUBMIT':
             #if the task has just been submitted and not acquired by the TW
             self.api.modify(self.Task.SetStatusWarningTask_sql, status=["KILLED"], command=["KILL"],
