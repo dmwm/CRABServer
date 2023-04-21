@@ -284,12 +284,20 @@ class CRAB3CreateJson(object):
         self.jsonDoc['total_running_tasks'] = totalRunningTasks
         self.jsonDoc['total_idle_tasks'] = totalIdleTasks
         self.jsonDoc['total_running_tp'] = totalRunningTP
-        self.jsonDoc['tape_recall_total_TB'] = int(random.uniform(10,20))
+
+        # get tape recall quota stats (if available)
+        quotaReportFile = "/data/container/TaskWorker/log/tape_recall_quota.json"
+        try:
+            with open(quotaReportFile, 'r', encoding='utf-8') as fd:
+                quotaReport = json.load(fd)
+            self.jsonDoc['tape_recall_total_TB'] = quotaReport['totalTB']
+        except Exception as e:
+            pass
 
         return self.jsonDoc
 
 def main():
-    """ Simple main to execute the action standalon. You just need to set the task worker environment.
+    """ Simple main to execute the action standalone. You just need to set the task worker environment.
         The main is set up to work with the production task worker. If you want to use it on your own
         instance you need to change resthost, resturi, and twconfig.
         If you want to monitor your own machine, you have to enable it in puppet configuration.

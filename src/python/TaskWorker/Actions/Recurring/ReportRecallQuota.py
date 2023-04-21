@@ -13,7 +13,7 @@ class reportQuota(BaseRecurringAction):
     Recurring action to get every hour the used disk quota for crab_tape_recall account,
     then save it to `logsDir/tape_recall_quota.json`
     """
-    pollingTime = 60 #minutes
+    pollingTime = 60  # minutes
 
     def _execute(self, config, task):
         account = 'crab_tape_recall'

@@ -78,7 +78,7 @@ def main():
     now = time.strftime("%Y-%m-%d %H:%M:%S %Z")
     title = f"\n<center><b>Status of CRAB Tape Recall rules at {now}</b></center><hr>\n"
     endOfDoc = '\n</html>'
-    with open('RecallRules.html', 'w') as fh:
+    with open('RecallRules.html', 'w', encoding='utf-8') as fh:
         fh.write(beginningOfDoc)
         fh.write(header)
         fh.write(title)
