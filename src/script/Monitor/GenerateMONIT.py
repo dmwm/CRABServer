@@ -286,9 +286,9 @@ class CRAB3CreateJson(object):
         self.jsonDoc['total_running_tp'] = totalRunningTP
 
         # get tape recall quota stats (if available)
-        quotaReportFile = "/data/container/TaskWorker/log/tape_recall_quota.json"
+        quotaReportFile = "/data/container/TaskWorker/logs/tape_recall_quota.json"
         try:
-            with open(quotaReportFile, 'r', encoding='utf-8') as fd:
+            with open(quotaReportFile, 'r') as fd:
                 quotaReport = json.load(fd)
             self.jsonDoc['tape_recall_total_TB'] = quotaReport['totalTB']
         except Exception as e:
