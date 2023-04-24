@@ -47,7 +47,7 @@ for d in "${dir[@]}"; do
   fi
 done
 
-DOCKER_VOL="-v /data/container/:/data/hostdisk/ -v /data/srv/tmp/:/data/srv/tmp/ -v /cvmfs/cms.cern.ch/SITECONF:/cvmfs/cms.cern.ch/SITECONF -v /etc/grid-security/:/etc/grid-security/ -v /data/certs/:/data/certs/ -v /var/run/nscd/socket:/var/run/nscd/socket "
+DOCKER_VOL="-v /data/container/:/data/hostdisk/ -v /data/srv/tmp/:/data/srv/tmp/ -v /cvmfs/cms.cern.ch/SITECONF:/cvmfs/cms.cern.ch/SITECONF -v /etc/grid-security/:/etc/grid-security/ -v /data/certs/:/data/certs/ -v /var/run/nscd/socket:/var/run/nscd/socket -v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
 DOCKER_OPT="-e SERVICE=${SERVICE} -w /data/srv/${DIRECTORY} "
 docker run --name ${SERVICE} -d -ti --net host --privileged $DOCKER_OPT $DOCKER_VOL ${TW_REPO:-registry.cern.ch/cmscrab}/crabtaskworker:${TW_VERSION}
 
