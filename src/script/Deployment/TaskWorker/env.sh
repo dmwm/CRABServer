@@ -15,6 +15,9 @@ then
   export GHrepoDir='/data/repos'
 fi
 
+# until we get a new openssl version, python3 requires this
+export CRYPTOGRAPHY_ALLOW_OPENSSL_102=true
+
 # cleanup the environment (needed in some cases when running interactively)
 unset X509_USER_PROXY
 unset X509_USER_CERT
