@@ -172,7 +172,7 @@ class DBSDataDiscovery(DataDiscovery):
                     if availableSpace/1e12 > 100:  # at least 100TB available
                         freeRSEs.append(rse)
             # use either list (largeRSEs or freeRSEs) according to dataset size:
-            if TBtoRecall < 50.:
+            if TBtoRecall <= 1000.:  # see https://github.com/dmwm/CRABServer/issues/7610
                 grouping = 'ALL'
                 self.logger.info("Will place all blocks at a single site")
                 RSE_EXPRESSION = '|'.join(largeRSEs)  # any solid site will do, most datasets are a few TB anyhow
