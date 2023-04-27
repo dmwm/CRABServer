@@ -1,4 +1,8 @@
 #!/bin/bash
+#
+# this script will run CheckTapeRecall.py and place the HTML output on CERNBOX
+# from where it can be accessed via browser. It can be used e.g. in an acrontab
+#
 uid=`id -u`
 proxy=/tmp/x509up_u${uid}
 cat /afs/cern.ch/user/b/belforte/.globus/.stefano | /usr/bin/voms-proxy-init -quiet -pwstdin -rfc -voms cms -valid 192:00 -out ${proxy} 2>/dev/null
