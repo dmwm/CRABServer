@@ -453,11 +453,11 @@ class DBSDataDiscovery(DataDiscovery):
             secondaryBlocksWithLocation = secondaryLocationsMap.copy().keys()
 
         # take note of where tapes are
-        tapeLocations = []
+        tapeLocations = set()
         for block, locations in locationsMap.items():
             for rse in locations:
                 if 'Tape' in rse:
-                    tapeLocations.append(rse)
+                    tapeLocations.add(rse)
         # then filter out TAPE locations
         self.keepOnlyDiskRSEs(locationsMap)
 
