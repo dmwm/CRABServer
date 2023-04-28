@@ -195,8 +195,9 @@ class TapeRecallManager(BaseRecurringAction):
         """ Removes all warnings uploaded so fare for this task """
         #TODO this is also a candidate for TaskWorker/TaskUtils.py
         configreq = {'subresource': 'deletewarnings', 'workflow': taskname}
+        data = urlencode(configreq)
         try:
-            self.crabserver.post(api='task', data=configreq)
+            self.crabserver.post(api='task', data=data)
         except HTTPException as hte:
             self.logger.error("Error deleting warnings: %s", str(hte))
             self.logger.warning("Can not delete warnings from REST interface.")
@@ -207,7 +208,7 @@ class TapeRecallManager(BaseRecurringAction):
         self.logger.info('Will set to %s task %s', status, taskName)
         if status == 'NEW':
             command = 'SUBMIT'
-        elif status == 'KILL':
+        elif status == 'KILLED':
             command = 'KILL'
         else:
             self.logger.error('updateTaskStatus does not know how to handle status %s. Do nothing', status)
