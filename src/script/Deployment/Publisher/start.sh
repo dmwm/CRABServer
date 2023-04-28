@@ -62,8 +62,6 @@ ln -s /data/hostdisk/${SERVICE}/nohup.out nohup.out
 
 #==== START THE SERVICE
 
-export CRYPTOGRAPHY_ALLOW_OPENSSL_102=true
-
 case $MODE in
   current)
   # current mode: run current instance
