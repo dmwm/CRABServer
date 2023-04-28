@@ -270,7 +270,7 @@ class RESTTask(RESTEntity):
         row = self.Task.ID_tuple(*rows[0])
         warnings = literal_eval(row.task_warnings.read() if row.task_warnings else '[]')
         if len(warnings)<1:
-            raise ExecutionError("No warnings to remove.")
+            self.logger.info('deletewarnings called for task %s but there are no warnings', workflow)
 
         self.api.modify(self.Task.DeleteWarnings_sql, workflow=[workflow])
 
