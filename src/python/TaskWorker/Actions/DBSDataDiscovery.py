@@ -151,7 +151,7 @@ class DBSDataDiscovery(DataDiscovery):
                 if 'T1_RU_JINR_Tape' in tapeLocations and len(tapeLocations) > 1:
                     tapeLocations.remove('T1_RU_JINR_Tape')  # JINR tape data are often duplicated
                 if len(tapeLocations) == 1:
-                    if 'US' in tapeLocations:
+                    if 'US' in list(tapeLocations)[0]:
                         ALL_RSES += "&(country=US|country=BR)"
                     else:
                         ALL_RSES += "\country=US\country=BR"  # Rucio wants the set complement operator \
@@ -453,11 +453,11 @@ class DBSDataDiscovery(DataDiscovery):
             secondaryBlocksWithLocation = secondaryLocationsMap.copy().keys()
 
         # take note of where tapes are
-        tapeLocations = []
+        tapeLocations = set()
         for block, locations in locationsMap.items():
             for rse in locations:
                 if 'Tape' in rse:
-                    tapeLocations.append(rse)
+                    tapeLocations.add(rse)
         # then filter out TAPE locations
         self.keepOnlyDiskRSEs(locationsMap)
 
