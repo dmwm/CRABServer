@@ -108,16 +108,7 @@ class TapeRecallManager(BaseRecurringAction):
                 newLifetime = 30 * 24 * 60 * 60  # 30 days in seconds
                 self.privilegedRucioClient.update_replication_rule(reqId, {'lifetime': newLifetime})
             else:
-                expiration = rule['expires_at']  # this is a datetime.datetime object
-                # this condition could be met only if rule expiration is shorter then MAX_DAYS_FOR_TAPERECALL
-                # which is more a mistake than a possibility, anyhow, let's cover all grounds
-                if expiration < datetime.datetime.now():  # did we wait too much ?
-                    msg = ("Replication request %s for task %s expired." % (reqId, taskName))
-                    msg += " Setting its status to FAILED"
-                    self.logger.info(msg)
-                    failTask(taskName, self.crabserver, msg, self.logger, 'FAILED')
-                else:
-                    pass  # keep waiting
+                pass  # keep waiting
             self.logger.info("Done on this task")
 
 
