@@ -171,7 +171,8 @@ class TapeRecallManager(BaseRecurringAction):
         tasks = []
         configreq = {'limit': 1000, 'workername': self.config.TaskWorker.name, 'getstatus': status}
         try:
-            tasks = self.crabserver.get(api='workflowdb', data=configreq)[0]['result']
+            data = urlencode(configreq)
+            tasks = self.crabserver.get(api='workflowdb', data=data)[0]['result']
         except Exception:
             pass
         if not tasks:
