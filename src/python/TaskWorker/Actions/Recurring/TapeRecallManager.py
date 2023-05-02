@@ -77,8 +77,8 @@ class TapeRecallManager(BaseRecurringAction):
             self.logger.info("Working on task %s", taskName)
             # 1.) check for "waited too long"
             if (time.time() - getTimeFromTaskname(str(taskName))) > MAX_DAYS_FOR_TAPERECALL*24*60*60:
-                msg = "Disk replica request (ID: %s) for input data did not complete in %d days." %\
-                      (reqId, MAX_DAYS_FOR_TAPERECALL)
+                msg = "Tape recall request for input data did not complete in %d days." %\
+                      MAX_DAYS_FOR_TAPERECALL
                 self.logger.info(msg)
                 failTask(taskName, self.crabserver, msg, self.logger, 'FAILED')
                 continue
