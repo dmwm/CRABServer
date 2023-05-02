@@ -62,6 +62,8 @@ def validateConfig(config):
 def getRESTParams(config, logger):
     """ get REST host name and db instance from a config object
     returns a tuple of strings (host, dbinstance). If can't, raises exception"""
+    # TODO this is also a candidate for TaskWorker/TaskUtils.py
+
     try:
         instance = config.TaskWorker.instance
     except:
