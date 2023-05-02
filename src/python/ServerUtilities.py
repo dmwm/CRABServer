@@ -76,7 +76,7 @@ MAX_POST_JOBS = 20
 ## It's also used during resubmissions since we don't allow a resubmission during the last week
 ## Before changing this value keep in mind that old running DAGs have the old value in the CRAB_TaskSubmitTime
 ## classad expression but DagmanResubmitter uses this value to calculate if a resubmission is possible
-TASKLIFETIME = 30*24*60*60
+TASKLIFETIME = 30*24*60*60  # 30 days in seconds
 ## Number of days where the resubmission is not possible if the task is expiring
 NUM_DAYS_FOR_RESUBMITDRAIN = 7
 ## Maximum number of days a task can stay in TAPERECALL status
