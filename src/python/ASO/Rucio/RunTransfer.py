@@ -1,12 +1,12 @@
 import logging
 import os
-
 from rucio.client.client import Client as RucioClient
 
-from ASO.Rucio.Actions.BuildTaskDataset import BuildTaskDataset
-#from ASO.Rucio.Actions.AddFilesToTransfer import AddFilesToTransfer
 from ASO.Rucio.Transfer import Transfer
 from ASO.Rucio.exception import RucioTransferException
+from ASO.Rucio.Actions.BuildDBSDataset import BuildDBSDataset
+#from ASO.Rucio.Actions.RegisterReplicas import RegisterReplicas
+#from ASO.Rucio.Actions.MonitorLocksStatus import MonitorLocksStatus
 
 class RunTransfer:
     """
@@ -20,7 +20,8 @@ class RunTransfer:
     def __init__(self):
         self.logger = logging.getLogger("RucioTransfer.RunTransfer")
         self.transfer = None
-        self.rucio = None
+        self.rucioClient = None
+        self.crabRESTClient = None
 
     def algorithm(self):
         """
@@ -30,13 +31,13 @@ class RunTransfer:
         """
         # init
         self.transfer = Transfer()
-        self.rucio = self._initRucioClient(self.transfer.username, self.transfer.proxypath)
-        # do nothing
-        BuildTaskDataset(self.transfer, self.rucio).execute()
+        self.transfer.readInfo()
+        self.rucioClient = self._initRucioClient(self.transfer.username, self.transfer.restProxyFile)
+        #self.crabRESTClient = self._initCrabRESTClient
+        # do dbs dataset
+        #BuildDBSDataset(self.transfer, self.rucioClient).execute()
         # do 1
-        #AddFilesToTransfer(self.rucios, elf.transfer)
-        # do 2
-
+        #RegisterReplicas(self.transfer, self.rucioClient, self.crabRESTClient).execute()
     def _initRucioClient(self, username, proxypath=None):
         # maybe we can share with getNativeRucioClient
         rucioLogger = logging.getLogger('RucioTransfer.RucioClient')

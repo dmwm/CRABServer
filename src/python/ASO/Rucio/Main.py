@@ -1,49 +1,17 @@
 import logging
-
 from argparse import ArgumentParser
 
-from ASO.Rucio.RunTransfer import RunTransfer
 import ASO.Rucio.config as config
-from python.ASO.Rucio.exception import RucioTransferException
+from ASO.Rucio.RunTransfer import RunTransfer
+from ASO.Rucio.exception import RucioTransferException
 
-
-class RucioTransferMain:
-    """
-    This class is entrypoint of RUCIO_Transfers.py It setup logs
-    handlers and called RunTransfer to execute RUCIO_Transfers.py
-    algorithm.
-    """
-    def __init__(self):
-        self._initLogger()
-        self.logger = logging.getLogger('RucioTransfer.RucioTransferMain')
-
-    def run(self):
-        """
-        Execute RunTransfer.algorithm.
-        Exception handling here is for debugging purpose. If
-        RucioTransferException was raise, it mean some condition is
-        not meet and we want to fail (fast) this process.  But if
-        Exception is raise mean something gone wrong with our code and
-        need to investigate.
-        """
-        self.logger.info("executing RunTransfer")
-        try:
-            self.logger.info('executing RunTransfer')
-            run = RunTransfer()
-            run.algorithm()
-        except RucioTransferException as ex:
-            raise ex
-        except Exception as ex:
-            raise Exception("Unexpected error during main  %s") from ex
-        self.logger.info('transfer completed')
-
-    def _initLogger(self):
-        logger = logging.getLogger('RucioTransfer')
-        logger.setLevel(logging.DEBUG)
-        hldr = logging.StreamHandler()
-        formatter = logging.Formatter('[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s')
-        hldr.setFormatter(formatter)
-        logger.addHandler(hldr)
+def initLogger():
+    logger = logging.getLogger('RucioTransfer')
+    logger.setLevel(logging.DEBUG)
+    hldr = logging.StreamHandler()
+    formatter = logging.Formatter('[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s')
+    hldr.setFormatter(formatter)
+    logger.addHandler(hldr)
 
 
 def main():
@@ -53,19 +21,50 @@ def main():
     run process directly from this file.
     """
     opt = ArgumentParser(usage=__doc__)
-    opt.add_argument("--force-publishname", dest="force_publishname", default=None,
+    opt.add_argument("--force-publishname", dest="force_publishname", default=None, type=str,
                      help="use provided output dataset name instead of output")
+    opt.add_argument("--force-last-line", dest="force_last_line", default=None, type=int,
+                     help="")
+    opt.add_argument("--last-line-path", dest="last_line_path",
+                     default='task_process/transfers/last_transfer.txt',
+                     help="")
+    opt.add_argument("--transfer-txt-path", dest="transfers_txt_path",
+                     default='task_process/transfers.txt',
+                     help="")
+    opt.add_argument("--rest-info-path", dest="rest_info_path",
+                     default='task_process/RestInfoForFileTransfers.json',
+                     help="")
+    opt.add_argument("--container-ruleid-path", dest="container_ruleid_path",
+                     default='task_process/transfers/container_ruleid.txt',
+                     help="")
     opts = opt.parse_args()
 
-    # Wa: I personally does not know how to mock this in unittest. I manually
-    # instantiate new one in test function before run one.
-    # Will switch to WMCore.Configuration.ConfigurationEx later
+    # Put args to config module to share variable across process.
+    # NOTE: For unittest, manually instantiate new one with argparse.Namespace
+    # class before execute test.
+    config.args = opts
 
-    config.config = opts
-    rucioTransfer = RucioTransferMain()
+    # init logger
+    initLogger()
+    logger = logging.getLogger('RucioTransfer')
 
-    rucioTransfer.run()
 
+    # Execute RunTransfer.algorithm().
+    # Exception handling here is for debugging purpose. If
+    # RucioTransferException was raise, it mean some condition is
+    # not meet and we want to fail (fast) this process.  But if
+    # Exception is raise mean something gone wrong with our code and
+    # need to investigate.
+    logger.info("executing RunTransfer")
+    try:
+        logger.info('executing RunTransfer')
+        run = RunTransfer()
+        run.algorithm()
+    except RucioTransferException as ex:
+        raise ex
+    except Exception as ex:
+        raise Exception("Unexpected error during main") from ex
+    logger.info('transfer completed')
 
 if __name__ == "__main__":
     main()
