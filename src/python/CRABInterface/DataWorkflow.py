@@ -394,7 +394,7 @@ class DataWorkflow(object):
             self.api.modify(self.Task.SetStatusWarningTask_sql, status=["NEW"], command=["KILL"],
                             taskname=[workflow], warnings = [str(warnings)])
 
-        if row.task_status == 'TAPERECALL':
+        elif row.task_status == 'TAPERECALL':
             self.api.modify(self.Task.SetStatusWarningTask_sql, status=["KILLRECALL"], command=["KILL"],
                             taskname=[workflow], warnings=[str(warnings)])
 
