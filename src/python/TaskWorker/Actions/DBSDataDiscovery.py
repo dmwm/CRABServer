@@ -14,7 +14,7 @@ from WMCore.Services.DBS.DBSErrors import DBSReaderError
 
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
-from ServerUtilities import FEEDBACKMAIL, parseDBSInstance, isDatasetUserDataset
+from ServerUtilities import FEEDBACKMAIL, MAX_DAYS_FOR_TAPERECALL, parseDBSInstance, isDatasetUserDataset
 from RucioUtils import getNativeRucioClient
 
 from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent,
@@ -190,7 +190,8 @@ class DBSDataDiscovery(DataDiscovery):
             #RSE_EXPRESSION = 'T3_IT_Trieste' # for testing
             WEIGHT = 'ddm_quota'
             #WEIGHT = None # for testing
-            LIFETIME = 30 * 24 * 3600  # 30 days
+            # make rul last 7 extra days to allow debugging in case TW or Recall action fail
+            LIFETIME = (MAX_DAYS_FOR_TAPERECALL + 7 ) * 24 * 60 * 60  # in seconds
             ASK_APPROVAL = False
             #ASK_APPROVAL = True # for testing
             ACCOUNT = 'crab_tape_recall'

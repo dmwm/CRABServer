@@ -12,6 +12,7 @@ import HTCondorUtils
 from WMCore.Credential.Proxy import Proxy
 from RESTInteractions import CRABRest
 from ServerUtilities import SERVICE_INSTANCES, tempSetLogLevel
+from TaskWorker.MasterWorker import getRESTParams
 from TaskWorker.WorkerExceptions import ConfigException
 
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
@@ -62,28 +63,7 @@ class CRAB3ProxyRenewer(object):
 
     def get_backendurls(self):
         # need to deal with the fact that TaskWorkerConfig may only specify a name instance
-        # following code snipped is copy/pasted from MasterWorker.py
-        try:
-            instance = self.config.TaskWorker.instance
-        except:
-            msg = "No instance provided: need to specify config.TaskWorker.instance in the configuration"
-            raise ConfigException(msg)
-        if instance in SERVICE_INSTANCES:
-            self.logger.info('Will connect to CRAB service: %s', instance)
-            self.restHost = SERVICE_INSTANCES[instance]['restHost']
-            self.dbInstance = SERVICE_INSTANCES[instance]['dbInstance']
-        else:
-            msg = "Invalid instance value '%s'" % instance
-            raise ConfigException(msg)
-        if instance == 'other':
-            self.logger.info('Will use restHost and dbInstance from config file')
-            try:
-                self.restHost = self.config.TaskWorker.restHost
-                self.dbInstance = self.config.TaskWorker.dbInstance
-            except:
-                msg = "Need to specify config.TaskWorker.restHost and dbInstance in the configuration"
-                raise ConfigException(msg)
-
+        self.restHost, self.dbInstance = getRESTParams(self.config, self.logger)
         self.logger.info("Querying server %s for HTCondor schedds and pool names.", self.restHost)
         crabserver = CRABRest(self.restHost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey,
                               retry=2, userAgent='CRABTaskWorker')

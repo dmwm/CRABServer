@@ -59,6 +59,34 @@ def validateConfig(config):
         config.TaskWorker.scheddPickerFunction = HTCondorLocator.memoryBasedChoices
     return True, 'Ok'
 
+def getRESTParams(config, logger):
+    """ get REST host name and db instance from a config object
+    returns a tuple of strings (host, dbinstance). If can't, raises exception"""
+    # TODO this is also a candidate for TaskWorker/TaskUtils.py
+
+    try:
+        instance = config.TaskWorker.instance
+    except:
+        msg = "No instance provided: need to specify config.TaskWorker.instance in the configuration"
+        raise ConfigException(msg)
+
+    if instance in SERVICE_INSTANCES:
+        logger.info('Will connect to CRAB service: %s', instance)
+        restHost = SERVICE_INSTANCES[instance]['restHost']
+        dbInstance = SERVICE_INSTANCES[instance]['dbInstance']
+    else:
+        msg = "Invalid instance value '%s'" % instance
+        raise ConfigException(msg)
+    if instance == 'other':
+        logger.info('Will use restHost and dbInstance from config file')
+        try:
+            restHost = config.TaskWorker.restHost
+            dbInstance = config.TaskWorker.dbInstance
+        except:
+            msg = "Need to specify config.TaskWorker.restHost and dbInstance in the configuration"
+            raise ConfigException(msg)
+    return restHost, dbInstance
+
 
 class MasterWorker(object):
     """I am the master of the TaskWorker"""
@@ -191,29 +219,9 @@ class MasterWorker(object):
 
         logVersionAndConfig(self.config, self.logger)
 
-        try:
-            instance = self.config.TaskWorker.instance
-        except:
-            msg = "No instance provided: need to specify config.TaskWorker.instance in the configuration"
-            raise ConfigException(msg)
-
-        if instance in SERVICE_INSTANCES:
-            self.logger.info('Will connect to CRAB service: %s', instance)
-            self.restHost = SERVICE_INSTANCES[instance]['restHost']
-            dbInstance = SERVICE_INSTANCES[instance]['dbInstance']
-        else:
-            msg = "Invalid instance value '%s'" % instance
-            raise ConfigException(msg)
-        if instance == 'other':
-            self.logger.info('Will use restHost and dbInstance from config file')
-            try:
-                self.restHost = self.config.TaskWorker.restHost
-                dbInstance = self.config.TaskWorker.dbInstance
-            except:
-                msg = "Need to specify config.TaskWorker.restHost and dbInstance in the configuration"
-                raise ConfigException(msg)
+        restHost, dbInstance = getRESTParams(self.config, self.logger)
+        self.restHost = restHost
         self.dbInstance = dbInstance
-
         self.logger.info('Will connect via URL: https://%s/%s', self.restHost, self.dbInstance)
 
         #Let's increase the server's retries for recoverable errors in the MasterWorker

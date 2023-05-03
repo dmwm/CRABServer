@@ -390,11 +390,18 @@ class DataWorkflow(object):
             warnings += [killwarning]
         warnings = str(warnings)
 
-        if row.task_status in ['SUBMITTED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED', 'KILLED', 'TAPERECALL']:
-            self.api.modify(self.Task.SetStatusWarningTask_sql, status = ["NEW"], command = ["KILL"], taskname = [workflow], warnings = [str(warnings)])
+        if row.task_status in ['SUBMITTED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED', 'KILLED']:
+            self.api.modify(self.Task.SetStatusWarningTask_sql, status=["NEW"], command=["KILL"],
+                            taskname=[workflow], warnings = [str(warnings)])
+
+        elif row.task_status == 'TAPERECALL':
+            self.api.modify(self.Task.SetStatusWarningTask_sql, status=["KILLRECALL"], command=["KILL"],
+                            taskname=[workflow], warnings=[str(warnings)])
+
         elif row.task_status == 'NEW' and row.task_command == 'SUBMIT':
             #if the task has just been submitted and not acquired by the TW
-            self.api.modify(self.Task.SetStatusWarningTask_sql, status = ["KILLED"], command = ["KILL"], taskname = [workflow], warnings = [str(warnings)])
+            self.api.modify(self.Task.SetStatusWarningTask_sql, status=["KILLED"], command=["KILL"],
+                            taskname=[workflow], warnings=[str(warnings)])
         else:
             raise ExecutionError("You cannot kill a task if it is in the %s status" % row.task_status)
 
