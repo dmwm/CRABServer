@@ -15,7 +15,7 @@ class GetAcceleratorSite(BaseRecurringAction):
 
     def _execute(self, config, task):  # pylint: disable=unused-argument
         # get glidein url from taskworker config
-        collector_url = config.TaskWorker.glideinPool
+        collector_url = config.TaskWorker.acceleratorSitesCollector
         collector = htcondor.Collector(collector_url)
         try:
             result = collector.query(htcondor.AdTypes.Any,
