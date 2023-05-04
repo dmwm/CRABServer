@@ -100,25 +100,6 @@ check_file_exist() {
     fi
 }
 
-term_signal_handler() {
-    echo "The job received a termination signal: " $1
-
-    # the job received a sigterm and it is likely that CMSRunAnalysis.py:logCMSSW()
-    # did not run. We then print here the stdout+stderr of cmsRun.
-    check_file_exist cmsRun-stdout.log.tmp DUMMY printfile
-
-    # proceed with exit pipeline: this will call finish()
-    finish
-}
-
-# Set a trap for SIGINT and SIGTERM signals
-# it is possible that condor only sends sigterm, but i'd rather
-# play it safe and trap also other termination signals
-trap "term_signal_handler TERM" SIGTERM
-trap "term_signal_handler INT"  SIGINT
-trap "term_signal_handler HUP"  SIGHUP
-trap "term_signal_handler QUIT" SIGQUIT
-
 function finish {
   parse_cmsrun
   chirp_exit_code
@@ -192,7 +173,7 @@ function parse_cmsrun {
     echo "======== Parsing output of cmsRun at $(TZ=GMT date)========"
     # We check which files that contain information about cmsRun execution exist.
 
-    check_file_exist cmsRun-stdout.log.tmp DUMMY
+    check_file_exist cmsRun-stdout.log.tmp DUMMY printfile
     check_file_exist cmsRun-stdout.log DUMMY
     check_file_exist FrameworkJobReport.xml DUMMY
     check_file_exist jobReport.json.$CRAB_Id JRJSON_NONEMPTY
