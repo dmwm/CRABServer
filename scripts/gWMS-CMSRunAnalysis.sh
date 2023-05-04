@@ -108,7 +108,7 @@ term_signal_handler() {
     check_file_exist cmsRun-stdout.log.tmp DUMMY printfile
 
     # proceed with exit pipeline: this will call finish()
-    exit
+    finish
 }
 
 # Set a trap for SIGINT and SIGTERM signals
