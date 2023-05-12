@@ -1,2 +1,0 @@
-TaskWorker release notes
-========================
