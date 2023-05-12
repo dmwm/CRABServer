@@ -1,0 +1,49 @@
+@startuml
+[*] --> NEW : crab submit
+NEW --> HOLDING /' I am gonna work on it '/
+HOLDING --> QUEUE /' I acquire it for my internal queue '/
+
+'HOLDING --> SUBMITFAILED /': (SUBMIT)MasterWorkeer.algorithm.failBannedTask,(SUBMIT)MasterWorkeer.algorithm.skipRejectedCommand'/
+'HOLDING --> KILLFAILED /': (KILL)MasterWorkeer.algorithm.failBannedTask'/
+'HOLDING --> RESUBMITFAILED /': (RESUBMIT)MasterWorkeer.algorithm.failBannedTask'/
+
+'are these state transition correct as it suppose to be?
+'HOLDING --> SUBMITTED /': (RESUBMIT)MasterWorkeer.algorithm.skipRejectedCommand'/
+'HOLDING --> SUBMITTED /': (KILL)MasterWorkeer.algorithm.skipRejectedCommand'/
+
+'submit
+QUEUE --> UPLOADED : dryrun
+UPLOADED --> SUBMITTED : crab-progress
+
+SUBMITTED --> NEW : crab-kill,crab-resubmit
+UPLOADED --> SUBMITFAILED : crab-progress
+
+QUEUE --> SUBMITTED
+QUEUE --> SUBMITFAILED 
+
+QUEUE --> RESUBMITFAILED
+RESUBMITFAILED --> NEW
+
+QUEUE --> KILLFAILED
+KILLFAILED --> NEW : crab resubmit
+
+QUEUE --> KILLED : Command=KILL
+KILLED --> NEW : crab resubmit
+
+' tape recall
+QUEUE --> TAPERECALL
+TAPERECALL --> TAPERECALL : wait for RucioRule
+TAPERECALL --> NEW : RucioRule is OK
+TAPERECALL --> KILLRECALL : crab kill
+KILLRECALL --> KILLED : TapeRecallManager
+
+QUEUE --> NEW : (tw startup)
+
+TAPERECALL --> FAILED : wait longer than n day
+SUBMITTED --> FAILED : (predag)
+
+
+SUBMITTED --> COMPLETED : task finish
+
+NEW --> KILLED : crab kill
+@enduml
