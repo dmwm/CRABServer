@@ -28,6 +28,7 @@ class BuildDBSDataset():
         self.checkOrCreateContainer()
         # create log dataset
         self.createDataset(self.transfer.logsDataset)
+        # Get the dataset for register replicas
         self.transfer.currentDataset = self.getOrCreateDataset()
 
     def checkOrCreateContainer(self):
@@ -113,7 +114,7 @@ class BuildDBSDataset():
 
     def createDataset(self, datasetName):
         """
-        Creating Rucio container, add replication rule, attach to container.
+        Creating Rucio dataset, add replication rule, attach to container.
         Ignore error if it already done.
 
         :param datasetName: dataset name to create.
