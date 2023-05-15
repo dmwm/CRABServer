@@ -55,7 +55,6 @@ def main():
     # not meet and we want to fail (fast) this process.  But if
     # Exception is raise mean something gone wrong with our code and
     # need to investigate.
-    logger.info("executing RunTransfer")
     try:
         logger.info('executing RunTransfer')
         run = RunTransfer()
