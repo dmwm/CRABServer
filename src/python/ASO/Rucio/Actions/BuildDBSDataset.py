@@ -4,7 +4,6 @@ import uuid
 from rucio.common.exception import DataIdentifierAlreadyExists, InvalidObject, DuplicateRule, DuplicateContent
 
 from ASO.Rucio.exception import RucioTransferException
-from ASO.Rucio.config import config
 
 class BuildDBSDataset():
     """
@@ -58,12 +57,13 @@ class BuildDBSDataset():
                     'name': self.transfer.publishname,
                     'type': "CONTAINER",
                 }
-                ruleID = self.rucioClient.add_replication_rule([containerDID], 1, self.transfer.destination)
+                ruleID = self.rucioClient.add_replication_rule([containerDID], 1, self.transfer.destination)[0]
                 self.transfer.updateContainerRuleID(ruleID)
                 # TODO: not sure if any other case make the rule duplicate beside script crash
             except DuplicateRule:
+                # TODO: it possible that someone will create the rule for container, need better filter rule to match rules we create
                 self.logger.info(f"Rule already exists. Get rule ID from Rucio.")
-                ruleID = list(self.rucioClient.list_did_rules(self.transfer.rucioScope, self.transfer.publishname))[0]
+                ruleID = list(self.rucioClient.list_did_rules(self.transfer.rucioScope, self.transfer.publishname))[0]['id']
                 self.transfer.updateContainerRuleID(ruleID)
 
     def getOrCreateDataset(self):

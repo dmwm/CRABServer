@@ -17,7 +17,7 @@ class Transfer:
 
         # from rest info
         self.restHost = ''
-        self.restDBinstance = ''
+        self.restDBInstance = ''
         self.restProxyFile = ''
 
 
@@ -43,6 +43,9 @@ class Transfer:
         It needs to execute to following order because of dependency between
         method.
         """
+        # ensure task_process/transfers directory
+        if not os.path.exists('task_process/transfers'):
+            os.makedirs('task_process/transfers')
         self.readLastTransferLine()
         self.readTransferItems()
         self.readRESTInfo()
@@ -53,7 +56,7 @@ class Transfer:
         """
         Reading lastTransferLine from task_process/transfers/last_transfer.txt
         """
-        if config.args.force_last_line != None: #  Need explicit compare to None
+        if config.args.force_last_line != None: #  Need explicitly compare to None
             self.lastTransferLine = config.args.force_last_line
             return
         path = config.args.last_line_path
@@ -63,6 +66,12 @@ class Transfer:
         except FileNotFoundError:
             self.logger.info(f'{path} not found. Assume it is first time it run.')
             self.lastTransferLine = 0
+
+    def updateLastTransferLine(self, line):
+        self.lastTransferLine = line
+        path = config.args.last_line_path
+        with writePath(path) as w:
+            w.write(str(self.lastTransferLine))
 
     def readTransferItems(self):
         """
@@ -89,7 +98,7 @@ class Transfer:
             with open(path, 'r', encoding='utf-8') as r:
                 doc = json.loads(r.read())
                 self.restHost = doc['host']
-                self.restDBinstance = doc['dbInstance']
+                self.restDBInstance = doc['dbInstance']
                 self.restProxyFile = doc['proxyfile']
         except FileNotFoundError as ex:
             raise RucioTransferException(f'{path} does not exist. Probably no completed jobs in the task yet.') from ex
@@ -113,10 +122,14 @@ class Transfer:
         """
         Read containerRuleID from task_process/transfers/bookkeeping_rules.json
         """
+        # skip reading rule from bookkeeping in case rerun with new publishname.
+        if config.args.force_publishname:
+            return
         path = config.args.container_ruleid_path
         try:
             with open(path, 'r', encoding='utf-8') as r:
                 self.containerRuleID = r.read()
+                self.logger.info(f'Got container rule ID from bookkeeping. Rule ID: {self.containerRuleID}')
         except FileNotFoundError:
             self.logger.info(f'Bookkeeping rules "{path}" does not exist. Assume it is first time it run.')
 
@@ -124,6 +137,8 @@ class Transfer:
         """
         update task_process/transfers/container_ruleid.txt
         """
+        self.containerRuleID = ruleID
         path = config.args.container_ruleid_path
+        self.logger.info(f'Bookkeeping container rule ID [{ruleID}] to file: {path}')
         with writePath(path) as w:
             w.write(ruleID)
