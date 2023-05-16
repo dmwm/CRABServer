@@ -37,6 +37,12 @@ class Transfer:
         # rule bookkeeping
         self.containerRuleID = ''
 
+        # all replicas from rucio
+        self.replicasInContainer = None
+
+        # map lf2 to id
+        self.replicaLFN2IDMap = None
+
     def readInfo(self):
         """
         Read the information from input files using path from configuration.
@@ -46,11 +52,22 @@ class Transfer:
         # ensure task_process/transfers directory
         if not os.path.exists('task_process/transfers'):
             os.makedirs('task_process/transfers')
+        # read into memory
         self.readLastTransferLine()
         self.readTransferItems()
+        self.buildLFN2IDMap()
         self.readRESTInfo()
         self.readInfoFromTransferItems()
         self.readContainerRuleID()
+
+    def readInfoFromRucio(self, rucioClient):
+        """
+        Read the information from Rucio.
+
+        :param rucioClient: Rucio client
+        :type rucioClient: rucio.client.client.Client
+        """
+        self.getReplicasInContainer(rucioClient)
 
     def readLastTransferLine(self):
         """
@@ -68,6 +85,12 @@ class Transfer:
             self.lastTransferLine = 0
 
     def updateLastTransferLine(self, line):
+        """
+        Update lastTransferLine to task_process/transfers/last_transfer.txt
+
+        :param line: line number
+        :type line: int
+        """
         self.lastTransferLine = line
         path = config.args.last_line_path
         with writePath(path) as w:
@@ -88,6 +111,15 @@ class Transfer:
             raise RucioTransferException(f'{path} does not exist. Probably no completed jobs in the task yet.') from ex
         if len(self.transferItems) == 0:
             raise RucioTransferException(f'{path} does not contain new entry.')
+
+    def buildLFN2IDMap(self):
+        """
+        Create `self.replicaLFN2IDMap` for map from LFN to ID of REST file
+        trasnfer.
+        """
+        self.replicaLFN2IDMap = {}
+        for x in self.transferItems:
+            self.replicaLFN2IDMap[x['destination_lfn']] = x['id']
 
     def readRESTInfo(self):
         """
@@ -142,3 +174,22 @@ class Transfer:
         self.logger.info(f'Bookkeeping container rule ID [{ruleID}] to file: {path}')
         with writePath(path) as w:
             w.write(ruleID)
+
+    def getReplicasInContainer(self, rucioClient):
+        """
+        Get the list of replicas in the container and store it as key-value pair
+        in `self.replicasInContainer`, as a map of LFN to the dataset name it
+        attaches to.
+
+        :param rucioClient: Rucio Client
+        :type rucioClient: rucio.client.client.Client
+        """
+        replicasInContainer = {}
+        datasets = rucioClient.list_content(self.rucioScope, self.publishname)
+        for ds in datasets:
+            files = rucioClient.list_content(self.rucioScope, ds['name'])
+            for f in files:
+                if not f['name'] in replicasInContainer:
+                    replicasInContainer[f['name']] = ds['name']
+        self.logger.debug(f'all replicas in container: {replicasInContainer}')
+        self.replicasInContainer = replicasInContainer

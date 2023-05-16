@@ -6,7 +6,10 @@ from unittest.mock import patch, Mock
 from ASO.Rucio.exception import RucioTransferException
 from rucio.common.exception import DataIdentifierAlreadyExists, InvalidObject, DuplicateRule, DuplicateContent
 
-from ASO.Rucio.Actions.BuildTaskDataset import BuildTaskDataset
+from ASO.Rucio.Actions.BuildDBSDataset import BuildTaskDataset
+
+# FIXME: class name is changed from BuildTaskDataset to BuildDBSDataset.
+# Need to fix on all test in this files
 
 @pytest.fixture
 def mock_Transfer():
@@ -44,6 +47,7 @@ def test_checkOrCreateContainer_container_exist(mock_rucioClient, mock_Transfer)
 #    should we do it in integration test or in unittest?
 
 def test_createDataset(mock_Transfer, mock_rucioClient):
+    mock_Transfer.addNewRules = Mock()
     b = BuildTaskDataset(mock_Transfer, mock_rucioClient)
     b.createDataset(mock_Transfer.datasetName)
     mock_rucioClient.add_dataset.assert_called_once()
@@ -56,6 +60,7 @@ def test_createDataset(mock_Transfer, mock_rucioClient):
     ('attach_dids', DuplicateContent),
 ])
 def test_createDataset_raise_exception(mock_Transfer, mock_rucioClient, methodName, exception):
+    mock_Transfer.addNewRules = Mock()
     getattr(mock_rucioClient, methodName).side_effect = exception
     b = BuildTaskDataset(mock_Transfer, mock_rucioClient)
     b.createDataset(mock_Transfer.datasetName)
@@ -63,7 +68,6 @@ def test_createDataset_raise_exception(mock_Transfer, mock_rucioClient, methodNa
     mock_rucioClient.add_dataset.assert_called_once()
     mock_rucioClient.add_replication_rule.assert_called_once()
     mock_rucioClient.attach_dids.assert_called_once()
-
 
 # test getOrCreateDataset()
 # algo
