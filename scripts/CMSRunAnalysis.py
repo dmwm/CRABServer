@@ -260,6 +260,8 @@ def handleException(exitAcronym, exitCode, exitMsg):
 
     with open('jobReport.json', 'w') as rf:
         json.dump(report, rf)
+    with open('jobReport.exitCode.txt', 'w') as rf:
+        rf.write(str(report['exitCode']))
 
 def parseArgs():
     parser = PassThroughOptionParser()
@@ -434,13 +436,12 @@ def executeUserApplication(command, scram, cleanEnv=True):
     """
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
         ret = scram(command, runtimeDir=os.getcwd(), cleanEnv=cleanEnv)
+        dest = shutil.move('cmsRun-stdout.log.tmp', 'cmsRun-stdout.log')
+        logging.debug("cmssw stdout moved to cmsRun-stdout.log: %s", dest)
     if ret > 0:
-        with open('cmsRun-stdout.log', 'w') as fh:
+        with open('cmsRun-stdout.log', 'a') as fh:
             fh.write(scram.diagnostic())
         print("Error executing application in CMSSW environment.\n\tSee stdout log")
-    else:
-        with open('cmsRun-stdout.log', 'w') as fh:
-            fh.write(scram.getStdout())
     return ret
 
 def AddChecksums(report):
@@ -635,15 +636,16 @@ if __name__ == "__main__":
         jobExitCode = None
         applicationName = 'CMSSW JOB' if not options.scriptExe else 'ScriptEXE'
         print("==== %s Execution started at %s ====" % (applicationName, time.asctime(time.gmtime())))
+        cmd = "stdbuf -oL -eL "
         if not options.scriptExe :
-            cmd = 'cmsRun -p PSet.py -j FrameworkJobReport.xml'
+            cmd += 'cmsRun -p PSet.py -j FrameworkJobReport.xml'
         else:
             # make sure scriptexe is executable
             st = os.stat(options.scriptExe)
             os.chmod(options.scriptExe, st.st_mode | stat.S_IEXEC)
-            cmd = os.getcwd() + "/%s %s %s" %\
+            cmd += os.getcwd() + "/%s %s %s" %\
                   (options.scriptExe, options.jobNumber, " ".join(json.loads(options.scriptArgs)))
-
+        cmd += " > cmsRun-stdout.log.tmp 2>&1"
         applicationExitCode = executeUserApplication(cmd, scram, cleanEnv=False)
         if applicationExitCode:
             print("==== Execution FAILED at %s ====" % time.asctime(time.gmtime()))
@@ -679,6 +681,8 @@ if __name__ == "__main__":
                 rep['jobExitCode'] = jobExitCode
                 with open('jobReport.json', 'w') as of:
                     json.dump(rep, of)
+                with open('jobReport.exitCode.txt', 'w') as rf:
+                    rf.write(str(rep['jobExitCode']))
             except Exception:
                 print("WARNING: Failure when trying to parse FJR XML after job failure.")
 
@@ -763,6 +767,8 @@ if __name__ == "__main__":
         print("== Execution site from site-local-config.xml: %s" % slCfg.siteName)
         with open('jobReport.json', 'w') as of:
             json.dump(rep, of)
+        with open('jobReport.exitCode.txt', 'w') as rf:
+            rf.write(str(rep['exitCode']))
         with open('jobReportExtract.pickle', 'wb') as of:
             pickle.dump(rep, of)
         print("==== Report file creation FINISHED at %s ====" % time.asctime(time.gmtime()))
