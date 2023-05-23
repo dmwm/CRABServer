@@ -107,7 +107,7 @@ class DBSDataDiscovery(DataDiscovery):
         msg = msgHead
         if system == 'Rucio':
             # need to use crab_tape_recall Rucio account to create containers and create rules
-            tapeRecallConfig = copy.copy(self.config)
+            tapeRecallConfig = copy.deepcopy(self.config)
             tapeRecallConfig.Services.Rucio_account = 'crab_tape_recall'
             rucioClient = getNativeRucioClient(tapeRecallConfig, self.logger) # pylint: disable=redefined-outer-name
             # turn input CMS blocks into Rucio dids in cms scope
