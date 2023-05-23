@@ -89,174 +89,6 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\nhttps://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ"
                 raise TaskWorkerException(msg)
 
-    def requestTapeRecall(self, blockList, sizeToRecall, tapeLocations=None, system='Rucio', msgHead=''):   # pylint: disable=W0102
-        """
-        :param blockList: a list of blocks to recall from Tape to Disk
-        :param sizeToRecall: an integer of blockList's total size in bytes.
-        :param system: a string identifying the DDM system to use 'Rucio' or 'None'
-        :param msgHead: a string with the initial part of a message to be used for exceptions
-        :return: nothing: Since data on tape means no submission possible, this function will
-            always raise a TaskWorkerException to stop the action flow.
-            The exception message contains details and an attempt is done to upload it to TaskDB
-            so that crab status can report it
-        """
-        if not blockList:
-            return
-        # beware blockList being not subscriptable (e.g. dict_keys type)
-        dbsDatasetName = next(iter(blockList)).split('#')[0]
-        msg = msgHead
-        if system == 'Rucio':
-            # need to use crab_tape_recall Rucio account to create containers and create rules
-            tapeRecallConfig = copy.copy(self.config)
-            tapeRecallConfig.Services.Rucio_account = 'crab_tape_recall'
-            rucioClient = getNativeRucioClient(tapeRecallConfig, self.logger) # pylint: disable=redefined-outer-name
-            # turn input CMS blocks into Rucio dids in cms scope
-            dids = [{'scope': 'cms', 'name': block} for block in blockList]
-            # prepare container /TapeRecall/taskname/USER in the service scope
-            myScope = 'user.crab_tape_recall'
-            containerName = '/TapeRecall/%s/USER' % self.taskName.replace(':', '.')
-            containerDid = {'scope':myScope, 'name':containerName}
-            self.logger.info("Create RUcio container %s", containerName)
-            try:
-                rucioClient.add_container(myScope, containerName)
-            except DataIdentifierAlreadyExists:
-                self.logger.debug("Container name already exists in Rucio. Keep going")
-            except Exception as ex:
-                msg += "\nRucio exception creating container: %s" %  (str(ex))
-                raise TaskWorkerException(msg) from ex
-            try:
-                rucioClient.attach_dids(myScope, containerName, dids)
-            except DuplicateContent:
-                self.logger.debug("Some dids are already in this container. Keep going")
-            except Exception as ex:
-                msg += "\nRucio exception adding blocks to container: %s" %  (str(ex))
-                raise TaskWorkerException(msg) from ex
-            self.logger.info("Rucio container %s:%s created with %d blocks", myScope, containerName, len(blockList))
-
-            TBtoRecall = sizeToRecall // 1e12
-            # a friendly-formatted string to print the size
-            recallSize = f"{TBtoRecall:.0f} TBytes" if TBtoRecall>0 else f"{sizeToRecall/1e9:.0f} GBytes"
-            # Sanity check
-            if TBtoRecall > 1e3:
-                msg += '\nDataset size %d TB. Will not trigger automatic recall for >1PB. Contact DataOps' % TBtoRecall
-                raise TaskWorkerException(msg)
-            self.logger.info("Total size of data to recall : %s", recallSize)
-
-            # make RSEs lists
-            # asking for ddm_quota>0 gets rid also of Temp and Test RSE's
-            ALL_RSES = "ddm_quota>0&(tier=1|tier=2)&rse_type=DISK"
-            # tune list according to where tapes are, we expect a single location
-            # if there are more... let Rucio deal with them to find best route
-            if tapeLocations:
-                if 'T1_RU_JINR_Tape' in tapeLocations and len(tapeLocations) > 1:
-                    tapeLocations.remove('T1_RU_JINR_Tape')  # JINR tape data are often duplicated
-                if len(tapeLocations) == 1:
-                    if 'US' in list(tapeLocations)[0]:
-                        ALL_RSES += "&(country=US|country=BR)"
-                    else:
-                        ALL_RSES += "\country=US\country=BR"  # Rucio wants the set complement operator \
-            rses = rucioClient.list_rses(ALL_RSES)
-            rseNames = [r['rse'] for r in rses]
-            largeRSEs = []  # a list of largish (i.e. solid) RSEs
-            freeRSEs = []  # a subset of largeRSEs which also have quite some free space
-            for rse in rseNames:
-                if rse[2:6] == '_RU_':  # avoid fragile sites, see #7400
-                    continue
-                usageDetails = list(rucioClient.get_rse_usage(rse, filters={'source': 'static'}))
-                if not usageDetails:  # some RSE's are put in the system with an empty list here, e.g. T2_FR_GRIF
-                    continue
-                size = usageDetails[0]['used']  # bytes
-                if float(size)/1.e15 > 1.0:  # more than 1 PB
-                    largeRSEs.append(rse)
-                    availableSpace = int(rucioClient.list_rse_attributes(rse)['ddm_quota'])  # bytes
-                    if availableSpace/1e12 > 100:  # at least 100TB available
-                        freeRSEs.append(rse)
-            # use either list (largeRSEs or freeRSEs) according to dataset size:
-            if TBtoRecall <= 1000.:  # see https://github.com/dmwm/CRABServer/issues/7610
-                grouping = 'ALL'
-                self.logger.info("Will place all blocks at a single site")
-                RSE_EXPRESSION = '|'.join(largeRSEs)  # any solid site will do, most datasets are a few TB anyhow
-            else:
-                grouping = 'DATASET'  # Rucio DATASET i.e. CMS block !
-                self.logger.info("Will scatter blocks on multiple sites")
-                # restrict the list to as many sites as there are 50TB chunks in the dataset, plus some slack
-                nRSEs = int(TBtoRecall/50) + 1
-                myRSEs = random.sample(freeRSEs, nRSEs)
-                RSE_EXPRESSION = '|'.join(myRSEs)
-            self.logger.debug('Will use RSE_EXPRESSION = %s', RSE_EXPRESSION)
-
-            # create rule
-            #RSE_EXPRESSION = 'ddm_quota>0&(tier=1|tier=2)&rse_type=DISK'
-            #RSE_EXPRESSION = 'T3_IT_Trieste' # for testing
-            WEIGHT = 'ddm_quota'
-            #WEIGHT = None # for testing
-            # make rul last 7 extra days to allow debugging in case TW or Recall action fail
-            LIFETIME = (MAX_DAYS_FOR_TAPERECALL + 7 ) * 24 * 60 * 60  # in seconds
-            ASK_APPROVAL = False
-            #ASK_APPROVAL = True # for testing
-            ACCOUNT = 'crab_tape_recall'
-            copies = 1
-            try:
-                ruleId = rucioClient.add_replication_rule(
-                    dids=[containerDid], copies=copies, rse_expression=RSE_EXPRESSION,
-                    grouping=grouping, weight=WEIGHT, lifetime=LIFETIME, account=ACCOUNT,
-                    activity='Analysis Input',
-                    comment=f"Recall {recallSize} for user: {self.username} dataset: {dbsDatasetName}",
-                    ask_approval=ASK_APPROVAL, asynchronous=True)
-            except DuplicateRule as ex:
-                # handle "A duplicate rule for this account, did, rse_expression, copies already exists"
-                # which should only happen when testing, since container name is unique like task name, anyhow...
-                self.logger.debug("A duplicate rule for this account, did, rse_expression, copies already exists. Use that")
-                # find the existing rule id
-                ruleId = rucioClient.list_did_rules(myScope, containerName)
-            except (InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage) as ex:
-                msg = "\nNot enough global quota to issue a tape recall request. Rucio exception:\n%s" % str(ex)
-                raise TaskWorkerException(msg) from ex
-            except Exception as ex:
-                msg += "\nRucio exception creating rule: %s" %  str(ex)
-                raise TaskWorkerException(msg) from ex
-            ruleId = str(ruleId[0])  # from list to singleId and remove unicode
-
-            msg += "\nA disk replica has been requested to Rucio (rule ID: %s )" % ruleId
-            msg += "\nyou can check progress via either of the following two commands:"
-            msg += "\n rucio rule-info %s" % ruleId
-            msg += "\n rucio list-rules %s:%s" % (myScope, containerName)
-            msg += "\nor simply check 'state' line in this page: https://cms-rucio-webui.cern.ch/rule?rule_id=%s" % ruleId
-            automaticTapeRecallIsImplemented = True
-            if automaticTapeRecallIsImplemented:
-                tapeRecallStatus = 'TAPERECALL'
-            else:
-                tapeRecallStatus = 'SUBMITFAILED'
-            configreq = {'workflow': self.taskName,
-                         'taskstatus': tapeRecallStatus,
-                         'ddmreqid': ruleId,
-                         'subresource': 'addddmreqid',
-                         }
-            try:
-                tapeRecallStatusSet = self.crabserver.post(api='task', data=urlencode(configreq))
-            except HTTPException as hte:
-                self.logger.exception(hte)
-                msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (
-                    self.config.TaskWorker.restHost, str(hte))
-                msg += "\nStoring of %s status and ruleId (%s) failed for task %s" % (
-                    tapeRecallStatus, ruleId, self.taskName)
-                msg += "\nHTTP Headers are: %s" % hte.headers
-                raise TaskWorkerException(msg, retry=True) from hte
-            if tapeRecallStatusSet[2] == "OK":
-                self.logger.info("Status for task %s set to '%s'", self.taskName, tapeRecallStatus)
-            if automaticTapeRecallIsImplemented:
-                msg += "\nThis task will be automatically submitted as soon as the stage-out is completed."
-                self.uploadWarning(msg, self.userproxy, self.taskName)
-                raise TapeDatasetException(msg)
-            # fall here if could not setup for automatic submission after recall
-            msg += "\nPlease monitor recall progress via Rucio or DAS and try again once data are on disk."
-            raise TaskWorkerException(msg)
-
-        if system == 'None':
-            msg += '\nIt is not possible to request a recall from tape.'
-            msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
-            raise TaskWorkerException(msg)
-
     def execute(self, *args, **kwargs):
         """
         This is a convenience wrapper around the executeInternal function
@@ -449,9 +281,9 @@ class DBSDataDiscovery(DataDiscovery):
 
         # make a copy of locationsMap dictionary, so that manipulating it in keeOnlyDiskRSE
         # does not touch blocksWithLocation
-        blocksWithLocation = locationsMap.copy().keys()
+        blocksWithLocation = list(locationsMap.copy().keys())
         if secondaryDataset:
-            secondaryBlocksWithLocation = secondaryLocationsMap.copy().keys()
+            secondaryBlocksWithLocation = list(secondaryLocationsMap.copy().keys())
 
         # take note of where tapes are
         tapeLocations = set()
@@ -479,35 +311,34 @@ class DBSDataDiscovery(DataDiscovery):
         # check for tape recall
         #if set(locationsMap.keys()) != set(blocksWithLocation):
         if requestTapeRecall:
+            dataToRecall = inputDataset if not inputBlocks else list(blocksWithLocation)
             dataTier = inputDataset.split('/')[3]
             maxTierToBlockRecallSizeTB = getattr(self.config.TaskWorker, 'maxTierToBlockRecallSizeTB', 0)
             maxTierToBlockRecallSize = maxTierToBlockRecallSizeTB * 1e12
             if dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []):
                 msg = f"Task could not be submitted because not all blocks of dataset {inputDataset} are on DISK"
-                msg += "\nWill try to request a full disk copy for you. See"
+                msg += "\nWill request a full disk copy for you. See"
                 msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
-                self.requestTapeRecall(blocksWithLocation, totalSizeBytes,
+                self.requestTapeRecall(dataToRecall=dataToRecall, sizeToRecall=totalSizeBytes,
                                        tapeLocations=tapeLocations, system='Rucio', msgHead=msg)
             elif inputBlocks:
                 if totalSizeBytes < maxTierToBlockRecallSize:
                     msg = "Task could not be submitted because blocks specified in 'Data.inputBlocks' are not on disk."
-                    msg += "\nWill try to request disk copy for you. See"
+                    msg += "\nWill request a disk copy for you. See"
                     msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
-                    self.requestTapeRecall(blocksWithLocation, totalSizeBytes,
+                    self.requestTapeRecall(dataToRecall=dataToRecall, sizeToRecall=totalSizeBytes,
                                            tapeLocations=tapeLocations, system='Rucio', msgHead=msg)
                 else:
                     msg = "Some blocks are on TAPE only and will not be processed."
                     msg += f"\nThere is no automatic recall from TAPE for data tier '{dataTier}' if 'Data.inputBlocks' is provided,"
                     msg += f"\nbut the recall size ({totalSizeBytes/1e12:.3f} TB) is larger than the maximum allowed size ({maxTierToBlockRecallSizeTB} TB)."
                     msg += f"\nIf you need these blocks, contact Data Transfer team via {FEEDBACKMAIL}"
-                    self.logger.warning(msg)
-                    self.uploadWarning(msg, self.userproxy, self.taskName)
+                    raise TaskWorkerException(msg)
             else:
                 msg = "Some blocks are on TAPE only and will not be processed."
                 msg += f"\nThere is no automatic recall from tape for data tier '{dataTier}' if 'Data.inputBlocks' is not provided."
                 msg += f"\nIf you need the full dataset, contact Data Transfer team via {FEEDBACKMAIL}"
-                self.logger.warning(msg)
-                self.uploadWarning(msg, self.userproxy, self.taskName)
+                raise TaskWorkerException(msg)
 
         # will not need lumi info if user has asked for split by file with no run/lumi mask
         splitAlgo = kwargs['task']['tm_split_algo']
@@ -572,6 +403,233 @@ class DBSDataDiscovery(DataDiscovery):
 
         return result
 
+    def requestTapeRecall(self, dataToRecall=None, sizeToRecall=0,
+                          tapeLocations=None, system=None, msgHead=''):
+        """
+        :param dataToRecall: two formats are possible:
+            1. a string with a DBS dataset name
+            2. a list of blocks to recall from Tape to Disk
+        :param sizeToRecall: an integer of recall total size in bytes.
+        :param system: a string identifying the DDM system to use 'Rucio' or 'None'
+        :param msgHead: a string with the initial part of a message to be used for exceptions
+        :return: nothing: Since data on tape means no submission possible, this function will
+            always raise a TaskWorkerException to stop the action flow.
+            The exception message contains details and an attempt is done to upload it to TaskDB
+            so that crab status can report it
+        """
+        msg = msgHead
+        if not isinstance(dataToRecall, str) and not isinstance(dataToRecall, list):
+            return
+        if system == 'Rucio':
+            self.requestRucioTapeRecall(dataToRecall, sizeToRecall, tapeLocations, msgHead=msg)
+            msg += "\nThis task will be automatically submitted as soon as the stage-out is completed."
+            self.uploadWarning(msg, self.userproxy, self.taskName)
+            raise TapeDatasetException(msg)
+        elif system == 'None':
+            msg += '\nIt is not possible to request a recall from tape.'
+            msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
+            raise TaskWorkerException(msg)
+
+    def requestRucioTapeRecall(self, dataToRecall=None, sizeToRecall=0, tapeLocations=None, msgHead=''):
+        """
+        implements tape recall with Rucio
+        params and returns are the same as requestTapeRecall defined above
+        """
+        # args to replace self: config, taskName, logger, crabserver
+        msg = msgHead
+        # need to use crab_tape_recall Rucio account to create containers and create rules
+        tapeRecallConfig = copy.copy(self.config)
+        tapeRecallConfig.Services.Rucio_account = 'crab_tape_recall'
+        rucioClient = getNativeRucioClient(tapeRecallConfig, self.logger)  # pylint: disable=redefined-outer-name
+
+        # prepare container to be recalled
+        if isinstance(dataToRecall, str):
+            # recalling a full DBS dataset, simple the container already exists
+            myScope = 'cms'
+            dbsDatasetName = dataToRecall
+            containerDid = {'scope': myScope, 'name': dbsDatasetName}
+        elif isinstance(dataToRecall, list) or isinstance(dataToRecall, dict_keys):
+            # need to prepare ad hoc container. Can not reuse a possibly existing one:
+            # if a user wants one block from a large dataset, we must
+            # not recall also all blocks possibly requested in the past
+            #  by other users for other reasons.
+            #  Therefore we stick with naming the container after the task name
+            myScope = 'user.crab_tape_recall'  # do not mess up with cms scope
+            containerName = '/TapeRecall/%s/USER' % self.taskName.replace(':', '.')
+            containerDid = {'scope': myScope, 'name': containerName}
+            self.makeContainerFromBlockList(
+                rucio=rucioClient, blockList=dataToRecall,
+                containerDid=containerDid, logger=self.logger)
+            # beware blockList being not subscriptable (e.g. dict_keys type)
+            dbsDatasetName = next(iter(dataToRecall)).split('#')[0]
+        else:
+            return
+
+        TBtoRecall = sizeToRecall // 1e12
+        # a friendly-formatted string to print the size
+        recallSize = f"{TBtoRecall:.0f} TBytes" if TBtoRecall > 0 else f"{sizeToRecall / 1e9:.0f} GBytes"
+        # Sanity check
+        if TBtoRecall > 1e3:
+            msg += '\nDataset size %d TB. Will not trigger automatic recall for >1PB. Contact DataOps' % TBtoRecall
+            raise TaskWorkerException(msg)
+        self.logger.info("Total size of data to recall : %s", recallSize)
+        # prepare comment to be inserted in the Rucio rule
+        comment = f"Recall {recallSize} for user: {self.username} dataset: {dbsDatasetName}"
+
+        # define where to recall to, which depends also on where data are on tape
+        (RSE_EXPRESSION, grouping) = self.whereToRecall(
+            rucio=rucioClient, TBtoRecall=TBtoRecall, tapeLocations=tapeLocations, logger=self.logger)
+
+        # create rule
+        ruleId = self.createRucioRule(rucio=rucioClient, did=containerDid, grouping=grouping,
+                                      RSE_EXPRESSION=RSE_EXPRESSION, comment=comment,
+                                      logger=self.logger)
+        self.logger.info(f"Created Rucio rule ID: {ruleId}")
+
+        # this will be printed by "crab status"
+        msg += "\nA disk replica has been requested to Rucio.  Check progress via:"
+        msg += "\n  rucio rule-info %s" % ruleId
+        msg += "\nor simply check 'state' line in this page: https://cms-rucio-webui.cern.ch/rule?rule_id=%s" % ruleId
+
+        # update task status in CRAB DB and store the rule ID
+        self.setTaskToTapeRecall(taskname=self.taskName, ruleId=ruleId,
+                                 crabserver=self.crabserver, logger=self.logger)
+
+    def makeContainerFromBlockList(self, rucio=None, logger=None, blockList=None, containerDid=None):
+        """ create container and fill with given blocks """
+        scope = containerDid['scope']
+        containerName = containerDid['name']
+        # turn input CMS blocks into Rucio dids in cms scope
+        dids = [{'scope': 'cms', 'name': block} for block in blockList]
+        # prepare container
+        logger.info("Create Rucio container %s", containerName)
+        try:
+            rucio.add_container(scope, containerName)
+        except DataIdentifierAlreadyExists:
+            logger.debug("Container name already exists in Rucio. Keep going")
+        except Exception as ex:
+            msg = "\nRucio exception creating container: %s" % (str(ex))
+            raise TaskWorkerException(msg) from ex
+        # add block dids to container
+        try:
+            rucio.attach_dids(scope, containerName, dids)
+        except DuplicateContent:
+            logger.debug("Some dids are already in this container. Keep going")
+        except Exception as ex:
+            msg = "\nRucio exception adding blocks to container: %s" % (str(ex))
+            raise TaskWorkerException(msg) from ex
+        logger.info("Rucio container %s:%s created with %d blocks", scope, containerName, len(blockList))
+
+    def whereToRecall(self, rucio=None, TBtoRecall=0, tapeLocations=None, logger=None):
+        # make RSEs lists
+        # asking for ddm_quota>0 gets rid also of Temp and Test RSE's
+        ALL_RSES = "ddm_quota>0&(tier=1|tier=2)&rse_type=DISK"
+        # tune list according to where tapes are, we expect a single location
+        # if there are more... let Rucio deal with them to find best route
+        if tapeLocations:
+            if 'T1_RU_JINR_Tape' in tapeLocations and len(tapeLocations) > 1:
+                tapeLocations.remove('T1_RU_JINR_Tape')  # JINR tape data are often duplicated
+            if len(tapeLocations) == 1:
+                if 'US' in list(tapeLocations)[0]:
+                    ALL_RSES += "&(country=US|country=BR)"
+                else:
+                    ALL_RSES += "\country=US\country=BR"  # Rucio wants the set complement operator \
+        rses = rucio.list_rses(ALL_RSES)
+        rseNames = [r['rse'] for r in rses]
+        largeRSEs = []  # a list of largish (i.e. solid) RSEs
+        freeRSEs = []  # a subset of largeRSEs which also have quite some free space
+        for rse in rseNames:
+            if rse[2:6] == '_RU_':  # avoid fragile sites, see #7400
+                continue
+            usageDetails = list(rucio.get_rse_usage(rse, filters={'source': 'static'}))
+            if not usageDetails:  # some RSE's are put in the system with an empty list here, e.g. T2_FR_GRIF
+                continue
+            size = usageDetails[0]['used']  # bytes
+            if float(size) / 1.e15 > 1.0:  # more than 1 PB
+                largeRSEs.append(rse)
+                availableSpace = int(rucio.list_rse_attributes(rse)['ddm_quota'])  # bytes
+                if availableSpace / 1e12 > 100:  # at least 100TB available
+                    freeRSEs.append(rse)
+        # sort lists so that duplicated rules can be spotted
+        largeRSEs.sort()
+        freeRSEs.sort()
+        # use either list (largeRSEs or freeRSEs) according to dataset size:
+        if TBtoRecall <= 1000.:  # see https://github.com/dmwm/CRABServer/issues/7610
+            grouping = 'ALL'
+            logger.info("Will place all blocks at a single site")
+            RSE_EXPRESSION = '|'.join(largeRSEs)  # any solid site will do, most datasets are a few TB anyhow
+        else:
+            grouping = 'DATASET'  # Rucio DATASET i.e. CMS block !
+            logger.info("Will scatter blocks on multiple sites")
+            # restrict the list to as many sites as there are 50TB chunks in the dataset, plus some slack
+            nRSEs = int(TBtoRecall / 50) + 1
+            myRSEs = random.sample(freeRSEs, nRSEs)
+            RSE_EXPRESSION = '|'.join(myRSEs)
+        logger.debug('Will use RSE_EXPRESSION = %s', RSE_EXPRESSION)
+        return RSE_EXPRESSION, grouping
+
+    def createRucioRule(self, rucio=None, did=None, grouping='', RSE_EXPRESSION='', comment='', logger=None):
+        # RSE_EXPRESSION = 'ddm_quota>0&(tier=1|tier=2)&rse_type=DISK'
+        # RSE_EXPRESSION = 'T3_IT_Trieste' # for testing
+        WEIGHT = 'ddm_quota'
+        # WEIGHT = None # for testing
+        # make rul last 7 extra days to allow debugging in case TW or Recall action fail
+        LIFETIME = (MAX_DAYS_FOR_TAPERECALL + 7) * 24 * 60 * 60  # in seconds
+        ASK_APPROVAL = False
+        # ASK_APPROVAL = True # for testing
+        ACCOUNT = 'crab_tape_recall'
+        copies = 1
+        try:
+            ruleIds = rucio.add_replication_rule(  # N.B. returns a list
+                dids=[did], copies=copies, rse_expression=RSE_EXPRESSION,
+                grouping=grouping, weight=WEIGHT, lifetime=LIFETIME, account=ACCOUNT,
+                activity='Analysis Input',
+                comment=comment,
+                ask_approval=ASK_APPROVAL, asynchronous=True)
+        except DuplicateRule as ex:
+            # handle "A duplicate rule for this account, did, rse_expression, copies already exists"
+            # which should only happen when testing, since container name is unique like task name, but
+            # we cover also retry situations where TW was stopped/killed/crashed halfway in the process
+            logger.debug("A duplicate rule for this account, did, rse_expression, copies already exists. Use that")
+            # find the existing rule id
+            ruleIdGen = rucio.list_did_rules(scope=did['scope'], name=did['name'])
+            # and use it as return value
+            ruleIds = [next(ruleIdGen)['id']]
+            # extend rule lifetime
+            rucio.update_replication_rule(ruleIds[0], {'lifetime': LIFETIME})
+
+        except (InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage) as ex:
+            msg = "\nNot enough global quota to issue a tape recall request. Rucio exception:\n%s" % str(ex)
+            raise TaskWorkerException(msg) from ex
+        except Exception as ex:
+            msg = "\nRucio exception creating rule: %s" % str(ex)
+            raise TaskWorkerException(msg) from ex
+        ruleId = str(ruleIds[0])  # from list to singleId and remove unicode
+
+        return ruleId
+
+    def setTaskToTapeRecall(self, crabserver=None, logger=None, taskname='', ruleId=0):
+        tapeRecallStatus = 'TAPERECALL'
+        configreq = {'workflow': taskname,
+                     'taskstatus': tapeRecallStatus,
+                     'ddmreqid': ruleId,
+                     'subresource': 'addddmreqid',
+                     }
+        try:
+            tapeRecallStatusSet = crabserver.post(api='task', data=urlencode(configreq))
+        except HTTPException as hte:
+            logger.exception(hte)
+            msg = "HTTP Error while contacting the REST Interface %s:\n%s" % (
+                crabserver.server['host'], str(hte))
+            msg += "\nStoring of %s status and ruleId (%s) failed for task %s" % (
+                tapeRecallStatus, ruleId, taskname)
+            msg += "\nHTTP Headers are: %s" % hte.headers
+            raise TaskWorkerException(msg, retry=True) from hte
+        if tapeRecallStatusSet[2] == "OK":
+            logger.info("Status for task %s set to '%s'", taskname, tapeRecallStatus)
+        raise TaskWorkerException(msg)
+
+
 if __name__ == '__main__':
     ###
     # Usage: python3 DBSDataDiscovery.py dbs_instance dbsDataset [secondaryDataset]
@@ -606,6 +664,7 @@ if __name__ == '__main__':
                                                 X509_USER_KEY=config.TaskWorker.cmskey)
 
     config.TaskWorker.instance = 'prod'
+    config.TaskWorker.tiersToRecall = ['AOD', 'AODSIM', 'MINIAOD', 'MINIAODSIM', 'NANOAOD', 'NANOAODSIM']
     config.TaskWorker.maxTierToBlockRecallSizeTB = 10
 
     config.Services.Rucio_host = 'https://cms-rucio.cern.ch'
