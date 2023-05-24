@@ -448,7 +448,7 @@ class DBSDataDiscovery(DataDiscovery):
             myScope = 'cms'
             dbsDatasetName = dataToRecall
             containerDid = {'scope': myScope, 'name': dbsDatasetName}
-        elif isinstance(dataToRecall, list) or isinstance(dataToRecall, dict_keys):
+        elif isinstance(dataToRecall, list):
             # need to prepare ad hoc container. Can not reuse a possibly existing one:
             # if a user wants one block from a large dataset, we must
             # not recall also all blocks possibly requested in the past
@@ -586,7 +586,7 @@ class DBSDataDiscovery(DataDiscovery):
                 activity='Analysis Input',
                 comment=comment,
                 ask_approval=ASK_APPROVAL, asynchronous=True)
-        except DuplicateRule as ex:
+        except DuplicateRule:
             # handle "A duplicate rule for this account, did, rse_expression, copies already exists"
             # which should only happen when testing, since container name is unique like task name, but
             # we cover also retry situations where TW was stopped/killed/crashed halfway in the process
@@ -597,7 +597,6 @@ class DBSDataDiscovery(DataDiscovery):
             ruleIds = [next(ruleIdGen)['id']]
             # extend rule lifetime
             rucio.update_replication_rule(ruleIds[0], {'lifetime': LIFETIME})
-
         except (InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage) as ex:
             msg = "\nNot enough global quota to issue a tape recall request. Rucio exception:\n%s" % str(ex)
             raise TaskWorkerException(msg) from ex
