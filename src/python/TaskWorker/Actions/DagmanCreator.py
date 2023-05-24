@@ -113,7 +113,7 @@ accounting_group_user = %(accounting_group_user)s
 
 
 # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
-+DESIRED_Archs = %(desired_arch)s
++REQUIRED_ARCH = %(required_arch)s
 +DESIRED_CMSDataset = %(inputdata)s
 
 +JOBGLIDEIN_CMSSite = "$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])"
@@ -147,7 +147,7 @@ should_transfer_files = YES
 #x509userproxy = %(x509up_file)s
 use_x509userproxy = true
 %(opsys_req)s
-Requirements = ((target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED))
+Requirements = stringListMember(TARGET.Arch, REQUIRED_ARCH)
 periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
 # Remove if
 # a) job is in the 'held' status for more than 7 minutes
@@ -287,7 +287,7 @@ def transform_strings(data):
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', \
                'stageoutpolicy', 'taskType', 'worker_name', 'cms_wmtool', 'cms_tasktype', 'cms_type', \
-               'desired_arch', 'resthost', 'dbinstance', 'submitter_ip_addr', \
+               'required_arch', 'resthost', 'dbinstance', 'submitter_ip_addr', \
                'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
         val = data.get(var, None)
         if val == None:
@@ -366,16 +366,16 @@ class DagmanCreator(TaskAction):
     def populateGlideinMatching(self, info):
         scram_arch = info['tm_job_arch']
         # Set defaults
-        info['desired_arch'] = "X86_64"
+        info['required_arch'] = "X86_64"
         m = re.match("([a-z]+)(\d+)_(\w+)_(\w+)", scram_arch)
         if m:
             _, _, arch, _ = m.groups()
             if arch not in SCRAM_TO_ARCH:
                 msg = "Job configured to a ScramArch: '{}' not supported in TaskWorker".format(item)
                 raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
-            info['desired_arch'] = SCRAM_TO_ARCH.get(arch)
+            info['required_arch'] = SCRAM_TO_ARCH.get(arch)
             # if arch == "amd64":
-            #     info['desired_arch'] = "X86_64"
+            #     info['required_arch'] = "X86_64"
 
 
     def getDashboardTaskType(self, task):
