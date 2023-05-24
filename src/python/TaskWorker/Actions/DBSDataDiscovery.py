@@ -281,9 +281,9 @@ class DBSDataDiscovery(DataDiscovery):
 
         # make a copy of locationsMap dictionary, so that manipulating it in keeOnlyDiskRSE
         # does not touch blocksWithLocation
-        blocksWithLocation = list(locationsMap.copy().keys())
+        blocksWithLocation = locationsMap.copy().keys()
         if secondaryDataset:
-            secondaryBlocksWithLocation = list(secondaryLocationsMap.copy().keys())
+            secondaryBlocksWithLocation = secondaryLocationsMap.copy().keys()
 
         # take note of where tapes are
         tapeLocations = set()
