@@ -14,7 +14,8 @@ from WMCore.Services.DBS.DBSErrors import DBSReaderError
 
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
-from ServerUtilities import FEEDBACKMAIL, MAX_DAYS_FOR_TAPERECALL, parseDBSInstance, isDatasetUserDataset
+from ServerUtilities import FEEDBACKMAIL, MAX_DAYS_FOR_TAPERECALL, MAX_TB_TO_RECALL_AT_A_SINGLE_SITE,\
+    parseDBSInstance, isDatasetUserDataset
 from RucioUtils import getNativeRucioClient
 
 from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent,
@@ -438,7 +439,7 @@ class DBSDataDiscovery(DataDiscovery):
         # args to replace self: config, taskName, logger, crabserver
         msg = msgHead
         # need to use crab_tape_recall Rucio account to create containers and create rules
-        tapeRecallConfig = copy.copy(self.config)
+        tapeRecallConfig = copy.deepcopy(self.config)
         tapeRecallConfig.Services.Rucio_account = 'crab_tape_recall'
         rucioClient = getNativeRucioClient(tapeRecallConfig, self.logger)  # pylint: disable=redefined-outer-name
 
@@ -554,16 +555,16 @@ class DBSDataDiscovery(DataDiscovery):
         largeRSEs.sort()
         freeRSEs.sort()
         # use either list (largeRSEs or freeRSEs) according to dataset size:
-        if TBtoRecall <= 1000.:  # see https://github.com/dmwm/CRABServer/issues/7610
+        if TBtoRecall <= MAX_TB_TO_RECALL_AT_A_SINGLE_SITE:  #
             grouping = 'ALL'
             logger.info("Will place all blocks at a single site")
             RSE_EXPRESSION = '|'.join(largeRSEs)  # any solid site will do, most datasets are a few TB anyhow
         else:
             grouping = 'DATASET'  # Rucio DATASET i.e. CMS block !
             logger.info("Will scatter blocks on multiple sites")
-            # restrict the list to as many sites as there are 50TB chunks in the dataset, plus some slack
-            nRSEs = int(TBtoRecall / 50) + 1
-            myRSEs = random.sample(freeRSEs, nRSEs)
+            # restrict the list to as few sites as possible
+            nRSEs = int(TBtoRecall / MAX_TB_TO_RECALL_AT_A_SINGLE_SITE) + 1
+            myRSEs = random.sample(largeRSEs, nRSEs)
             RSE_EXPRESSION = '|'.join(myRSEs)
         logger.debug('Will use RSE_EXPRESSION = %s', RSE_EXPRESSION)
         return RSE_EXPRESSION, grouping
