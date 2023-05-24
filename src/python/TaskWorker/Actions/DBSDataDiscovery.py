@@ -397,6 +397,7 @@ class DBSDataDiscovery(DataDiscovery):
             if isUserDataset:
                 self.logger.info("USER dataset. Looking up data locations using origin site in DBS")
                 try:
+                    # locationsMap is a dictionary {blockName:[RSEs], ...}
                     locationsMap = self.dbs.listFileBlockLocation(list(blocks))
                 except Exception as ex:
                     raise TaskWorkerException(
@@ -404,6 +405,14 @@ class DBSDataDiscovery(DataDiscovery):
                         "This is could be a temporary DBS glitch, please try to submit a new task (resubmit will not work)"+\
                         " and contact the experts if the error persists.\nError reason: %s" % str(ex)
                     ) from ex
+                CERNBOX = False
+                for v in locationsMap.values():
+                    if 'T3_CH_CERNBOX' in v: CERNBOX = True
+                if CERNBOX:
+                    raise TaskWorkerException(
+                        "USER dataset is located at T3_CH_CERNBOX, but this location \n"+\
+                        "is not available to CRAB jobs."
+                    )
             else:
                 # datasets other than USER *must* be in Rucio
                 raise TaskWorkerException(
