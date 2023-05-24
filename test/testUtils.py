@@ -153,7 +153,7 @@ def writePset():
     return
 
 def writePset8cores():
-    newLine = "\nprocess.options.numberOfThreads = cms.untracked.int32(8)\n"
+    newLine = "\nprocess.options.numberOfThreads = cms.untracked.uint32(8)\n"
     existingLine = None
     for line in psetFileContent.split('\n'):
         if line.startswith('process.options'):
