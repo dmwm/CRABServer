@@ -1,5 +1,4 @@
-from __future__ import print_function
-from __future__ import division
+import logging
 
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
@@ -14,6 +13,17 @@ def getNativeRucioClient(config=None, logger=None):
     logger.info("Initializing native Rucio client")
     from rucio.client import Client
 
+    rucioLogger = logging.getLogger('RucioClient')
+    rucioLogger.setLevel(logging.INFO)
+
+    # silence a few noisy components used by rucio
+    ul = logging.getLogger('urllib3')
+    ul.setLevel(logging.ERROR)
+    dl = logging.getLogger('dogpile')
+    dl.setLevel(logging.ERROR)
+    cl = logging.getLogger('charset_normalizer')
+    cl.setLevel(logging.ERROR)
+
     rucio_cert = getattr(config.Services, "Rucio_cert", config.TaskWorker.cmscert)
     rucio_key = getattr(config.Services, "Rucio_key", config.TaskWorker.cmskey)
     logger.debug("Using cert [%s]\n and key [%s] for rucio client.", rucio_cert, rucio_key)
@@ -23,7 +33,8 @@ def getNativeRucioClient(config=None, logger=None):
         ca_cert=config.Services.Rucio_caPath,
         account=config.Services.Rucio_account,
         creds={"client_cert": rucio_cert, "client_key": rucio_key},
-        auth_type='x509'
+        auth_type='x509',
+        logger=rucioLogger
     )
     ret = nativeClient.ping()
     logger.info("Rucio server v.%s contacted", ret['version'])
