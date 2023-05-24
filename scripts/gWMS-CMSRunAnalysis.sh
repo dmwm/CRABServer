@@ -13,7 +13,32 @@
 # It should not be needed, but in case something goes wrong and you need 
 # 
 
+echo "======== gWMS-CMSRunAnalysis.sh STARTING at $(TZ=GMT date) on $(hostname) ========"
+echo "User id:    $(id)"
+echo "Local time: $(date)"
+echo "Hostname:   $(hostname -f)"
+echo "System:     $(uname -a)"
+echo "Arguments are $@"
+
+# In the future, we could use condor_chirp to add a classad which records which
+# is the current status of a job. 
+# For example, we could set "bootstrap", "running", "stageout", "finished"
+# We do not do it because we currently have no use for it.
+#echo "======== Attempting to notify HTCondor of job bootstrap ========"
+#condor_chirp set_job_attr_delayed Chirp_CRAB3_Job_Phase bootstrap
+
+# redirect stderr to stdout, so that it all goes to job_out.*, leaving job_err.* empty
+# see https://stackoverflow.com/a/13088401
+exec 2>&1
+
+#
+# Saving START_TIME and when job finishes, check if runtime is not lower than 20m
+# If it is lower, sleep the difference. Will not sleep if CRAB3_RUNTIME_DEBUG is set.
+#
+START_TIME=$(date +%s)
+
 echo "======== Startup environment - STARTING ========"
+# First of all, we save the startup environment.
 
 # import some auxiliary functions from a script that is intented to be shared
 # with WMCore
@@ -24,11 +49,13 @@ save_env
 
 echo "======== Startup environment - FINISHING ========"
 
-# Saving START_TIME and when job finishes, check if runtime is not lower than 20m
-# If it is lower, sleep the difference. Will not sleep if CRAB3_RUNTIME_DEBUG is set.
-START_TIME=$(date +%s)
+echo "======== Auxiliary Functions - STARTING ========"
+# auxiliary functions, needed when the job terminates
+# we can consider making some of these fuctions less CRAB-oriented and moving them to ./submit_env.sh
+
 function finish {
   chirp_exit_code
+  check_application_execution
   END_TIME=$(date +%s)
   DIFF_TIME=$((END_TIME-START_TIME))
   echo "Job started:  " $START_TIME ", " $(TZ=GMT date -d @$START_TIME)
@@ -48,36 +75,30 @@ function finish {
 trap finish EXIT
 
 function chirp_exit_code {
-    #Get the long exit code and set a classad using condor_chirp
-    #The long exit code is taken from jobReport.json file if it exist
-    #and is successfully loaded. It is taken from the EXIT_STATUS variable
-    #instead (which contains the short exit coce)
+    # Get the long exit code and set a classad using condor_chirp
+    # The long exit code is taken from jobReport.exitCode.txt file if it exist and is not empty
+    # Otherwise, it is taken from the EXIT_STATUS variable (which contains the short exit coce)
 
     echo "======== Figuring out long exit code of the job for condor_chirp at $(TZ=GMT date)========"
 
-    #check if the command condor_chirp exists
+    # check if the command condor_chirp exists
     command -v condor_chirp > /dev/null 2>&1
     if [ $? -ne 0 ]; then
         echo "Cannot find condor_chirp to set up the job exit code (ignoring, that's for monitoring purposes)"
         return
     fi
-    #check if exitCode is in there and report it
-    #any error or exception will be printed to stderr and cause $? <> 0
-    LONG_EXIT_CODE=$(python << END
-from __future__ import print_function
-import json
-with open("jobReport.json.$CRAB_Id") as fd:
-    data = json.load(fd)
-print(data['exitCode'])
-END
-)
-    if [ $? -eq 0 ]; then
+
+    if [[ -e jobReport.exitCode.txt ]] && [[ -s jobReport.exitCode.txt ]] ; then
+        # if jobReport.exitCode.txt exists and is not empty, 
+        # it should contain exitCode, so we report it
+        LONG_EXIT_CODE=$(cat jobReport.exitCode.txt)
         echo "==== Long exit code of the job is $LONG_EXIT_CODE ===="
         condor_chirp set_job_attr_delayed Chirp_CRAB3_Job_ExitCode $LONG_EXIT_CODE
         CHIRP_EC=$?
     else
-        echo "==== Failed to load the long exit code from jobReport.json.$CRAB_Id. Falling back to short exit code ===="
-        #otherwise checjk if EXIT_STATUS is set and report it
+        # otherwise check if EXIT_STATUS is set and report it
+        # we want to execute this code block if jobReport.exitCode.txt does not exist
+        echo "==== Failed to load the long exit code from jobReport.exitCode.txt. Falling back to short exit code ===="
         if [ -z "$EXIT_STATUS" ]; then
             echo "======== Short exit code also missing. Settint exit code to 80001 ========"
             condor_chirp set_job_attr_delayed Chirp_CRAB3_Job_ExitCode 80001
@@ -89,25 +110,74 @@ END
         fi
     fi
     echo "======== Finished condor_chirp -ing the exit code of the job. Exit code of condor_chirp: $CHIRP_EC ========"
+
 }
 
-echo "======== gWMS-CMSRunAnalysis.sh STARTING at $(TZ=GMT date) on $(hostname) ========"
-echo "User id:    $(id)"
-echo "Local time: $(date)"
-echo "Hostname:   $(hostname -f)"
-echo "System:     $(uname -a)"
-echo "Arguments are $@"
+function check_application_execution {
+    # We check the files that contain information about the execution of
+    # a generic user application. Then we focus on the execution of cmsRun
 
-# In the future, we could use condor_chirp to add a classad which records which
-# is the current status of a job. 
-# For example, we could set "bootstrap", "running", "stageout", "finished"
-# We do not do it because we currently have no use for it.
-#echo "======== Attempting to notify HTCondor of job bootstrap ========"
-#condor_chirp set_job_attr_delayed Chirp_CRAB3_Job_Phase bootstrap
+    echo "======== Checking execution of user application (cmsRun and scriptExe) $(TZ=GMT date)========"
 
-# redirect stderr to stdout, so that it all goes to job_out.*, leaving job_err.* empty
-# see https://stackoverflow.com/a/13088401
-exec 2>&1
+    check_file_exist cmsRun-stdout.log.tmp printfile
+    check_file_exist cmsRun-stdout.log
+
+    echo "======== Checking execution of cmsRun $(TZ=GMT date)========"
+
+    check_file_exist FrameworkJobReport.xml
+    check_file_exist jobReport.json.$CRAB_Id
+    check_file_exist jobReport.exitCode.txt
+
+    echo "======== Finished - Checking execution of user application $(TZ=GMT date)========"
+}
+
+check_file_exist() {
+    # Helper function used to check the files that carry information about cmsRun execution
+    # it checks if a file exists and is not empty. In this case, it
+    # 1. prints some stats about it with wc
+    # 2. if the argument "printfile" is passed, then it prints the file content
+
+    FILEPATH=$1
+
+    if [[ -e $FILEPATH ]]; then
+        echo "the file $FILEPATH exists"
+        if [[ -s $FILEPATH ]]; then
+            echo "the file $FILEPATH is non-empty. wc (newlines, words, bytes): " $(wc $FILEPATH)
+            if [[ $2 == "printfile" ]]; then
+                # used when the job terminates unexpectedly and we want to make sure that the
+                # content of a file is written to stdout.
+                print_file $FILEPATH
+            fi
+        fi
+    else 
+        echo "the file $FILEPATH does **NOT** exist"
+    fi
+}
+
+print_file() {
+    # similar in spirit to CMSRunAnalysis.py:logCMSSW()
+
+    keepAtStart=1000
+    keepAtEnd=3000
+    maxLineLen=3000
+
+    FILEPATH=$1
+    maxLines=$(expr $keepAtStart + $keepAtEnd)
+    numLines=$(cat $FILEPATH | wc -l)
+
+    if [[ $numLines -gt $maxLines ]]; then
+        head -n $keepAtStart $FILEPATH
+        echo "[...]"
+        tail -n $keepAtEnd $FILEPATH
+    else
+        cat $FILEPATH
+    fi
+    echo
+}
+
+echo "======== Auxiliary Functions - FINISHING ========"
+
+echo "======== gWMS-CMSRunAnalysis.sh STARTED at $(TZ=GMT date) on $(hostname) ========"
 
 CRAB_oneEventMode=0
 if [ "X$_CONDOR_JOB_AD" != "X" ];
