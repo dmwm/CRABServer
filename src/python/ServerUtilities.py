@@ -67,7 +67,7 @@ MAX_MEMORY = 2*1024
 # see https://github.com/dmwm/CRABServer/issues/5995
 MAX_MEMORY_PER_CORE = 2500
 MAX_MEMORY_SINGLE_CORE = 5000
-MAX_DISK_SPACE = 20000000 # Disk usage is not used from .job.ad as CRAB3 is not seeting it. 20GB is max.
+MAX_DISK_SPACE = 20000000  # Disk usage is not used from .job.ad as CRAB3 is not seeting it. 20GB is max.
 
 MAX_IDLE_JOBS = 1000
 MAX_POST_JOBS = 20
@@ -81,9 +81,11 @@ TASKLIFETIME = 30*24*60*60  # 30 days in seconds
 NUM_DAYS_FOR_RESUBMITDRAIN = 7
 ## Maximum number of days a task can stay in TAPERECALL status
 MAX_DAYS_FOR_TAPERECALL = 15
+## Threshold (in TB) to split a dataset among multiple sites when recalling from tape
+MAX_TB_TO_RECALL_AT_A_SINGLE_SITE = 10000  # effectively no limit. See https://github.com/dmwm/CRABServer/issues/7610
 
 ## These are all possible statuses of a task in the TaskDB.
-TASKDBSTATUSES_TMP = ['NEW', 'HOLDING', 'QUEUED']
+TASKDBSTATUSES_TMP = ['NEW', 'HOLDING', 'QUEUED', 'TAPERECALL', 'KILLRECALL']
 TASKDBSTATUSES_FAILURES = ['SUBMITFAILED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']
 TASKDBSTATUSES_FINAL = ['UPLOADED', 'SUBMITTED', 'KILLED'] + TASKDBSTATUSES_FAILURES
 TASKDBSTATUSES = TASKDBSTATUSES_TMP + TASKDBSTATUSES_FINAL
