@@ -455,7 +455,7 @@ class DBSDataDiscovery(DataDiscovery):
             # not recall also all blocks possibly requested in the past
             #  by other users for other reasons.
             #  Therefore we stick with naming the container after the task name
-            myScope = 'user.crab_tape_recall'  # do not mess up with cms scope
+            myScope = 'user.crab_tape_recall'  # do not mess with cms scope
             containerName = '/TapeRecall/%s/USER' % self.taskName.replace(':', '.')
             containerDid = {'scope': myScope, 'name': containerName}
             self.makeContainerFromBlockList(
