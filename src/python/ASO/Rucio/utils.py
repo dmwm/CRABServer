@@ -1,6 +1,7 @@
 import shutil
 import re
 from contextlib import contextmanager
+import itertools
 
 from ServerUtilities import encodeRequest
 from ASO.Rucio.exception import RucioTransferException
@@ -37,11 +38,20 @@ def chunks(l, n=1):
     :return: yield the next list chunk
     :rtype: generator
     """
-    for i in range(0, len(l), n):
-        yield l[i:i + n]
+    if isinstance(l, list):
+        for i in range(0, len(l), n):
+            yield l[i:i + n]
+    else:
+        while True:
+            newList = list(itertools.islice(l, n))
+            if newList:
+                yield newList
+            else:
+                break
 
 
-def updateDB(client, api, subresource, fileDoc):
+
+def updateDB(client, api, subresource, fileDoc, logger=None):
     """
     Upload fileDoc to REST
 

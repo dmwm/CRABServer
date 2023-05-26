@@ -6,8 +6,8 @@ from RESTInteractions import CRABRest
 from ASO.Rucio.Transfer import Transfer
 from ASO.Rucio.exception import RucioTransferException
 from ASO.Rucio.Actions.BuildDBSDataset import BuildDBSDataset
-#from ASO.Rucio.Actions.MonitorLocksStatus import MonitorLocksStatus
 from ASO.Rucio.Actions.RegisterReplicas import RegisterReplicas
+#from ASO.Rucio.Actions.MonitorLocksStatus import MonitorLocksStatus
 
 class RunTransfer:
     """
