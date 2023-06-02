@@ -149,7 +149,7 @@ class TapeRecallManager(BaseRecurringAction):
 
         # setup a Rucio client with the account which can edit our rules
         if not self.privilegedRucioClient:
-            tapeRecallConfig = copy.copy(self.config)
+            tapeRecallConfig = copy.deepcopy(self.config)
             tapeRecallConfig.Services.Rucio_account = 'crab_tape_recall'
             self.privilegedRucioClient = getNativeRucioClient(tapeRecallConfig, self.logger)
 
