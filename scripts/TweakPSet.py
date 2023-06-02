@@ -250,11 +250,14 @@ def createScriptLines(opts, pklIn):
 
     # 3. make sure that process.maxEvents.input is propagated to Producers, see:
     # https://github.com/dmwm/WMCore/blob/85d6d423f0a85fdedf78b65ca8b7b81af9263789/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L448-L465
-    pklOut = pklIn + '-nEvents'
-    procScript = 'cmssw_handle_nEvents.py'
-    cmd = "%s --input_pkl %s --output_pkl %s" % (procScript, pklIn, pklOut)
-    moreLines = createTweakingCommandLines(cmd, pklIn, pklOut)
-    commandLines += moreLines
+    # this only makes sense for produces which use nEvents internally, i.e. when running
+    # MC production (GEN) using external scripts not directly controlled by cmsRun (forked)
+    if inputFile["lfn"].startswith("MCFakeFile"):  # see https://github.com/dmwm/CRABServer/issues/7650
+        pklOut = pklIn + '-nEvents'
+        procScript = 'cmssw_handle_nEvents.py'
+        cmd = "%s --input_pkl %s --output_pkl %s" % (procScript, pklIn, pklOut)
+        moreLines = createTweakingCommandLines(cmd, pklIn, pklOut)
+        commandLines += moreLines
 
     return commandLines
 
