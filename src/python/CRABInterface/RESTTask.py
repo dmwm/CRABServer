@@ -45,6 +45,7 @@ class RESTTask(RESTEntity):
             validate_str('taskstatus', param, safe, RX_STATUS, optional=True)
             validate_str('username', param, safe, RX_USERNAME, optional=True)
             validate_str('minutes', param, safe, RX_RUNS, optional=True)
+            validate_str("ddmreqid", param, safe, RX_RUCIORULE, optional=True)
 
     @restcall
     def get(self, subresource, **kwargs):
@@ -101,6 +102,13 @@ class RESTTask(RESTEntity):
         """Retrieves all jobs of the specified user with the specified status"""
         rows = self.api.query(None, None, self.Task.TaskByStatus_sql, username_=kwargs["username"], taskstatus=kwargs["taskstatus"])
 
+        return rows
+
+
+    #Get all tasks with a specified ddmreqid
+    def taskbyddmreqid(self, **kwargs):
+        """Retrieves all tasks with the specified ddmreqid"""
+        rows = self.api.query(None, None, self.Task.TaskByDdmReqid_sql, ddmreqid=kwargs["ddmreqid"])
         return rows
 
 

@@ -30,6 +30,8 @@ class Task(object):
     QuickSearch_sql = "SELECT * FROM tasks WHERE tm_taskname = :taskname"
     #get all jobs with a specified status
     TaskByStatus_sql = "SELECT tm_task_status,tm_taskname FROM tasks WHERE tm_task_status = :taskstatus AND tm_username=:username_"
+    # get all tasks with a specified ddm_reqid
+    TaskByDdmReqid_sql = "SELECT tm_taskname FROM tasks WHERE tm_ddm_reqid = :ddmreqid"
     #get all the tasks in a certain state in the last :minutes minutes
     CountLastTasksByStatus = "SELECT tm_task_status, count(*) FROM tasks WHERE tm_start_time > SYS_EXTRACT_UTC(SYSTIMESTAMP) - (:minutes/1440)  GROUP BY tm_task_status"
     #get all the tasks in a certain state submitted by which user in the last :minutes minutes
