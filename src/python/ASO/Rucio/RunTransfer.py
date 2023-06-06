@@ -32,8 +32,10 @@ class RunTransfer:
         """
         # init
         self.transfer = Transfer()
+        # Read info from files written by PostJobs and bookkeeping from previous run.
         self.transfer.readInfo()
         self.rucioClient = self._initRucioClient(self.transfer.username, self.transfer.restProxyFile)
+        # Get info what's already in Rucio containers
         self.transfer.readInfoFromRucio(self.rucioClient)
         self.crabRESTClient = self._initCrabRESTClient(
             self.transfer.restHost,
@@ -71,6 +73,8 @@ class RunTransfer:
         """
         Initialize client for CRAB REST
         """
+        restLogger = logging.getLogger('RucioTransfer.RESTClient')
+        restLogger.setLevel(logging.DEBUG)
         proxyPathEnv = os.environ.get('X509_USER_PROXY', None)
         if proxyPathEnv:
             proxypath = proxyPathEnv
@@ -81,7 +85,8 @@ class RunTransfer:
             host,
             localcert=proxypath,
             localkey=proxypath,
-            userAgent='CRABSchedd'
+            userAgent='CRABSchedd',
+            logger=restLogger,
         )
         crabRESTClient.setDbInstance(dbInstance)
         return crabRESTClient

@@ -69,9 +69,8 @@ class BuildDBSDataset():
                     'type': "CONTAINER",
                 }
                 ruleID = self.rucioClient.add_replication_rule([containerDID], 1, self.transfer.destination)[0]
-                # TODO: not sure if any other case make the rule duplicate beside script crash
             except DuplicateRule:
-                # TODO: it possible that someone will create the rule for container, need better filter rule to match rules we create
+                # TODO: it is possible that someone will create the rule for container, need better filter rule to match rules we create
                 self.logger.info(f"Rule already exists. Get rule ID from Rucio.")
                 ruleID = list(self.rucioClient.list_did_rules(self.transfer.rucioScope, container))[0]['id']
             self.transfer.updateContainerRuleID(ruleID)

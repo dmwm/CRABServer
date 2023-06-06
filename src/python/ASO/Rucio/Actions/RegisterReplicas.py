@@ -7,7 +7,7 @@ from rucio.common.exception import FileAlreadyExists
 
 import ASO.Rucio.config as config
 from ASO.Rucio.exception import RucioTransferException
-from ASO.Rucio.utils import chunks, updateDB, tfcLFN2PFN, LFNToPFNFromPFN
+from ASO.Rucio.utils import chunks, uploadToTransfersdb, tfcLFN2PFN, LFNToPFNFromPFN
 
 
 
@@ -202,7 +202,7 @@ class RegisterReplicas:
             will raise exception in `rucioClient.lfns2pfns()`.
         :type sourceRSE: string
         :param destinationRSE: need for select proper protocol for transfer
-            with `find_machine_scheme()`.
+            with `find_matching_scheme()`.
         :type destinationRSE: string
 
         :returns: PFN return from `lfns2pfns()`
@@ -275,4 +275,4 @@ class RegisterReplicas:
             'list_of_retry_value': None, # omit
             'list_of_fts_id': ['NA']*num,
         }
-        updateDB(self.crabRESTClient, 'filetransfers', 'updateTransfers', fileDoc, self.logger)
+        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', fileDoc, self.logger)

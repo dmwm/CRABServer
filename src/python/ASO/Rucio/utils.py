@@ -9,12 +9,10 @@ from ASO.Rucio.exception import RucioTransferException
 @contextmanager
 def writePath(path):
     """
-    Prevent bookkeeping file corruption by simply write to temp file and replace
-    original file.
+    Prevent bookkeeping file corruption by writing to temp path and replacing
+    original path with the file in temp path when exiting contextmanager.
 
-    This simple contextmanager provide new io object for file write operation
-    to `path` with `_tmp` suffix. At the end of `with` statement it will
-    replace original path with temp file.
+    This guarantee file in `path` will not be touched until return from caller.
 
     :param path: path to write.
     :type path:
@@ -51,7 +49,7 @@ def chunks(l, n=1):
 
 
 
-def updateDB(client, api, subresource, fileDoc, logger=None):
+def uploadToTransfersdb(client, api, subresource, fileDoc, logger=None):
     """
     Upload fileDoc to REST
 
