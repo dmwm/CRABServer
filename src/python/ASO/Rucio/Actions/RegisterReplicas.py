@@ -195,6 +195,14 @@ class RegisterReplicas:
         """
         Get source PFN from `rucioClient.lfns2pfns()`.
 
+        The PFN stored in the Temp_RSE is not a general thing, but it is a
+        PFN which can only be used for replicating this file to a specific
+        destination. Given that, current code is clear enough, and forcing a
+        'davs' scheme would not make it any easier to understand.
+
+        All in all, we expect replicas in Temp_RSE to only stay there for one
+        month max.
+
         :param sourceLFN: source LFN
         :type sourceLFN: string
         :param sourceRSE: source RSE where LFN is reside, but it must be normal
