@@ -95,6 +95,11 @@ os_ver=$(source /etc/os-release;echo $VERSION_ID)
 curl_path="/cvmfs/cms.cern.ch/slc${os_ver}_amd64_gcc700/external/curl/7.59.0"
 source ${curl_path}/etc/profile.d/init.sh
 
+# for automatic splitting, DagmanCreator needs HOSTNAME env.var. to be set
+# see https://github.com/dmwm/CRABServer/issues/7652
+# possibly a new requirement since we upgraded to condor 10
+export HOSTNAME
+
 export PYTHONUNBUFFERED=1
 echo "Printing current environment..."
 
