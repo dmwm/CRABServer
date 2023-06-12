@@ -67,17 +67,21 @@ def main():
     pending['size'] = pending.apply(lambda x: findDatasetSize(rucio, x.dataset), axis=1)
     print("Done!")
 
-    print('find tasks using this rule')
+    print('find tasks using these rules')
     pending['tasks'] = pending.apply(lambda x: findTasksForRule(crab, x.id), axis=1)
     print("Done!")
 
+    print('compute a short Url for each task')
+    pending['taskUrls'] = pending.apply(lambda x: createTaskUrl(x.tasks), axis=1)
+    print("Done!")
+
     # select interesting columns
-    selected = pending[['id', 'state', 'user', 'locks', 'days', 'tape', 'size', 'dataset', 'tasks']]
+    selected = pending[['id', 'state', 'user', 'locks', 'days', 'tape', 'size', 'dataset', 'taskUrls']]
     rulesToPrint = selected.rename(columns={'locks': 'locks ok/rep/st', 'size': 'size TB'})
     print(rulesToPrint.to_string())
 
     # create an HTML table
-    selected = pending[['idUrl', 'state', 'user', 'locks', 'days', 'tape', 'size', 'dataset', 'tasks']]
+    selected = pending[['idUrl', 'state', 'user', 'locks', 'days', 'tape', 'size', 'dataset', 'taskUrls']]
     renamed = selected.rename(columns={'locks': 'locks ok/rep/st', 'size': 'size TB'})
     rulesToHtml = renamed.to_html(escape=False)
     beginningOfDoc = '<!DOCTYPE html>\n<html>\n'
@@ -91,6 +95,20 @@ def main():
         fh.write(title)
         fh.write(rulesToHtml)
         fh.write(endOfDoc)
+
+
+def createTaskUrl(tasks):
+    """
+    create an URL pointing to task info in CRABRest UI
+    use ahortened task name (timstamp:user) as link in the table
+    """
+    urlBase = '<a href="https://cmsweb.cern.ch/crabserver/ui/task/%s">%s</a>'
+    urlList = []
+    for task in tasks:
+        taskHeader = '_'.join(task.split('_')[0:2])
+        url = urlBase % (task, taskHeader)
+        urlList.append(url)
+    return urlList
 
 
 def findUserNameForRule(rucioClient=None, ruleId=None):
@@ -159,8 +177,9 @@ def findTasksForRule(crabRest=None, ruleId=None):
     """
     data = {'subresource': 'taskbyddmreqid', 'ddmreqid': ruleId}
     res = crabRest.get(api='task', data=encodeRequest(data))
-    tasks = res[0]['result']
-    return tasks
+    tasks = res[0]['result']  # for obscure reasons ths has the form [['task1'],['task2']...]
+    taskList = [t[0] for t in tasks]
+    return taskList
 
 def findDatasetSize(rucioClient=None, dataset=None):
     """
