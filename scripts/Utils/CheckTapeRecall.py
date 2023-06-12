@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """
 Standalone (Rucio and pandas dependent) script to check status
-of pending CRAB tape recalls
+of pending CRAB tape recalls. Needs also access to CRAB REST
 usage:  python3 CheckTapeRecall.py
 example output:
 """
@@ -11,12 +11,15 @@ import sys
 import time
 import pandas as pd
 
+from RESTInteractions import CRABRest
+from ServerUtilities import encodeRequest
+
 def main():
     """
         get all rules for this account, find pending ones,
         order, pretty format, print them and write an HTML file
     """
-    rucio = ensureEnvironment()
+    rucio, crab = ensureEnvironment()
     account = 'crab_tape_recall'
 
     # get rules for this account
@@ -64,13 +67,17 @@ def main():
     pending['size'] = pending.apply(lambda x: findDatasetSize(rucio, x.dataset), axis=1)
     print("Done!")
 
+    print('find tasks using this rule')
+    pending['tasks'] = pending.apply(lambda x: findTasksForRule(crab, x.id), axis=1)
+    print("Done!")
+
     # select interesting columns
-    selected = pending[['id', 'state', 'user', 'locks', 'days', 'tape', 'size', 'dataset']]
+    selected = pending[['id', 'state', 'user', 'locks', 'days', 'tape', 'size', 'dataset', 'tasks']]
     rulesToPrint = selected.rename(columns={'locks': 'locks ok/rep/st', 'size': 'size TB'})
     print(rulesToPrint.to_string())
 
     # create an HTML table
-    selected = pending[['idUrl', 'state', 'user', 'locks', 'days', 'tape', 'size', 'dataset']]
+    selected = pending[['idUrl', 'state', 'user', 'locks', 'days', 'tape', 'size', 'dataset', 'tasks']]
     renamed = selected.rename(columns={'locks': 'locks ok/rep/st', 'size': 'size TB'})
     rulesToHtml = renamed.to_html(escape=False)
     beginningOfDoc = '<!DOCTYPE html>\n<html>\n'
@@ -145,6 +152,15 @@ def findDatasetForRule(rucioClient=None, ruleId=None):
             dataset = ds['name']
     return dataset
 
+def findTasksForRule(crabRest=None, ruleId=None):
+    """
+    returns the list of task names which have stored the given Rucio
+    rule as ddmreqid in DB Tasks table
+    """
+    data = {'subresource': 'taskbyddmreqid', 'ddmreqid': ruleId}
+    res = crabRest.get(api='task', data=encodeRequest(data))
+    tasks = res[0]['result']
+    return tasks
 
 def findDatasetSize(rucioClient=None, dataset=None):
     """
@@ -160,18 +176,27 @@ def findDatasetSize(rucioClient=None, dataset=None):
     return size
 
 def ensureEnvironment():
-    """ make sure we can run Rucio client """
-    if os.getenv("CMSSW_BASE"):
-        print("Must use a shell w/o CMSSW environent")
-        sys.exit()
+    """ make sure we can run Rucio client and talk with CRAB"""
+    #if os.getenv("CMSSW_BASE"):
+    #    print("Must use a shell w/o CMSSW environent")
+    #    sys.exit()
     try:
         from rucio.client import Client
     except ModuleNotFoundError:
-        print("Setup Rucio first via:\n source /cvmfs/cms.cern.ch/rucio/setup-py3.sh; export RUCIO_ACCOUNT=`whoami`")
+        print("Setup Rucio first via:\n" +
+              "export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/\n" +
+              "export RUCIO_HOME=/cvmfs/cms.cern.ch/rucio/current/\n" +
+              "export RUCIO_ACCOUNT=`whoami`")
         sys.exit()
-    # make sure Rucio client is initialized
+    # make sure Rucio client is initialized, this also ensures X509 proxy
     rucio = Client()
-    return rucio
+
+    proxy = os.environ['X509_USER_PROXY']
+    crab = CRABRest(hostname='cmsweb-testbed.cern.ch', localcert=proxy,
+                    localkey=proxy, userAgent='CheckTapeRecall')
+    crab.setDbInstance('prod')
+
+    return rucio, crab
 
 def htmlHeader():
     """
