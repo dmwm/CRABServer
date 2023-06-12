@@ -503,7 +503,7 @@ class DBSDataDiscovery(DataDiscovery):
 
         # update task status in CRAB DB and store the rule ID
         self.setTaskToTapeRecall(taskname=self.taskName, ruleId=ruleId,
-                                 crabserver=self.crabserver, logger=self.logger)
+                                 crabserver=self.crabserver, logger=self.logger, msg=msg)
 
     def makeContainerFromBlockList(self, rucio=None, logger=None, blockList=None, containerDid=None):
         """ create container and fill with given blocks """
@@ -617,7 +617,7 @@ class DBSDataDiscovery(DataDiscovery):
 
         return ruleId
 
-    def setTaskToTapeRecall(self, crabserver=None, logger=None, taskname='', ruleId=0):
+    def setTaskToTapeRecall(self, crabserver=None, logger=None, taskname='', ruleId='', msg=''):
         tapeRecallStatus = 'TAPERECALL'
         configreq = {'workflow': taskname,
                      'taskstatus': tapeRecallStatus,
@@ -636,7 +636,9 @@ class DBSDataDiscovery(DataDiscovery):
             raise TaskWorkerException(msg, retry=True) from hte
         if tapeRecallStatusSet[2] == "OK":
             logger.info("Status for task %s set to '%s'", taskname, tapeRecallStatus)
-        raise TaskWorkerException(msg)
+        msg += "\nThis task will be automatically submitted as soon as the stage-out is completed."
+        self.uploadWarning(msg, self.userproxy, self.taskName)
+        raise TapeDatasetException(msg)
 
 
 if __name__ == '__main__':
