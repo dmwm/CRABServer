@@ -636,7 +636,7 @@ class DBSDataDiscovery(DataDiscovery):
             raise TaskWorkerException(msg, retry=True) from hte
         if tapeRecallStatusSet[2] == "OK":
             logger.info("Status for task %s set to '%s'", taskname, tapeRecallStatus)
-        raise TaskWorkerException(msg)
+        raise TapeDatasetException(msg)
 
 
 if __name__ == '__main__':
