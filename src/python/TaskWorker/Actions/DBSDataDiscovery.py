@@ -636,6 +636,8 @@ class DBSDataDiscovery(DataDiscovery):
             raise TaskWorkerException(msg, retry=True) from hte
         if tapeRecallStatusSet[2] == "OK":
             logger.info("Status for task %s set to '%s'", taskname, tapeRecallStatus)
+        msg += "\nThis task will be automatically submitted as soon as the stage-out is completed."
+        self.uploadWarning(msg, self.userproxy, self.taskName)
         raise TapeDatasetException(msg)
 
 
