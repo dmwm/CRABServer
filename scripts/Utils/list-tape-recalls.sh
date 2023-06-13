@@ -1,8 +1,4 @@
 #!/bin/bash
-#
-# this script will run CheckTapeRecall.py and place the HTML output on CERNBOX
-# from where it can be accessed via browser. It can be used e.g. in an acrontab
-#
 uid=`id -u`
 proxy=/tmp/x509up_u${uid}
 cat /afs/cern.ch/user/b/belforte/.globus/.stefano | /usr/bin/voms-proxy-init -quiet -pwstdin -rfc -voms cms -valid 192:00 -out ${proxy} 2>/dev/null
@@ -11,7 +7,12 @@ if ! [ $rc == "0" ] ; then
     echo "proxy creation failed:"
     cat /afs/cern.ch/user/b/belforte/.globus/.stefano | /usr/bin/voms-proxy-init -quiet -pwstdin -rfc -voms cms -valid 192:00 -out ${proxy}
 fi
-source /cvmfs/cms.cern.ch/rucio/setup-py3.sh > /dev/null
+export X509_USER_PROXY=$proxy
+#source /cvmfs/cms.cern.ch/rucio/setup-py3.sh > /dev/null
+export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/
+export PYTHONPATH=/afs/cern.ch/user/b/belforte/WORK/CRAB3/CRABServer/src/python:$PYTHONPATH
+export PYTHONPATH=/afs/cern.ch/user/b/belforte/WORK/CRAB3/WMCore/src/python:$PYTHONPATH
+export RUCIO_HOME=/cvmfs/cms.cern.ch/rucio/current/
 export RUCIO_ACCOUNT=`whoami`
 
 mkdir -p /tmp/belforte
