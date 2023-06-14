@@ -31,20 +31,9 @@ def main():
     df = pd.DataFrame(rules)
     print(df.groupby('state').size())  # count by state
 
-    # use standard compact format (OK/Rep/Stucl) for lock counts
-    df['locks'] = df.apply(lambda x: f"{x.locks_ok_cnt}/{x.locks_replicating_cnt}/{x.locks_stuck_cnt}", axis=1)
-
-    # extract CRAB user name from rule comment (ouch ! FRAGILE !)
-    #df['user'] = df.apply(lambda x: x.comments.replace("Staged from tape for ", ""), axis=1)
-    df['user'] = df.apply(lambda x: findUserNameForRule(rucio, x.id), axis=1)
-
     # transform created_at to number of days
     today = pd.Timestamp.now()
     df['days'] = df.apply(lambda x: (today-x['created_at']).days, axis=1)
-
-    # add and URL pointing to rule in Rucio UI
-    urlBase = '<a href="https://cms-rucio-webui.cern.ch/rule?rule_id=%s">%s</a>'
-    df['idUrl'] = df.apply(lambda x: (urlBase % (x.id, x.id)), axis=1)
 
     # select non-OK states
     stuck = df[df['state'] == 'STUCK'].sort_values(by=['days'], ascending=False)
@@ -53,19 +42,28 @@ def main():
     # combine all pending rules in a single dataframe
     pending = pd.concat([stuck, replicating]).reset_index(drop=True)
 
+    # use standard compact format (OK/Rep/Stucl) for lock counts
+    pending['locks'] = pending.apply(lambda x: f"{x.locks_ok_cnt}/{x.locks_replicating_cnt}/{x.locks_stuck_cnt}", axis=1)
+
+    # extract CRAB user name from rule comment (ouch ! FRAGILE !)
+    pending['user'] = pending.apply(lambda x: findUserNameForRule(rucio, x.id), axis=1)
+
+    # add and URL pointing to rule in Rucio UI
+    urlBase = '<a href="https://cms-rucio-webui.cern.ch/rule?rule_id=%s">%s</a>'
+    pending['idUrl'] = pending.apply(lambda x: (urlBase % (x.id, x.id)), axis=1)
+
     # add tape locations
     print("finding tape source for all pending rules (takes some time...)")
     pending['tape'] = pending.apply(lambda x: findTapesForRule(rucio, x.id), axis=1)
-    print("Done!")
 
-    print('Add dataset name ...')
-    # add (DBS) dataset name
+    print('Add (DBS) dataset name ...')
     pending['dataset'] = pending.apply(lambda x: findDatasetForRule(rucio, x.id), axis=1)
-
     print('... and size')
-    # add size of recalled container
     pending['size'] = pending.apply(lambda x: findDatasetSize(rucio, x.dataset), axis=1)
     print("Done!")
+
+    print('compute a short Url for each dataset')
+    pending['datasetUrl'] = pending.apply(lambda x: createDatasetUrl(x.dataset), axis=1)
 
     print('find tasks using these rules')
     pending['tasks'] = pending.apply(lambda x: findTasksForRule(crab, x.id), axis=1)
@@ -76,12 +74,12 @@ def main():
     print("Done!")
 
     # select interesting columns
-    selected = pending[['id', 'state', 'user', 'locks', 'days', 'tape', 'size', 'dataset', 'taskUrls']]
+    selected = pending[['id', 'state', 'user', 'locks', 'days', 'tape', 'size', 'datasetUrl', 'taskUrls']]
     rulesToPrint = selected.rename(columns={'locks': 'locks ok/rep/st', 'size': 'size TB'})
     print(rulesToPrint.to_string())
 
     # create an HTML table
-    selected = pending[['idUrl', 'state', 'user', 'locks', 'days', 'tape', 'size', 'dataset', 'taskUrls']]
+    selected = pending[['idUrl', 'state', 'user', 'locks', 'days', 'tape', 'size', 'datasetUrl', 'taskUrls']]
     renamed = selected.rename(columns={'locks': 'locks ok/rep/st', 'size': 'size TB'})
     rulesToHtml = renamed.to_html(escape=False)
     beginningOfDoc = '<!DOCTYPE html>\n<html>\n'
@@ -99,16 +97,37 @@ def main():
 
 def createTaskUrl(tasks):
     """
-    create an URL pointing to task info in CRABRest UI
+    create an URL reference string for HTML pointing to task info in CRABRest UI
     use ahortened task name (timstamp:user) as link in the table
     """
     urlBase = '<a href="https://cmsweb.cern.ch/crabserver/ui/task/%s">%s</a>'
-    urlList = []
+    hrefList = []
     for task in tasks:
         taskHeader = '_'.join(task.split('_')[0:2])
-        url = urlBase % (task, taskHeader)
-        urlList.append(url)
-    return urlList
+        href = urlBase % (task, taskHeader)
+        hrefList.append(href)
+    return hrefList
+
+
+def createDatasetUrl(dataset):
+    """
+    create an URL reference string for HTML pointing to dataset info in DAS Web UI
+    use shortened dataset name as link in the table
+    """
+    urlBase = '<a href="https://cmsweb.cern.ch/das/ui/task/%s">%s</a>'
+    dasUrl = f"https://cmsweb.cern.ch/das/request?view=list&instance=prod/global&input={dataset}"
+
+    # shorten dataset name picking only first word of A and B in /A/B/Tier
+    # use either _ or - as word separators
+    primaryDS = dataset.split('/')[1]
+    processedDS = dataset.split('/')[2]
+    datatier = dataset.split('/')[3]
+    prim = primaryDS.replace('_','-').split('-')[0]
+    proc = processedDS.replace('_','-').split('-')[0]
+    shortDS = '/'.join(['', prim, proc, datatier])
+
+    href = f'<a href="{dasUrl}">{shortDS}</a>'
+    return href
 
 
 def findUserNameForRule(rucioClient=None, ruleId=None):
@@ -153,21 +172,26 @@ def findTapesForRule(rucioClient=None, ruleId=None):
 def findDatasetForRule(rucioClient=None, ruleId=None):
     """
     returns the DBS dataset name
+    if rule refers to a dataset in cms scope, this is trivial, otherwise
     assume all files in the container described in the rule have same origin
     so it will be enough to look up the first one:
     """
     dataset = None
     datasets = []
     rule = rucioClient.get_replication_rule(ruleId)
-    aFile = next(rucioClient.list_files(scope=rule['scope'], name=rule['name']))
-    # to find original dataset need to travel up from file to block to dataset
-    # at the container level and make sure to pick scope cms:
-    block = next(rucioClient.list_parent_dids(scope=aFile['scope'], name=aFile['name']))
-    if block:
-        datasets = rucioClient.list_parent_dids(scope=block['scope'], name=block['name'])
-    for ds in datasets:
-        if ds['scope'] == 'cms':
-            dataset = ds['name']
+    if rule['scope'] == 'cms':
+        dataset = rule['name']
+    else:
+        aFile = next(rucioClient.list_files(scope=rule['scope'], name=rule['name']))
+        # to find original dataset need to travel up from file to block to dataset
+        # at the container level and make sure to pick scope cms:
+        block = next(rucioClient.list_parent_dids(scope=aFile['scope'], name=aFile['name']))
+        if block:
+            datasets = rucioClient.list_parent_dids(scope=block['scope'], name=block['name'])
+        for ds in datasets:
+            if ds['scope'] == 'cms':
+                dataset = ds['name']
+                break
     return dataset
 
 def findTasksForRule(crabRest=None, ruleId=None):
@@ -177,7 +201,7 @@ def findTasksForRule(crabRest=None, ruleId=None):
     """
     data = {'subresource': 'taskbyddmreqid', 'ddmreqid': ruleId}
     res = crabRest.get(api='task', data=encodeRequest(data))
-    tasks = res[0]['result']  # for obscure reasons ths has the form [['task1'],['task2']...]
+    tasks = res[0]['result']  # for obscure reasons this has the form [['task1'],['task2']...]
     taskList = [t[0] for t in tasks]
     return taskList
 
@@ -237,6 +261,7 @@ def htmlHeader():
     <style>
         body {
 	        font-family: 'Trebuchet MS', sans-serif;
+	        font-size: 12px;
         }
         /* Search bar */
         .dataTables_filter input {
