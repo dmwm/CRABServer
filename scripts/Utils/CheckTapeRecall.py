@@ -169,6 +169,7 @@ def findTapesForRule(rucioClient=None, ruleId=None):
             tapes.append(rse.replace("_Tape", ""))
     return tapes
 
+
 def findDatasetForRule(rucioClient=None, ruleId=None):
     """
     returns the DBS dataset name
@@ -194,6 +195,7 @@ def findDatasetForRule(rucioClient=None, ruleId=None):
                 break
     return dataset
 
+
 def findTasksForRule(crabRest=None, ruleId=None):
     """
     returns the list of task names which have stored the given Rucio
@@ -204,6 +206,7 @@ def findTasksForRule(crabRest=None, ruleId=None):
     tasks = res[0]['result']  # for obscure reasons this has the form [['task1'],['task2']...]
     taskList = [t[0] for t in tasks]
     return taskList
+
 
 def findDatasetSize(rucioClient=None, dataset=None):
     """
@@ -217,6 +220,7 @@ def findDatasetSize(rucioClient=None, dataset=None):
     teraBytes = datasetBytes//1e12
     size = f"{datasetBytes/1e12:.0f}" if teraBytes > 0 else f"{datasetBytes/1e12:.3f}"
     return size
+
 
 def ensureEnvironment():
     """ make sure we can run Rucio client and talk with CRAB"""
@@ -241,13 +245,14 @@ def ensureEnvironment():
 
     return rucio, crab
 
+
 def htmlHeader():
     """
     something to make a prettier HTML table, stolen from Ceyhun's
     https://cmsdatapop.web.cern.ch/cmsdatapop/eos-path-size/size.html
+    and trimmed down a lot
     """
     head = """<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- prepared using https://datatables.net/download/ -->
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-colvis-2.2.3/b-html5-2.2.3/b-print-2.2.3/cr-1.5.6/date-1.1.2/kt-2.7.0/rr-1.2.8/sc-2.0.6/sb-1.3.3/sp-2.0.1/sl-1.4.0/sr-1.1.1/datatables.min.css"/>
 
@@ -255,7 +260,6 @@ def htmlHeader():
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/dt-1.12.1/datatables.min.css"/>
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.11.4/css/dataTables.bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.2.2/css/buttons.bootstrap.min.css">
 
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
@@ -263,70 +267,25 @@ def htmlHeader():
 	        font-family: 'Trebuchet MS', sans-serif;
 	        font-size: 12px;
         }
-        /* Search bar */
-        .dataTables_filter input {
-          border: 7px solid Tomato;
-          width: 400px;
-          font-size: 14px;
-          font-weight: bold;
-        }
         table td {
             word-break: break-all;
-        }
-        /* From 7th column, align to left */
-        table td:nth-child(n+7) {
-            text-align: left;
         }
         /* First row bold */
         table td:nth-child(1) {
             font-weight: bold;
-        }
-        /* Path title */
-        table th:nth-child(1) {
-            color: #990000;
         }
         /* Header rows, total and titles, align left */
         table th:nth-child(n+2) {
             text-align: left !important;
             color:  #990000 !important;
         }
-        /* Different background color for even and odd columns  */
-        .table.display tr:nth-child(even) {
-          /* background-color: #dddfff; */
+        /* First column color */
+        table th:nth-child(1) {
+            color: #990000;
         }
         /* No carriage return for values, no break lines */
         table tr td {
-          width: 1%;
           white-space: nowrap;
-        }
-        /* button */
-        div.dt-buttons {
-          float: right;
-        }
-        .dt-button.buttons-columnVisibility.active {
-              background: #FF0000 !important;
-              color: white !important;
-              opacity: 0.5;
-           }
-        .dt-button.buttons-columnVisibility {
-              background: black !important;
-              color: white !important;
-              opacity: 1;
-           }
-
-        div.dataTables_wrapper {
-          margin-bottom: 3em;
-        }
-
-        <!--         Divider   -->
-        .divider {
-<!--            width:500px;-->
-            text-align:center;
-        }
-        .divider hr {
-            margin-left:auto;
-            margin-right:auto;
-            width:100%;
         }
     </style>
 </head>"""
