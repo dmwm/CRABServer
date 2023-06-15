@@ -7,7 +7,6 @@ import logging
 import sys
 import os
 import time
-import datetime
 import copy
 
 from http.client import HTTPException
@@ -32,6 +31,7 @@ class TapeRecallManager(BaseRecurringAction):
     rucioClient = None
     privilegedRucioClient = None
     crabserver = None
+
 
     def _execute(self, config, task):  # pylint: disable=unused-argument
         """ this is what we do at every polling cycle """
@@ -177,7 +177,8 @@ class TapeRecallManager(BaseRecurringAction):
         # to import from there. Should probably create a TaskWorker/TaskUtils.py for such functions
         configreq = {'subresource': 'addwarning', 'workflow': taskname, 'warning': msg}
         try:
-            self.crabserver.post(api='task', data=configreq)
+            data = urlencode(configreq)
+            self.crabserver.post(api='task', data=data)
         except HTTPException as hte:
             self.logger.error("Error uploading warning: %s", str(hte))
             self.logger.warning("Cannot add a warning to REST interface. Warning message: %s", msg)
