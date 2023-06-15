@@ -93,7 +93,7 @@ class TapeRecallManager(BaseRecurringAction):
             except RuleNotFound:
                 msg = "Rucio rule id %s not found. Please report to experts" % reqId
                 self.logger.error(msg)
-                self.uploadWarning(msg, taskName)
+                self.uploadWarning(taskname=taskName, msg=msg)
                 continue
             self.logger.info("Rule %s is %s", reqId, rule['state'])
             # 3.) check if rule completed
@@ -171,7 +171,7 @@ class TapeRecallManager(BaseRecurringAction):
             self.logger.info("Retrieved a total of %d %s tasks", len(tasks), status)
         return tasks
 
-    def uploadWarning(self, taskname, msg):
+    def uploadWarning(self, taskname='', msg=''):
         """ Uploads a warning message to the Task DB so that crab status can show it """
         #TODO this is duplicated in TaskWorker/Actions/TaskAction.py but it is not possible
         # to import from there. Should probably create a TaskWorker/TaskUtils.py for such functions
