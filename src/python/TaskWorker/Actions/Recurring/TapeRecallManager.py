@@ -7,7 +7,6 @@ import logging
 import sys
 import os
 import time
-import datetime
 import copy
 
 from http.client import HTTPException
@@ -32,6 +31,7 @@ class TapeRecallManager(BaseRecurringAction):
     rucioClient = None
     privilegedRucioClient = None
     crabserver = None
+
 
     def _execute(self, config, task):  # pylint: disable=unused-argument
         """ this is what we do at every polling cycle """
