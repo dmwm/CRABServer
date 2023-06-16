@@ -50,18 +50,31 @@ class TapeRecallManager(BaseRecurringAction):
 
         for aTask in tasksToWorkOn:
             taskName = aTask['tm_taskname']
-            self.logger.info("Working on task %s", taskName)
+            msg = f"Working on task {taskName}"
+            self.logger.info(msg)
 
             reqId = aTask['tm_DDM_reqid']
             if not reqId:
-                self.logger.debug("tm_DDM_reqid' is not defined for task %s, skipping it", taskName)
+                msg = f"tm_DDM_reqid' is not defined for task {taskName}, skipping it"
+                self.logger.debug(msg)
+                # leave the task in there, so that in time it gets noticed and the issue addressed
                 continue
-            msg = "Task points to Rucio RuleId:  %s " % reqId
+            msg = f"Task points to Rucio RuleId:  {reqId} "
             self.logger.info(msg)
 
             # delete rule and set task status to killed
-            self.logger.info('Will delete rule %s', reqId)
-            self.privilegedRucioClient.delete_replication_rule(reqId)
+            # Check if this rule can be deleted. Is any other task using it ?
+            tasksUsingThisRule = self.findTasksForRule(ruleId=reqId)
+            if len(tasksUsingThisRule) == 1 and tasksUsingThisRule[0] == taskName:
+                msg = f"Will delete rule {reqId}"
+                self.logger.info(msg)
+                try:
+                    self.privilegedRucioClient.delete_replication_rule(reqId)
+                except RuleNotFound:
+                    self.logger.info("Rule not found, can not delete it. Simply set task as KILLED")
+            else:
+                msg = f"rule {reqId} used by tasks {tasksUsingThisRule}. Will not delete it"
+                self.logger.info(msg)
             self.updateTaskStatus(taskName, 'KILLED')
             # Clean up previous "dataset on tape" warnings
             self.deleteWarnings(taskName)
@@ -74,11 +87,11 @@ class TapeRecallManager(BaseRecurringAction):
         tasksToWorkOn = self.getTasks(status)
         for aTask in tasksToWorkOn:
             taskName = aTask['tm_taskname']
-            self.logger.info("Working on task %s", taskName)
+            msg = f"Working on task {taskName}"
+            self.logger.info(msg)
             # 1.) check for "waited too long"
             if (time.time() - getTimeFromTaskname(str(taskName))) > MAX_DAYS_FOR_TAPERECALL*24*60*60:
-                msg = "Tape recall request for input data did not complete in %d days." %\
-                      MAX_DAYS_FOR_TAPERECALL
+                msg = f"Tape recall request did not complete in {MAX_DAYS_FOR_TAPERECALL} days."
                 self.logger.info(msg)
                 failTask(taskName, self.crabserver, msg, self.logger, 'FAILED')
                 continue
@@ -87,19 +100,22 @@ class TapeRecallManager(BaseRecurringAction):
             if not reqId:
                 self.logger.debug("tm_DDM_reqid' is not defined for task %s, skipping it", taskName)
                 continue
-            self.logger.info("Task points to Rucio RuleId:  %s ", reqId)
+            msg = f"Task points to Rucio RuleId:  {reqId}"
+            self.logger.info(msg)
             try:
                 rule = self.rucioClient.get_replication_rule(reqId)
             except RuleNotFound:
-                msg = "Rucio rule id %s not found. Please report to experts" % reqId
+                msg = f"Rucio rule id {reqId} not found. Please report to experts"
                 self.logger.error(msg)
                 self.uploadWarning(taskname=taskName, msg=msg)
                 continue
-            self.logger.info("Rule %s is %s", reqId, rule['state'])
+            msg = f"Rule {reqId} is {rule['state']}"
+            self.logger.info(msg)
             # 3.) check if rule completed
             if rule['state'] == 'OK':
                 # all good kick off a new processing
-                self.logger.info("Request %s is completed, proceed with submission", reqId)
+                msg = f"Request {reqId} is completed, proceed with submission"
+                self.logger.info(msg)
                 self.updateTaskStatus(taskName, 'NEW')
                 # Clean up previous "dataset on tape" warnings
                 self.deleteWarnings(taskName)
@@ -157,7 +173,7 @@ class TapeRecallManager(BaseRecurringAction):
     def getTasks(self, status):
         """retrieve from DB a list of tasks with given status"""
         #TODO this is also a candidate for TaskWorker/TaskUtils.py
-        self.logger.info("Retrieving %s tasks", status)
+        msg = f"Retrieving {status} tasks"
         tasks = []
         configreq = {'limit': 1000, 'workername': self.config.TaskWorker.name, 'getstatus': status}
         try:
@@ -166,9 +182,11 @@ class TapeRecallManager(BaseRecurringAction):
         except Exception:
             pass
         if not tasks:
-            self.logger.info("No %s task retrieved.", status)
+            msg = f"No {status} task retrieved."
+            self.logger.info(msg)
         else:
-            self.logger.info("Retrieved a total of %d %s tasks", len(tasks), status)
+            msg = f"Retrieved a total of {len(tasks)} {status} tasks"
+            self.logger.info(msg)
         return tasks
 
     def uploadWarning(self, taskname='', msg=''):
@@ -197,7 +215,8 @@ class TapeRecallManager(BaseRecurringAction):
     def updateTaskStatus(self, taskName, status):
         """ change task status in the DB """
         #TODO this is also a candidate for TaskWorker/TaskUtils.py
-        self.logger.info('Will set to %s task %s', status, taskName)
+        msg = f"Will set to {status} task {taskName}"
+        self.logger.info(msg)
         if status == 'NEW':
             command = 'SUBMIT'
         elif status == 'KILLED':
@@ -209,12 +228,24 @@ class TapeRecallManager(BaseRecurringAction):
         data = urlencode(configreq)
         self.crabserver.post(api='workflowdb', data=data)
 
+    def findTasksForRule(self, ruleId=None):
+        """
+        returns the list of task names which have stored the given Rucio
+        rule as ddmreqid in DB Tasks table
+        """
+        #TODO this is also a candidate for TaskWorker/TaskUtils.py
+        data = {'subresource': 'taskbyddmreqid', 'ddmreqid': ruleId}
+        res = self.crabserver.get(api='task', data=urlencode(data))
+        tasks = res[0]['result']  # for obscure reasons this has the form [['task1'],['task2']...]
+        taskList = [t[0] for t in tasks]
+        return taskList
+
 
 if __name__ == '__main__':
     # Simple main to execute the action standalone for testing
     # You just need to set the task worker environment and desired twconfig.
 
-    twconfig = '/data/srv/TaskManager/current/TaskWorkerConfig.py'
+    TWCONFIG = '/data/srv/TaskManager/current/TaskWorkerConfig.py'
 
     logger = logging.getLogger()
     handler = logging.StreamHandler(sys.stdout)
@@ -224,7 +255,7 @@ if __name__ == '__main__':
     logger.setLevel(logging.DEBUG)
 
     from WMCore.Configuration import loadConfigurationFile
-    cfg = loadConfigurationFile(twconfig)
+    cfg = loadConfigurationFile(TWCONFIG)
 
     trs = TapeRecallManager(cfg.TaskWorker.logsDir)
     trs._execute(cfg, None)  # pylint: disable=protected-access
