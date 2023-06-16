@@ -27,7 +27,7 @@ class TapeRecallManager(BaseRecurringAction):
     which implements the _execute method (with the unused argument "task"...pff)
     name of this class, this file and the recurring action in TW config list
     must be the same """
-    pollingTime = 60*4  # unit=minutes. Runs every 4 hours
+    pollingTime = 60*2  # unit=minutes. Runs every 2 hours
     rucioClient = None
     privilegedRucioClient = None
     crabserver = None
