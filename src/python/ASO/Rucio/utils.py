@@ -48,7 +48,6 @@ def chunks(l, n=1):
                 break
 
 
-
 def uploadToTransfersdb(client, api, subresource, fileDoc, logger=None):
     """
     Upload fileDoc to REST
