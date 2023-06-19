@@ -1,6 +1,7 @@
 import logging
 import json
 import os
+import hashlib
 
 from ASO.Rucio.exception import RucioTransferException
 from ASO.Rucio.utils import writePath
@@ -25,7 +26,8 @@ class Transfer:
         self.username = ''
         self.rucioScope = ''
         self.destination = ''
-        self.publishname = ''
+        self.publishContainer = ''
+        self.transferContainer = ''
         self.logsDataset = ''
 
         # dynamically change throughout the scripts
@@ -33,9 +35,13 @@ class Transfer:
 
         # bookkeeping
         self.lastTransferLine = 0
-
-        # rule bookkeeping
         self.containerRuleID = ''
+
+        # info from rucio
+        self.replicasInContainer = None
+
+        # map lfn to id
+        self.replicaLFN2IDMap = None
 
     def readInfo(self):
         """
@@ -46,11 +52,22 @@ class Transfer:
         # ensure task_process/transfers directory
         if not os.path.exists('task_process/transfers'):
             os.makedirs('task_process/transfers')
+        # read into memory
         self.readLastTransferLine()
         self.readTransferItems()
+        self.buildLFN2IDMap()
         self.readRESTInfo()
         self.readInfoFromTransferItems()
         self.readContainerRuleID()
+
+    def readInfoFromRucio(self, rucioClient):
+        """
+        Read the information from Rucio.
+
+        :param rucioClient: Rucio client
+        :type rucioClient: rucio.client.client.Client
+        """
+        self.initReplicasInContainer(rucioClient)
 
     def readLastTransferLine(self):
         """
@@ -68,6 +85,12 @@ class Transfer:
             self.lastTransferLine = 0
 
     def updateLastTransferLine(self, line):
+        """
+        Update lastTransferLine to task_process/transfers/last_transfer.txt
+
+        :param line: line number
+        :type line: int
+        """
         self.lastTransferLine = line
         path = config.args.last_line_path
         with writePath(path) as w:
@@ -88,6 +111,15 @@ class Transfer:
             raise RucioTransferException(f'{path} does not exist. Probably no completed jobs in the task yet.') from ex
         if len(self.transferItems) == 0:
             raise RucioTransferException(f'{path} does not contain new entry.')
+
+    def buildLFN2IDMap(self):
+        """
+        Create `self.replicaLFN2IDMap` map from LFN to REST ID using using info
+        in self.transferItems
+        """
+        self.replicaLFN2IDMap = {}
+        for x in self.transferItems:
+            self.replicaLFN2IDMap[x['destination_lfn']] = x['id']
 
     def readRESTInfo(self):
         """
@@ -113,16 +145,21 @@ class Transfer:
         self.rucioScope = f'user.{self.username}'
         self.destination = info['destination']
         if config.args.force_publishname:
-            self.publishname = config.args.force_publishname
+            containerName = config.args.force_publishname
         else:
-            self.publishname = info['outputdataset']
-        self.logsDataset = f'{self.publishname}#LOGS'
+            containerName = info["outputdataset"]
+        self.publishContainer = containerName
+        tmp = containerName.split('/')
+        taskNameHash = hashlib.md5(info['taskname'].encode()).hexdigest()[:8]
+        tmp[2] += f'_TRANSFER.{taskNameHash}'
+        self.transferContainer = '/'.join(tmp)
+        self.logsDataset = f'{self.transferContainer}#LOGS'
 
     def readContainerRuleID(self):
         """
-        Read containerRuleID from task_process/transfers/bookkeeping_rules.json
+        Read containerRuleID from task_process/transfers/container_ruleid.txt
         """
-        # skip reading rule from bookkeeping in case rerun with new publishname.
+        # skip reading rule from bookkeeping in case rerun with new transferContainerName.
         if config.args.force_publishname:
             return
         path = config.args.container_ruleid_path
@@ -135,10 +172,45 @@ class Transfer:
 
     def updateContainerRuleID(self, ruleID):
         """
-        update task_process/transfers/container_ruleid.txt
+        update containerRuleID to task_process/transfers/container_ruleid.txt
         """
         self.containerRuleID = ruleID
         path = config.args.container_ruleid_path
         self.logger.info(f'Bookkeeping container rule ID [{ruleID}] to file: {path}')
         with writePath(path) as w:
             w.write(ruleID)
+
+    def initReplicasInContainer(self, rucioClient):
+        """
+        Get replicas from transfer and publish container and assign it to
+        self.replicasInContainer as key-value pare of containerName and map of
+        LFN2Dataset.
+
+        :param rucioClient: Rucio Client
+        :type rucioClient: rucio.client.client.Client
+        """
+        replicasInContainer = {}
+        replicasInContainer[self.transferContainer] = self.populateLFN2DatasetMap(self.transferContainer, rucioClient)
+        replicasInContainer[self.publishContainer] = self.populateLFN2DatasetMap(self.publishContainer, rucioClient)
+        self.replicasInContainer = replicasInContainer
+
+    def populateLFN2DatasetMap(self, container, rucioClient):
+        """
+        Get the list of replicas in the container and return as key-value pair
+        in `self.replicasInContainer` as a map of LFN to the dataset name it
+        attaches to.
+
+        :param container: container name
+        :type: str
+        :param rucioClient: Rucio client object
+        :type rucioClient: rucio.client.client.Client
+        :returns:
+        :rtype:
+        """
+        replicasInContainer = {}
+        datasets = rucioClient.list_content(self.rucioScope, container)
+        for ds in datasets:
+            files = rucioClient.list_content(self.rucioScope, ds['name'])
+            for f in files:
+                replicasInContainer[f['name']] = ds['name']
+        return replicasInContainer
