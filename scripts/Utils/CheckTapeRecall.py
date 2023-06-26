@@ -14,6 +14,7 @@ import pandas as pd
 from RESTInteractions import CRABRest
 from ServerUtilities import encodeRequest
 
+
 def main():
     """
         get all rules for this account, find pending ones,
@@ -33,7 +34,7 @@ def main():
 
     # transform created_at to number of days
     today = pd.Timestamp.now()
-    df['days'] = df.apply(lambda x: (today-x['created_at']).days, axis=1)
+    df['days'] = df.apply(lambda x: (today - x['created_at']).days, axis=1)
 
     # select non-OK states
     stuck = df[df['state'] == 'STUCK'].sort_values(by=['days'], ascending=False)
@@ -109,6 +110,7 @@ def createRulesHtmlTable(pending, rucio, crab):
 
     return rulesToHtml
 
+
 def createTaskUrl(tasks):
     """
     create an URL reference string for HTML pointing to task info in CRABRest UI
@@ -135,8 +137,8 @@ def createDatasetUrl(dataset):
     primaryDS = dataset.split('/')[1]
     processedDS = dataset.split('/')[2]
     datatier = dataset.split('/')[3]
-    prim = primaryDS.replace('_','-').split('-')[0]
-    proc = processedDS.replace('_','-').split('-')[0]
+    prim = primaryDS.replace('_', '-').split('-')[0]
+    proc = processedDS.replace('_', '-').split('-')[0]
     shortDS = '/'.join(['', prim, proc, datatier])
 
     href = f'<a href="{dasUrl}">{shortDS}</a>'
@@ -230,16 +232,15 @@ def findDatasetSize(rucioClient=None, dataset=None):
         return None
     info = rucioClient.get_did(scope='cms', name=dataset, dynamic='DATASET')
     datasetBytes = info['bytes']
-    teraBytes = datasetBytes//1e12
+    teraBytes = datasetBytes // 1e12
     size = f"{datasetBytes/1e12:.0f}" if teraBytes > 0 else f"{datasetBytes/1e12:.3f}"
     return size
 
 
 def ensureEnvironment():
-    """ make sure we can run Rucio client and talk with CRAB"""
-    #if os.getenv("CMSSW_BASE"):
-    #    print("Must use a shell w/o CMSSW environent")
-    #    sys.exit()
+    """
+    make sure we can run Rucio client and talk with CRAB
+    """
     try:
         from rucio.client import Client
     except ModuleNotFoundError:
@@ -267,7 +268,8 @@ def htmlHeader():
     """
     head = """<head>
     <!-- prepared using https://datatables.net/download/ -->
-    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-colvis-2.2.3/b-html5-2.2.3/b-print-2.2.3/cr-1.5.6/date-1.1.2/kt-2.7.0/rr-1.2.8/sc-2.0.6/sb-1.3.3/sp-2.0.1/sl-1.4.0/sr-1.1.1/datatables.min.css"/>
+    <link rel="stylesheet" type="text/css"
+     href="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-colvis-2.2.3/b-html5-2.2.3/b-print-2.2.3/cr-1.5.6/date-1.1.2/kt-2.7.0/rr-1.2.8/sc-2.0.6/sb-1.3.3/sp-2.0.1/sl-1.4.0/sr-1.1.1/datatables.min.css"/>
 
     <!--  Please do not delete below CSSes, important for pretty view -->
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/dt-1.12.1/datatables.min.css"/>
@@ -277,8 +279,8 @@ def htmlHeader():
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
         body {
-	        font-family: 'Trebuchet MS', sans-serif;
-	        font-size: 12px;
+            font-family: 'Trebuchet MS', sans-serif;
+            font-size: 12px;
         }
         table td {
             word-break: break-all;
@@ -303,7 +305,6 @@ def htmlHeader():
     </style>
 </head>"""
     return head
-
 
 
 if __name__ == '__main__':
