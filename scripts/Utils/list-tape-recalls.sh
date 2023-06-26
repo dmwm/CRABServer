@@ -8,23 +8,30 @@ if ! [ $rc == "0" ] ; then
     cat /afs/cern.ch/user/b/belforte/.globus/.stefano | /usr/bin/voms-proxy-init -quiet -pwstdin -rfc -voms cms -valid 192:00 -out ${proxy}
 fi
 export X509_USER_PROXY=$proxy
-#source /cvmfs/cms.cern.ch/rucio/setup-py3.sh > /dev/null
+
 export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/
-export PYTHONPATH=/afs/cern.ch/user/b/belforte/WORK/CRAB3/CRABServer/src/python:$PYTHONPATH
-export PYTHONPATH=/afs/cern.ch/user/b/belforte/WORK/CRAB3/WMCore/src/python:$PYTHONPATH
 export RUCIO_HOME=/cvmfs/cms.cern.ch/rucio/current/
 export RUCIO_ACCOUNT=`whoami`
 
 mkdir -p /tmp/belforte
 cd /tmp/belforte
-rm -f CheckTapeRecall.py
-wget -q https://github.com/dmwm/CRABServer/raw/master/scripts/Utils/CheckTapeRecall.py 
-python3 CheckTapeRecall.py > check.log 2>&1
+rm -rf CRABServer
+rm -rf WMCore
+git clone https://github.com/dmwm/CRABServer/
+git clone https://github.com/dmwm/WMCore
+wmcver=`cat CRABServer/requirements.txt|grep wmcver|cut -d= -f3`
+cd WMCore; git checkout $wmcver; cd -
+
+export PYTHONPATH=`pwd`/CRABServer/src/python:$PYTHONPATH
+export PYTHONPATH=`pwd`/WMCore/src/python:$PYTHONPATH
+
+python3 `pwd`/CRABServer/scripts/Utils/CheckTapeRecall.py > check.log 2>&1
 rc=$?
+
 if ! [ $rc == "0" ] ; then
     echo "TapeRecalls check failed: here's log"
     cat check.log
 else
-    cp RecallRules.html /eos/home-b/belforte/www/RecallRules.html
+    cp RecallRules.html /eos/project/c/cmsweb/www/CRAB/RecallRules.html
 fi
 
