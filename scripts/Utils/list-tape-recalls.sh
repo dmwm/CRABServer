@@ -17,10 +17,12 @@ mkdir -p /tmp/belforte
 cd /tmp/belforte
 rm -rf CRABServer
 rm -rf WMCore
-git clone https://github.com/dmwm/CRABServer/
-git clone https://github.com/dmwm/WMCore
+
+git clone -q https://github.com/dmwm/CRABServer/ > /dev/null
+git clone -q https://github.com/dmwm/WMCore > /dev/null
+
 wmcver=`cat CRABServer/requirements.txt|grep wmcver|cut -d= -f3`
-cd WMCore; git checkout $wmcver; cd -
+cd WMCore; git checkout -q $wmcver; cd - > /dev/null
 
 export PYTHONPATH=`pwd`/CRABServer/src/python:$PYTHONPATH
 export PYTHONPATH=`pwd`/WMCore/src/python:$PYTHONPATH
