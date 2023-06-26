@@ -42,6 +42,30 @@ def main():
     # combine all pending rules in a single dataframe
     pending = pd.concat([stuck, replicating]).reset_index(drop=True)
 
+    # prepare an HTML table
+    if pending.empty:
+        rulesTable = "<tr><td><center>No rules either in replicating nor stuck</center></td></tr>"
+    else:
+        rulesTable = createRulesHtmlTable(pending)
+
+    # write an HTML doc
+    beginningOfDoc = '<!DOCTYPE html>\n<html>\n'
+    header = htmlHeader()
+    now = time.strftime("%Y-%m-%d %H:%M:%S %Z")
+    title = f"\n<center><b>Status of CRAB Tape Recall rules at {now}</b></center><hr>\n"
+    endOfDoc = '\n</html>'
+    with open('RecallRules.html', 'w', encoding='utf-8') as fh:
+        fh.write(beginningOfDoc)
+        fh.write(header)
+        fh.write(title)
+        fh.write(rulesTable)
+        fh.write(endOfDoc)
+
+
+def createRulesHtmlTable(pending):
+    """
+    reformat the datafram into a compact-looking HTML table
+    """
     # use standard compact format (OK/Rep/Stucl) for lock counts
     pending['locks'] = pending.apply(lambda x: f"{x.locks_ok_cnt}/{x.locks_replicating_cnt}/{x.locks_stuck_cnt}", axis=1)
 
@@ -82,18 +106,8 @@ def main():
     selected = pending[['idUrl', 'state', 'user', 'locks', 'days', 'tape', 'size', 'datasetUrl', 'taskUrls']]
     renamed = selected.rename(columns={'locks': 'locks ok/rep/st', 'size': 'size TB'})
     rulesToHtml = renamed.to_html(escape=False)
-    beginningOfDoc = '<!DOCTYPE html>\n<html>\n'
-    header = htmlHeader()
-    now = time.strftime("%Y-%m-%d %H:%M:%S %Z")
-    title = f"\n<center><b>Status of CRAB Tape Recall rules at {now}</b></center><hr>\n"
-    endOfDoc = '\n</html>'
-    with open('RecallRules.html', 'w', encoding='utf-8') as fh:
-        fh.write(beginningOfDoc)
-        fh.write(header)
-        fh.write(title)
-        fh.write(rulesToHtml)
-        fh.write(endOfDoc)
 
+    return rulesToHtml
 
 def createTaskUrl(tasks):
     """
