@@ -46,7 +46,7 @@ def main():
     if pending.empty:
         rulesTable = "<tr><td><center>No rules either in replicating nor stuck</center></td></tr>"
     else:
-        rulesTable = createRulesHtmlTable(pending)
+        rulesTable = createRulesHtmlTable(pending, rucio, crab)
 
     # write an HTML doc
     beginningOfDoc = '<!DOCTYPE html>\n<html>\n'
@@ -62,7 +62,7 @@ def main():
         fh.write(endOfDoc)
 
 
-def createRulesHtmlTable(pending):
+def createRulesHtmlTable(pending, rucio, crab):
     """
     reformat the datafram into a compact-looking HTML table
     """
@@ -128,7 +128,6 @@ def createDatasetUrl(dataset):
     create an URL reference string for HTML pointing to dataset info in DAS Web UI
     use shortened dataset name as link in the table
     """
-    urlBase = '<a href="https://cmsweb.cern.ch/das/ui/task/%s">%s</a>'
     dasUrl = f"https://cmsweb.cern.ch/das/request?view=list&instance=prod/global&input={dataset}"
 
     # shorten dataset name picking only first word of A and B in /A/B/Tier
