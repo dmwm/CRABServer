@@ -253,7 +253,7 @@ def ensureEnvironment():
     rucio = Client()
 
     proxy = os.environ['X509_USER_PROXY']
-    crab = CRABRest(hostname='cmsweb-testbed.cern.ch', localcert=proxy,
+    crab = CRABRest(hostname='cmsweb.cern.ch', localcert=proxy,
                     localkey=proxy, userAgent='CheckTapeRecall')
     crab.setDbInstance('prod')
 
