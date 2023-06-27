@@ -411,8 +411,14 @@ def extractUserSandbox(archiveJob, cmsswVersion):
     # the PSet which is also in the user sandbox
     os.chdir(cmsswVersion)
     print(subprocess.getoutput('tar xfm %s ' % os.path.join('..', archiveJob)))
-    os.rename('PSet.py','../PSet.py')
-    os.rename('PSet.pkl','../PSet.pkl')
+    os.rename('PSet.py', '../PSet.py')
+    os.rename('PSet.pkl', '../PSet.pkl')
+    # if the sandbox contains tar files, expand them
+    files = subprocess.getoutput(f"tar tf ../{archiveJob}").split('\n')
+    for file in files:
+        if ('.tar.' in file) or file.endswith('.tar') or\
+                file.endswith('.tgz') or file.endswith('.tbz'):
+            print(subprocess.getoutput(f"tar xfm {file}"))
     os.chdir('..')
 
 def getProv(filename, scram):
