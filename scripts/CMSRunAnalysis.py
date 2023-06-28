@@ -758,7 +758,8 @@ if __name__ == "__main__":
             json.dump(rep, of)
         with open('jobReport.exitCode.txt', 'w', encoding='utf-8') as rf:
             rf.write(str(rep['exitCode']))
-        with open('jobReportExtract.pickle', 'wb', encoding='utf-8') as of:
+        # TODO looks like following file is never used anywhere (SB). Test removing this
+        with open('jobReportExtract.pickle', 'wb') as of:
             pickle.dump(rep, of)
         print(f"==== Report file creation FINISHED at {time.asctime(time.gmtime())} ====")
     except FwkJobReportException as FJRex:
