@@ -1,5 +1,6 @@
 import logging
 import copy
+import datetime
 
 import ASO.Rucio.config as config
 from ASO.Rucio.utils import uploadToTransfersdb
@@ -22,163 +23,166 @@ class MonitorLockStatus:
         Main execution step.
         """
         # Check replicas's lock status
-        okReplicas, notOKReplicas = self.checkLockStatus()
-        self.logger.debug(f'okReplicas: {okReplicas}')
-        self.logger.debug(f'notOKReplicas: {notOKReplicas}')
+        okFileDocs, notOKFileDocs = self.checkLockStatus()
+        self.logger.debug(f'okFileDocs: {okFileDocs}')
+        self.logger.debug(f'notOKFileDocs: {notOKFileDocs}')
 
         # Register transfer complete replicas to publish container.
-        publishedReplicas = self.registerToPublishContainer(okReplicas)
-        self.logger.debug(f'publishReplicas: {publishedReplicas}')
-        # update ok status
-        self.updateOKReplicasToREST(publishedReplicas)
+        publishedFileDocs = self.registerToPublishContainer(okFileDocs)
+        self.logger.debug(f'publishedFileDocs: {publishedFileDocs}')
+        # update fileDoc for ok filedocs
+        self.updateRESTFileDocsStateToDone(publishedFileDocs)
 
         # update block complete status
-        replicasToUpdateBlockComplete = self.checkBlockCompleteStatus(publishedReplicas)
-        self.logger.debug(f'Replicas to update block completion: {replicasToUpdateBlockComplete}')
-        self.updateBlockCompleteToREST(replicasToUpdateBlockComplete)
+        blockCompletefileDocs = self.checkBlockCompleteStatus(publishedFileDocs)
+        self.logger.debug(f'fileDocs to update block completion: {blockCompletefileDocs}')
+        self.updateRESTFileDocsBlockCompletionInfo(blockCompletefileDocs)
 
         # Bookkeeping published replicas (only replicas with blockcomplete "ok")
-        self.transfer.updateTransferOKReplicas([x['name'] for x in replicasToUpdateBlockComplete])
+        self.transfer.updateOKLocks([x['name'] for x in blockCompletefileDocs])
 
     def checkLockStatus(self):
         """
         Check all lock status of replicas in the rule from
         `Transfer.containerRuleID`.
 
-        :return: list of `okReplicas` where transfers are completed, and
-            `notOkReplicas` where transfer transfers are still in REPLICATING
-             or STUCK state. Each item in list is dict of replica info.
+        :return: list of `okFileDocs` where locks is `OK` and `notOKFileDocs`
+            where locks is `REPLICATING` or `STUCK`. Return as fileDoc format
         :rtype: tuple of list of dict
         """
-        okReplicas = []
-        notOKReplicas = []
+        okFileDocs = []
+        notOKFileDocs = []
         try:
             listReplicasLocks = self.rucioClient.list_replica_locks(self.transfer.containerRuleID)
         except TypeError:
             # Current rucio-clients==1.29.10 will raise exception when it get
-            # None response from server. It will happen when we run
-            # list_replica_locks immediately after register replicas with
+            # None from server. It happen when we run list_replica_locks
+            # immediately after register replicas in transfer container which
             # replicas lock info is not available yet.
-            self.logger.info('Error has raised. Assume there is still no lock info available yet.')
+            self.logger.info('Error was raised. Assume there is still no lock info available yet.')
             listReplicasLocks = []
-        replicasInContainer = self.transfer.replicasInContainer[self.transfer.transferContainer]
-        for replicaStatus in listReplicasLocks:
-            # Skip replicas that register in the same run.
-            if not replicaStatus['name'] in replicasInContainer:
-                continue
-            # skip if replicas transfer is in transferOKReplicas. No need to
-            # update status for transfer complete.
-            if replicaStatus['name'] in self.transfer.transferOKReplicas:
-                continue
-
-            replica = {
-                'id': self.transfer.replicaLFN2IDMap[replicaStatus['name']],
-                'name': replicaStatus['name'],
+        for lock in listReplicasLocks:
+            fileDoc = {
+                'id': self.transfer.replicaLFN2IDMap[lock['name']],
+                'name': lock['name'],
                 'dataset': None,
                 'blockcomplete': 'NO',
                 'ruleid': self.transfer.containerRuleID,
             }
-            if replicaStatus['state'] == 'OK':
-                okReplicas.append(replica)
+            if lock['state'] == 'OK':
+                okFileDocs.append(fileDoc)
             else:
-                notOKReplicas.append(replica)
-        return (okReplicas, notOKReplicas)
+                notOKFileDocs.append(fileDoc)
+        return (okFileDocs, notOKFileDocs)
 
-    def registerToPublishContainer(self, replicas):
+    def registerToPublishContainer(self, fileDocs):
         """
-        Register replicas to the published container. Update the replicas info
+        Register replicas to the publish container. Update the replicas info
         to the new dataset name.
 
-        :param replicas: replicas info return from `checkLockStatus` method.
-        :type replicas: list of dict
+        :param fileDocs: replicas info return from `checkLockStatus` method.
+        :type fileDocs: list of dict (fileDoc)
 
         :return: replicas info with updated dataset name.
         :rtype: list of dict
         """
         r = RegisterReplicas(self.transfer, self.rucioClient, None)
-        replicasPublishedInfo = r.addReplicasToContainer(replicas, self.transfer.publishContainer)
+        publishContainerFileDocs = r.addReplicasToContainer(fileDocs, self.transfer.publishContainer)
         # Update dataset name for each replicas
-        tmpLFN2DatasetMap = {x['name']:x['dataset'] for x in replicasPublishedInfo}
-        tmpReplicas = copy.deepcopy(replicas)
-        for i in tmpReplicas:
-            i['dataset'] = tmpLFN2DatasetMap[i['name']]
-        return tmpReplicas
+        tmpLFN2DatasetMap = {x['name']:x['dataset'] for x in publishContainerFileDocs}
+        tmpFileDocs = copy.deepcopy(fileDocs)
+        for f in tmpFileDocs:
+            f['dataset'] = tmpLFN2DatasetMap[f['name']]
+        return tmpFileDocs
 
-    def checkBlockCompleteStatus(self, replicas):
+    def checkBlockCompleteStatus(self, fileDocs):
         """
-        check (DBS) block completion status from `is_open` dataset metadata.
-        Only return list of replica info where `is_open` of the dataset is
-        `False`.
+        Checking (DBS) block completion status from `is_open` dataset metadata.
+        Only return list of fileDocs where `is_open` of the dataset is `False`.
 
-        :param replicas: replica info return from `registerToPublishContainer`
+        :param fileDocs: replicas's fileDocs
             method.
-        :type replicas: list of dict
+        :type fileDocs: list of dict
 
         :return: list of replicas info with updated `blockcomplete` to `OK`.
         :rtype: list of dict
         """
-        tmpReplicas = []
+        tmpFileDocs = []
         datasetsMap = {}
-        for i in replicas:
-            dataset = i['dataset']
-            if not dataset in datasetsMap:
-                datasetsMap[dataset] = [i]
+        for i in fileDocs:
+            # Skip if locks are in transferOKLocks. No need to update status
+            # for transfer complete.
+            if i['name'] in self.transfer.bookkeepingOKLocks:
+                continue
+            datasetName = i['dataset']
+            if not datasetName in datasetsMap:
+                datasetsMap[datasetName] = [i]
             else:
-                datasetsMap[dataset].append(i)
-        for k, v in datasetsMap.items():
-            metadata = self.rucioClient.get_metadata(self.transfer.rucioScope, k)
+                datasetsMap[datasetName].append(i)
+        for dataset, v in datasetsMap.items():
+            metadata = self.rucioClient.get_metadata(self.transfer.rucioScope, dataset)
             # TODO: Also close dataset when (in or)
             # - the task has completed.
-            # - no new replica/is_open for more than 6 hours
+            #   - We have no indication when task is completed unless it pass as
+            #     args manually from caller scripts (task_proc_wrapper.sh)
+            # - no new replica/is_open for more than 6 hours. DONE
+            shouldClose = (metadata['updated_at'] + \
+                           datetime.timedelta(seconds=config.args.open_dataset_timeout)) \
+                           < datetime.datetime.now()
             if not metadata['is_open']:
-                for r in v:
-                    item = copy.copy(r)
-                    item['blockcomplete'] = 'OK'
-                    tmpReplicas.append(item)
+                for f in v:
+                    newF = copy.deepcopy(f)
+                    newF['blockcomplete'] = 'OK'
+                    tmpFileDocs.append(newF)
+            elif shouldClose:
+                self.logger.info(f'Closing dataset: {dataset}')
+                self.rucioClient.close(self.transfer.rucioScope, dataset)
+            else:
+                self.logger.info(f'Dataset {dataset} is still open.')
+        return tmpFileDocs
 
-        return tmpReplicas
-
-    def updateOKReplicasToREST(self, replicas):
+    def updateRESTFileDocsStateToDone(self, fileDocs):
         """
-        Update OK status transfers info to REST server.
+        Update files transfer state in filetransfersdb to DONE, along with
+        metadata info required by REST.
 
-        :param replicas: transferItems's ID and its information.
-        :type replicas: list of dict
+        :param fileDocs: transferItems's ID and its information.
+        :type fileDocs: list of dict
         """
         # TODO: may need to refactor later along with rest and publisher part
-        num = len(replicas)
-        fileDoc = {
+        num = len(fileDocs)
+        restFileDoc = {
             'asoworker': 'rucio',
-            'list_of_ids': [x['id'] for x in replicas],
+            'list_of_ids': [x['id'] for x in fileDocs],
             'list_of_transfer_state': ['DONE']*num,
-            'list_of_dbs_blockname': [x['dataset'] for x in replicas],
-            'list_of_block_complete': [x['blockcomplete'] for x in replicas],
+            'list_of_dbs_blockname': [x['dataset'] for x in fileDocs],
+            'list_of_block_complete': None, # omit
             'list_of_fts_instance': ['https://fts3-cms.cern.ch:8446/']*num,
             'list_of_failure_reason': None, # omit
             'list_of_retry_value': None, # omit
-            'list_of_fts_id': ['NA']*num,
+            'list_of_fts_id': [x['ruleid'] for x in fileDocs]*num,
         }
-        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', fileDoc, self.logger)
+        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc, self.logger)
 
-    def updateBlockCompleteToREST(self, replicas):
+    def updateRESTFileDocsBlockCompletionInfo(self, fileDocs):
         """
-        Update block complete status of replicas to REST server.
+        Update block complete status of fileDocs to REST server.
 
-        :param replicas: transferItems's ID and its information.
-        :type replicas: list of dict
+        :param fileDocs: transferItems's ID and its information.
+        :type fileDocs: list of dict
         """
         # TODO: may need to refactor later along with rest and publisher part
         # This can be optimize to single REST API call together with updateTransfers's subresources
-        num = len(replicas)
-        fileDoc = {
+        num = len(fileDocs)
+        restFileDoc = {
             'asoworker': 'rucio',
-            'list_of_ids': [x['id'] for x in replicas],
+            'list_of_ids': [x['id'] for x in fileDocs],
             'list_of_transfer_state': ['DONE']*num,
-            'list_of_dbs_blockname': [x['dataset'] for x in replicas],
-            'list_of_block_complete': [x['blockcomplete'] for x in replicas],
+            'list_of_dbs_blockname': [x['dataset'] for x in fileDocs],
+            'list_of_block_complete': [x['blockcomplete'] for x in fileDocs],
             'list_of_fts_instance': ['https://fts3-cms.cern.ch:8446/']*num,
             'list_of_failure_reason': None, # omit
             'list_of_retry_value': None, # omit
-            'list_of_fts_id': ['NA']*num,
+            'list_of_fts_id': None,
         }
-        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateRucioInfo', fileDoc, self.logger)
+        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateRucioInfo', restFileDoc, self.logger)

@@ -36,16 +36,7 @@ class Transfer:
         # bookkeeping
         self.lastTransferLine = 0
         self.containerRuleID = ''
-        self.transferOKReplicas = None
-
-        # info from rucio
-        self.replicasInContainer = None
-
-        # map lfn to id
-        self.replicaLFN2IDMap = None
-
-        # info from rucio
-        self.replicasInContainer = None
+        self.bookkeepingOKLocks = None
 
         # map lfn to id
         self.replicaLFN2IDMap = None
@@ -66,7 +57,7 @@ class Transfer:
         self.readRESTInfo()
         self.readInfoFromTransferItems()
         self.readContainerRuleID()
-        self.readTransferOKReplicas()
+        self.readOKLocks()
 
     def readInfoFromRucio(self, rucioClient):
         """
@@ -75,16 +66,7 @@ class Transfer:
         :param rucioClient: Rucio client
         :type rucioClient: rucio.client.client.Client
         """
-        self.initReplicasInContainer(rucioClient)
-
-    def readInfoFromRucio(self, rucioClient):
-        """
-        Read the information from Rucio.
-
-        :param rucioClient: Rucio client
-        :type rucioClient: rucio.client.client.Client
-        """
-        self.initReplicasInContainer(rucioClient)
+        pass
 
     def readLastTransferLine(self):
         """
@@ -197,52 +179,38 @@ class Transfer:
         with writePath(path) as w:
             w.write(ruleID)
 
-    def readTransferOKReplicas(self):
+    def readOKLocks(self):
         """
-        Read transferOKReplicas from task_process/transfers/transfers_ok.txt
+        Read bookkeepingOKLocks from task_process/transfers/transfers_ok.txt.
+        Initialize empty list in case of path not found or
+        `--ignore-transfer-ok` is `True`.
         """
         if config.args.ignore_transfer_ok:
-            self.transferOKReplicas = []
+            self.bookkeepingOKLocks = []
             return
         path = config.args.transfer_ok_path
         try:
             with open(path, 'r', encoding='utf-8') as r:
-                self.transferOKReplicas = r.read().splitlines()
-                self.logger.info(f'Got list of transfer status "OK" from bookkeeping: {self.transferOKReplicas}')
+                self.bookkeepingOKLocks = r.read().splitlines()
+                self.logger.info(f'Got list of locks "OK" from bookkeeping: {self.bookkeepingOKLocks}')
         except FileNotFoundError:
-            self.transferOKReplicas = []
-            self.logger.info(f'Bookkeeping transfer status OK from path "{path}" does not exist. Assume this is first time it run.')
+            self.bookkeepingOKLocks = []
+            self.logger.info(f'Bookkeeping path "{path}" does not exist. Assume this is first time it run.')
 
-    def updateTransferOKReplicas(self, newReplicas):
+    def updateOKLocks(self, newLocks):
         """
-        update transferOKReplicas to task_process/transfers/transfers_ok.txt
+        update bookkeepingOKLocks to task_process/transfers/transfers_ok.txt
 
-        :param newReplicas: list of LFN
-        :type newReplicas: list of string
+        :param newLocks: list of LFN
+        :type newLocks: list of string
         """
-        self.transferOKReplicas += newReplicas
-        if config.args.ignore_transfer_ok:
-            return
+        self.bookkeepingOKLocks += newLocks
         path = config.args.transfer_ok_path
-        self.logger.info(f'Bookkeeping transfer status OK: {self.transferOKReplicas}')
+        self.logger.info(f'Bookkeeping transfer status OK: {self.bookkeepingOKLocks}')
         self.logger.info(f'to file: {path}')
         with writePath(path) as w:
-            for l in self.transferOKReplicas:
+            for l in self.bookkeepingOKLocks:
                 w.write(f'{l}\n')
-
-    def initReplicasInContainer(self, rucioClient):
-        """
-        Get replicas from transfer and publish container and assign it to
-        self.replicasInContainer as key-value pare of containerName and map of
-        LFN2Dataset.
-
-        :param rucioClient: Rucio Client
-        :type rucioClient: rucio.client.client.Client
-        """
-        replicasInContainer = {}
-        replicasInContainer[self.transferContainer] = self.populateLFN2DatasetMap(self.transferContainer, rucioClient)
-        replicasInContainer[self.publishContainer] = self.populateLFN2DatasetMap(self.publishContainer, rucioClient)
-        self.replicasInContainer = replicasInContainer
 
     def populateLFN2DatasetMap(self, container, rucioClient):
         """
