@@ -75,6 +75,10 @@ def mintime():
         time.sleep(remaining)
         print(f"==== Failure sleep FINISHED at {time.asctime(time.gmtime())} ====")
 
+def Now():
+    """ return current time in UTC. For use as timestamp in messages"""
+    return time.asctime(time.gmtime())
+
 class PassThroughOptionParser(OptionParser):
     """
     An unknown option pass-through implementation of OptionParser.
@@ -388,26 +392,28 @@ def parseArgs():
     return opts
 
 def prepSandbox(opts):
-    print("==== Sandbox untarring STARTING at %s ====" % time.asctime(time.gmtime()))
+    print(f"==== Sandbox untarring STARTING at {Now()} ====")
 
     #The user sandbox.tar.gz has to be unpacked no matter what (even in DEBUG mode)
     print(subprocess.getoutput('tar xfm %s' % opts.archiveJob))
-    print("==== Sandbox untarring FINISHED at %s ====" % time.asctime(time.gmtime()))
+    print(f"==== Sandbox untarring FINISHED at {Now()} ====")
 
     #move the pset in the right place
-    print("==== WMCore filesystem preparation STARTING at %s ====" % time.asctime(time.gmtime()))
+    print(f"==== WMCore filesystem preparation STARTING at {Now()} ====")
     destDir = 'WMTaskSpace/cmsRun'
     if os.path.isdir(destDir):
         shutil.rmtree(destDir)
     os.makedirs(destDir)
     os.rename('PSet.py', destDir + '/PSet.py')
-    open('WMTaskSpace/__init__.py', 'w').close()
-    open(destDir + '/__init__.py', 'w').close()
+    with open('WMTaskSpace/__init__.py', 'w', encoding='utf-8') as fh:
+        fh.close()
+    with open(destDir + '/__init__.py', 'w', encoding='utf-8')as fh:
+        fh.close()
     #move the additional user files in the right place
     if opts.userFiles:
         for myfile in opts.userFiles.split(','):
             os.rename(myfile, destDir + '/' + myfile)
-    print("==== WMCore filesystem preparation FINISHED at %s ====" % time.asctime(time.gmtime()))
+    print(f"==== WMCore filesystem preparation FINISHED at {Now()} ====")
 
 def extractUserSandbox(archiveJob, cmsswVersion):
     # the user sandbox contains the user scram directory files and thus
