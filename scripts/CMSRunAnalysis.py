@@ -660,8 +660,8 @@ if __name__ == "__main__":
             # make sure scriptexe is executable
             st = os.stat(options.scriptExe)
             os.chmod(options.scriptExe, st.st_mode | stat.S_IEXEC)
-            cmd += os.getcwd() + f"/{options.scriptExe} {options.jobNumber}" +\
-                   f"{' '.join(json.loads(options.scriptArgs))}"
+            cmd += os.getcwd() + f"/{options.scriptExe}  {options.jobNumber}" +\
+                   f" {' '.join(json.loads(options.scriptArgs))}"
         cmd += " > cmsRun-stdout.log.tmp 2>&1"
         applicationExitCode = executeUserApplication(command=cmd, scramTool=scram, cleanEnv=False)
         if applicationExitCode:
