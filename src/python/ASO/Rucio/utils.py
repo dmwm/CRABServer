@@ -24,7 +24,6 @@ def writePath(path):
         yield w
     shutil.move(tmpPath, path)
 
-
 def chunks(l, n=1):
     """
     Yield successive n-sized chunks from l.
@@ -33,10 +32,14 @@ def chunks(l, n=1):
     :type l: list
     :param n: chunk size
     :type n: int
-    :return: yield the next list chunk
+    :return: yield the next chunk list
     :rtype: generator
     """
     if isinstance(l, list):
+        for i in range(0, len(l), n):
+            yield l[i:i + n]
+    elif isinstance(l, dict):
+        l = list(l.items())
         for i in range(0, len(l), n):
             yield l[i:i + n]
     else:
@@ -46,7 +49,6 @@ def chunks(l, n=1):
                 yield newList
             else:
                 break
-
 
 def uploadToTransfersdb(client, api, subresource, fileDoc, logger=None):
     """
