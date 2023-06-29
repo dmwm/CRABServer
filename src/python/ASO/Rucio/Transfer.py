@@ -36,6 +36,13 @@ class Transfer:
         # bookkeeping
         self.lastTransferLine = 0
         self.containerRuleID = ''
+        self.transferOKReplicas = None
+
+        # info from rucio
+        self.replicasInContainer = None
+
+        # map lfn to id
+        self.replicaLFN2IDMap = None
 
         # info from rucio
         self.replicasInContainer = None
@@ -59,6 +66,16 @@ class Transfer:
         self.readRESTInfo()
         self.readInfoFromTransferItems()
         self.readContainerRuleID()
+        self.readTransferOKReplicas()
+
+    def readInfoFromRucio(self, rucioClient):
+        """
+        Read the information from Rucio.
+
+        :param rucioClient: Rucio client
+        :type rucioClient: rucio.client.client.Client
+        """
+        self.initReplicasInContainer(rucioClient)
 
     def readInfoFromRucio(self, rucioClient):
         """
@@ -179,6 +196,39 @@ class Transfer:
         self.logger.info(f'Bookkeeping container rule ID [{ruleID}] to file: {path}')
         with writePath(path) as w:
             w.write(ruleID)
+
+    def readTransferOKReplicas(self):
+        """
+        Read transferOKReplicas from task_process/transfers/transfers_ok.txt
+        """
+        if config.args.ignore_transfer_ok:
+            self.transferOKReplicas = []
+            return
+        path = config.args.transfer_ok_path
+        try:
+            with open(path, 'r', encoding='utf-8') as r:
+                self.transferOKReplicas = r.read().splitlines()
+                self.logger.info(f'Got list of transfer status "OK" from bookkeeping: {self.transferOKReplicas}')
+        except FileNotFoundError:
+            self.transferOKReplicas = []
+            self.logger.info(f'Bookkeeping transfer status OK from path "{path}" does not exist. Assume this is first time it run.')
+
+    def updateTransferOKReplicas(self, newReplicas):
+        """
+        update transferOKReplicas to task_process/transfers/transfers_ok.txt
+
+        :param newReplicas: list of LFN
+        :type newReplicas: list of string
+        """
+        self.transferOKReplicas += newReplicas
+        if config.args.ignore_transfer_ok:
+            return
+        path = config.args.transfer_ok_path
+        self.logger.info(f'Bookkeeping transfer status OK: {self.transferOKReplicas}')
+        self.logger.info(f'to file: {path}')
+        with writePath(path) as w:
+            for l in self.transferOKReplicas:
+                w.write(f'{l}\n')
 
     def initReplicasInContainer(self, rucioClient):
         """
