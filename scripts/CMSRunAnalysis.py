@@ -398,25 +398,6 @@ def prepSandbox(opts):
     print(subprocess.getoutput('tar xfm %s' % opts.archiveJob))
     print(f"==== Sandbox untarring FINISHED at {Now()} ====")
 
-    """
-    WMTaskSpace is some old thing not seeded anymore
-    #move the pset in the right place
-    print(f"==== WMCore filesystem preparation STARTING at {Now()} ====")
-    destDir = 'WMTaskSpace/cmsRun'
-    if os.path.isdir(destDir):
-        shutil.rmtree(destDir)
-    os.makedirs(destDir)
-    os.rename('PSet.py', destDir + '/PSet.py')
-    with open('WMTaskSpace/__init__.py', 'w', encoding='utf-8') as fh:
-        fh.close()
-    with open(destDir + '/__init__.py', 'w', encoding='utf-8')as fh:
-        fh.close()
-    #move the additional user files in the right place
-    if opts.userFiles:
-        for myfile in opts.userFiles.split(','):
-            os.rename(myfile, destDir + '/' + myfile)
-    print(f"==== WMCore filesystem preparation FINISHED at {Now()} ====")
-    """
 
 def extractUserSandbox(archiveJob, cmsswVersion):
     # the user sandbox contains the user scram directory files and thus
