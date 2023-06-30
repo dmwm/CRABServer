@@ -398,8 +398,17 @@ def parseArgs():
 def prepSandbox(opts):
     print(f"==== Sandbox untarring STARTING at {UTCNow()} ====")
 
-    #The user sandbox.tar.gz has to be unpacked in cwd no matter what (even in DEBUG mode)
+    #The user sandbox.tar.gz has to be unpacked no matter what (even in DEBUG mode)
+    print(f"expanding {opts.archiveJob} in {os.getcwd()}")
     print(subprocess.getoutput('tar xfm %s' % opts.archiveJob))
+    # if the sandbox contains tar files, expand them
+    files = subprocess.getoutput(f"tar tf {opts.archiveJob}").split('\n')
+    for file in files:
+        if ('.tar.' in file) or file.endswith('.tar') or\
+                file.endswith('.tgz') or file.endswith('.tbz'):
+            print(f"expanding {file} in {os.getcwd()}")
+            print(subprocess.getoutput(f"tar xfm {file}"))
+
     print(f"==== Sandbox untarring FINISHED at {UTCNow()} ====")
 
 
@@ -412,12 +421,6 @@ def extractUserSandbox(archiveJob, cmsswVersion):
     print(subprocess.getoutput(f"tar xfm {os.path.join('..', archiveJob)}"))
     os.rename('PSet.py', '../PSet.py')
     os.rename('PSet.pkl', '../PSet.pkl')
-    # if the sandbox contains tar files, expand them
-    files = subprocess.getoutput(f"tar tf ../{archiveJob}").split('\n')
-    for file in files:
-        if ('.tar.' in file) or file.endswith('.tar') or\
-                file.endswith('.tgz') or file.endswith('.tbz'):
-            print(subprocess.getoutput(f"tar xfm {file}"))
     os.chdir('..')
 
 def getProv(filename='', scramTool=None):
