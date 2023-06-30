@@ -61,6 +61,14 @@ EC_ReportHandlingErr =  50115
 EC_WGET =               99998 #TODO define an error code
 EC_PsetHash           = 80453
 
+
+
+def UTCNow():
+    """ return current time in UTC. For use as timestamp in messages"""
+    return f"{time.asctime(time.gmtime())} UTC"
+
+
+
 def mintime():
     # enforce a minimum running time for failing jobs
     mymin = 20*60 # 20 minutes was used in the past
@@ -68,16 +76,12 @@ def mintime():
     tottime = time.time()-starttime
     remaining = mymin - tottime
     if remaining > 0 and not "CRAB3_RUNTIME_DEBUG" in os.environ:
-        print(f"==== Failure sleep STARTING at {time.asctime(time.gmtime())} ====")
+        print(f"==== Failure sleep STARTING at {UTCNow()} ====")
         print(f"Sleeping for {remaining} seconds due to failure.")
         sys.stdout.flush()
         sys.stderr.flush()
         time.sleep(remaining)
-        print(f"==== Failure sleep FINISHED at {time.asctime(time.gmtime())} ====")
-
-def Now():
-    """ return current time in UTC. For use as timestamp in messages"""
-    return time.asctime(time.gmtime())
+        print(f"==== Failure sleep FINISHED at {UTCNow()} ====")
 
 class PassThroughOptionParser(OptionParser):
     """
@@ -255,7 +259,7 @@ def handleException(exitAcronym, exitCode, exitMsg):
     if len(exitMsg) > maxChars:
         exitMsg = exitMsg[0:maxChars] + " + ... message truncated at 10k chars"
     report['exitMsg'] = exitMsg
-    print(f"ERROR: Exceptional exit at {time.asctime(time.gmtime())} {exitCode}: {exitMsg}")
+    print(f"ERROR: Exceptional exit at {UTCNow()} {exitCode}: {exitMsg}")
     if not formatted_tb.startswith("None"):
         print("ERROR: Traceback follows:\n", formatted_tb)
 
@@ -359,7 +363,7 @@ def parseArgs():
             setattr(opts, name, None)
 
     try:
-        print(f"==== Parameters Dump at {time.asctime(time.gmtime())} ===")
+        print(f"==== Parameters Dump at {UTCNow()} ===")
         print("archiveJob:    ", opts.archiveJob)
         print("runDir:        ", opts.runDir)
         print("sourceURL:     ", opts.sourceURL)
@@ -392,11 +396,11 @@ def parseArgs():
     return opts
 
 def prepSandbox(opts):
-    print(f"==== Sandbox untarring STARTING at {Now()} ====")
+    print(f"==== Sandbox untarring STARTING at {UTCNow()} ====")
 
     #The user sandbox.tar.gz has to be unpacked in cwd no matter what (even in DEBUG mode)
     print(subprocess.getoutput('tar xfm %s' % opts.archiveJob))
-    print(f"==== Sandbox untarring FINISHED at {Now()} ====")
+    print(f"==== Sandbox untarring FINISHED at {UTCNow()} ====")
 
 
 def extractUserSandbox(archiveJob, cmsswVersion):
@@ -463,9 +467,9 @@ def AddChecksums(report):
                 else:
                     continue
             fileInfo['size'] = os.stat(fileInfo['pfn']).st_size
-            print(f"==== Checksum computation STARTING at {time.asctime(time.gmtime())} ====")
+            print(f"==== Checksum computation STARTING at {UTCNow()} ====")
             (adler32, cksum) = calculateChecksums(fileInfo['pfn'])
-            print(f"==== Checksum FINISHED at {time.asctime(time.gmtime())} ====")
+            print(f"==== Checksum FINISHED at {UTCNow()} ====")
             print(f"== FileName: {fileInfo['pfn']}  -  FileAdler32: {adler32}" +
                   f"- FileSize: {float(fileInfo['size'])/(1024*1024)}.3f MBytes")
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
@@ -511,7 +515,7 @@ def AddPsetHash(report=None, scramTool=None):
             if not m:
                 print(f"== EDM output filename ({fileInfo['pfn']}) must match RE ^[A-Za-z0-9\\-._]+$")
                 continue
-            print(f"==== PSet Hash computation STARTING at {time.asctime(time.gmtime())} ====")
+            print(f"==== PSet Hash computation STARTING at {UTCNow()} ====")
             lines = getProv(filename=fileInfo['pfn'], scramTool=scramTool)
             found_history = False
             matches = {}
@@ -528,7 +532,7 @@ def AddPsetHash(report=None, scramTool=None):
                     matches[depth] = pset_hash
                 else:
                     break
-            print(f"==== PSet Hash computation FINISHED at {time.asctime(time.gmtime())} ====")
+            print(f"==== PSet Hash computation FINISHED at {UTCNow()} ====")
             if matches:
                 max_depth = max(matches.keys())
                 pset_hash = matches[max_depth]
@@ -558,7 +562,7 @@ def StripReport(report):
                 fileInfo['fileName'] = re.sub(r'^file:', '', fileInfo['fileName'])
 
 if __name__ == "__main__":
-    print(f"==== CMSRunAnalysis.py STARTING at {time.asctime(time.gmtime())} ====")
+    print(f"==== CMSRunAnalysis.py STARTING at {UTCNow()} ====")
     print(f"Local time : {time.ctime()}")
     starttime = time.time()
 
@@ -566,7 +570,7 @@ if __name__ == "__main__":
     try:
         ad = parseAd()
     except Exception:
-        print(f"==== FAILURE WHEN PARSING HTCONDOR CLASSAD AT {time.asctime(time.gmtime())} ====")
+        print(f"==== FAILURE WHEN PARSING HTCONDOR CLASSAD AT {UTCNow()} ====")
         print(traceback.format_exc())
         ad = {}
 
@@ -583,7 +587,7 @@ if __name__ == "__main__":
     except Exception:
         # We may not even be able to create a FJR at this point.  Record
         # error and exit.
-        print(f"==== FAILURE WHEN LOADING WMCORE AT {time.asctime(time.gmtime())} ====")
+        print(f"==== FAILURE WHEN LOADING WMCORE AT {UTCNow()} ====")
         print(traceback.format_exc())
         mintime()
         sys.exit(10043)
@@ -598,26 +602,26 @@ if __name__ == "__main__":
     try:
         setupLogging('.')
 
-        print(f"==== CMSSW Stack Execution STARTING at {time.asctime(time.gmtime())} ====")
+        print(f"==== CMSSW Stack Execution STARTING at {UTCNow()} ====")
         scram = Scram(
             version=options.cmsswVersion,
             directory=os.getcwd(),
             architecture=options.scramArch,
             )
 
-        print(f"==== SCRAM Obj CREATED at {time.asctime(time.gmtime())} ====")
+        print(f"==== SCRAM Obj CREATED at {UTCNow()} ====")
         if scram.project() or scram.runtime(): #if any of the two commands fail...
             dgn = scram.diagnostic()
             handleException("FAILED", EC_CMSMissingSoftware, f"Error setting CMSSW environment: {dgn}")
             mintime()
             sys.exit(EC_CMSMissingSoftware)
-        print(f"==== SCRAM Obj INITIALIZED at {time.asctime(time.gmtime())} ====")
+        print(f"==== SCRAM Obj INITIALIZED at {UTCNow()} ====")
 
         print("==== Extract user sandbox in CMSSW directory ====")
         extractUserSandbox(options.archiveJob, options.cmsswVersion)
 
         # tweaking of the PSet is needed both for CMSSWStack and ScriptEXE
-        print(f"==== Tweak PSet at {time.asctime(time.gmtime())} ====")
+        print(f"==== Tweak PSet at {UTCNow()} ====")
         tweakingScriptName = 'tweakThePset.sh'
         prepareTweakingScript(options, tweakingScriptName)
         cmd = f"sh {tweakingScriptName}"
@@ -632,11 +636,11 @@ if __name__ == "__main__":
         # debugging help in initial development: print command output in any case
         print(f"{tweakingScriptName} output:\n{scram.diagnostic()}")
 
-        print(f"==== Tweak PSet Done at {time.asctime(time.gmtime())} ====")
+        print(f"==== Tweak PSet Done at {UTCNow()} ====")
 
         jobExitCode = None
         applicationName = 'CMSSW JOB' if not options.scriptExe else 'ScriptEXE'
-        print(f"==== {applicationName} Execution started at {time.asctime(time.gmtime())} ====")
+        print(f"==== {applicationName} Execution started at {UTCNow()} ====")
         cmd = "stdbuf -oL -eL "
         if not options.scriptExe :
             cmd += 'cmsRun -p PSet.py -j FrameworkJobReport.xml'
@@ -649,10 +653,10 @@ if __name__ == "__main__":
         cmd += " > cmsRun-stdout.log.tmp 2>&1"
         applicationExitCode = executeUserApplication(command=cmd, scramTool=scram, cleanEnv=False)
         if applicationExitCode:
-            print(f"==== Execution FAILED at {time.asctime(time.gmtime())} ====")
-        print(f"==== {applicationName} Execution completed at {time.asctime(time.gmtime())} ====")
+            print(f"==== Execution FAILED at {UTCNow()} ====")
+        print(f"==== {applicationName} Execution completed at {UTCNow()} ====")
         print(f"Application exit code: {applicationExitCode}")
-        print(f"==== Execution FINISHED at {time.asctime(time.gmtime())} ====")
+        print(f"==== Execution FINISHED at {UTCNow()} ====")
         logCMSSW()
     except Exception as ex:
         print(f"ERROR: Caught Wrapper ExecutionFailure - detail =\n{ex}")
@@ -693,7 +697,7 @@ if __name__ == "__main__":
 
     #Create the report file
     try:
-        print(f"==== Report file creation STARTING at {time.asctime(time.gmtime())} ====")
+        print(f"==== Report file creation STARTING at {UTCNow()} ====")
         # sanitize FJR in case non-ascii chars have been captured in error messages
         # e.g. from xroot https://github.com/dmwm/CRABServer/issues/6640#issuecomment-909362639
         print("Sanitize FJR")
@@ -773,7 +777,7 @@ if __name__ == "__main__":
         # TODO looks like following file is never used anywhere (SB). Test removing this
         with open('jobReportExtract.pickle', 'wb') as of:
             pickle.dump(rep, of)
-        print(f"==== Report file creation FINISHED at {time.asctime(time.gmtime())} ====")
+        print(f"==== Report file creation FINISHED at {UTCNow()} ====")
     except FwkJobReportException as FJRex:
         extype = "BadFWJRXML"
         handleException("FAILED", EC_ReportHandlingErr, extype)
@@ -799,6 +803,6 @@ if __name__ == "__main__":
     else:
         mintime()
 
-    print(f"==== CMSRunAnalysis.py FINISHED at {time.asctime(time.gmtime())} ====")
+    print(f"==== CMSRunAnalysis.py FINISHED at {UTCNow()} ====")
     print(f"Local time : {time.ctime()}")
     sys.exit(jobExitCode)
