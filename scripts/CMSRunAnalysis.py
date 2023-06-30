@@ -394,10 +394,12 @@ def parseArgs():
 def prepSandbox(opts):
     print(f"==== Sandbox untarring STARTING at {Now()} ====")
 
-    #The user sandbox.tar.gz has to be unpacked no matter what (even in DEBUG mode)
+    #The user sandbox.tar.gz has to be unpacked in cwd no matter what (even in DEBUG mode)
     print(subprocess.getoutput('tar xfm %s' % opts.archiveJob))
     print(f"==== Sandbox untarring FINISHED at {Now()} ====")
 
+    """
+    WMTaskSpace is some old thing not seeded anymore
     #move the pset in the right place
     print(f"==== WMCore filesystem preparation STARTING at {Now()} ====")
     destDir = 'WMTaskSpace/cmsRun'
@@ -414,6 +416,7 @@ def prepSandbox(opts):
         for myfile in opts.userFiles.split(','):
             os.rename(myfile, destDir + '/' + myfile)
     print(f"==== WMCore filesystem preparation FINISHED at {Now()} ====")
+    """
 
 def extractUserSandbox(archiveJob, cmsswVersion):
     # the user sandbox contains the user scram directory files and thus
