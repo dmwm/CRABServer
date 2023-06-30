@@ -386,13 +386,15 @@ def prepSandbox(opts):
     print("==== Sandbox untarring in job's top dir STARTING at %s ====" % time.asctime(time.gmtime()))
 
     #The user sandbox.tar.gz has to be unpacked no matter what (even in DEBUG mode)
+    print(f"expanding {opts.archiveJob} in {os.getcwd()}")
     print(subprocess.getoutput('tar xfm %s' % opts.archiveJob))
     # if the sandbox contains tar files, expand them
     files = subprocess.getoutput(f"tar tf {opts.archiveJob}").split('\n')
     for file in files:
         if ('.tar.' in file) or file.endswith('.tar') or\
                 file.endswith('.tgz') or file.endswith('.tbz'):
-            print(subprocess.getoutput(f"tar xvfm {file}"))
+            print(f"expanding {file} in {os.getcwd()}")
+            print(subprocess.getoutput(f"tar xfm {file}"))
 
     print("==== Sandbox untarring FINISHED at %s ====" % time.asctime(time.gmtime()))
 
