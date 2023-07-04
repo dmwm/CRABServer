@@ -173,9 +173,8 @@ def logCMSSW():
     if not os.path.exists("cmsRun-stdout.log"):
         print("ERROR: Cannot dump CMSSW stdout; perhaps CMSSW never executed (e.g.: scriptExe was set)?")
         logCMSSWSaved = True
-        with open('logCMSSWSaved.txt', 'a', encoding='utf-8') as fh:
-            fh.close()
-        os.utime('logCMSSWSaved.txt', None)
+        # inform CMSRunAnalysis.sh by "touching a file"
+        with open('logCMSSWSaved.txt', 'a', encoding='utf-8'): pass
         return
 
     outfile = "cmsRun-stdout.log"
@@ -214,13 +213,14 @@ def logCMSSW():
 
     print("======== CMSSW OUTPUT FINSHING ========")
     logCMSSWSaved = True
-    with open('logCMSSWSaved.txt', 'a', encoding='utf-8') as fh:
-        fh.close()
-    os.utime('logCMSSWSaved.txt', None)
+    # inform CMSRunAnalysis.sh by "touching a file"
+    with open('logCMSSWSaved.txt', 'a', encoding='utf-8'): pass
+
 
 def printCMSSWLine(aLine, lineLenLimit):
     """ Simple print auxiliary function that truncates lines"""
     print(aLine[:lineLenLimit].rstrip())
+
 
 def handleException(exitAcronym, exitCode, exitMsg):
     #first save the traceback before it gets overwritten by other tracebacks (e.g.: wrong jobReport)
