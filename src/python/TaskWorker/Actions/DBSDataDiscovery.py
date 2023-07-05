@@ -531,7 +531,7 @@ class DBSDataDiscovery(DataDiscovery):
         logger.info("Rucio container %s:%s created with %d blocks", scope, containerName, len(blockList))
 
     def whereToRecall(self, rucio=None, TBtoRecall=0, tapeLocations=None, logger=None):
-        # make RSEs lists
+        # make RSEs list
         # asking for ddm_quota>0 gets rid also of Temp and Test RSE's
         ALL_RSES = "ddm_quota>0&(tier=1|tier=2)&rse_type=DISK"
         # tune list according to where tapes are, we expect a single location
@@ -547,7 +547,6 @@ class DBSDataDiscovery(DataDiscovery):
         rses = rucio.list_rses(ALL_RSES)
         rseNames = [r['rse'] for r in rses]
         largeRSEs = []  # a list of largish (i.e. solid) RSEs
-        freeRSEs = []  # a subset of largeRSEs which also have quite some free space
         for rse in rseNames:
             if rse[2:6] == '_RU_':  # avoid fragile sites, see #7400
                 continue
@@ -557,13 +556,8 @@ class DBSDataDiscovery(DataDiscovery):
             size = usageDetails[0]['used']  # bytes
             if float(size) / 1.e15 > 1.0:  # more than 1 PB
                 largeRSEs.append(rse)
-                availableSpace = int(rucio.list_rse_attributes(rse)['ddm_quota'])  # bytes
-                if availableSpace / 1e12 > 100:  # at least 100TB available
-                    freeRSEs.append(rse)
-        # sort lists so that duplicated rules can be spotted
+        # sort list so that duplicated rules can be spotted
         largeRSEs.sort()
-        freeRSEs.sort()
-        # use either list (largeRSEs or freeRSEs) according to dataset size:
         if TBtoRecall <= MAX_TB_TO_RECALL_AT_A_SINGLE_SITE:  #
             grouping = 'ALL'
             logger.info("Will place all blocks at a single site")
