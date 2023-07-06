@@ -34,15 +34,16 @@ class RegisterReplicas:
         else:
             end = len(self.transfer.transferItems)
         transferGenerator = itertools.islice(self.transfer.transferItems, start, end)
+
         # Prepare
         preparedReplicasByRSE = self.prepare(transferGenerator)
         # Add file to rucio by RSE
-        successReplicas = self.addFilesToRucio(preparedReplicasByRSE)
-        self.logger.debug(f'successReplicas: {successReplicas}')
+        successFileDocs = self.addFilesToRucio(preparedReplicasByRSE)
+        self.logger.debug(f'successFileDocs: {successFileDocs}')
         # Add replicas to transfer container
-        self.addReplicasToContainer(successReplicas, self.transfer.transferContainer)
-        # Create new entry in REST in FILETRANSFERDB table
-        self.uploadTransferInfoToREST(successReplicas)
+        self.addReplicasToContainer(successFileDocs, self.transfer.transferContainer)
+        # Update state of files in REST in FILETRANSFERDB table
+        self.updateRESTFileDocStateToSubmitted(successFileDocs)
         # After everything is done, bookkeeping LastTransferLine.
         self.transfer.updateLastTransferLine(end)
 
@@ -60,7 +61,7 @@ class RegisterReplicas:
         :param transfers: the iterable object which produce item of transfer.
         :type transfers: iterator
 
-        :returns: map of `<site>_Temp` and list of dicts that replicas information.
+        :returns: map of `<site>_Temp` with nested map of replicas information.
         :rtype: dict
         """
         # create bucket RSE
@@ -77,18 +78,18 @@ class RegisterReplicas:
             # We determine PFN of Temp RSE from normal RSE.
             # Simply remove temp suffix before passing to getSourcePFN function.
             pfn = self.getSourcePFN(xdict["source_lfn"], rse.split('_Temp')[0], xdict["destination"])
-            replicasByRSE[rse] = []
+            replicasByRSE[rse] = {}
             for xdict in bucket[rse]:
                 replica = {
-                    'scope': self.transfer.rucioScope,
-                    'pfn': LFNToPFNFromPFN(xdict["source_lfn"], pfn),
-                    'name': xdict['destination_lfn'],
-                    'bytes': xdict['filesize'],
-                    'adler32': xdict['checksums']['adler32'].rjust(8, '0'),
-                    # TODO: move id out of replicas info
-                    'id': xdict['id'],
+                    xdict['id'] : {
+                        'scope': self.transfer.rucioScope,
+                        'pfn': LFNToPFNFromPFN(xdict["source_lfn"], pfn),
+                        'name': xdict['destination_lfn'],
+                        'bytes': xdict['filesize'],
+                        'adler32': xdict['checksums']['adler32'].rjust(8, '0'),
+                    }
                 }
-                replicasByRSE[rse].append(replica)
+                replicasByRSE[rse].update(replica)
         return replicasByRSE
 
     def addFilesToRucio(self, prepareReplicas):
@@ -109,85 +110,96 @@ class RegisterReplicas:
             self.logger.debug(f'Registering replicas from {rse}')
             self.logger.debug(f'Replicas: {replicas}')
             for chunk in chunks(replicas, config.args.replicas_chunk_size):
+                # Wa: I should make code more clear instead write comment like this.
+                # chunk is slice of list of dict.items() return by chunks's utils function, only when we passing dict in first args.
+                rs = [v for _, v in chunk]
                 try:
-                    # TODO: remove id from dict we construct in prepare() method.
-                    # remove 'id' from dict
-                    r = []
-                    for c in chunk:
-                        d = c.copy()
-                        d.pop('id')
-                        r.append(d)
                     # add_replicas with same dids will always return True, even
                     # with changing metadata (e.g pfn), rucio will not update to
                     # the new value.
                     # See https://github.com/dmwm/CMSRucio/issues/343#issuecomment-1543663323
-                    self.rucioClient.add_replicas(rse, r)
+                    self.rucioClient.add_replicas(rse, rs)
                 except Exception as ex:
                     # Note that 2 exceptions we encounter so far here is due to
                     # LFN to PFN converstion and RSE protocols.
                     # https://github.com/dmwm/CRABServer/issues/7632
-                    self.logger.error(f'add_replicas(rse, r): rse={rse} r={r}')
+                    self.logger.error(f'add_replicas(rse, r): rse={rse} rs={rs}')
                     raise RucioTransferException('Something wrong with adding new replicas') from ex
-                success = [{'id': x['id'], 'name': x['name']} for x in chunk]
-                ret += success
+                for idx, r in chunk:
+                    fileDoc = {
+                        'id': idx,
+                        'name': r['name'],
+                        'dataset': None,
+                        'blockcomplete': None,
+                        'ruleid': None,
+                    }
+                    ret.append(fileDoc)
         return ret
 
-    def addReplicasToContainer(self, replicas, container):
+    def addReplicasToContainer(self, fileDocs, container):
         """
         Add `replicas` to the dataset in `container` in chunks (chunk size is
         defined in `config.args.replicas_chunk_size`). This including creates a
         new dataset when the current dataset exceeds
         `config.arg.max_file_per_datset`.
 
-        :param replicas: a list contain dict with REST xfer id and replicas LFN.
-        :type replicas: list
+        :param fileDocs: a list of fileDoc info an
+        :type fileDocs: list of dict
+        :return: same list as fileDocs args but with updated rule iD and dataset
+            name
+        :rtype: list of dict
         """
 
-        containerReplicas = []
-        newReplicas = []
+        containerFileDocs = []
+        newFileDocs = []
+
         # filter out duplicated replicas
-        replicasInContainer = self.transfer.replicasInContainer[container]
-        for r in replicas:
+        replicasInContainer = self.transfer.populateLFN2DatasetMap(container, self.rucioClient)
+        for r in fileDocs:
             if r['name'] in replicasInContainer:
-                c = r.copy()
+                c = copy.deepcopy(r)
                 c['dataset'] = replicasInContainer[r['name']]
-                containerReplicas.append(c)
+                containerFileDocs.append(c)
             else:
-                newReplicas.append(r)
+                newFileDocs.append(r)
 
         b = BuildDBSDataset(self.transfer, self.rucioClient)
         currentDataset = b.getOrCreateDataset(container)
         self.logger.debug(f'currentDataset: {currentDataset}')
-        for chunk in chunks(newReplicas, config.args.replicas_chunk_size):
+        for chunk in chunks(newFileDocs, config.args.replicas_chunk_size):
             dids = [{
                 'scope': self.transfer.rucioScope,
                 'type': "FILE",
                 'name': x["name"]
             } for x in chunk]
-            # no need to try catch for duplicate content. Not sure if
-            # restart process is enough for the case of connection error
+            # no need to try catch for duplicate content.
             attachments = [{
                 'scope': self.transfer.rucioScope,
                 'name': currentDataset,
                 'dids': dids
             }]
             self.rucioClient.add_files_to_datasets(attachments, ignore_duplicate=True)
-            successItems = [{
-                'id': x['id'],
-                'name': x['name'],
-                'dataset': currentDataset,
-            } for x in chunk]
-            containerReplicas += successItems
+            for c in chunk:
+                success = {
+                    'id': c['id'],
+                    'name': c['name'],
+                    'dataset': currentDataset,
+                    'blockcomplete': None,
+                    'ruleid': self.transfer.containerRuleID,
+                }
+                containerFileDocs.append(success)
+
             # Current algo will add files whole chunk, so total number of
             # files in dataset is at most is max_file_per_datset+replicas_chunk_size.
             #
             # check the current number of files in the dataset
             num = len(list(self.rucioClient.list_content(self.transfer.rucioScope, currentDataset)))
             if num >= config.args.max_file_per_dataset:
-                self.logger.info(f'closing dataset: {currentDataset}')
+                self.logger.info(f'Closing dataset: {currentDataset}')
                 self.rucioClient.close(self.transfer.rucioScope, currentDataset)
                 currentDataset = b.getOrCreateDataset(container)
-        return containerReplicas
+                self.logger.debug(f'currentDataset: {currentDataset}')
+        return containerFileDocs
 
 
     def getSourcePFN(self, sourceLFN, sourceRSE, destinationRSE):
@@ -262,25 +274,25 @@ class RegisterReplicas:
         self.logger.debug(f'PFN2: {pfn}')
         return pfn
 
-    def uploadTransferInfoToREST(self, replicas):
+    def updateRESTFileDocStateToSubmitted(self, fileDocs):
         """
-        Upload transfers info to REST server.
+        Update files transfer state in filetransfersdb to SUBMITTED, along with
+        metadata info required by REST.
 
-        :param replicas: list of dict contains transferItems's ID and its
+        :param fileDocs: list of dict contains transferItems's ID and its
             information.
-        :type replicas: list
+        :type fileDocs: list
         """
-        num = len(replicas)
-        fileDoc = {
+        num = len(fileDocs)
+        restFileDoc = {
             'asoworker': 'rucio',
-            'list_of_ids': [x['id'] for x in replicas],
+            'list_of_ids': [x['id'] for x in fileDocs],
             'list_of_transfer_state': ['SUBMITTED']*num,
             'list_of_dbs_blockname': None, # omit, will update it in MonitorLockStatus action
-            'list_of_block_complete': ['NO']*num,
+            'list_of_block_complete': None, # omit, will update it in MonitorLockStatus action
             'list_of_fts_instance': ['https://fts3-cms.cern.ch:8446/']*num,
             'list_of_failure_reason': None, # omit
             'list_of_retry_value': None, # omit
-            'list_of_fts_id': [self.transfer.containerRuleID]*num,
-            'list_of_fts_id': ['NA']*num,
+            'list_of_fts_id': [x['ruleid'] for x in fileDocs]
         }
-        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', fileDoc, self.logger)
+        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc, self.logger)
