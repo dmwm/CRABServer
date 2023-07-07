@@ -9,11 +9,11 @@ class FileTransfers(object):
     AddNewFileTransfer_sql = "INSERT INTO filetransfersdb ( \
                tm_id, tm_username, tm_taskname, tm_destination, tm_destination_lfn, \
                tm_source, tm_source_lfn, tm_filesize, tm_publish, tm_jobid, tm_job_retry_count, tm_type, \
-               tm_rest_host, tm_rest_uri, tm_dbs_blockname, tm_block_complete, tm_transfer_state, tm_publication_state, tm_last_update, \
+               tm_dbs_blockname, tm_block_complete, tm_transfer_state, tm_publication_state, tm_last_update, \
                tm_transfer_max_retry_count, tm_publication_max_retry_count, tm_start_time, tm_creation_time) \
                VALUES (:id, :username, :taskname, :destination, :destination_lfn, \
                        :source, :source_lfn, :filesize, :publish, :job_id, :job_retry_count, :type, \
-                       :rest_host, :rest_uri, :dbs_blockname, :block_complete, :transfer_state, :publication_state, :last_update, \
+                       :dbs_blockname, :block_complete, :transfer_state, :publication_state, :last_update, \
                        :transfer_max_retry_count, :publication_max_retry_count, :start_time, SYS_EXTRACT_UTC(SYSTIMESTAMP))"
 
     AcquireTransfers_sql = "UPDATE filetransfersdb SET tm_aso_worker = :asoworker, \
@@ -243,7 +243,7 @@ class FileTransfers(object):
 
     GetById_sql = "SELECT tm_id, tm_username, tm_taskname, tm_destination, tm_destination_lfn, tm_source, tm_source_lfn, tm_filesize, tm_publish, \
                           tm_jobid, tm_job_retry_count, tm_type, tm_aso_worker, tm_transfer_retry_count, tm_transfer_max_retry_count, \
-                          tm_publication_retry_count, tm_publication_max_retry_count, tm_rest_host, tm_rest_uri, tm_transfer_state, \
+                          tm_publication_retry_count, tm_publication_max_retry_count, tm_transfer_state, \
                           tm_publication_state, tm_transfer_failure_reason, tm_publication_failure_reason, tm_fts_id, tm_fts_instance, \
                           tm_last_update, tm_start_time, tm_end_time, tm_dbs_blockname, tm_block_complete \
                    FROM filetransfersdb where tm_id = :id"
