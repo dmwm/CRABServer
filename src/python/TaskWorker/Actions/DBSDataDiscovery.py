@@ -476,7 +476,8 @@ class DBSDataDiscovery(DataDiscovery):
         ruleId = self.createOrReuseRucioRule(rucio=rucioClient, account=rucioAccount,
                                              did=containerDid, RSE_EXPRESSION='rse_type=DISK',
                                              comment=comment, lifetime=lifetime, logger=self.logger)
-        self.logger.info(f"Created Rucio rule ID: {ruleId}")
+        msg = f"Created Rucio rule ID: {ruleId}"
+        self.logger.info(msg)
 
 
 
@@ -532,7 +533,7 @@ class DBSDataDiscovery(DataDiscovery):
             # not recall also all blocks possibly requested in the past
             #  by other users for other reasons.
             #  Therefore we stick with naming the container after the task name
-            myScope = f"user.{tapeRecallConfig.Services.Rucio_account}"  # do not mess with cms scope
+            myScope = f"user.{rucioAccount}"  # do not mess with cms scope
             containerName = '/TapeRecall/%s/USER' % self.taskName.replace(':', '.')
             containerDid = {'scope': myScope, 'name': containerName}
             self.makeContainerFromBlockList(
@@ -561,7 +562,6 @@ class DBSDataDiscovery(DataDiscovery):
         # create rule
         # make rule last 7 extra days to allow debugging in case TW or Recall action fail
         LIFETIME = (MAX_DAYS_FOR_TAPERECALL + 7) * 24 * 60 * 60  # in seconds
-        account = tapeRecallConfig.Services.Rucio_account
         ruleId = self.createOrReuseRucioRule(rucio=rucioClient, account=rucioAccount,
                                              did=containerDid, grouping=grouping, RSE_EXPRESSION=RSE_EXPRESSION,
                                              comment=comment, lifetime=LIFETIME, logger=self.logger)
@@ -677,7 +677,7 @@ class DBSDataDiscovery(DataDiscovery):
             # and use it as return value
             ruleIds = [next(ruleIdGen)['id']]
             # extend rule lifetime
-            rucio.update_replication_rule(ruleIds[0], {'lifetime': LIFETIME})
+            rucio.update_replication_rule(ruleIds[0], {'lifetime': lifetime})
         except (InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage) as ex:
             msg = "\nNot enough global quota to issue a tape recall request. Rucio exception:\n%s" % str(ex)
             raise TaskWorkerException(msg) from ex
