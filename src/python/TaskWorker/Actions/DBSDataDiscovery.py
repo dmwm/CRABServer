@@ -425,7 +425,6 @@ class DBSDataDiscovery(DataDiscovery):
                 msg = 'Locking of input data failed. Details in TaskWorker log. Submit anyhow'
                 self.logger.info(msg)
                 self.uploadWarning(msg, self.userproxy, self.taskName)
-                pass
 
         return result
 
@@ -439,10 +438,12 @@ class DBSDataDiscovery(DataDiscovery):
         if not isinstance(dataToLock, str) and not isinstance(dataToLock, list):
             return
 
-        self.logger.info(f"Lock {dataToLock} on disk")
+        msg = f"Lock {dataToLock} on disk"
+        self.logger.info(msg)
         # need to use crab_tape_recall Rucio account to create containers and create rules
+        rucioAccount = 'crab_tape_recall'  # TODO use different account
         lockConfig = copy.deepcopy(self.config)
-        lockConfig.Services.Rucio_account = 'crab_tape_recall'  # TODO use different account
+        lockConfig.Services.Rucio_account = rucioAccount
         rucioClient = getNativeRucioClient(lockConfig, self.logger)  # pylint: disable=redefined-outer-name
 
         # prepare container to be locked
@@ -472,7 +473,7 @@ class DBSDataDiscovery(DataDiscovery):
         lifetime = 45 * 24 * 60 * 60  # 45 days in seconds
 
         # create rule
-        ruleId = self.createOrReuseRucioRule(rucio=rucioClient, account=lockConfig.Services.Rucio_account,
+        ruleId = self.createOrReuseRucioRule(rucio=rucioClient, account=rucioAccount,
                                              did=containerDid, RSE_EXPRESSION='rse_type=DISK',
                                              comment=comment, lifetime=lifetime, logger=self.logger)
         self.logger.info(f"Created Rucio rule ID: {ruleId}")
@@ -514,8 +515,9 @@ class DBSDataDiscovery(DataDiscovery):
         # args to replace self: config, taskName, logger, crabserver
         msg = msgHead
         # need to use crab_tape_recall Rucio account to create containers and create rules
+        rucioAccount = 'crab_tape_recall'
         tapeRecallConfig = copy.deepcopy(self.config)
-        tapeRecallConfig.Services.Rucio_account = 'crab_tape_recall'
+        tapeRecallConfig.Services.Rucio_account = rucioAccount
         rucioClient = getNativeRucioClient(tapeRecallConfig, self.logger)  # pylint: disable=redefined-outer-name
 
         # prepare container to be recalled
@@ -560,10 +562,11 @@ class DBSDataDiscovery(DataDiscovery):
         # make rule last 7 extra days to allow debugging in case TW or Recall action fail
         LIFETIME = (MAX_DAYS_FOR_TAPERECALL + 7) * 24 * 60 * 60  # in seconds
         account = tapeRecallConfig.Services.Rucio_account
-        ruleId = self.createOrReuseRucioRule(rucio=rucioClient, account=tapeRecallConfig.Services.Rucio_account,
+        ruleId = self.createOrReuseRucioRule(rucio=rucioClient, account=rucioAccount,
                                              did=containerDid, grouping=grouping, RSE_EXPRESSION=RSE_EXPRESSION,
-                                             comment=comment, logger=self.logger)
-        self.logger.info(f"Created Rucio rule ID: {ruleId}")
+                                             comment=comment, lifetime=LIFETIME, logger=self.logger)
+        msg = f"Created Rucio rule ID: {ruleId}"
+        self.logger.info(msg)
 
         # this will be printed by "crab status"
         msg += "\nA disk replica has been requested to Rucio.  Check progress via:"
@@ -656,13 +659,11 @@ class DBSDataDiscovery(DataDiscovery):
         # WEIGHT = None # for testing
         ASK_APPROVAL = False
         # ASK_APPROVAL = True # for testing
-        ACCOUNT = account
-        LIFETIME = lifetime
         copies = 1
         try:
             ruleIds = rucio.add_replication_rule(  # N.B. returns a list
                 dids=[did], copies=copies, rse_expression=RSE_EXPRESSION,
-                grouping=grouping, weight=WEIGHT, lifetime=LIFETIME, account=ACCOUNT,
+                grouping=grouping, weight=WEIGHT, lifetime=lifetime, account=account,
                 activity='Analysis Input',
                 comment=comment,
                 ask_approval=ASK_APPROVAL, asynchronous=True)
