@@ -441,8 +441,8 @@ class DBSDataDiscovery(DataDiscovery):
 
         msg = f"Lock {dataToLock} on disk"
         self.logger.info(msg)
-        # need to use crab_tape_recall Rucio account to create containers and create rules
-        rucioAccount = 'crab_tape_recall'  # TODO use different account
+        # need to a "privileged" Rucio account to create containers and create rules
+        rucioAccount = 'crab_input'
         lockConfig = copy.deepcopy(self.config)
         lockConfig.Services.Rucio_account = rucioAccount
         rucioClient = getNativeRucioClient(lockConfig, self.logger)  # pylint: disable=redefined-outer-name
