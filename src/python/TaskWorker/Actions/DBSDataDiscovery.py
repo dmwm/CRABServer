@@ -16,6 +16,7 @@ from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetExceptio
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 from ServerUtilities import FEEDBACKMAIL, MAX_DAYS_FOR_TAPERECALL, MAX_TB_TO_RECALL_AT_A_SINGLE_SITE,\
     parseDBSInstance, isDatasetUserDataset
+from ServerUtilities import TASKLIFETIME
 from RucioUtils import getNativeRucioClient
 
 from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent,
@@ -470,12 +471,11 @@ class DBSDataDiscovery(DataDiscovery):
         # prepare comment to be inserted in the Rucio rule
         partOf = "" if not isinstance(dataToLock, list) else "part of"
         comment = f"Lock {partOf} dataset: {dbsDatasetName} for user: {self.username}"
-        lifetime = 45 * 24 * 60 * 60  # 45 days in seconds
 
         # create rule
         ruleId = self.createOrReuseRucioRule(rucio=rucioClient, account=rucioAccount,
                                              did=containerDid, RSE_EXPRESSION='rse_type=DISK',
-                                             comment=comment, lifetime=lifetime, logger=self.logger)
+                                             comment=comment, lifetime=TASKLIFETIME, logger=self.logger)
         msg = f"Created Rucio rule ID: {ruleId}"
         self.logger.info(msg)
 
