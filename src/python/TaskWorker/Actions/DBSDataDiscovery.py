@@ -457,7 +457,7 @@ class DBSDataDiscovery(DataDiscovery):
             # need to prepare ad hoc container. Can not reuse a possibly existing one
             # for this dataset which may have had a different content
             # Therefore we stick with naming the container after the task name
-            myScope = 'user.crab_tape_recall'  # do not mess with cms scope
+            myScope = f"user.{rucioAccount}"  # do not mess with cms scope
             containerName = '/TapeRecall/%s/USER' % self.taskName.replace(':', '.')
             containerDid = {'scope': myScope, 'name': containerName}
             self.makeContainerFromBlockList(
