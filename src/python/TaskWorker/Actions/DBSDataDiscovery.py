@@ -666,10 +666,12 @@ class DBSDataDiscovery(DataDiscovery):
             # which should only happen when testing, since container name is unique like task name, but
             # we cover also retry situations where TW was stopped/killed/crashed halfway in the process
             logger.debug("A duplicate rule for this account, did, rse_expression, copies already exists. Use that")
-            # find the existing rule id
+            # find the existing rule id. There can be multiple rules, pick the one from this account
             ruleIdGen = rucio.list_did_rules(scope=did['scope'], name=did['name'])
-            # and use it as return value
-            ruleIds = [next(ruleIdGen)['id']]
+            for rule in ruleIdGen:
+                if rule['account'] == account:
+                    ruleIds = [rule['id']]
+                    break
             # extend rule lifetime
             rucio.update_replication_rule(ruleIds[0], {'lifetime': lifetime})
         except (InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage) as ex:
