@@ -412,11 +412,12 @@ class DBSDataDiscovery(DataDiscovery):
 
         self.logger.debug("Got %s files", len(result.result.getFiles()))
 
-        # lock input data on disk before final submission (only for CMS datasets !)
+        # lock input data on disk before final submission
         # (submission can still fail in Splitting step, but it happens rarely and usually users fix
-        # a configuration mistake submit, i.e. they really want these data, so let's lock anyhow
+        # a configuration mistake and retry, i.e. they really want these data, so let's lock anyhow
 
-        if not isUserDataset:
+        #  only lock data in CMS scope and only if user did no say "I'll take whatever is on disk"
+        if not isUserDataset and not usePartialDataset:
             try:
                 if not inputBlocks:
                     self.lockInputData(dataToLock=inputDataset)
