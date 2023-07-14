@@ -1,12 +1,9 @@
-from __future__ import print_function
+"""
+Performing the data discovery through CMS DBS service.
+"""
 import os
-import random
 import logging
-import copy
-from http.client import HTTPException
-
 import sys
-from urllib.parse import urlencode  # pylint: disable=no-name-in-module  # for pylint2 compat.
 
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.DBS.DBSReader import DBSReader
@@ -14,19 +11,15 @@ from WMCore.Services.DBS.DBSErrors import DBSReaderError
 
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
-from ServerUtilities import FEEDBACKMAIL, MAX_DAYS_FOR_TAPERECALL, MAX_TB_TO_RECALL_AT_A_SINGLE_SITE,\
-    parseDBSInstance, isDatasetUserDataset
-from ServerUtilities import TASKLIFETIME
+from ServerUtilities import FEEDBACKMAIL, parseDBSInstance, isDatasetUserDataset
 from RucioUtils import getNativeRucioClient
 
 from TaskWorker.Actions.RucioActions import RucioAction
 
-from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent,
-                                    InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage)
-
 
 class DBSDataDiscovery(DataDiscovery):
-    """Performing the data discovery through CMS DBS service.
+    """
+    the way TW works, we need a class which implements the execute method
     """
 
     # disable pylint warning in next line since they refer to conflict with the main()
@@ -431,7 +424,7 @@ class DBSDataDiscovery(DataDiscovery):
                                      logger=self.logger)
                 locker.lockData(dataToLock=dataToLock)
             except Exception as e:
-                self.logger.exception("Fatal exception in lockData:\n%s" % e)
+                self.logger.exception("Fatal exception in lockData:\n%s", e)
                 msg = 'Locking of input data failed. Details in TaskWorker log. Submit anyhow'
                 self.logger.info(msg)
                 self.uploadWarning(msg, self.userproxy, self.taskName)
