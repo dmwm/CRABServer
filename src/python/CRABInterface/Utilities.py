@@ -85,14 +85,24 @@ def execute_command(command, logger, timeout):
 
 
 #This is used in case git is down for more than 30 minutes
-centralCfgFallback = None
+# NOTE BY STEFANO B: I do not like this global and the hacky way to
+# have a fallback here. IMHO there should be a class which we instantiate
+# for each configuration file that we want to retreive, with the fallback as
+# a private variable. No need to expose cfgFallback to the outside.
+# But at this time I am happy to have something which worke even if ugly.
+# Another much needed cleanup would be to avoid using the same extConfCommon
+# name for the structure loaded from gitlab and the differently formatted one
+# done below, avoid the deletion of dictionary keys etc.
+# But we can't spend all time cleaning up old code
+#
+global cfgFallback  # pylint: disable=global-statement
+cfgFallback = {}
+
 def getCentralConfig(extconfigurl, mode):
     """Utility to retrieve the central configuration to be used for dynamic variables
     arg str extconfigurl: the url pointing to the exteranl configuration parameter
     arg str mode: also known as the variant of the rest (prod, preprod, dev, private)
     return: the dictionary containing the external configuration for the selected mode."""
-
-    global centralCfgFallback  # pylint: disable=global-statement
 
     def retrieveConfig(externalLink):
 
@@ -110,52 +120,49 @@ def getCentralConfig(extconfigurl, mode):
         header = ResponseHeader(hbuf.getvalue())
         if (header.status < 200 or header.status >= 300):
             msg = "Reading %s returned %s." % (externalLink, header.status)
-            if centralCfgFallback:
+            if externalLink in cfgFallback:
                 msg += "\nUsing cached values for external configuration."
                 cherrypy.log(msg)
-                return centralCfgFallback
+                return cfgFallback[externalLink]
             else:
                 cherrypy.log(msg)
-                raise ExecutionError("Internal issue when retrieving external configuration from %s" % externalLink)
-        jsonConfig = bbuf.getvalue()
+                raise ExecutionError("Internal issue when retrieving configuration from %s" % externalLink)
+        try:
+            jsonConfig = bbuf.getvalue()
+            cfgFallback[externalLink] = jsonConfig
+            return jsonConfig
+        except Exception:
+            return cfgFallback[externalLink]
 
-        return jsonConfig
 
     extConfCommon = json.loads(retrieveConfig(extconfigurl))
+    extConfSchedds = json.loads(retrieveConfig(extConfCommon['htcondorScheddsLink']))
 
-    # below 'if' condition is only added for the transition period from the old config file to the new one. It should be removed after some time.
-    if 'modes' in extConfCommon:
-        extConfSchedds = json.loads(retrieveConfig(extConfCommon['htcondorScheddsLink']))
+    # The code below constructs dict from below provided JSON structure
+    # {   u'htcondorPool': '', u'compatible-version': [''], u'htcondorScheddsLink': '',
+    #     u'modes': [{
+    #         u'mode': '', u'backend-urls': {
+    #             u'htcondorSchedds': [''], u'cacheSSL': '', u'baseURL': ''}}],
+    #     u'banned-out-destinations': [], u'delegate-dn': ['']}
+    # to match expected dict structure which is:
+    # {   u'compatible-version': [''], u'htcondorScheddsLink': '',
+    #     'backend-urls': {
+    #         u'htcondorSchedds': {u'crab3@vocmsXXXX.cern.ch': {u'proxiedurl': '', u'weightfactor': 1}},
+    #         u'cacheSSL': '', u'baseURL': '', 'htcondorPool': ''},
+    #     u'banned-out-destinations': [], u'delegate-dn': ['']}
+    extConfCommon['backend-urls'] = next((item['backend-urls'] for item in extConfCommon['modes'] if item['mode'] == mode), None)
+    extConfCommon['backend-urls']['htcondorPool'] = extConfCommon.pop('htcondorPool')
+    del extConfCommon['modes']
 
-        # The code below constructs dict from below provided JSON structure
-        # {   u'htcondorPool': '', u'compatible-version': [''], u'htcondorScheddsLink': '',
-        #     u'modes': [{
-        #         u'mode': '', u'backend-urls': {
-        #             u'htcondorSchedds': [''], u'cacheSSL': '', u'baseURL': ''}}],
-        #     u'banned-out-destinations': [], u'delegate-dn': ['']}
-        # to match expected dict structure which is:
-        # {   u'compatible-version': [''], u'htcondorScheddsLink': '',
-        #     'backend-urls': {
-        #         u'htcondorSchedds': {u'crab3@vocmsXXXX.cern.ch': {u'proxiedurl': '', u'weightfactor': 1}},
-        #         u'cacheSSL': '', u'baseURL': '', 'htcondorPool': ''},
-        #     u'banned-out-destinations': [], u'delegate-dn': ['']}
-        extConfCommon['backend-urls'] = next((item['backend-urls'] for item in extConfCommon['modes'] if item['mode'] == mode), None)
-        extConfCommon['backend-urls']['htcondorPool'] = extConfCommon.pop('htcondorPool')
-        del extConfCommon['modes']
-
-        # if htcondorSchedds": [] is not empty, it gets populated with the specified list of schedds,
-        # otherwise it takes default list of schedds
-        if extConfCommon['backend-urls']['htcondorSchedds']:
-            extConfCommon['backend-urls']['htcondorSchedds'] = {k: v for k, v in extConfSchedds.items() if
-                                                                k in extConfCommon['backend-urls']['htcondorSchedds']}
-        else:
-            extConfCommon["backend-urls"]["htcondorSchedds"] = extConfSchedds
-        centralCfgFallback = extConfCommon
+    # if htcondorSchedds": [] is not empty, it gets populated with the specified list of schedds,
+    # otherwise it takes default list of schedds
+    if extConfCommon['backend-urls']['htcondorSchedds']:
+        extConfCommon['backend-urls']['htcondorSchedds'] = {k: v for k, v in extConfSchedds.items() if
+                                                            k in extConfCommon['backend-urls']['htcondorSchedds']}
     else:
         extConfCommon["backend-urls"]["htcondorSchedds"] = extConfSchedds
-    centralCfgFallback = extConfCommon
 
-    return centralCfgFallback
+    return extConfCommon
 
 
 def conn_handler(services):
@@ -171,7 +178,7 @@ def conn_handler(services):
             if 'cric' in services and (not args[0].allCMSNames.sites or (args[0].allCMSNames.cachetime+1800 < mktime(gmtime()))):
                 args[0].allCMSNames = CMSSitesCache(sites=CRIC().getAllPSNs(), cachetime=mktime(gmtime()))
                 args[0].allPNNNames = CMSSitesCache(sites=CRIC().getAllPhEDExNodeNames(), cachetime=mktime(gmtime()))
-            if 'centralconfig' in services and (not args[0].centralcfg.centralconfig or (args[0].centralcfg.cachetime+1800 < mktime(gmtime()))):
+            if 'centralconfig' in services and (not args[0].centralcfg.centralconfig or (args[0].centralcfg.cachetime+10 < mktime(gmtime()))):
                 args[0].centralcfg = ConfigCache(centralconfig=getCentralConfig(extconfigurl=args[0].config.extconfigurl, mode=args[0].config.mode), cachetime=mktime(gmtime()))
             return func(*args, **kwargs)
         return wrapped_func
