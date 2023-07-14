@@ -1,6 +1,8 @@
 """
 Performing the data discovery through CMS DBS service.
 """
+# avoid pylint complainging about non-elegfant code . It is old and works. Do not touch.
+# pylint: disable=too-many-locals, too-many-branches, too-many-nested-blocks, too-many-statements
 import os
 import logging
 import sys
@@ -8,6 +10,7 @@ import sys
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.DBS.DBSReader import DBSReader
 from WMCore.Services.DBS.DBSErrors import DBSReaderError
+from WMCore.Configuration import ConfigurationEx
 
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
@@ -29,11 +32,12 @@ class DBSDataDiscovery(DataDiscovery):
         self.rucioClient = rucioClient
 
     def checkDatasetStatus(self, dataset, kwargs):
+        """ as the name says """
         res = self.dbs.dbs.listDatasets(dataset=dataset, detail=1, dataset_access_type='*')
         if not res:
-            raise TaskWorkerException("Cannot find dataset %s in %s DBS instance" % (dataset, self.dbsInstance))
+            raise TaskWorkerException(f"Cannot find dataset {dataset} in {self.dbsInstance} DBS instance")
         if len(res) > 1:
-            raise TaskWorkerException("Found more than one dataset while checking in DBS the status of %s" % dataset)
+            raise TaskWorkerException(f"Found more than one dataset while checking in DBS the status of {dataset}")
         res = res[0]
         #import pprint
         #self.logger.info("Input dataset details: %s", pprint.pformat(res))
@@ -45,21 +49,23 @@ class DBSDataDiscovery(DataDiscovery):
                 msg = f"CRAB refuses to proceed in getting the details of the dataset {dataset} from DBS"
                 msg += f"because the dataset is not 'VALID' but '{accessType}'."
                 if accessType == 'DEPRECATED':
-                    msg += " (%s)" % (msgForDeprecDS)
+                    msg += f" ({msgForDeprecDS})"
                 msg += " To allow CRAB to consider a dataset that is not 'VALID', set Data.allowNonValidInputDataset = True in the CRAB configuration."
                 msg += " Notice that this will not force CRAB to run over all files in the dataset;"
                 msg += " CRAB will still check if there are any valid files in the dataset and run only over those files."
                 raise TaskWorkerException(msg)
-            msg = "The input dataset %s is not 'VALID' but '%s'." % (dataset, accessType)
+            msg = f"The input dataset {dataset} is not 'VALID' but '{accessType}'."
             msg += " CRAB will check if there are any valid files in the dataset and run only over those files."
             if accessType == 'DEPRECATED':
-                msg += " %s" % (msgForDeprecDS)
+                msg += f" ({msgForDeprecDS})"
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
 
 
     def keepOnlyDiskRSEs(self, locationsMap):
-        # get all the RucioStorageElements (RSEs) which are of kind 'Disk'
-        # locationsMap is a dictionary {block1:[locations], block2:[locations],...}
+        """
+        get all the RucioStorageElements (RSEs) which are of kind 'Disk'
+        locationsMap is a dictionary {block1:[locations], block2:[locations],...}
+        """
         diskLocationsMap = {}
         for block, locations in locationsMap.items():
             # as of Sept 2020, tape RSEs ends with _Tape, go for the quick hack
@@ -80,7 +86,7 @@ class DBSDataDiscovery(DataDiscovery):
             blockInfo = self.dbs.getDBSSummaryInfo(block=block)
             if blockInfo.get('NumberOfLumis', 0) > MAX_LUMIS_IN_BLOCK:
                 msg = f"Block {block} contains more than {MAX_LUMIS_IN_BLOCK} lumis."
-                msg += f"\nThis blows up CRAB server memory"
+                msg += "\nThis blows up CRAB server memory"
                 msg += "\nCRAB can only split this by ignoring lumi information. You can do this"
                 msg += "\nusing FileBased split algorithm and avoiding any additional request"
                 msg += "\nwich may cause lumi information to be looked up. See CRAB FAQ for more info:"
@@ -95,13 +101,16 @@ class DBSDataDiscovery(DataDiscovery):
         # DBS3 requires X509_USER_CERT to be set - but we don't want to leak that to other modules
         # so use a context manager to set an ad hoc env and restore as soon as
         # executeInternal is over, even if it raises exception
+        # NOTE this is legacy from the time we were using X509 to submit to schedd, most likely
+        # we can use a single X509 env. throught all of TW. But for now.. be conservative
 
         with self.config.TaskWorker.envForCMSWEB:
             result = self.executeInternal(*args, **kwargs)
 
         return result
 
-    def executeInternal(self, *args, **kwargs):  # pylinf: disable=unused-argument
+    def executeInternal(self, *args, **kwargs):  # pylint: disable=unused-argument
+        """ this is where things happen """
 
         self.logger.info("Data discovery with DBS")  # to be changed into debug
         if kwargs['task']['tm_dbs_url']:
@@ -154,7 +163,7 @@ class DBSDataDiscovery(DataDiscovery):
             # dataset not found in DBS is a known use case
             if str(dbsexc).find('No matching data'):
                 raise TaskWorkerException(
-                    "CRAB could not find dataset %s in this DBS instance: %s" % inputDataset, dbsurl
+                    f"CRAB could not find dataset {inputDataset} in this DBS instance: {dbsurl}"
                 ) from dbsexc
             raise
         ## Create a map for block's locations: for each block get the list of locations.
@@ -181,9 +190,9 @@ class DBSDataDiscovery(DataDiscovery):
         if useRucioForLocations:
             scope = "cms"
             # If the dataset is a USER one, use the Rucio user scope to find it
-            # TODO: we need a way to enable users to indicate others user scopes as source
+            # NOTE we need a way to enable users to indicate others user scopes as source
             if isUserDataset:
-                scope = "user.%s" % self.username
+                scope = f"user.{self.username}"
             self.logger.info("Looking up data location with Rucio in %s scope.", scope)
             locationsMap = {}
             partialLocationsMap = {}
@@ -208,8 +217,8 @@ class DBSDataDiscovery(DataDiscovery):
                     if partialReplicas:
                         partialLocationsMap[blockName] = partialReplicas
 
-            except Exception as exc:
-                msg = "Rucio lookup failed with\n%s" % str(exc)
+            except Exception as exc:  # pylint: disable=broad-except
+                msg = f"Rucio lookup failed with\n{exc}"
                 self.logger.warning(msg)
                 locationsMap = None
 
@@ -232,7 +241,7 @@ class DBSDataDiscovery(DataDiscovery):
                     raise TaskWorkerException(
                         "CRAB server could not get file locations from DBS for a USER dataset.\n"+\
                         "This is could be a temporary DBS glitch, please try to submit a new task (resubmit will not work)"+\
-                        " and contact the experts if the error persists.\nError reason: %s" % str(ex)
+                        f" and contact the experts if the error persists.\nError reason: {ex}"
                     ) from ex
                 useCernbox = False
                 for v in locationsMap.values():
@@ -260,7 +269,7 @@ class DBSDataDiscovery(DataDiscovery):
                     raise TaskWorkerException(
                         "CRAB server could not get file locations from DBS for secondary dataset of USER tier.\n"+\
                         "This is could be a temporary DBS glitch, please try to submit a new task (resubmit will not work)"+\
-                        " and contact the experts if the error persists.\nError reason: %s" % str(ex)
+                        f" and contact the experts if the error persists.\nError reason: {ex}"
                     ) from ex
             else:
                 self.logger.info("Trying data location of secondary dataset blocks with Rucio")
@@ -275,12 +284,12 @@ class DBSDataDiscovery(DataDiscovery):
                                 replicas.add(item['rse'])
                         if replicas:  # only fill map for blocks which have at least one location
                             secondaryLocationsMap[blockName] = replicas
-                except Exception as exc:
-                    msg = "Rucio lookup failed with\n%s" % str(exc)
+                except Exception as exc:  # pylint: disable=broad-except
+                    msg = f"Rucio lookup failed with\n{exc}"
                     self.logger.warning(msg)
                     secondaryLocationsMap = None
             if not secondaryLocationsMap:
-                msg = "No locations found for secondaryDataset %s." % secondaryDataset
+                msg = f"No locations found for secondaryDataset {secondaryDataset}."
                 raise TaskWorkerException(msg)
 
 
@@ -380,18 +389,18 @@ class DBSDataDiscovery(DataDiscovery):
                             infos['Parents'].append(secfilename)
                 self.logger.info("Done matching files from secondary dataset")
                 kwargs['task']['tm_use_parent'] = 1
-        except Exception as ex: #TODO should we catch HttpException instead?
+        except Exception as ex:
             self.logger.exception(ex)
             raise TaskWorkerException(
                 "The CRAB3 server backend could not contact DBS to get the files details (Lumis, events, etc).\n"+\
                 "This is could be a temporary DBS glitch. Please try to submit a new task (resubmit will not work)"+\
-                " and contact the experts if the error persists.\nError reason: %s" % str(ex)
+                f" and contact the experts if the error persists.\nError reason: {ex}"
             ) from ex
         if not filedetails:
             raise TaskWorkerException(
                 ("Cannot find any file inside the dataset. Please, check your dataset in DAS\n%s\n" +
                  "Aborting submission. Resubmitting your task will not help.") %
-                ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s" % (self.dbsInstance, inputDataset))
+                (f"https://cmsweb.cern.ch/das/request?instance={self.dbsInstance}&input=dataset={inputDataset}")
             )
 
         ## Format the output creating the data structures required by WMCore. Filters out invalid files,
@@ -403,8 +412,7 @@ class DBSDataDiscovery(DataDiscovery):
         if not result.result:
             raise TaskWorkerException(("Cannot find any valid file inside the dataset. Please, check your dataset in DAS, %s.\n" +
                                        "Aborting submission. Resubmitting your task will not help.") %
-                                      ("https://cmsweb.cern.ch/das/request?instance=%s&input=dataset=%s") %
-                                      (self.dbsInstance, inputDataset))
+                                      (f"https://cmsweb.cern.ch/das/request?instance={self.dbsInstance}&input=dataset={inputDataset}"))
 
         self.logger.debug("Got %s files", len(result.result.getFiles()))
 
@@ -424,7 +432,7 @@ class DBSDataDiscovery(DataDiscovery):
                                      taskName=self.taskName, username=self.username,
                                      logger=self.logger)
                 locker.lockData(dataToLock=dataToLock)
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 self.logger.exception("Fatal exception in lockData:\n%s", e)
                 msg = 'Locking of input data failed. Details in TaskWorker log. Submit anyhow'
                 self.logger.info(msg)
@@ -446,10 +454,12 @@ class DBSDataDiscovery(DataDiscovery):
             The exception message contains details and an attempt is done to upload it to TaskDB
             so that crab status can report it
         """
+        # SB: DO WE REALLY NEED THIS ? It was a helper when transitioning from DDM to Rucio
         msg = msgHead
         if not isinstance(dataToRecall, str) and not isinstance(dataToRecall, list):
             return
-        if system == 'Rucio':
+        # The else is needed here after the raise !
+        if system == 'Rucio':  # pylint: disable=no-else-raise
             recaller = RucioAction(config=config, crabserver=self.crabserver,
                                    rucioAcccount='crab_tape_recall',
                                    taskName=self.taskName, username=self.username,
@@ -460,7 +470,7 @@ class DBSDataDiscovery(DataDiscovery):
             msg += "\nThis task will be automatically submitted as soon as the stage-out is completed."
             self.uploadWarning(msg, self.userproxy, self.taskName)
             raise TapeDatasetException(msg)
-        elif system == 'None':
+        else:
             msg += '\nIt is not possible to request a recall from tape.'
             msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
             raise TaskWorkerException(msg)
@@ -476,11 +486,10 @@ if __name__ == '__main__':
     ###
     dbsInstance = sys.argv[1]
     dbsDataset = sys.argv[2]
-    dbsSecondaryDataset = sys.argv[3] if len(sys.argv) == 4 else None
+    dbsSecondaryDataset = sys.argv[3] if len(sys.argv) == 4 else None  # pylint: disable=invalid-name
     DBSUrl = f"https://cmsweb.cern.ch/dbs/{dbsInstance}/DBSReader/"
 
     logging.basicConfig(level=logging.DEBUG)
-    from WMCore.Configuration import ConfigurationEx
 
     config = ConfigurationEx()
     config.section_("Services")
