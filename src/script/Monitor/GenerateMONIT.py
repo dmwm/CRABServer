@@ -9,7 +9,6 @@ import traceback
 import subprocess
 import errno
 import signal
-import random
 
 from socket import gethostname
 from pprint import pprint
@@ -285,15 +284,6 @@ class CRAB3CreateJson(object):
         self.jsonDoc['total_idle_tasks'] = totalIdleTasks
         self.jsonDoc['total_running_tp'] = totalRunningTP
 
-        # get tape recall quota stats (if available)
-        quotaReportFile = "/data/container/TaskWorker/logs/tape_recall_quota.json"
-        try:
-            with open(quotaReportFile, 'r') as fd:
-                quotaReport = json.load(fd)
-            self.jsonDoc['tape_recall_total_TB'] = quotaReport['totalTB']
-        except Exception as e:
-            pass
-
         return self.jsonDoc
 
 def main():
@@ -340,7 +330,7 @@ def main():
         if os.stat(lockFile).st_size == 0:
             logger.error("Lockfile is empty.")
         else:
-            with open(lockFile, 'r') as lf:
+            with open(lockFile, 'r', encoding='utf-8') as lf:
                 oldProcess = int(lf.read())
             try:
                 if isRunning(oldProcess):
@@ -369,7 +359,7 @@ def main():
 
     # Put PID in the lockfile
     currentPid = str(os.getpid())
-    with open(lockFile, 'w') as lf:
+    with open(lockFile, 'w', encoding='utf-8') as lf:
         lf.write(currentPid)
 
     logger.info('Lock created. Start data collection')

@@ -1,8 +1,13 @@
-# pylint: disable=pointless-string-statement
-import os
+"""
+report used Rucio quota to ElasticSearch via MONIT
+"""
+import copy
 import sys
 import json
 import logging
+from socket import gethostname
+
+import requests
 
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 from RucioUtils import getNativeRucioClient
@@ -10,17 +15,23 @@ from RucioUtils import getNativeRucioClient
 
 class ReportRecallQuota(BaseRecurringAction):
     """
-    Recurring action to get every hour the used disk quota for crab_tape_recall account,
+    Recurring action to get every hour the used disk quota for crab_tape_recall
+    and crab_input  accounts
     then save it to `logsDir/tape_recall_quota.json`
     """
     pollingTime = 60  # minutes
 
-    def _execute(self, config, task):
-        account = 'crab_tape_recall'
-        self.logger.info(f"Looking up used quota for Rucio account: {account}")
-
-        config.Services.Rucio_account = account
-        rucioClient = getNativeRucioClient(config=config, logger=self.logger)
+    def createQuotaReport(self, config=None, account=None):
+        """
+        create a dictionary with the quota report to be sent to MONIT
+        even if we do not report usage at single RSE's now, let's collect that info as well
+        returns {'rse1':bytes, 'rse':bytes,..., 'totalTB':TBypte}
+        """
+        msg = f"Looking up used quota for Rucio account: {account}"
+        self.logger.info(msg)
+        myconfig = copy.deepcopy(config)
+        myconfig.Services.Rucio_account = account
+        rucioClient = getNativeRucioClient(config=myconfig, logger=self.logger)
         usageGenerator = rucioClient.get_local_account_usage(account=account)
         totalBytes = 0
         report = {}
@@ -31,17 +42,39 @@ class ReportRecallQuota(BaseRecurringAction):
             totalBytes += used
         totalTB = totalBytes // 1e12
         report['totalTB'] = totalTB
-        saveFile = os.path.join(config.TaskWorker.logsDir, "tape_recall_quota.json")
-        with open(saveFile, 'w', encoding='utf-8') as fd:
-            json.dump(report, fd)
+        return report
+
+    def _execute(self, config, task):  # pylint: disable=unused-argument, invalid-name
+        """
+        this is the method called by the TW recurring action handling code.
+        Need to be named _execute  !
+        """
+        # prepare a JSON to be sent to MONIT
+        jsonDoc = {'producer': 'crab', 'type': 'taskworker', 'hostname': gethostname()}
+
+        # get info for the used account, each will be sent with ad-hoc tag in the JSON
+        accounts = [{'name': 'crab_tape_recall', 'tag': 'tape_recall_total_TB'},
+                    {'name': 'crab_input', 'tag': 'crab_input_total_TB'}]
+        for account in accounts:
+            report = self.createQuotaReport(config=config, account=account['name'])
+            jsonDoc[account['tag']] = report['totalTB']
+
+        # sends this document to Elastic Search via MONIT
+        response = requests.post('http://monit-metrics:10012/', data=json.dumps(jsonDoc),
+                                  headers={"Content-Type": "application/json; charset=UTF-8"})
+        if response.status_code == 200:
+            self.logger.info("Report successfully sent to Monit")
+        else:
+            msg = f"sending of {jsonDoc} to MONIT failed. Status code {response.status_code}. Message{response.text}"
+            self.logger.error(msg)
+
 
 if __name__ == '__main__':
-    """ Simple main to execute the action standalone. You just need to set the task worker environment.
-        The main is set up to work with the production task worker. If you want to use it on your own
-        instance you need to change resthost, resturi, and twconfig.
-    """
+    # Simple main to execute the action standalone. You just need to set the task worker environment.
+    #  The main is set up to work with the production task worker. If you want to use it on your own
+    #  instance you need to change resthost, resturi, and TWCONFIG.
 
-    twconfig = '/data/srv/TaskManager/current/TaskWorkerConfig.py'
+    TWCONFIG = '/data/srv/TaskManager/current/TaskWorkerConfig.py'
 
     logger = logging.getLogger()
     handler = logging.StreamHandler(sys.stdout)
@@ -51,7 +84,7 @@ if __name__ == '__main__':
     logger.setLevel(logging.DEBUG)
 
     from WMCore.Configuration import loadConfigurationFile
-    cfg = loadConfigurationFile(twconfig)
+    cfg = loadConfigurationFile(TWCONFIG)
 
     rq = ReportRecallQuota(cfg.TaskWorker.logsDir)
     rq._execute(cfg, None)  # pylint: disable=protected-access
