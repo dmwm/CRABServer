@@ -330,7 +330,7 @@ def main():
         if os.stat(lockFile).st_size == 0:
             logger.error("Lockfile is empty.")
         else:
-            with open(lockFile, 'r', encoding='utf-8') as lf:
+            with open(lockFile, 'r') as lf:
                 oldProcess = int(lf.read())
             try:
                 if isRunning(oldProcess):
@@ -359,7 +359,7 @@ def main():
 
     # Put PID in the lockfile
     currentPid = str(os.getpid())
-    with open(lockFile, 'w', encoding='utf-8') as lf:
+    with open(lockFile, 'w') as lf:
         lf.write(currentPid)
 
     logger.info('Lock created. Start data collection')
