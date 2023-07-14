@@ -11,10 +11,10 @@ from WMCore.Services.DBS.DBSErrors import DBSReaderError
 
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
-from ServerUtilities import FEEDBACKMAIL, parseDBSInstance, isDatasetUserDataset
+from TaskWorker.Actions.RucioActions import RucioAction
+from ServerUtilities import FEEDBACKMAIL, MAX_LUMIS_IN_BLOCK, parseDBSInstance, isDatasetUserDataset
 from RucioUtils import getNativeRucioClient
 
-from TaskWorker.Actions.RucioActions import RucioAction
 
 
 class DBSDataDiscovery(DataDiscovery):
@@ -42,7 +42,8 @@ class DBSDataDiscovery(DataDiscovery):
             # as per Dima's suggestion https://github.com/dmwm/CRABServer/issues/4739
             msgForDeprecDS = "Please contact your physics group if you think the dataset should not be deprecated."
             if kwargs['task']['tm_nonvalid_input_dataset'] != 'T':
-                msg = "CRAB refuses to proceed in getting the details of the dataset %s from DBS, because the dataset is not 'VALID' but '%s'." % (dataset, accessType)
+                msg = f"CRAB refuses to proceed in getting the details of the dataset {dataset} from DBS"
+                msg += f"because the dataset is not 'VALID' but '{accessType}'."
                 if accessType == 'DEPRECATED':
                     msg += " (%s)" % (msgForDeprecDS)
                 msg += " To allow CRAB to consider a dataset that is not 'VALID', set Data.allowNonValidInputDataset = True in the CRAB configuration."
@@ -54,7 +55,7 @@ class DBSDataDiscovery(DataDiscovery):
             if accessType == 'DEPRECATED':
                 msg += " %s" % (msgForDeprecDS)
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
-        return
+
 
     def keepOnlyDiskRSEs(self, locationsMap):
         # get all the RucioStorageElements (RSEs) which are of kind 'Disk'
@@ -72,14 +73,14 @@ class DBSDataDiscovery(DataDiscovery):
         locationsMap.update(diskLocationsMap) # add only blocks with disk locations
 
     def checkBlocksSize(self, blocks):
-        """ Make sure no single blocks has more than 100k lumis. See
+        """ Make sure no single blocks has too many lumis. See
             https://hypernews.cern.ch/HyperNews/CMS/get/dmDevelopment/2022/1/1/1/1/1/1/2.html
         """
-        MAX_LUMIS = 100000
         for block in blocks:
             blockInfo = self.dbs.getDBSSummaryInfo(block=block)
-            if blockInfo.get('NumberOfLumis', 0) > MAX_LUMIS:
-                msg = "Block %s contains more than %s lumis.\nThis blows up CRAB server memory" % (block, MAX_LUMIS)
+            if blockInfo.get('NumberOfLumis', 0) > MAX_LUMIS_IN_BLOCK:
+                msg = f"Block {block} contains more than {MAX_LUMIS_IN_BLOCK} lumis."
+                msg += f"\nThis blows up CRAB server memory"
                 msg += "\nCRAB can only split this by ignoring lumi information. You can do this"
                 msg += "\nusing FileBased split algorithm and avoiding any additional request"
                 msg += "\nwich may cause lumi information to be looked up. See CRAB FAQ for more info:"
@@ -100,12 +101,9 @@ class DBSDataDiscovery(DataDiscovery):
 
         return result
 
-    def executeInternal(self, *args, **kwargs):
+    def executeInternal(self, *args, **kwargs):  # pylinf: disable=unused-argument
 
-
-        self.logger.info("Data discovery with DBS") ## to be changed into debug
-
-
+        self.logger.info("Data discovery with DBS")  # to be changed into debug
         if kwargs['task']['tm_dbs_url']:
             dbsurl = kwargs['task']['tm_dbs_url']
         else:
@@ -164,8 +162,10 @@ class DBSDataDiscovery(DataDiscovery):
         ## locations are found it gets the original locations from DBS. So it should
         ## never be the case at this point that some blocks have no locations.
         ## locationsMap is a dictionary, key=blockName, value=list of PhedexNodes, example:
-        ## {'/JetHT/Run2016B-PromptReco-v2/AOD#b10179dc-3723-11e6-9aa5-001e67abf228': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL'],
-        ## '/JetHT/Run2016B-PromptReco-v2/AOD#89b03ca6-1dc9-11e6-b567-001e67ac06a0': [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL']}
+        ## {'/JetHT/Run2016B-PromptReco-v2/AOD#b10179dc-3723-11e6-9aa5-001e67abf228':
+        # [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL'],
+        ## '/JetHT/Run2016B-PromptReco-v2/AOD#89b03ca6-1dc9-11e6-b567-001e67ac06a0':
+        # [u'T1_IT_CNAF_Buffer', u'T2_US_Wisconsin', u'T1_IT_CNAF_MSS', u'T2_BE_UCL']}
 
         # remove following line when ready to allow user dataset to have locations tracked in Rucio
         useRucioForLocations = not isUserDataset
@@ -234,10 +234,11 @@ class DBSDataDiscovery(DataDiscovery):
                         "This is could be a temporary DBS glitch, please try to submit a new task (resubmit will not work)"+\
                         " and contact the experts if the error persists.\nError reason: %s" % str(ex)
                     ) from ex
-                CERNBOX = False
+                useCernbox = False
                 for v in locationsMap.values():
-                    if 'T3_CH_CERNBOX' in v: CERNBOX = True
-                if CERNBOX:
+                    if 'T3_CH_CERNBOX' in v:
+                        useCernbox = True
+                if useCernbox:
                     raise TaskWorkerException(
                         "USER dataset is located at T3_CH_CERNBOX, but this location \n"+\
                         "is not available to CRAB jobs."
@@ -476,11 +477,10 @@ if __name__ == '__main__':
     dbsInstance = sys.argv[1]
     dbsDataset = sys.argv[2]
     dbsSecondaryDataset = sys.argv[3] if len(sys.argv) == 4 else None
-    DBSUrl = 'https://cmsweb.cern.ch/dbs/%s/DBSReader/' % dbsInstance
+    DBSUrl = f"https://cmsweb.cern.ch/dbs/{dbsInstance}/DBSReader/"
 
     logging.basicConfig(level=logging.DEBUG)
     from WMCore.Configuration import ConfigurationEx
-    from ServerUtilities import newX509env
 
     config = ConfigurationEx()
     config.section_("Services")
@@ -495,9 +495,6 @@ if __name__ == '__main__':
         config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
     else:
         config.TaskWorker.cmskey = '/data/certs/servicekey.pem'
-
-    config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=config.TaskWorker.cmscert,
-                                                X509_USER_KEY=config.TaskWorker.cmskey)
 
     config.TaskWorker.instance = 'prod'
     config.TaskWorker.tiersToRecall = ['AOD', 'AODSIM', 'MINIAOD', 'MINIAODSIM', 'NANOAOD', 'NANOAODSIM']

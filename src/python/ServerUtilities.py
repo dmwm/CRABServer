@@ -59,6 +59,10 @@ SERVICE_INSTANCES = {'prod': {'restHost':'cmsweb.cern.ch', 'dbInstance':'prod'},
                      'other': {'restHost':None, 'dbInstance':None},
                      }
 
+# Limits for TaskWorker
+MAX_LUMIS_IN_BLOCK = 100000  # 100K lumis to avoid blowing up memory
+
+
 # Fatal error limits for job resource usage
 # Defaults are used if unable to load from .job.ad
 # Otherwise it uses these values.
