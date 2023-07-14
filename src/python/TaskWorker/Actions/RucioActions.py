@@ -5,10 +5,9 @@ from urllib.parse import urlencode
 from http.client import HTTPException
 
 
-from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 
-from ServerUtilities import FEEDBACKMAIL, MAX_DAYS_FOR_TAPERECALL, MAX_TB_TO_RECALL_AT_A_SINGLE_SITE
+from ServerUtilities import MAX_DAYS_FOR_TAPERECALL, MAX_TB_TO_RECALL_AT_A_SINGLE_SITE
 from ServerUtilities import TASKLIFETIME
 
 from RucioUtils import getNativeRucioClient
@@ -16,22 +15,24 @@ from RucioUtils import getNativeRucioClient
 from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent,
                                     InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage)
 
-class RucioActions():
+class RucioAction():
     """
     performs action on tasks which require non trivial interaction with Rucio
     contains a few common methods to the two classes tapeRecaller and inputLocker
-    acting as base class for those
+    acting as base class for those. Different actions may require different Rucio accounts
     """
-    def __init__(self, config=None, crabserver=None, taskName=None, username=None, logger=None):
+    def __init__(self, config=None, crabserver=None, rucioAcccount=None,
+                 taskName=None, username=None, logger=None):
         self.config = config
         self.crabserver = crabserver
         self.taskName = taskName
         self.logger = logger
         self.username = username
         # following two will be filled in inherited subclasses TapeRecaller and InputLocker
-        self.rucioAccount = None
-        self.rucioClient = None
-
+        self.rucioAccount = rucioAcccount
+        myConfig = copy.deepcopy(self.config)
+        myConfig.Services.Rucio_account = self.rucioAccount
+        self.rucioClient = getNativeRucioClient(myConfig, self.logger)  # pylint: disable=redefined-outer-name
 
     def makeContainerFromBlockList(self, rucio=None, blockList=None, containerDid=None):
         """ create container and fill with given blocks """
@@ -100,21 +101,6 @@ class RucioActions():
         return ruleId
 
 
-
-class TapeRecaller(RucioActions):
-    """
-    request tape recall
-    """
-    def __init__(self, config=None, crabserver=None, taskName=None, username=None, logger=None):
-        RucioActions.__init__(self, config=config, crabserver=crabserver, taskName=taskName,
-                       username=username, logger=logger)
-        # need to use crab_tape_recall Rucio account to create containers and create rules
-        self.rucioAccount = 'crab_tape_recall'
-        tapeRecallConfig = copy.deepcopy(self.config)
-        tapeRecallConfig.Services.Rucio_account = self.rucioAccount
-        self.rucioClient = getNativeRucioClient(tapeRecallConfig, self.logger)  # pylint: disable=redefined-outer-name
-
-
     def whereToRecall(self, tapeLocations=None, TBtoRecall=0):
         # make RSEs lists
         # asking for ddm_quota>0 gets rid also of Temp and Test RSE's
@@ -128,7 +114,8 @@ class TapeRecaller(RucioActions):
                 if 'US' in list(tapeLocations)[0]:
                     ALL_RSES += "&(country=US|country=BR)"
                 else:
-                    ALL_RSES += "\country=US\country=BR"  # Rucio wants the set complement operator \
+                    # Rucio wants the set complement operator \
+                    ALL_RSES += "\country=US\country=BR"  # pylint: disable=anomalous-backslash-in-string
         rses = self.rucioClient.list_rses(ALL_RSES)
         rseNames = [r['rse'] for r in rses]
         largeRSEs = []  # a list of largish (i.e. solid) RSEs
@@ -248,19 +235,6 @@ class TapeRecaller(RucioActions):
 
         return
 
-
-class InputLocker(RucioActions):
-    """
-    lock input data for the lifetime of the task
-    """
-    def __init__(self, config=None, crabserver=None, taskName=None, username=None, logger=None):
-        RucioActions.__init__(self, config=config, crabserver=crabserver, taskName=taskName,
-                       username=username, logger=logger)
-        # need to use crab_input Rucio account to create containers and create rules
-        self.rucioAccount = 'crab_input'
-        tapeRecallConfig = copy.deepcopy(self.config)
-        tapeRecallConfig.Services.Rucio_account = self.rucioAccount
-        self.rucioClient = getNativeRucioClient(tapeRecallConfig, self.logger)  # pylint: disable=redefined-outer-name
 
 
     def lockData(self, dataToLock=None):

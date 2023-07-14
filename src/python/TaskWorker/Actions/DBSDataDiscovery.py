@@ -19,7 +19,7 @@ from ServerUtilities import FEEDBACKMAIL, MAX_DAYS_FOR_TAPERECALL, MAX_TB_TO_REC
 from ServerUtilities import TASKLIFETIME
 from RucioUtils import getNativeRucioClient
 
-from RucioActions import TapeRecaller, InputLocker
+from TaskWorker.Actions.RucioActions import RucioAction
 
 from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent,
                                     InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage)
@@ -425,9 +425,10 @@ class DBSDataDiscovery(DataDiscovery):
             else:
                 dataToLock = inputBlocks
             try:
-                locker = InputLocker(config=config, crabserver=self.crabserver,
-                                    taskName=self.taskName, username=self.username,
-                                    logger=self.logger)
+                locker = RucioAction(config=config, crabserver=self.crabserver,
+                                     rucioAcccount='crab_input',
+                                     taskName=self.taskName, username=self.username,
+                                     logger=self.logger)
                 locker.lockData(dataToLock=dataToLock)
             except Exception as e:
                 self.logger.exception("Fatal exception in lockData:\n%s" % e)
@@ -455,9 +456,10 @@ class DBSDataDiscovery(DataDiscovery):
         if not isinstance(dataToRecall, str) and not isinstance(dataToRecall, list):
             return
         if system == 'Rucio':
-            recaller = TapeRecaller(config=config, crabserver=self.crabserver,
-                                    taskName=self.taskName, username=self.username,
-                                    logger=self.logger)
+            recaller = RucioAction(config=config, crabserver=self.crabserver,
+                                   rucioAcccount='crab_tape_recall',
+                                   taskName=self.taskName, username=self.username,
+                                   logger=self.logger)
             recaller.recallData(dataToRecall=dataToRecall, sizeToRecall=sizeToRecall,
                                          tapeLocations=tapeLocations, msgHead=msg)
 
