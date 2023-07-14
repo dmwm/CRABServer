@@ -113,7 +113,7 @@ def getCentralConfig(extconfigurl, mode):
             if centralCfgFallback:
                 msg += "\nUsing cached values for external configuration."
                 cherrypy.log(msg)
-                return centralCfgFallback
+                return json.dumps(centralCfgFallback)
             else:
                 cherrypy.log(msg)
                 raise ExecutionError("Internal issue when retrieving external configuration from %s" % externalLink)
