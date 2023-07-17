@@ -59,6 +59,10 @@ SERVICE_INSTANCES = {'prod': {'restHost':'cmsweb.cern.ch', 'dbInstance':'prod'},
                      'other': {'restHost':None, 'dbInstance':None},
                      }
 
+# Limits for TaskWorker
+MAX_LUMIS_IN_BLOCK = 100000  # 100K lumis to avoid blowing up memory
+
+
 # Fatal error limits for job resource usage
 # Defaults are used if unable to load from .job.ad
 # Otherwise it uses these values.
@@ -903,10 +907,15 @@ class MeasureTime:
     cherrypy.log("%s executemany time: %6f" % (trace, mt.perf_counter,))
 
     """
+
     def __init__(self, logger=None, modulename="", label=""):
         self.logger = logger
         self.modulename = modulename
         self.label = label
+        self.perf_counter = None
+        self.process_time = None
+        self.thread_time = None
+        self.readout = None
 
     def __enter__(self):
         self.perf_counter = time.perf_counter()
@@ -914,7 +923,7 @@ class MeasureTime:
         self.thread_time = time.thread_time()
         return self
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, t, v, tb):
         self.thread_time = time.thread_time() - self.thread_time
         self.process_time = time.process_time() - self.process_time
         self.perf_counter = time.perf_counter() - self.perf_counter
