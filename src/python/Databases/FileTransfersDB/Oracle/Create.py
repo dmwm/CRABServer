@@ -55,8 +55,6 @@ class Create(DBCreator):
         tm_transfer_max_retry_count NUMBER(5) DEFAULT 2,
         tm_publication_retry_count NUMBER(5) DEFAULT 0,
         tm_publication_max_retry_count NUMBER(5) DEFAULT 2,
-        tm_rest_host VARCHAR(1000),
-        tm_rest_uri VARCHAR(1000),
         tm_dbs_blockname VARCHAR(1000),
         tm_block_complete VARCHAR(10),
         tm_transfer_state NUMBER(1) NOT NULL,

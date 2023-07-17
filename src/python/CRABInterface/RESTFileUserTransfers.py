@@ -55,8 +55,6 @@ class RESTFileUserTransfers(RESTEntity):
             validate_num("publication_retry_count", param, safe, optional=True)
             validate_num("publication_max_retry_count", param, safe, optional=True)
             validate_num("start_time", param, safe, optional=False)
-            validate_str("rest_host", param, safe, RX_ANYTHING, optional=True)
-            validate_str("rest_uri", param, safe, RX_ANYTHING, optional=True)
             validate_str("dbs_blockname", param, safe, RX_BLOCK, optional=True)
             validate_str("block_complete", param, safe, RX_STATUS, optional=True)
             validate_str("transfer_state", param, safe, RX_ANYTHING, optional=False)
@@ -120,15 +118,12 @@ class RESTFileUserTransfers(RESTEntity):
         # job_id: Job ID
         # job_retry_count: Job run retry count
         ## type: Job output type
-        # rest_host: rest host in which look for filemetadata OBSOLETE
-        # rest_uri: rest uri in which look for filemetadata OBSOLETE
         ###############################################
         # Also we need to ensure that specific variables are defined which are needed to store
         binds = {}
         for key in ['id', 'username', 'taskname', 'destination', 'destination_lfn',
                     'source', 'source_lfn', 'filesize', 'publish', 'start_time',
-                    'job_id', 'job_retry_count', 'type', 'rest_host', 'rest_uri',
-                    'dbs_blockname', 'block_complete']:
+                    'job_id', 'job_retry_count', 'type', 'dbs_blockname', 'block_complete']:
             binds[key] = [kwargs[key]]
             del kwargs[key]
         # Make a change to a number for TRANSFER_STATE and PUBLICATION_STATE
