@@ -28,7 +28,6 @@ class RucioAction():
         self.taskName = taskName
         self.logger = logger
         self.username = username
-        # following two will be filled in inherited subclasses TapeRecaller and InputLocker
         self.rucioAccount = rucioAcccount
         myConfig = copy.deepcopy(self.config)
         myConfig.Services.Rucio_account = self.rucioAccount
