@@ -110,7 +110,7 @@ class FileTransfers(object):
 
     GetDocsPublication0_sql = "SELECT f.tm_publication_state, f.tm_transfer_state, f.tm_aso_worker, f.tm_taskname, f.tm_username, \
                                       f.tm_destination, f.tm_source_lfn, f.tm_destination_lfn, \
-                                      f.tm_last_update, \
+                                      f.tm_last_update, f.tm_dbs_blockname, f.tm_block_complete,\
                                       t.tm_user_role, t.tm_user_group, \
 				      t.tm_input_dataset, t.tm_cache_url, \
 				      t.tm_dbs_url \
