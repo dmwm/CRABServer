@@ -139,7 +139,18 @@ class Transfer:
         Convert info from first transferItems to this object attribute.
         Need to execute readTransferItems before this method.
         """
+        # Need to get publish container name from the file that need to publish.
         info = self.transferItems[0]
+        firstJobID = info['job_id']
+        for t in self.transferItems:
+            # break the loop and use first transfers.txt in case there is no
+            # file need to publish.
+            if t['job_id'] != firstJobID:
+                break
+            if t['delayed_publicationflag_update']:
+                info = t
+                break
+
         self.username = info['username']
         self.rucioScope = f'user.{self.username}'
         self.destination = info['destination']
