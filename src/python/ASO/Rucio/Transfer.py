@@ -38,8 +38,8 @@ class Transfer:
         self.containerRuleID = ''
         self.bookkeepingOKLocks = None
 
-        # map lfn to id
-        self.replicaLFN2IDMap = None
+        # map of lfn to original info in transferItems
+        self.LFN2transferItemMap = None
 
     def readInfo(self):
         """
@@ -54,6 +54,7 @@ class Transfer:
         self.readLastTransferLine()
         self.readTransferItems()
         self.buildLFN2IDMap()
+        self.buildLFN2transferItem()
         self.readRESTInfo()
         self.readInfoFromTransferItems()
         self.readContainerRuleID()
@@ -111,14 +112,13 @@ class Transfer:
         if len(self.transferItems) == 0:
             raise RucioTransferException(f'{path} does not contain new entry.')
 
-    def buildLFN2IDMap(self):
+    def buildLFN2transferItemMap(self):
         """
-        Create `self.replicaLFN2IDMap` map from LFN to REST ID using using info
-        in self.transferItems
+        Create map from LFN to transferItem
         """
-        self.replicaLFN2IDMap = {}
+        self.LFN2transferItemMap = {}
         for x in self.transferItems:
-            self.replicaLFN2IDMap[x['destination_lfn']] = x['id']
+            self.LFN2transferItemMap[x['destination_lfn']] = x
 
     def readRESTInfo(self):
         """
