@@ -1,5 +1,6 @@
 import logging
 import copy
+import datetime
 
 import ASO.Rucio.config as config
 from ASO.Rucio.utils import uploadToTransfersdb
@@ -122,13 +123,22 @@ class MonitorLockStatus:
             metadata = self.rucioClient.get_metadata(self.transfer.rucioScope, dataset)
             # TODO: Also close dataset when (in or)
             # - the task has completed.
-            # - no new replica/is_open for more than 6 hours
+            #   - We have no indication when task is completed unless it pass as
+            #     args manually from caller scripts (task_proc_wrapper.sh)
+            # - no new replica/is_open for more than 6 hours. DONE
+            shouldClose = (metadata['updated_at'] + \
+                           datetime.timedelta(seconds=config.args.open_dataset_timeout)) \
+                           < datetime.datetime.now()
             if not metadata['is_open']:
-                for r in v:
-                    item = copy.copy(r)
-                    item['blockcomplete'] = 'OK'
-                    tmpFileDocs.append(item)
-
+                for f in v:
+                    newF = copy.deepcopy(f)
+                    newF['blockcomplete'] = 'OK'
+                    tmpFileDocs.append(newF)
+            elif shouldClose:
+                self.logger.info(f'Closing dataset: {dataset}')
+                self.rucioClient.close(self.transfer.rucioScope, dataset)
+            else:
+                self.logger.info(f'Dataset {dataset} is still open.')
         return tmpFileDocs
 
     def updateRESTFileDocsStateToDone(self, fileDocs):

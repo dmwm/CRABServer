@@ -50,6 +50,8 @@ def main():
     opt.add_argument("--ignore-transfer-ok", dest="ignore_transfer_ok",
                      action='store_true',
                      help="")
+    opt.add_argument("--open-dataset-timeout", dest="open_dataset_timeout", default=6*60*60, type=int, # 6 hours
+                     help="Open dataset timeout in seconds")
     opts = opt.parse_args()
 
     # Put args to config module to share variable across process.
