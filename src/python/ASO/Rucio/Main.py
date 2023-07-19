@@ -50,7 +50,13 @@ def main():
     opt.add_argument("--ignore-transfer-ok", dest="ignore_transfer_ok",
                      action='store_true',
                      help="")
-    opt.add_argument("--open-dataset-timeout", dest="open_dataset_timeout", default=6*60*60, type=int, # 6 hours
+    opt.add_argument("--bookkeeping-block-complete-path", dest="bookkeeping_block_complete_path",
+                     default='task_process/transfers/block_complete.txt',
+                     help="")
+    opt.add_argument("--ignore-bookkeeping-block-complete", dest="ignore_bookkeeping_block_complete",
+                     action='store_true',
+                     help="")
+    opt.add_argument("--open-dataset-timeout", dest="open_dataset_timeout", default=2*60*60, type=int, # 6 hours
                      help="Open dataset timeout in seconds")
     opts = opt.parse_args()
 

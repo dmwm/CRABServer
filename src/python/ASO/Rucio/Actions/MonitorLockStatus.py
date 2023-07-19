@@ -26,22 +26,28 @@ class MonitorLockStatus:
         okFileDocs, notOKFileDocs = self.checkLockStatus()
         self.logger.debug(f'okFileDocs: {okFileDocs}')
         self.logger.debug(f'notOKFileDocs: {notOKFileDocs}')
+        # skip locks that already update status to rest
+        newDoneFileDocs = [doc for doc in okFileDocs if not doc['name'] in self.transfer.bookkeepingOKLocks]
+        self.updateRESTFileDocsStateToDone(newDoneFileDocs)
+        self.transfer.updateOKLocks([x['name'] for x in newDoneFileDocs])
 
+        # move publication to filedocs
         needToPublishFileDocs = self.filterFilesNeedToPublish(okFileDocs)
         self.logger.debug(f'needToPublishFileDocs: {needToPublishFileDocs}')
         # Register transfer complete replicas to publish container.
+        # Note that for replica that already add to publish container will do
+        # nothing but return fileDoc with the block name.
         publishedFileDocs = self.registerToPublishContainer(needToPublishFileDocs)
         self.logger.debug(f'publishedFileDocs: {publishedFileDocs}')
-        # update fileDoc for ok filedocs
-        self.updateRESTFileDocsStateToDone(publishedFileDocs)
-
+        # skip filedocs that already update it status to rest.
+        newPublishFileDocs = [doc for doc in publishedFileDocs if not doc['dataset'] in self.transfer.bookkeepingBlockComplete]
+        blockCompleteFileDocs = self.checkBlockCompleteStatus(newPublishFileDocs)
         # update block complete status
-        blockCompletefileDocs = self.checkBlockCompleteStatus(publishedFileDocs)
-        self.logger.debug(f'fileDocs to update block completion: {blockCompletefileDocs}')
-        self.updateRESTFileDocsBlockCompletionInfo(blockCompletefileDocs)
-
+        self.logger.debug(f'fileDocs to update block completion: {blockCompleteFileDocs}')
+        self.updateRESTFileDocsBlockCompletionInfo(blockCompleteFileDocs)
         # Bookkeeping published replicas (only replicas with blockcomplete "ok")
-        self.transfer.updateOKLocks([x['name'] for x in blockCompletefileDocs])
+        newBlockComplete = list({doc['dataset'] for doc in self.transfer.bookkeepingBlockComplete})
+        self.transfer.updateBlockComplete(newBlockComplete)
 
     def checkLockStatus(self):
         """
@@ -64,10 +70,6 @@ class MonitorLockStatus:
             self.logger.info('Error was raised. Assume there is still no lock info available yet.')
             listReplicasLocks = []
         for lock in listReplicasLocks:
-            # skip if replicas transfer is in transferOKReplicas. No need to
-            # update status for transfer complete.
-            if lock['name'] in self.transfer.transferOKReplicas:
-                continue
             fileDoc = {
                 'id': self.transfer.LFN2transferItemMap[lock['name']]['id'],
                 'name': lock['name'],
@@ -180,7 +182,7 @@ class MonitorLockStatus:
             'asoworker': 'rucio',
             'list_of_ids': [x['id'] for x in fileDocs],
             'list_of_transfer_state': ['DONE']*num,
-            'list_of_dbs_blockname': [x['dataset'] for x in fileDocs],
+            'list_of_dbs_blockname': None, # omit
             'list_of_block_complete': None, # omit
             'list_of_fts_instance': ['https://fts3-cms.cern.ch:8446/']*num,
             'list_of_failure_reason': None, # omit

@@ -218,6 +218,40 @@ class Transfer:
             for l in self.bookkeepingOKLocks:
                 w.write(f'{l}\n')
 
+    def readBlockComplete(self):
+        """
+        Read bookkeepingBlockComplete from task_process/transfers/transfers_ok.txt.
+        Initialize empty list in case of path not found or
+        `--ignore-transfer-ok` is `True`.
+        """
+        if config.args.ignore_bookkeeping_block_complete:
+            self.bookkeepingBlockComplete = []
+            return
+        path = config.args.bookkeeping_block_complete_path
+        try:
+            with open(path, 'r', encoding='utf-8') as r:
+                self.bookkeepingBlockComplete = r.read().splitlines()
+                self.logger.info(f'Got list of block complete from bookkeeping: {self.bookkeepingBlockComplete}')
+        except FileNotFoundError:
+            self.bookkeepingBlockComplete = []
+            self.logger.info(f'Bookkeeping block complete path "{path}" does not exist. Assume this is first time it run.')
+
+    def updateBlockComplete(self, newLocks):
+        """
+        update bookkeepingBlockComplete to task_process/transfers/transfers_ok.txt
+
+        :param newLocks: list of LFN
+        :type newLocks: list of string
+        """
+        self.bookkeepingBlockComplete += newLocks
+        path = config.args.bookkeeping_block_complete_path
+        self.logger.info (f'Bookkeeping block complete to file: {path}')
+        self.logger.debug(f'{self.bookkeepingBlockComplete}')
+        with writePath(path) as w:
+            for l in self.bookkeepingBlockComplete:
+                w.write(f'{l}\n')
+
+
     def populateLFN2DatasetMap(self, container, rucioClient):
         """
         Get the list of replicas in the container and return as key-value pair
