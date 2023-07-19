@@ -37,6 +37,7 @@ class Transfer:
         self.lastTransferLine = 0
         self.containerRuleID = ''
         self.bookkeepingOKLocks = None
+        self.bookkeepingBlockComplete = None
 
         # map of lfn to original info in transferItems
         self.LFN2transferItemMap = None
@@ -53,12 +54,12 @@ class Transfer:
         # read into memory
         self.readLastTransferLine()
         self.readTransferItems()
-        self.buildLFN2IDMap()
-        self.buildLFN2transferItem()
+        self.buildLFN2transferItemMap()
         self.readRESTInfo()
         self.readInfoFromTransferItems()
         self.readContainerRuleID()
         self.readOKLocks()
+        self.readBlockComplete()
 
     def readInfoFromRucio(self, rucioClient):
         """
