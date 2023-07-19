@@ -137,6 +137,10 @@ class MonitorLockStatus:
             elif shouldClose:
                 self.logger.info(f'Closing dataset: {dataset}')
                 self.rucioClient.close(self.transfer.rucioScope, dataset)
+                for f in v:
+                    newF = copy.deepcopy(f)
+                    newF['blockcomplete'] = 'OK'
+                    tmpFileDocs.append(newF)
             else:
                 self.logger.info(f'Dataset {dataset} is still open.')
         return tmpFileDocs
