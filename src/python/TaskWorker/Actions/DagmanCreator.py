@@ -367,11 +367,14 @@ class DagmanCreator(TaskAction):
         scram_arch = info['tm_job_arch']
         # Set defaults
         info['required_arch'] = "X86_64"
+        # The following regex matches a scram arch into four groups 
+        # for example el9_amd64_gcc10 is matched as (el)(9)_(amd64)_(gcc10)
+        # later, only the third group is returned, the one corresponding to the arch.
         m = re.match("([a-z]+)(\d+)_(\w+)_(\w+)", scram_arch)
         if m:
             _, _, arch, _ = m.groups()
             if arch not in SCRAM_TO_ARCH:
-                msg = "Job configured to a ScramArch: '{}' not supported in TaskWorker".format(item)
+                msg = "Job configured to a ScramArch: '{}' not supported in TaskWorker".format(arch)
                 raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
             info['required_arch'] = SCRAM_TO_ARCH.get(arch)
             # if arch == "amd64":
