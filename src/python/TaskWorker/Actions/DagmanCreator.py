@@ -374,7 +374,7 @@ class DagmanCreator(TaskAction):
         if m:
             _, _, arch, _ = m.groups()
             if arch not in SCRAM_TO_ARCH:
-                msg = "Job configured to a ScramArch: '{}' not supported in TaskWorker".format(arch)
+                msg = f"Job configured to a ScramArch: '{arch}' not supported in TaskWorker"
                 raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
             info['required_arch'] = SCRAM_TO_ARCH.get(arch)
             # if arch == "amd64":
@@ -545,7 +545,7 @@ class DagmanCreator(TaskAction):
 
         info['max_disk_space'] = MAX_DISK_SPACE
 
-        with open("Job.submit", "w") as fd:
+        with open("Job.submit", "w", encoding='utf-8') as fd:
             fd.write(JOB_SUBMIT % info)
 
         return info
@@ -712,7 +712,7 @@ class DagmanCreator(TaskAction):
             argDict['CRAB_Destination'] = dagspec['destination']
             argdicts.append(argDict)
 
-        with open('input_args.json', 'w') as fd:
+        with open('input_args.json', 'w', encoding='utf-8') as fd:
             json.dump(argdicts, fd)
 
         tf = tarfile.open('InputFiles.tar.gz', mode='w:gz')
@@ -795,11 +795,11 @@ class DagmanCreator(TaskAction):
         # Create site-ad and info.  DagmanCreator should only be run in
         # succession, never parallel for a task!
         if os.path.exists("site.ad.json"):
-            with open("site.ad.json") as fd:
+            with open("site.ad.json", encoding='utf-8') as fd:
                 siteinfo = json.load(fd)
         else:
             siteinfo = {'group_sites': {}, 'group_datasites': {}}
-        if os.path.exists("site.ad"):
+        if os.path.exists("site.ad", encoding='utf-8'):
             with open("site.ad") as fd:
                 sitead = classad.parse(fd)
         else:
@@ -1002,7 +1002,7 @@ class DagmanCreator(TaskAction):
                 }
                 dag += SUBDAG_FRAGMENT.format(**subdagSpec)
                 subdag = "RunJobs{count}.subdag".format(**subdagSpec)
-                with open(subdag, "w") as fd:
+                with open(subdag, "w", encoding='utf-8') as fd:
                     fd.write("")
                 subdags.append(subdag)
 
@@ -1030,12 +1030,12 @@ class DagmanCreator(TaskAction):
                 tfd2 = tarfile.open('input_files.tar.gz', 'w:gz')
                 for dagSpec in dagSpecs:
                     job_lumis_file = os.path.join(tempDir, 'job_lumis_'+ str(dagSpec['count']) +'.json')
-                    with open(job_lumis_file, "w") as fd:
+                    with open(job_lumis_file, "w", encoding='utf-8') as fd:
                         fd.write(str(dagSpec['runAndLumiMask']))
                     ## Also creating a tarball with the dataset input files.
                     ## Each .txt file in the tarball contains a list of dataset files to be used for the job.
                     job_input_file_list = os.path.join(tempDir2, 'job_input_file_list_'+ str(dagSpec['count']) +'.txt')
-                    with open(job_input_file_list, "w") as fd2:
+                    with open(job_input_file_list, "w", encoding='utf-8') as fd2:
                         fd2.write(str(dagSpec['inputFiles']))
             finally:
                 tfd.add(tempDir, arcname='')
@@ -1064,14 +1064,14 @@ class DagmanCreator(TaskAction):
             name = "RunJobs{0}.subdag".format(parent)
 
         ## Cache site information
-        with open("site.ad", "w") as fd:
+        with open("site.ad", "w", encoding='utf-8') as fd:
             fd.write(str(sitead))
 
-        with open("site.ad.json", "w") as fd:
+        with open("site.ad.json", "w", encoding='utf-8') as fd:
             json.dump(siteinfo, fd)
 
         ## Save the DAG into a file.
-        with open(name, "w") as fd:
+        with open(name, "w", encoding='utf-8') as fd:
             fd.write(dag)
 
         kwargs['task']['jobcount'] = len(dagSpecs)
