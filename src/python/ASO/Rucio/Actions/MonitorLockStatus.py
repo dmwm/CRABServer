@@ -27,8 +27,10 @@ class MonitorLockStatus:
         self.logger.debug(f'okFileDocs: {okFileDocs}')
         self.logger.debug(f'notOKFileDocs: {notOKFileDocs}')
 
+        needToPublishFileDocs = self.filterFilesNeedToPublish(okFileDocs)
+        self.logger.debug(f'needToPublishFileDocs: {needToPublishFileDocs}')
         # Register transfer complete replicas to publish container.
-        publishedFileDocs = self.registerToPublishContainer(okFileDocs)
+        publishedFileDocs = self.registerToPublishContainer(needToPublishFileDocs)
         self.logger.debug(f'publishedFileDocs: {publishedFileDocs}')
         # update fileDoc for ok filedocs
         self.updateRESTFileDocsStateToDone(publishedFileDocs)
@@ -67,7 +69,7 @@ class MonitorLockStatus:
             if lock['name'] in self.transfer.transferOKReplicas:
                 continue
             fileDoc = {
-                'id': self.transfer.replicaLFN2IDMap[lock['name']],
+                'id': self.transfer.LFN2transferItemMap[lock['name']]['id'],
                 'name': lock['name'],
                 'dataset': None,
                 'blockcomplete': 'NO',
@@ -144,6 +146,25 @@ class MonitorLockStatus:
             else:
                 self.logger.info(f'Dataset {dataset} is still open.')
         return tmpFileDocs
+
+    def filterFilesNeedToPublish(self, fileDocs):
+        """
+        Return only fileDoc that need to publish by publisher.
+        Use the fact that non-edm files and logfiles will have '/FakeDataset'
+        as outputdataset.
+
+        :param fileDocs: list of fileDoc
+        :type fileDocs: list of dict
+
+        :return: fileDocs
+        :rtype: list of dict
+        """
+        tmpPublishFileDocs = []
+        for doc in fileDocs:
+            transferItem = self.transfer.LFN2transferItemMap[doc['name']]
+            if not transferItem['outputdataset'].startswith('/FakeDataset'):
+                tmpPublishFileDocs.append(doc)
+        return tmpPublishFileDocs
 
     def updateRESTFileDocsStateToDone(self, fileDocs):
         """
