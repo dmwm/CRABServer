@@ -41,9 +41,9 @@ class RegisterReplicas:
         successFileDocs = self.addFilesToRucio(preparedReplicasByRSE)
         self.logger.debug(f'successFileDocs: {successFileDocs}')
         # Add replicas to transfer container
-        self.addReplicasToContainer(successFileDocs, self.transfer.transferContainer)
+        transferFileDocs = self.addReplicasToContainer(successFileDocs, self.transfer.transferContainer)
         # Update state of files in REST in FILETRANSFERDB table
-        self.updateRESTFileDocStateToSubmitted(successFileDocs)
+        self.updateRESTFileDocStateToSubmitted(transferFileDocs)
         # After everything is done, bookkeeping LastTransferLine.
         self.transfer.updateLastTransferLine(end)
 
@@ -159,6 +159,7 @@ class RegisterReplicas:
             if r['name'] in replicasInContainer:
                 c = copy.deepcopy(r)
                 c['dataset'] = replicasInContainer[r['name']]
+                c['ruleid'] = self.transfer.containerRuleID
                 containerFileDocs.append(c)
             else:
                 newFileDocs.append(r)
