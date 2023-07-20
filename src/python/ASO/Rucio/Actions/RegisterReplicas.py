@@ -159,6 +159,7 @@ class RegisterReplicas:
             if r['name'] in replicasInContainer:
                 c = copy.deepcopy(r)
                 c['dataset'] = replicasInContainer[r['name']]
+                c['ruleid'] = self.transfer.containerRuleID
                 containerFileDocs.append(c)
             else:
                 newFileDocs.append(r)
