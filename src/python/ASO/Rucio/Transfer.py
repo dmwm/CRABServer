@@ -139,15 +139,10 @@ class Transfer:
         Convert info from first transferItems to this object attribute.
         Need to execute readTransferItems before this method.
         """
-        # Need to get publish container name from the file that need to publish.
+        # Get publish container name from the file that need to publish.
         info = self.transferItems[0]
-        firstJobID = info['job_id']
         for t in self.transferItems:
-            # break the loop and use first transfers.txt in case there is no
-            # file need to publish.
-            if t['job_id'] != firstJobID:
-                break
-            if t['delayed_publicationflag_update']:
+            if t['outputdataset'].startswith('/FakeDataset'):
                 info = t
                 break
 

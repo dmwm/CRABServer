@@ -135,7 +135,9 @@ class MonitorLockStatus:
 
     def filterFilesNeedToPublish(self, fileDocs):
         """
-        Return only fileDocs that need to publish by publisher
+        Return only fileDoc that need to publish by publisher.
+        Use the fact that non-edm files and logfiles will have '/FakeDataset'
+        as outputdataset.
 
         :param fileDocs: list of fileDoc
         :type fileDocs: list of dict
@@ -146,7 +148,7 @@ class MonitorLockStatus:
         tmpPublishFileDocs = []
         for doc in fileDocs:
             transferItem = self.transfer.LFN2transferItemMap[doc['name']]
-            if transferItem['delayed_publicationflag_update']:
+            if not transferItem['outputdataset'].startswith('/FakeDataset'):
                 tmpPublishFileDocs.append(doc)
         return tmpPublishFileDocs
 

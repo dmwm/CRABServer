@@ -821,7 +821,6 @@ class ASOServerJob(object):
                            'publication_state': 'not_published',
                            'publication_retry_count': [],
                            'type': file_type,
-                           'delayed_publicationflag_update' : delayed_publicationflag_update,
                           }
                     ## TODO: We do the following, only because that's what ASO does when a file has
                     ## been successfully transferred. But this modified LFN makes no sence when it
@@ -981,8 +980,6 @@ class ASOServerJob(object):
                 newDoc['destination'] = doc['destination']
             if not 'outputdataset' in newDoc:
                 newDoc['outputdataset'] = doc['outputdataset']
-            if not 'delayed_publicationflag_update' in  newDoc:
-                newDoc['delayed_publicationflag_update'] = doc['delayed_publicationflag_update']
             with open('task_process/transfers.txt', 'a+') as transfers_file:
                 transfer_dump = json.dumps(newDoc)
                 transfers_file.write(transfer_dump+"\n")
