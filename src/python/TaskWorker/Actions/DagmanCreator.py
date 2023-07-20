@@ -374,7 +374,7 @@ class DagmanCreator(TaskAction):
         if m:
             _, _, arch, _ = m.groups()
             if arch not in SCRAM_TO_ARCH:
-                msg = f"Job configured to a ScramArch: '{arch}' not supported in TaskWorker"
+                msg = f"Job configured for non-supoprted ScramArch '{arch}'"
                 raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
             info['required_arch'] = SCRAM_TO_ARCH.get(arch)
             # if arch == "amd64":
@@ -799,8 +799,8 @@ class DagmanCreator(TaskAction):
                 siteinfo = json.load(fd)
         else:
             siteinfo = {'group_sites': {}, 'group_datasites': {}}
-        if os.path.exists("site.ad", encoding='utf-8'):
-            with open("site.ad") as fd:
+        if os.path.exists("site.ad"):
+            with open("site.ad", encoding='utf-8') as fd:
                 sitead = classad.parse(fd)
         else:
             sitead = classad.ClassAd()
