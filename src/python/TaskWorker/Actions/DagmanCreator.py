@@ -1194,7 +1194,7 @@ class DagmanCreator(TaskAction):
             except Exception as ex:
                 raise TaskWorkerException("The CRAB server backend could not download the input sandbox with your code " + \
                                   "from S3.\nThis could be a temporary glitch; please try to submit a new task later " + \
-                                  "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex))
+                                  "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex)) from ex
             try:
                 downloadFromS3(crabserver=self.crabserver, objecttype='sandbox', username=username,
                                tarballname=dbgFilesName, filepath=debugTarBall, logger=self.logger)
