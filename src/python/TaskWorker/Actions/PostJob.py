@@ -96,6 +96,7 @@ import pickle
 import traceback
 import random
 import shutil
+import hashlib
 from shutil import move
 from http.client import HTTPException
 
@@ -1622,6 +1623,11 @@ class PostJob():
             else:
                 msg = "This post-job corresponds to job with Condor ID %s." % (self.dag_clusterid)
                 self.logger.debug(msg)
+
+        # alter G_FAKE_OUTDATASET
+        taskhash = hashlib.md5(self.reqname.encode()).hexdigest()
+        global G_FAKE_OUTDATASET
+        G_FAKE_OUTDATASET = f'/FakeDataset/fakefile-FakePublish-{taskhash}/USER'
 
         ## Call execute_internal().
         retval = JOB_RETURN_CODES.RECOVERABLE_ERROR
