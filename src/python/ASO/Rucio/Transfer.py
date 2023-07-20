@@ -38,8 +38,8 @@ class Transfer:
         self.containerRuleID = ''
         self.bookkeepingOKLocks = None
 
-        # map lfn to id
-        self.replicaLFN2IDMap = None
+        # map of lfn to original info in transferItems
+        self.LFN2transferItemMap = None
 
     def readInfo(self):
         """
@@ -54,6 +54,7 @@ class Transfer:
         self.readLastTransferLine()
         self.readTransferItems()
         self.buildLFN2IDMap()
+        self.buildLFN2transferItem()
         self.readRESTInfo()
         self.readInfoFromTransferItems()
         self.readContainerRuleID()
@@ -111,14 +112,13 @@ class Transfer:
         if len(self.transferItems) == 0:
             raise RucioTransferException(f'{path} does not contain new entry.')
 
-    def buildLFN2IDMap(self):
+    def buildLFN2transferItemMap(self):
         """
-        Create `self.replicaLFN2IDMap` map from LFN to REST ID using using info
-        in self.transferItems
+        Create map from LFN to transferItem
         """
-        self.replicaLFN2IDMap = {}
+        self.LFN2transferItemMap = {}
         for x in self.transferItems:
-            self.replicaLFN2IDMap[x['destination_lfn']] = x['id']
+            self.LFN2transferItemMap[x['destination_lfn']] = x
 
     def readRESTInfo(self):
         """
@@ -139,7 +139,13 @@ class Transfer:
         Convert info from first transferItems to this object attribute.
         Need to execute readTransferItems before this method.
         """
+        # Get publish container name from the file that need to publish.
         info = self.transferItems[0]
+        for t in self.transferItems:
+            if t['outputdataset'].startswith('/FakeDataset'):
+                info = t
+                break
+
         self.username = info['username']
         self.rucioScope = f'user.{self.username}'
         self.destination = info['destination']
