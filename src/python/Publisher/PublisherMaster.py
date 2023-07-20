@@ -626,7 +626,25 @@ class Master(object):
                     logger.debug('++++++++ TASK %s IN BLACKLIST,SKIP FILEMETADATA RETRIEVE AND MARK FILES AS FAILED',
                                  workflow)
                 else:
+                    # retrieve information from FileMetadata
                     publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready, logger)
+                # now combine the info from FMD with the info from transfersdb (in active_)
+                # to create the JSON files (one per task) to be put in Publisher_Files and
+                # used by TaskPublish.py as input
+                # current format for Publisher_schedd is a list of dictionaries, one per file
+                # each dictionary has these keys, most values come straight from FileMetadata table
+                # a (*) indicated values which in Publisher_schedd are obtained from info in transfersdb
+                # which we now have in task['files']
+                # 'taskname', 'filetype', 'jobid', 'outdataset', 'acquisitionera',
+                # 'swversion', 'inevents', 'globaltag', 'publishname', 'location',
+                # 'tmplocation', 'runlumi',
+                #  'adler32', 'cksum', 'md5', 'lfn'(*), 'filesize',
+                #  'parents', 'state', 'created', 'tmplfn', 'User'(*), 'Group'(*),
+                # 'Role'(*), 'UserDN'(*), 'Destination'(*), 'SourceLFN(*)'
+                # Clearly `taskname`, 'acquisitionera', 'swversion', 'globaltag', 'UserDN' are common,
+                # others could be different from one file to another (even if we do not support multiple
+                # outputdataset at this moment
+
                 for file_ in active_:
                     if workflow in self.taskBlackList:
                         toFail.append(file_["value"][1])  # mark all files as failed to avoid to look at them again
