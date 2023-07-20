@@ -29,7 +29,7 @@ import classad
 
 import WMCore.WMSpec.WMTask
 from WMCore.Services.CRIC.CRIC import CRIC
-from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS
+from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS, SCRAM_TO_ARCH
 
 DAG_HEADER = """
 
@@ -113,7 +113,7 @@ accounting_group_user = %(accounting_group_user)s
 
 
 # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
-+DESIRED_Archs = %(desired_arch)s
++REQUIRED_ARCH = %(required_arch)s
 +DESIRED_CMSDataset = %(inputdata)s
 
 +JOBGLIDEIN_CMSSite = "$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])"
@@ -147,7 +147,7 @@ should_transfer_files = YES
 #x509userproxy = %(x509up_file)s
 use_x509userproxy = true
 %(opsys_req)s
-Requirements = ((target.IS_GLIDEIN =!= TRUE) || (target.GLIDEIN_CMSSite =!= UNDEFINED))
+Requirements = stringListMember(TARGET.Arch, REQUIRED_ARCH)
 periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
 # Remove if
 # a) job is in the 'held' status for more than 7 minutes
@@ -287,7 +287,7 @@ def transform_strings(data):
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', \
                'stageoutpolicy', 'taskType', 'worker_name', 'cms_wmtool', 'cms_tasktype', 'cms_type', \
-               'desired_arch', 'resthost', 'dbinstance', 'submitter_ip_addr', \
+               'required_arch', 'resthost', 'dbinstance', 'submitter_ip_addr', \
                'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
         val = data.get(var, None)
         if val == None:
@@ -366,12 +366,19 @@ class DagmanCreator(TaskAction):
     def populateGlideinMatching(self, info):
         scram_arch = info['tm_job_arch']
         # Set defaults
-        info['desired_arch'] = "X86_64"
+        info['required_arch'] = "X86_64"
+        # The following regex matches a scram arch into four groups 
+        # for example el9_amd64_gcc10 is matched as (el)(9)_(amd64)_(gcc10)
+        # later, only the third group is returned, the one corresponding to the arch.
         m = re.match("([a-z]+)(\d+)_(\w+)_(\w+)", scram_arch)
         if m:
             _, _, arch, _ = m.groups()
-            if arch == "amd64":
-                info['desired_arch'] = "X86_64"
+            if arch not in SCRAM_TO_ARCH:
+                msg = f"Job configured for non-supoprted ScramArch '{arch}'"
+                raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
+            info['required_arch'] = SCRAM_TO_ARCH.get(arch)
+            # if arch == "amd64":
+            #     info['required_arch'] = "X86_64"
 
 
     def getDashboardTaskType(self, task):
@@ -538,7 +545,7 @@ class DagmanCreator(TaskAction):
 
         info['max_disk_space'] = MAX_DISK_SPACE
 
-        with open("Job.submit", "w") as fd:
+        with open("Job.submit", "w", encoding='utf-8') as fd:
             fd.write(JOB_SUBMIT % info)
 
         return info
@@ -705,7 +712,7 @@ class DagmanCreator(TaskAction):
             argDict['CRAB_Destination'] = dagspec['destination']
             argdicts.append(argDict)
 
-        with open('input_args.json', 'w') as fd:
+        with open('input_args.json', 'w', encoding='utf-8') as fd:
             json.dump(argdicts, fd)
 
         tf = tarfile.open('InputFiles.tar.gz', mode='w:gz')
@@ -788,12 +795,12 @@ class DagmanCreator(TaskAction):
         # Create site-ad and info.  DagmanCreator should only be run in
         # succession, never parallel for a task!
         if os.path.exists("site.ad.json"):
-            with open("site.ad.json") as fd:
+            with open("site.ad.json", encoding='utf-8') as fd:
                 siteinfo = json.load(fd)
         else:
             siteinfo = {'group_sites': {}, 'group_datasites': {}}
         if os.path.exists("site.ad"):
-            with open("site.ad") as fd:
+            with open("site.ad", encoding='utf-8') as fd:
                 sitead = classad.parse(fd)
         else:
             sitead = classad.ClassAd()
@@ -995,7 +1002,7 @@ class DagmanCreator(TaskAction):
                 }
                 dag += SUBDAG_FRAGMENT.format(**subdagSpec)
                 subdag = "RunJobs{count}.subdag".format(**subdagSpec)
-                with open(subdag, "w") as fd:
+                with open(subdag, "w", encoding='utf-8') as fd:
                     fd.write("")
                 subdags.append(subdag)
 
@@ -1023,12 +1030,12 @@ class DagmanCreator(TaskAction):
                 tfd2 = tarfile.open('input_files.tar.gz', 'w:gz')
                 for dagSpec in dagSpecs:
                     job_lumis_file = os.path.join(tempDir, 'job_lumis_'+ str(dagSpec['count']) +'.json')
-                    with open(job_lumis_file, "w") as fd:
+                    with open(job_lumis_file, "w", encoding='utf-8') as fd:
                         fd.write(str(dagSpec['runAndLumiMask']))
                     ## Also creating a tarball with the dataset input files.
                     ## Each .txt file in the tarball contains a list of dataset files to be used for the job.
                     job_input_file_list = os.path.join(tempDir2, 'job_input_file_list_'+ str(dagSpec['count']) +'.txt')
-                    with open(job_input_file_list, "w") as fd2:
+                    with open(job_input_file_list, "w", encoding='utf-8') as fd2:
                         fd2.write(str(dagSpec['inputFiles']))
             finally:
                 tfd.add(tempDir, arcname='')
@@ -1057,14 +1064,14 @@ class DagmanCreator(TaskAction):
             name = "RunJobs{0}.subdag".format(parent)
 
         ## Cache site information
-        with open("site.ad", "w") as fd:
+        with open("site.ad", "w", encoding='utf-8') as fd:
             fd.write(str(sitead))
 
-        with open("site.ad.json", "w") as fd:
+        with open("site.ad.json", "w", encoding='utf-8') as fd:
             json.dump(siteinfo, fd)
 
         ## Save the DAG into a file.
-        with open(name, "w") as fd:
+        with open(name, "w", encoding='utf-8') as fd:
             fd.write(dag)
 
         kwargs['task']['jobcount'] = len(dagSpecs)
@@ -1187,7 +1194,7 @@ class DagmanCreator(TaskAction):
             except Exception as ex:
                 raise TaskWorkerException("The CRAB server backend could not download the input sandbox with your code " + \
                                   "from S3.\nThis could be a temporary glitch; please try to submit a new task later " + \
-                                  "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex))
+                                  "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex)) from ex
             try:
                 downloadFromS3(crabserver=self.crabserver, objecttype='sandbox', username=username,
                                tarballname=dbgFilesName, filepath=debugTarBall, logger=self.logger)
