@@ -237,14 +237,14 @@ class Transfer:
             self.bookkeepingBlockComplete = []
             self.logger.info(f'Bookkeeping block complete path "{path}" does not exist. Assume this is first time it run.')
 
-    def updateBlockComplete(self, newLocks):
+    def updateBlockComplete(self, newBlocks):
         """
         update bookkeepingBlockComplete to task_process/transfers/transfers_ok.txt
 
-        :param newLocks: list of LFN
-        :type newLocks: list of string
+        :param newBlocks: list of LFN
+        :type newBlocks: list of string
         """
-        self.bookkeepingBlockComplete += newLocks
+        self.bookkeepingBlockComplete += newBlocks
         path = config.args.bookkeeping_block_complete_path
         self.logger.info (f'Bookkeeping block complete to file: {path}')
         self.logger.debug(f'{self.bookkeepingBlockComplete}')
