@@ -47,7 +47,7 @@ class MonitorLockStatus:
         self.logger.debug(f'fileDocs to update block completion: {blockCompleteFileDocs}')
         self.updateRESTFileDocsBlockCompletionInfo(blockCompleteFileDocs)
         # Bookkeeping published replicas (only replicas with blockcomplete "ok")
-        newBlockComplete = list({doc['dataset'] for doc in self.transfer.bookkeepingBlockComplete})
+        newBlockComplete = list({doc['dataset'] for doc in blockCompleteFileDocs})
         self.transfer.updateBlockComplete(newBlockComplete)
 
     def checkLockStatus(self):
