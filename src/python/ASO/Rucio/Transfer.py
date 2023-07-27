@@ -142,7 +142,7 @@ class Transfer:
         # Get publish container name from the file that need to publish.
         info = self.transferItems[0]
         for t in self.transferItems:
-            if t['outputdataset'].startswith('/FakeDataset'):
+            if not t['outputdataset'].startswith('/FakeDataset'):
                 info = t
                 break
 
@@ -158,6 +158,7 @@ class Transfer:
         taskNameHash = hashlib.md5(info['taskname'].encode()).hexdigest()[:8]
         tmp[2] += f'_TRANSFER.{taskNameHash}'
         self.transferContainer = '/'.join(tmp)
+        self.logger.info(f'Publish container: {self.publishContainer}, Transfer container: {self.transferContainer}')
         self.logsDataset = f'{self.transferContainer}#LOGS'
 
     def readContainerRuleID(self):
