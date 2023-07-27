@@ -37,6 +37,7 @@ class Transfer:
         self.lastTransferLine = 0
         self.containerRuleID = ''
         self.bookkeepingOKLocks = None
+        self.bookkeepingBlockComplete = None
 
         # map of lfn to original info in transferItems
         self.LFN2transferItemMap = None
@@ -53,12 +54,12 @@ class Transfer:
         # read into memory
         self.readLastTransferLine()
         self.readTransferItems()
-        self.buildLFN2IDMap()
-        self.buildLFN2transferItem()
+        self.buildLFN2transferItemMap()
         self.readRESTInfo()
         self.readInfoFromTransferItems()
         self.readContainerRuleID()
         self.readOKLocks()
+        self.readBlockComplete()
 
     def readInfoFromRucio(self, rucioClient):
         """
@@ -218,6 +219,40 @@ class Transfer:
         with writePath(path) as w:
             for l in self.bookkeepingOKLocks:
                 w.write(f'{l}\n')
+
+    def readBlockComplete(self):
+        """
+        Read bookkeepingBlockComplete from task_process/transfers/transfers_ok.txt.
+        Initialize empty list in case of path not found or
+        `--ignore-transfer-ok` is `True`.
+        """
+        if config.args.ignore_bookkeeping_block_complete:
+            self.bookkeepingBlockComplete = []
+            return
+        path = config.args.bookkeeping_block_complete_path
+        try:
+            with open(path, 'r', encoding='utf-8') as r:
+                self.bookkeepingBlockComplete = r.read().splitlines()
+                self.logger.info(f'Got list of block complete from bookkeeping: {self.bookkeepingBlockComplete}')
+        except FileNotFoundError:
+            self.bookkeepingBlockComplete = []
+            self.logger.info(f'Bookkeeping block complete path "{path}" does not exist. Assume this is first time it run.')
+
+    def updateBlockComplete(self, newBlocks):
+        """
+        update bookkeepingBlockComplete to task_process/transfers/transfers_ok.txt
+
+        :param newBlocks: list of LFN
+        :type newBlocks: list of string
+        """
+        self.bookkeepingBlockComplete += newBlocks
+        path = config.args.bookkeeping_block_complete_path
+        self.logger.info (f'Bookkeeping block complete to file: {path}')
+        self.logger.debug(f'{self.bookkeepingBlockComplete}')
+        with writePath(path) as w:
+            for l in self.bookkeepingBlockComplete:
+                w.write(f'{l}\n')
+
 
     def populateLFN2DatasetMap(self, container, rucioClient):
         """
