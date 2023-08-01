@@ -21,17 +21,21 @@ from TaskWorker.MasterWorker import getRESTParams
 from TaskWorker.Worker import failTask
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 
+
 class TapeRecallManager(BaseRecurringAction):
     """ interface needed by the way TW deals with recurring actions
     must have a class which inherit from BaseRecurringAction
     which implements the _execute method (with the unused argument "task"...pff)
     name of this class, this file and the recurring action in TW config list
     must be the same """
-    pollingTime = 60*2  # unit=minutes. Runs every 2 hours
+    pollingTime = 60 * 2  # unit=minutes. Runs every 2 hours
+    # some static class variables to prevent pylint W0201
     rucioClient = None
     privilegedRucioClient = None
     crabserver = None
-
+    config = None
+    restHost = None
+    dbInstance = None
 
     def _execute(self, config, task):  # pylint: disable=unused-argument
         """ this is what we do at every polling cycle """
@@ -41,7 +45,6 @@ class TapeRecallManager(BaseRecurringAction):
         # do the work
         self.handleRecall()
         self.handleKill()
-
 
     def handleKill(self):
         """ looks for tasks in KILLRECALL and deals with them """
@@ -80,7 +83,6 @@ class TapeRecallManager(BaseRecurringAction):
             self.deleteWarnings(taskName)
             self.logger.info("Done on this task")
 
-
     def handleRecall(self):
         """ looks for tasks in TAPERECALL and deals with them """
         status = 'TAPERECALL'
@@ -90,7 +92,7 @@ class TapeRecallManager(BaseRecurringAction):
             msg = f"Working on task {taskName}"
             self.logger.info(msg)
             # 1.) check for "waited too long"
-            if (time.time() - getTimeFromTaskname(str(taskName))) > MAX_DAYS_FOR_TAPERECALL*24*60*60:
+            if (time.time() - getTimeFromTaskname(str(taskName))) > MAX_DAYS_FOR_TAPERECALL * 24 * 60 * 60:
                 msg = f"Tape recall request did not complete in {MAX_DAYS_FOR_TAPERECALL} days."
                 self.logger.info(msg)
                 failTask(taskName, self.crabserver, msg, self.logger, 'FAILED')
@@ -126,7 +128,6 @@ class TapeRecallManager(BaseRecurringAction):
                 pass  # keep waiting
             self.logger.info("Done on this task")
 
-
     def init(self):
         """ setup logger, crabserver client and rucio client"""
         if not self.logger:
@@ -138,8 +139,8 @@ class TapeRecallManager(BaseRecurringAction):
             self.logger.addHandler(handler)
             self.logger.setLevel(logging.DEBUG)
         else:
-        # do not use BaseRecurringAction logger but create a new logger
-        # which writes to config.TaskWorker.logsDir/taks/recurring/TapeRecallManager_YYMMDD-HHMM.log
+            # do not use BaseRecurringAction logger but create a new logger
+            # which writes to config.TaskWorker.logsDir/taks/recurring/TapeRecallManager_YYMMDD-HHMM.log
             self.logger = logging.getLogger('TapeRecallManager')
             logDir = self.config.TaskWorker.logsDir + '/tasks/recurring/'
             if not os.path.exists(logDir):
@@ -169,13 +170,12 @@ class TapeRecallManager(BaseRecurringAction):
             tapeRecallConfig.Services.Rucio_account = 'crab_tape_recall'
             self.privilegedRucioClient = getNativeRucioClient(tapeRecallConfig, self.logger)
 
-
     def getTasks(self, status):
         """retrieve from DB a list of tasks with given status"""
-        #TODO this is also a candidate for TaskWorker/TaskUtils.py
+        # TODO this is also a candidate for TaskWorker/TaskUtils.py
         msg = f"Retrieving {status} tasks"
         tasks = []
-        configreq = {'limit': 1000, 'workername': self.config.TaskWorker.name, 'getstatus': status}
+        configreq = {'limit': 1000, 'workername': '%', 'getstatus': status}
         try:
             data = urlencode(configreq)
             tasks = self.crabserver.get(api='workflowdb', data=data)[0]['result']
@@ -191,7 +191,7 @@ class TapeRecallManager(BaseRecurringAction):
 
     def uploadWarning(self, taskname='', msg=''):
         """ Uploads a warning message to the Task DB so that crab status can show it """
-        #TODO this is duplicated in TaskWorker/Actions/TaskAction.py but it is not possible
+        # TODO this is duplicated in TaskWorker/Actions/TaskAction.py but it is not possible
         # to import from there. Should probably create a TaskWorker/TaskUtils.py for such functions
         configreq = {'subresource': 'addwarning', 'workflow': taskname, 'warning': msg}
         try:
@@ -203,7 +203,7 @@ class TapeRecallManager(BaseRecurringAction):
 
     def deleteWarnings(self, taskname):
         """ Removes all warnings uploaded so fare for this task """
-        #TODO this is also a candidate for TaskWorker/TaskUtils.py
+        # TODO this is also a candidate for TaskWorker/TaskUtils.py
         configreq = {'subresource': 'deletewarnings', 'workflow': taskname}
         data = urlencode(configreq)
         try:
@@ -214,7 +214,7 @@ class TapeRecallManager(BaseRecurringAction):
 
     def updateTaskStatus(self, taskName, status):
         """ change task status in the DB """
-        #TODO this is also a candidate for TaskWorker/TaskUtils.py
+        # TODO this is also a candidate for TaskWorker/TaskUtils.py
         msg = f"Will set to {status} task {taskName}"
         self.logger.info(msg)
         if status == 'NEW':
@@ -233,7 +233,7 @@ class TapeRecallManager(BaseRecurringAction):
         returns the list of task names which have stored the given Rucio
         rule as ddmreqid in DB Tasks table
         """
-        #TODO this is also a candidate for TaskWorker/TaskUtils.py
+        # TODO this is also a candidate for TaskWorker/TaskUtils.py
         data = {'subresource': 'taskbyddmreqid', 'ddmreqid': ruleId}
         res = self.crabserver.get(api='task', data=urlencode(data))
         tasks = res[0]['result']  # for obscure reasons this has the form [['task1'],['task2']...]
