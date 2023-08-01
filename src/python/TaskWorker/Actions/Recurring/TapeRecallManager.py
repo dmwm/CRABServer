@@ -175,7 +175,7 @@ class TapeRecallManager(BaseRecurringAction):
         #TODO this is also a candidate for TaskWorker/TaskUtils.py
         msg = f"Retrieving {status} tasks"
         tasks = []
-        configreq = {'limit': 1000, 'workername': self.config.TaskWorker.name, 'getstatus': status}
+        configreq = {'limit': 1000, 'workername': '%', 'getstatus': status}
         try:
             data = urlencode(configreq)
             tasks = self.crabserver.get(api='workflowdb', data=data)[0]['result']
