@@ -278,12 +278,6 @@ class RegisterReplicas:
             # hardcode fix for DESY temp,
             if sourceRSE == 'T2_DE_DESY':
                 pfn = pfn.replace('/pnfs/desy.de/cms/tier2/temp', '/pnfs/desy.de/cms/tier2/store/temp')
-            # hardcode fix for T2_UK_SGrid_Bristol
-            if sourceRSE == 'T2_UK_SGrid_Bristol':
-                proto = self.rucioClient.get_protocols('T2_UK_SGrid_Bristol_Temp')[0]
-                if proto['scheme'] != 'root':
-                    raise RucioTransferException('Expected protocol scheme "root" from T2_UK_SGrid_Bristol_Temp (Temporary hardcoded).')
-                pfn = f'{proto["scheme"]}://{proto["hostname"]}{proto["prefix"]}{"/".join(sourceLFN.split("/")[3:])}'
             self.logger.debug(f'PFN: {pfn}')
             return pfn
         except Exception as ex:
