@@ -23,8 +23,9 @@ from WMCore.REST.Server import RESTArgs
 CMSSitesCache = namedtuple("CMSSitesCache", ["cachetime", "sites"])
 ConfigCache = namedtuple("ConfigCache", ["cachetime", "centralconfig"])
 
-#These parameters are set in the globalinit (called in RESTBaseAPI)
+# These parameters are set in the globalinit (called in RESTBaseAPI)
 credServerPath = None
+
 
 def getDBinstance(config, namespace, name):
     if config.backend.lower() == 'mysql':
@@ -35,7 +36,7 @@ def getDBinstance(config, namespace, name):
     # factory = WMFactory(name = 'TaskQuery', namespace = 'Databases.TaskDB.%s.Task' % backend)
     factory = WMFactory(name=name, namespace=f"Databases.{namespace}.{backend}.{name}")
 
-    return factory.loadObject( name )
+    return factory.loadObject(name)
 
 
 def globalinit(credpath):
@@ -51,10 +52,10 @@ def execute_command(command, logger, timeout):
 
     stdout, stderr, rc = None, None, 99999
     proc = subprocess.Popen(
-            command, shell=True, cwd=os.environ['PWD'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            stdin=subprocess.PIPE,
+        command, shell=True, cwd=os.environ['PWD'],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        stdin=subprocess.PIPE,
     )
 
     t_beginning = time.time()
@@ -168,11 +169,11 @@ def conn_handler(services):
     """
     def wrap(func):
         def wrapped_func(*args, **kwargs):
-            if 'cric' in services and (not args[0].allCMSNames.sites or
+            if 'cric' in services and (not args[0].allCMSNames.sites or \
                                        (args[0].allCMSNames.cachetime + 1800 < mktime(gmtime()))):
                 args[0].allCMSNames = CMSSitesCache(sites=CRIC().getAllPSNs(), cachetime=mktime(gmtime()))
                 args[0].allPNNNames = CMSSitesCache(sites=CRIC().getAllPhEDExNodeNames(), cachetime=mktime(gmtime()))
-            if ('centralconfig' in services and
+            if ('centralconfig' in services and \
                     (not args[0].centralcfg.centralconfig or (args[0].centralcfg.cachetime + 1800 < mktime(gmtime())))):
                 args[0].centralcfg = ConfigCache(
                     centralconfig=getCentralConfig(extconfigurl=args[0].config.extconfigurl, mode=args[0].config.mode),
