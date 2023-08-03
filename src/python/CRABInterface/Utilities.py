@@ -1,30 +1,24 @@
-from __future__ import division
-from __future__ import print_function
-import logging
+
+"""
+The module contains some utility functions used by the various modules of the CRAB REST interface
+"""
 import os
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 from collections import namedtuple
 from time import mktime, gmtime
-import re
-from hashlib import sha1
-import cherrypy
-import pycurl
+import time
+import subprocess
 import io
 import json
 import copy
+import pycurl
+import cherrypy
 
 from WMCore.WMFactory import WMFactory
 from WMCore.REST.Error import ExecutionError, InvalidParameter
 from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.Services.pycurl_manager import ResponseHeader
 from WMCore.REST.Server import RESTArgs
-
-from Utils.Utilities import encodeUnicodeToBytes
-
-from CRABInterface.Regexps import RX_CERT
-"""
-The module contains some utility functions used by the various modules of the CRAB REST interface
-"""
 
 CMSSitesCache = namedtuple("CMSSitesCache", ["cachetime", "sites"])
 ConfigCache = namedtuple("ConfigCache", ["cachetime", "centralconfig"])
@@ -38,22 +32,22 @@ def getDBinstance(config, namespace, name):
     elif config.backend.lower() == 'oracle':
         backend = 'Oracle'
 
-    #factory = WMFactory(name = 'TaskQuery', namespace = 'Databases.TaskDB.%s.Task' % backend)
-    factory = WMFactory(name=name, namespace='Databases.%s.%s.%s' % (namespace, backend, name))
+    # factory = WMFactory(name = 'TaskQuery', namespace = 'Databases.TaskDB.%s.Task' % backend)
+    factory = WMFactory(name=name, namespace=f"Databases.{namespace}.{backend}.{name}")
 
     return factory.loadObject( name )
+
 
 def globalinit(credpath):
     global credServerPath  # pylint: disable=global-statement
     credServerPath = credpath
+
 
 def execute_command(command, logger, timeout):
     """
     _execute_command_
     Funtion to manage commands.
     """
-    import subprocess
-    import time
 
     stdout, stderr, rc = None, None, 99999
     proc = subprocess.Popen(
@@ -71,7 +65,7 @@ def execute_command(command, logger, timeout):
         seconds_passed = time.time() - t_beginning
         if timeout and seconds_passed > timeout:
             proc.terminate()
-            logger.error('Timeout in %s execution.' % command )
+            logger.error(f"Timeout in {command} execution.")
             return stdout, rc
 
         time.sleep(0.1)
@@ -79,12 +73,12 @@ def execute_command(command, logger, timeout):
     stdout, stderr = proc.communicate()
     rc = proc.returncode
 
-    logger.debug('Executing : \n command : %s\n output : %s\n error: %s\n retcode : %s' % (command, stdout, stderr, rc))
+    logger.debug(f"Executing : \n command : {command}\n output : {stdout}\n error: {stderr}\n retcode : {rc}")
 
     return stdout, rc
 
 
-#This is used in case git is down for more than 30 minutes
+# This is used in case git is down for more than 30 minutes
 # NOTE BY STEFANO B: I do not like this global and the hacky way to
 # have a fallback here. IMHO there should be a class which we instantiate
 # for each configuration file that we want to retreive, with the fallback as
@@ -95,8 +89,9 @@ def execute_command(command, logger, timeout):
 # done below, avoid the deletion of dictionary keys etc.
 # But we can't spend all time cleaning up old code
 #
-global cfgFallback  # pylint: disable=global-statement
+global cfgFallback  # pylint: disable=global-statement, global-at-module-level
 cfgFallback = {}
+
 
 def getCentralConfig(extconfigurl, mode):
     """Utility to retrieve the central configuration to be used for dynamic variables
@@ -119,21 +114,19 @@ def getCentralConfig(extconfigurl, mode):
 
         header = ResponseHeader(hbuf.getvalue())
         if (header.status < 200 or header.status >= 300):
-            msg = "Reading %s returned %s." % (externalLink, header.status)
+            msg = f"Reading {externalLink} returned {header.status}."
             if externalLink in cfgFallback:
                 msg += "\nUsing cached values for external configuration."
                 cherrypy.log(msg)
                 return cfgFallback[externalLink]
-            else:
-                cherrypy.log(msg)
-                raise ExecutionError("Internal issue when retrieving configuration from %s" % externalLink)
+            cherrypy.log(msg)
+            raise ExecutionError(f"Internal issue when retrieving configuration from {externalLink}")
         try:
             jsonConfig = bbuf.getvalue()
             cfgFallback[externalLink] = jsonConfig
             return jsonConfig
-        except Exception:
+        except ValueError:
             return cfgFallback[externalLink]
-
 
     extConfCommon = json.loads(retrieveConfig(extconfigurl))
     extConfSchedds = json.loads(retrieveConfig(extConfCommon['htcondorScheddsLink']))
@@ -175,11 +168,15 @@ def conn_handler(services):
     """
     def wrap(func):
         def wrapped_func(*args, **kwargs):
-            if 'cric' in services and (not args[0].allCMSNames.sites or (args[0].allCMSNames.cachetime+1800 < mktime(gmtime()))):
+            if 'cric' in services and (not args[0].allCMSNames.sites or
+                                       (args[0].allCMSNames.cachetime + 1800 < mktime(gmtime()))):
                 args[0].allCMSNames = CMSSitesCache(sites=CRIC().getAllPSNs(), cachetime=mktime(gmtime()))
                 args[0].allPNNNames = CMSSitesCache(sites=CRIC().getAllPhEDExNodeNames(), cachetime=mktime(gmtime()))
-            if 'centralconfig' in services and (not args[0].centralcfg.centralconfig or (args[0].centralcfg.cachetime+10 < mktime(gmtime()))):
-                args[0].centralcfg = ConfigCache(centralconfig=getCentralConfig(extconfigurl=args[0].config.extconfigurl, mode=args[0].config.mode), cachetime=mktime(gmtime()))
+            if ('centralconfig' in services and
+                    (not args[0].centralcfg.centralconfig or (args[0].centralcfg.cachetime + 1800 < mktime(gmtime())))):
+                args[0].centralcfg = ConfigCache(
+                    centralconfig=getCentralConfig(extconfigurl=args[0].config.extconfigurl, mode=args[0].config.mode),
+                    cachetime=mktime(gmtime()))
             return func(*args, **kwargs)
         return wrapped_func
     return wrap
