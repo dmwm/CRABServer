@@ -12,11 +12,12 @@ from WMCore.Services.DBS.DBSReader import DBSReader
 from WMCore.Services.DBS.DBSErrors import DBSReaderError
 from WMCore.Configuration import ConfigurationEx
 
+from RucioUtils import getNativeRucioClient
+
+from ServerUtilities import FEEDBACKMAIL, MAX_LUMIS_IN_BLOCK, parseDBSInstance, isDatasetUserDataset
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 from TaskWorker.Actions.RucioActions import RucioAction
-from ServerUtilities import FEEDBACKMAIL, MAX_LUMIS_IN_BLOCK, parseDBSInstance, isDatasetUserDataset
-from RucioUtils import getNativeRucioClient
 
 
 
@@ -61,7 +62,8 @@ class DBSDataDiscovery(DataDiscovery):
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
 
 
-    def keepOnlyDiskRSEs(self, locationsMap):
+    @staticmethod
+    def keepOnlyDiskRSEs(locationsMap):
         """
         get all the RucioStorageElements (RSEs) which are of kind 'Disk'
         locationsMap is a dictionary {block1:[locations], block2:[locations],...}
