@@ -427,7 +427,7 @@ class DBSDataDiscovery(DataDiscovery):
             else:
                 dataToLock = inputBlocks
             try:
-                locker = RucioAction(config=config, crabserver=self.crabserver,
+                locker = RucioAction(config=self.config, crabserver=self.crabserver,
                                      rucioAcccount='crab_input',
                                      taskName=self.taskName, username=self.username,
                                      logger=self.logger)
@@ -460,7 +460,7 @@ class DBSDataDiscovery(DataDiscovery):
             return
         # The else is needed here after the raise !
         if system == 'Rucio':  # pylint: disable=no-else-raise
-            recaller = RucioAction(config=config, crabserver=self.crabserver,
+            recaller = RucioAction(config=self.config, crabserver=self.crabserver,
                                    rucioAcccount='crab_tape_recall',
                                    taskName=self.taskName, username=self.username,
                                    logger=self.logger)
