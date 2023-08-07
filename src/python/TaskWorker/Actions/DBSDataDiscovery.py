@@ -12,11 +12,12 @@ from WMCore.Services.DBS.DBSReader import DBSReader
 from WMCore.Services.DBS.DBSErrors import DBSReaderError
 from WMCore.Configuration import ConfigurationEx
 
+from RucioUtils import getNativeRucioClient
+
+from ServerUtilities import FEEDBACKMAIL, MAX_LUMIS_IN_BLOCK, parseDBSInstance, isDatasetUserDataset
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 from TaskWorker.Actions.RucioActions import RucioAction
-from ServerUtilities import FEEDBACKMAIL, MAX_LUMIS_IN_BLOCK, parseDBSInstance, isDatasetUserDataset
-from RucioUtils import getNativeRucioClient
 
 
 
@@ -61,7 +62,8 @@ class DBSDataDiscovery(DataDiscovery):
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
 
 
-    def keepOnlyDiskRSEs(self, locationsMap):
+    @staticmethod
+    def keepOnlyDiskRSEs(locationsMap):
         """
         get all the RucioStorageElements (RSEs) which are of kind 'Disk'
         locationsMap is a dictionary {block1:[locations], block2:[locations],...}
@@ -427,7 +429,7 @@ class DBSDataDiscovery(DataDiscovery):
             else:
                 dataToLock = inputBlocks
             try:
-                locker = RucioAction(config=config, crabserver=self.crabserver,
+                locker = RucioAction(config=self.config, crabserver=self.crabserver,
                                      rucioAcccount='crab_input',
                                      taskName=self.taskName, username=self.username,
                                      logger=self.logger)
@@ -460,7 +462,7 @@ class DBSDataDiscovery(DataDiscovery):
             return
         # The else is needed here after the raise !
         if system == 'Rucio':  # pylint: disable=no-else-raise
-            recaller = RucioAction(config=config, crabserver=self.crabserver,
+            recaller = RucioAction(config=self.config, crabserver=self.crabserver,
                                    rucioAcccount='crab_tape_recall',
                                    taskName=self.taskName, username=self.username,
                                    logger=self.logger)

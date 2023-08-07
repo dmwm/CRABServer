@@ -6,13 +6,14 @@ import copy
 from urllib.parse import urlencode
 from http.client import HTTPException
 
-from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
-from ServerUtilities import MAX_DAYS_FOR_TAPERECALL, MAX_TB_TO_RECALL_AT_A_SINGLE_SITE
-from ServerUtilities import TASKLIFETIME
 from RucioUtils import getNativeRucioClient
-
 from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent,
                                     InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage)
+
+from ServerUtilities import MAX_DAYS_FOR_TAPERECALL, MAX_TB_TO_RECALL_AT_A_SINGLE_SITE
+from ServerUtilities import TASKLIFETIME
+from TaskWorker.WorkerUtilities import uploadWarning
+from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 
 
 class RucioAction():
@@ -162,7 +163,7 @@ class RucioAction():
         if tapeRecallStatusSet[2] == "OK":
             self.logger.info("Status for task %s set to '%s'", self.taskName, tapeRecallStatus)
         msg += "\nThis task will be automatically submitted as soon as the stage-out is completed."
-        self.uploadWarning(msg, self.userproxy, self.taskName)
+        uploadWarning(warning=msg, taskname=self.taskName, crabserver=self.crabserver, logger=self.logger)
         raise TapeDatasetException(msg)
 
     def recallData(self, dataToRecall=None, sizeToRecall=0, tapeLocations=None, msgHead=''):
