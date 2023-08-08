@@ -462,14 +462,14 @@ $(document).ready(function() {
                                     data.result[k][index["tm_fts_id"]] + "> " +
                                     data.result[k][index["tm_fts_id"]] +
                                     " </a>"
-							} else {
+                            }  else {
                                 fts_href = "<a href=" +
                                     data.result[k][index["tm_fts_instance"]].replace("8446","8449") +
                                     "/fts3/ftsmon/#/job/" +
                                     data.result[k][index["tm_fts_id"]] + "> " +
                                     data.result[k][index["tm_fts_id"]] +
                                     " </a>"
-							}
+                            }
                         }
                         content = [
                             data.result[k][index["tm_jobid"]],
