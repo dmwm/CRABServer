@@ -456,18 +456,18 @@ $(document).ready(function() {
                         doc_href = "<a href=" + doc_url + "> " + data.result[k][index["tm_id"]] + " </a>"
                         fts_href = null
                         if (data.result[k][index["tm_fts_instance"]]){
-							if (data.result[k][index["tm_aso_worker"]] === "rucio") {
-								fts_href = "<a href=" +
-                                        "https://cms-rucio-webui.cern.ch/rule?rule_id=" +
-                                        data.result[k][index["tm_fts_id"]] + "> " +
-                                        data.result[k][index["tm_fts_id"]] +
+                            if (data.result[k][index["tm_aso_worker"]] === "rucio") {
+                                fts_href = "<a href=" +
+                                    "https://cms-rucio-webui.cern.ch/rule?rule_id=" +
+                                    data.result[k][index["tm_fts_id"]] + "> " +
+                                    data.result[k][index["tm_fts_id"]] +
                                     " </a>"
 							} else {
                                 fts_href = "<a href=" +
-                                        data.result[k][index["tm_fts_instance"]].replace("8446","8449") +
-                                        "/fts3/ftsmon/#/job/" +
-                                        data.result[k][index["tm_fts_id"]] + "> " +
-                                        data.result[k][index["tm_fts_id"]] +
+                                    data.result[k][index["tm_fts_instance"]].replace("8446","8449") +
+                                    "/fts3/ftsmon/#/job/" +
+                                    data.result[k][index["tm_fts_id"]] + "> " +
+                                    data.result[k][index["tm_fts_id"]] +
                                     " </a>"
 							}
                         }
