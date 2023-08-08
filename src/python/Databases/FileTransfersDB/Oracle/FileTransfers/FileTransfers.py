@@ -249,7 +249,7 @@ class FileTransfers(object):
                    FROM filetransfersdb where tm_id = :id"
 
 # As jobs can be retried we should look only at the last ones. For that specific case this needs to be relooked.
-    GetTaskStatusForTransfers_sql = "SELECT tm_id, tm_jobid, tm_transfer_state, tm_start_time, tm_last_update, tm_fts_id, tm_fts_instance FROM filetransfersdb \
+    GetTaskStatusForTransfers_sql = "SELECT tm_id, tm_jobid, tm_transfer_state, tm_start_time, tm_last_update, tm_fts_id, tm_fts_instance, tm_aso_worker FROM filetransfersdb \
                                      WHERE tm_username = :username AND tm_taskname = :taskname"  # ORDER BY tm_job_retry_count"
     GetTaskStatusForPublication_sql = "SELECT tm_id, tm_jobid, tm_publication_state, tm_start_time, tm_last_update FROM filetransfersdb \
                                        WHERE tm_username = :username AND tm_taskname = :taskname"  # ORDER BY tm_job_retry_count"
@@ -259,4 +259,3 @@ class FileTransfers(object):
 
     GetActiveUserPublications_sql = "SELECT t.tm_username, t.tm_user_role, t.tm_user_group, count(*) FROM filetransfersdb f LEFT OUTER JOIN tasks t ON t.tm_taskname = f.tm_taskname \
                                        WHERE (tm_publication_state=0 OR tm_publication_state = 1) AND tm_aso_worker=:asoworker AND tm_publish = 1 GROUP BY t.tm_username,t.tm_user_role,t.tm_user_group"
-
