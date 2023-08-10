@@ -330,7 +330,7 @@ def checkBlockMigration(taskname, migrateApi, block, migLogDir):
     return inProgress, atDestination, failed
 
 
-def publishInDBS3(config, taskname, verbose):
+def publishInDBS3(config, taskname, verbose, console):
     """
     Publish output from one task in DBS
     It must return the name of the SummaryFile where result of the pbulication attempt is saved
@@ -432,7 +432,7 @@ def publishInDBS3(config, taskname, verbose):
                 print(f"The task worker need to access the '{dirname}' directory")
                 sys.exit(1)
 
-    def setupLogging(config, taskname):
+    def setupLogging(config, taskname, console):
         # prepare log and work directories
         taskFilesDir = config.General.taskFilesDir
         username = taskname.split(':')[1].split('_')[0]
@@ -441,10 +441,17 @@ def publishInDBS3(config, taskname, verbose):
         createLogdir(logdir)
         migrationLogDir = os.path.join(config.General.logsDir, 'migrations')
         createLogdir(migrationLogDir)
-        logger = logging.getLogger(taskname)
-        logging.basicConfig(filename=logfile, level=logging.INFO, format=config.TaskPublisher.logMsgFormat)
+        # create logger
+        if console:
+            logger = logging.getLogger()
+            logger.addHandler(logging.StreamHandler())
+            logger.setLevel(logging.INFO)
+        else:
+            logger = logging.getLogger(taskname)
+            logging.basicConfig(filename=logfile, level=logging.INFO, format=config.TaskPublisher.logMsgFormat)
         if verbose:
             logger.setLevel(logging.DEBUG)
+        # pass info around
         log['logger'] = logger
         log['logdir'] = logdir
         log['migrationLogDir'] = migrationLogDir
@@ -816,7 +823,7 @@ def publishInDBS3(config, taskname, verbose):
     os.environ['X509_USER_CERT'] = config.TaskPublisher.cert
     os.environ['X509_USER_KEY'] = config.TaskPublisher.key
 
-    setupLogging(config, taskname)
+    setupLogging(config, taskname, console)
     logger = log['logger']
 
     dryRun = config.TaskPublisher.dryRun
@@ -1002,11 +1009,13 @@ def main():
     parser.add_argument('--taskname', help='taskname', required=True)
     parser.add_argument('--verbose', help='Verbose mode, print dictionaries', action='store_true')
     parser.add_argument('--dry', help='Dry run mode, no changes done in DBS', action='store_true')
+    parser.add_argument('--console', help='Console mode, send logging to stdout', action='store_true')
     args = parser.parse_args()
     configFile = os.path.abspath(args.configFile)
     taskname = args.taskname
     verbose = args.verbose
     dryRun = args.dry
+    console = args.console
     modeMsg = " in DRY RUN mode" if dryRun else ""
     config = loadConfigurationFile(configFile)
     if dryRun:
@@ -1015,7 +1024,7 @@ def main():
     if verbose:
         print(f"Will run {modeMsg} with:\nconfigFile: {configFile}\ntaskname  : {taskname}\n")
 
-    summaryFile = publishInDBS3(config, taskname, verbose)
+    summaryFile = publishInDBS3(config, taskname, verbose, console)
     print(f"Completed with result in {summaryFile}")
 
 if __name__ == '__main__':
