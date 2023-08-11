@@ -53,10 +53,19 @@ def parse_result(listOfTasks):
 
 
 def main():
-
+    """
+    start from a list of task names in $WORK_DIR/artifacts/submitted_tasks (one per row)
+    then will write in artifacts/result one line per task in dict-like format
+    {'TN': taskname, 'dbStatus': 'SUBMITTED', 'testResult': 'TestPassed',
+       'jobsPerStatus': {'finished': 100, ....},  'combinedStatus': 'COMPLETED'}
+    Note that order of keys in the printout will be potentially random
+    Jenkins will check this file for the Test* strings and
+    if TestRunning is present: run the test again after some time
+    if TestFailed is present" declare the test FAILED
+    """
     listOfTasks = []
     instance = os.getenv('REST_Instance','preprod')
-    work_dir=os.getenv('WORK_DIR','dummy_workdir')
+    work_dir = os.getenv('WORK_DIR','dummy_workdir')
 
     with open('%s/artifacts/submitted_tasks' %work_dir) as fp:
         tasks = fp.readlines()
