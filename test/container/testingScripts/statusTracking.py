@@ -34,11 +34,16 @@ def parse_result(listOfTasks):
                 if '-' in job and task['jobs'][job]['State'] == 'failed':
                     task['jobsPerStatus']['failed'] -= 1
             total_jobs = sum(task['jobsPerStatus'].values())
+            finished_jobs = task['jobsPerStatus']['finished']
+            published_in_transfersdb = task['publication']['done']
+            published_in_dbs =
+            task['pubSummary'] = '%d/%d/%d' % (published_in_dbs, published_in_transfersdb, finished_jobs )
 
             if ('finished', total_jobs) in task['jobsPerStatus'].items():
                 result = 'TestPassed'
             elif any(k in task['jobsPerStatus'] for k in ('failed', 'held')):
-                result = 'TestFailed'
+                resubmit = crab_cmd({'cmd': 'resubmit', 'args': {'dir': task['workdir']}})
+                result = 'TestResubmitted'
             else:
                 result = 'TestRunning'
         elif task['dbStatus'] in ['HOLDING', 'QUEUED', 'NEW']:
@@ -47,16 +52,26 @@ def parse_result(listOfTasks):
             result = 'TestFailed'
 
         testResult.append({'TN': task['taskName'], 'testResult': result, 'dbStatus': task['dbStatus'], 
-                           'combinedStatus': task['status'], 'jobsPerStatus': task['jobsPerStatus']})
+                           'combinedStatus': task['status'], 'jobsPerStatus': task['jobsPerStatus'],
+                           'publication (f/t/D)': task['pubSummary']})
 
     return testResult
 
 
 def main():
-
+    """
+    start from a list of task names in $WORK_DIR/artifacts/submitted_tasks (one per row)
+    then will write in artifacts/result one line per task in dict-like format
+    {'TN': taskname, 'dbStatus': 'SUBMITTED', 'testResult': 'TestPassed',
+       'jobsPerStatus': {'finished': 100, ....},  'combinedStatus': 'COMPLETED'}
+    Note that order of keys in the printout will be potentially random
+    Jenkins will check this file for the Test* strings and
+    if TestRunning is present: run the test again after some time
+    if TestFailed is present" declare the test FAILED
+    """
     listOfTasks = []
     instance = os.getenv('REST_Instance','preprod')
-    work_dir=os.getenv('WORK_DIR','dummy_workdir')
+    work_dir = os.getenv('WORK_DIR','dummy_workdir')
 
     with open('%s/artifacts/submitted_tasks' %work_dir) as fp:
         tasks = fp.readlines()
@@ -68,6 +83,7 @@ def main():
         status_dict = {'dir': remake_dir}
         status_command_output = crab_cmd({'cmd': 'status', 'args': status_dict})
         status_command_output.update({'taskName': task.rstrip()})
+        status_command_output['workdir'] = remake_dir
         listOfTasks.append(status_command_output)
 
     summary = parse_result(listOfTasks)
