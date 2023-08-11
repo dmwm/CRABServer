@@ -39,7 +39,8 @@ def parse_result(listOfTasks):
             published_in_transfersdb = task['publication']['done'] if 'done' in task['publication'] else 0
             # have to suffer absurd format task['outdatasets'="['dsetname']" i.e. the output of a print command !
             outdataset = eval(task['outdatasets'])[0]
-            cmd = "/cvmfs/cms.cern.ch/common/dasgoclient --query 'file dataset=%s' | wc -l" % outdataset
+            cmd = "/cvmfs/cms.cern.ch/common/dasgoclient --query"
+            cmd += " 'file dataset=%s instance=prod/phys03' | wc -l" % outdataset
             ret = subprocess.check_output(cmd, shell=True)
             published_in_dbs = eval(ret)  # dirty trick from b'999\n' to 999 (e.g.)
 
