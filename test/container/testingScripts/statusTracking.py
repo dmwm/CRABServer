@@ -35,7 +35,7 @@ def parse_result(listOfTasks):
                     task['jobsPerStatus']['failed'] -= 1
             total_jobs = sum(task['jobsPerStatus'].values())
             finished_jobs = task['jobsPerStatus']['finished']
-            published_in_transfersdb = task['publication']['done']
+            published_in_transfersdb = task['publication']['done'] if 'done' in task['publication'] else 0
             published_in_dbs = 0  # TODO make a call to dasgoclient
             task['pubSummary'] = '%d/%d/%d' % (published_in_dbs, published_in_transfersdb, finished_jobs )
 
