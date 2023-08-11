@@ -4,6 +4,7 @@ from __future__ import print_function
 from __future__ import division
 
 import os
+import subprocess
 try:
     from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
 except:  # pylint: disable=bare-except
@@ -36,7 +37,11 @@ def parse_result(listOfTasks):
             total_jobs = sum(task['jobsPerStatus'].values())
             finished_jobs = task['jobsPerStatus']['finished'] if 'finished' in task['jobsPerStatus'] else 0
             published_in_transfersdb = task['publication']['done'] if 'done' in task['publication'] else 0
-            published_in_dbs = 0  # TODO make a call to dasgoclient
+            # have to suffer absurd format task['outdatasets'="['dsetname']" i.e. the output of a print command !
+            outdataset = eval(task['outdatasets'])[0]
+            cmd = "/cvmfs/cms.cern.ch/common/dasgoclient --query 'file dataset=%s' | wc -l" % outdataset
+            ret = subprocess.check_output(cmd, shell=True)
+            published_in_dbs = eval(ret)  # dirty trick from b'999\n' to 999 (e.g.)
             task['pubSummary'] = '%d/%d/%d' % (finished_jobs, published_in_transfersdb, published_in_dbs)
 
             if ('finished', total_jobs) in task['jobsPerStatus'].items():
