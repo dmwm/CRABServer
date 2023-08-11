@@ -42,6 +42,7 @@ def parse_result(listOfTasks):
             cmd = "/cvmfs/cms.cern.ch/common/dasgoclient --query 'file dataset=%s' | wc -l" % outdataset
             ret = subprocess.check_output(cmd, shell=True)
             published_in_dbs = eval(ret)  # dirty trick from b'999\n' to 999 (e.g.)
+
             task['pubSummary'] = '%d/%d/%d' % (finished_jobs, published_in_transfersdb, published_in_dbs)
 
             if ('finished', total_jobs) in task['jobsPerStatus'].items():
