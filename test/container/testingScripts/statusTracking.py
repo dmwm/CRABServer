@@ -37,7 +37,7 @@ def parse_result(listOfTasks):
             finished_jobs = task['jobsPerStatus']['finished'] if 'finished' in task['jobsPerStatus'] else 0
             published_in_transfersdb = task['publication']['done'] if 'done' in task['publication'] else 0
             published_in_dbs = 0  # TODO make a call to dasgoclient
-            task['pubSummary'] = '%d/%d/%d' % (published_in_dbs, published_in_transfersdb, finished_jobs )
+            task['pubSummary'] = '%d/%d/%d' % (finished_jobs, published_in_transfersdb, published_in_dbs)
 
             if ('finished', total_jobs) in task['jobsPerStatus'].items():
                 result = 'TestPassed'
