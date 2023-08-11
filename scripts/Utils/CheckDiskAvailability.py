@@ -8,7 +8,7 @@ example output:
 Checking disk availability of dataset: /DPS_Bottomonium_Charmonium_UpsilonToMuMu_JPsiToMuMu_4MuFilter_TuneCP5_13TeV-pythia8/RunIISummer20UL17RECO-106X_mc2017_realistic_v6-v2/AODSIM
  only fully available (i.e. complete) block replicas are considered 
 dataset has 14 blocks
-Checking blocks availabiliyt on disk ...
+Checking blocks availability on disk ...
   block: 14
    0 blocks have  0 disk replicas
    5 blocks have  1 disk replicas
