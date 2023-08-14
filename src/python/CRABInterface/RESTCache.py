@@ -114,6 +114,8 @@ class RESTCache(RESTEntity):
                 if not tarballname:
                     raise MissingParameter("tarballname is missing")
                 ownerName = authenticatedUserName if subresource == 'upload' else username
+                if not ownerName:
+                    raise MissingParameter("username is missing")
                 # sandbox goes in bucket/username/sandboxes/
                 objectPath = ownerName + '/sandboxes/' + tarballname
             else:
