@@ -24,7 +24,7 @@ def crab_cmd(configuration):
         print('Failed', configuration['cmd'], 'of the task: %s' % (cle))
 
 
-def parse_result(listOfTasks):
+def parse_result(listOfTasks, checkPublication=False):
 
     testResult = []
 
@@ -48,7 +48,11 @@ def parse_result(listOfTasks):
             task['pubSummary'] = '%d/%d/%d' % (finished_jobs, published_in_transfersdb, published_in_dbs)
 
             if ('finished', total_jobs) in task['jobsPerStatus'].items():
-                result = 'TestPassed'
+                if checkPublication:
+                    if finished_jobs == published_in_transfersdb and finished_jobs == published_in_dbs:
+                        result = 'TestPassed'
+                    else:
+                        result = 'TestRunning'
             elif any(k in task['jobsPerStatus'] for k in ('failed', 'held')):
                 resubmit = crab_cmd({'cmd': 'resubmit', 'args': {'dir': task['workdir']}})
                 result = 'TestResubmitted'
@@ -82,6 +86,7 @@ def main():
     work_dir = os.getenv('WORK_DIR', 'dummy_workdir')
     Check_Publication_Status = os.getenv('Check_Publication_Status', 'No')
     print("Check_Publication_Status is : ", Check_Publication_Status )
+    checkPublication = True if Check_Publication_Status == 'Yes' else False
 
     with open('%s/artifacts/submitted_tasks' %work_dir) as fp:
         tasks = fp.readlines()
@@ -96,7 +101,7 @@ def main():
         status_command_output['workdir'] = remake_dir
         listOfTasks.append(status_command_output)
 
-    summary = parse_result(listOfTasks)
+    summary = parse_result(listOfTasks,checkPublication)
 
     with open('%s/artifacts/result' %work_dir, 'w') as fp:
         for result in summary:
