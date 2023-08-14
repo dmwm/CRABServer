@@ -22,7 +22,7 @@ def crab_cmd(configuration):
         print('Failed', configuration['cmd'], 'of the task: %s' % (hte.headers))
     except ClientException as cle:
         print('Failed', configuration['cmd'], 'of the task: %s' % (cle))
-        
+
 
 def parse_result(listOfTasks):
 
@@ -37,7 +37,8 @@ def parse_result(listOfTasks):
             total_jobs = sum(task['jobsPerStatus'].values())
             finished_jobs = task['jobsPerStatus']['finished'] if 'finished' in task['jobsPerStatus'] else 0
             published_in_transfersdb = task['publication']['done'] if 'done' in task['publication'] else 0
-            # have to suffer absurd format task['outdatasets'="['dsetname']" i.e. the output of a print command !
+            # deal with absurd format (output of a print command !)
+            # task['outdatasets']="['dsetname']" of type string
             outdataset = eval(task['outdatasets'])[0]
             cmd = "/cvmfs/cms.cern.ch/common/dasgoclient --query"
             cmd += " 'file dataset=%s instance=prod/phys03' | wc -l" % outdataset
@@ -58,7 +59,7 @@ def parse_result(listOfTasks):
         else:
             result = 'TestFailed'
 
-        testResult.append({'TN': task['taskName'], 'testResult': result, 'dbStatus': task['dbStatus'], 
+        testResult.append({'TN': task['taskName'], 'testResult': result, 'dbStatus': task['dbStatus'],
                            'combinedStatus': task['status'], 'jobsPerStatus': task['jobsPerStatus'],
                            'publication (f/t/D)': task['pubSummary']})
 
@@ -77,8 +78,10 @@ def main():
     if TestFailed is present" declare the test FAILED
     """
     listOfTasks = []
-    instance = os.getenv('REST_Instance','preprod')
-    work_dir = os.getenv('WORK_DIR','dummy_workdir')
+    instance = os.getenv('REST_Instance', 'preprod')
+    work_dir = os.getenv('WORK_DIR', 'dummy_workdir')
+    Check_Publication_Status = os.getenv('Check_Publication_Status', 'No')
+    print("Check_Publication_Status is : ", Check_Publication_Status )
 
     with open('%s/artifacts/submitted_tasks' %work_dir) as fp:
         tasks = fp.readlines()
