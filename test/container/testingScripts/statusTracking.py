@@ -38,6 +38,7 @@ def parse_result(listOfTasks, checkPublication=False):
             total_jobs = sum(task['jobsPerStatus'].values())
             finished_jobs = task['jobsPerStatus']['finished'] if 'finished' in task['jobsPerStatus'] else 0
             published_in_transfersdb = task['publication']['done'] if 'done' in task['publication'] else 0
+            failedPublications = task['publication']['failed'] if 'failed' in task['publication'] else 0
             # deal with absurd format (output of a print command !) of outdatasets
             # task['outdatasets'] is of type string and it is like ['datasetname']
             # with string first character being '['
@@ -54,13 +55,15 @@ def parse_result(listOfTasks, checkPublication=False):
             else:
                 published_in_dbs = 0
 
-            task['pubSummary'] = '%d/%d/%d' % (finished_jobs, published_in_transfersdb, published_in_dbs)
+            task['pubSummary'] = '%d/%d/%d' % (failedPublications, published_in_transfersdb, published_in_dbs)
 
             if ('finished', total_jobs) in task['jobsPerStatus'].items():
                 result = 'TestPassed'
                 if checkPublication:
                     if finished_jobs == published_in_transfersdb and finished_jobs == published_in_dbs:
                         result = 'TestPassed'
+                    elif failedPublications:
+                        result = 'TestFailed'
                     else:
                         result = 'TestRunning'
             elif any(k in task['jobsPerStatus'] for k in ('failed', 'held')):
@@ -76,7 +79,7 @@ def parse_result(listOfTasks, checkPublication=False):
 
         testResult.append({'TN': task['taskName'], 'testResult': result, 'dbStatus': task['dbStatus'],
                            'combinedStatus': task['status'], 'jobsPerStatus': task['jobsPerStatus'],
-                           'publication (f/t/D)': task['pubSummary']})
+                           'publication (fail/tdb/DBS)': task['pubSummary']})
 
     return testResult
 
@@ -103,8 +106,11 @@ def main():
         tasks = fp.readlines()
 
     for task in tasks:
-        remake_dict = {'task': task, 'instance': instance}
-        remake_dir = crab_cmd({'cmd': 'remake', 'args': remake_dict})
+        # when testing it helps to reuse alreayd made directories
+        remake_dir = '_'.join(task.rstrip().split('_')[-3:])
+        if not os.path.isdir(remake_dir):
+            remake_dict = {'task': task, 'instance': instance}
+            remake_dir = crab_cmd({'cmd': 'remake', 'args': remake_dict})
 
         status_dict = {'dir': remake_dir}
         status_command_output = crab_cmd({'cmd': 'status', 'args': status_dict})
