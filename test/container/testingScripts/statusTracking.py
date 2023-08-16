@@ -64,6 +64,7 @@ def parse_result(listOfTasks, checkPublication=False):
                         result = 'TestPassed'
                     elif failedPublications:
                         result = 'TestFailed'
+
                     else:
                         result = 'TestRunning'
             elif any(k in task['jobsPerStatus'] for k in ('failed', 'held')):
