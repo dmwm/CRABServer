@@ -29,7 +29,8 @@ def parse_result(listOfTasks, checkPublication=False):
     testResult = []
 
     for task in listOfTasks:
-        if task['dbStatus'] == 'SUBMITTED' and task['status'] != 'FAILED':
+        task['pubSummary'] = 'None'  # make sure this is initialized
+        if task['dbStatus'] == 'SUBMITTED':
             # remove failed probe jobs (job id of X-Y kind) if any from count
             for job in task['jobs'].keys():
                 if '-' in job and task['jobs'][job]['State'] == 'failed':
@@ -37,13 +38,21 @@ def parse_result(listOfTasks, checkPublication=False):
             total_jobs = sum(task['jobsPerStatus'].values())
             finished_jobs = task['jobsPerStatus']['finished'] if 'finished' in task['jobsPerStatus'] else 0
             published_in_transfersdb = task['publication']['done'] if 'done' in task['publication'] else 0
-            # deal with absurd format (output of a print command !)
-            # task['outdatasets']="['dsetname']" of type string
-            outdataset = eval(task['outdatasets'])[0]
-            cmd = "/cvmfs/cms.cern.ch/common/dasgoclient --query"
-            cmd += " 'file dataset=%s instance=prod/phys03' | wc -l" % outdataset
-            ret = subprocess.check_output(cmd, shell=True)
-            published_in_dbs = eval(ret)  # dirty trick from b'999\n' to 999 (e.g.)
+            # deal with absurd format (output of a print command !) of outdatasets
+            # task['outdatasets'] is of type string and it is like ['datasetname']
+            # with string first character being '['
+            # beware that soon after submission this is not defined.
+            # reference: https://github.com/dmwm/CRABClient/blob/549c4e3b6158e8344315437d1d128f2288551d47/src/python/CRABClient/Commands/status.py#L1059
+            outdataset = eval(task['outdatasets'])[0] if task['outdatasets'] else None
+            if task['outdatasets'] == 'None':
+                outdataset = None
+            if outdataset:
+                cmd = "/cvmfs/cms.cern.ch/common/dasgoclient --query"
+                cmd += " 'file dataset=%s instance=prod/phys03' | wc -l" % outdataset
+                ret = subprocess.check_output(cmd, shell=True)
+                published_in_dbs = eval(ret)  # dirty trick from b'999\n' to 999 (e.g.)
+            else:
+                published_in_dbs = 0
 
             task['pubSummary'] = '%d/%d/%d' % (finished_jobs, published_in_transfersdb, published_in_dbs)
 
@@ -61,7 +70,8 @@ def parse_result(listOfTasks, checkPublication=False):
         elif task['dbStatus'] in ['HOLDING', 'QUEUED', 'NEW']:
             result = 'TestRunning'
         else:
-            result = 'TestFailed'
+            resubmit = crab_cmd({'cmd': 'resubmit', 'args': {'dir': task['workdir']}})
+            result = 'TestResubmitted'
 
         testResult.append({'TN': task['taskName'], 'testResult': result, 'dbStatus': task['dbStatus'],
                            'combinedStatus': task['status'], 'jobsPerStatus': task['jobsPerStatus'],
