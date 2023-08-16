@@ -57,7 +57,6 @@ def parse_result(listOfTasks, checkPublication=False):
             task['pubSummary'] = '%d/%d/%d' % (finished_jobs, published_in_transfersdb, published_in_dbs)
 
             if ('finished', total_jobs) in task['jobsPerStatus'].items():
-                result = 'TestPassed'
                 if checkPublication:
                     if finished_jobs == published_in_transfersdb and finished_jobs == published_in_dbs:
                         result = 'TestPassed'
