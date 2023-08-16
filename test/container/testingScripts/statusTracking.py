@@ -107,7 +107,7 @@ def main():
         tasks = fp.readlines()
 
     for task in tasks:
-        # when testing it helps to reuse alreayd made directories
+        # when testing it helps to reuse already made directories
         remake_dir = '_'.join(task.rstrip().split('_')[-3:])
         if not os.path.isdir(remake_dir):
             remake_dict = {'task': task, 'instance': instance}
