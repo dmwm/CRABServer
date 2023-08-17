@@ -590,7 +590,7 @@ class Master(object):
 
     def markAsFailed(self, lfns=None, reason=None):
         nMarked = 0
-        for lfn in toFail:
+        for lfn in lfns:
             source_lfn = lfn
             docId = getHashLfn(source_lfn)
             data = dict()
@@ -605,8 +605,8 @@ class Master(object):
                 # if nMarked % 10 == 0:
                 # logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
             except Exception as ex:
-                logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
-                logger.error("Error reason: %s", ex)
+                self.logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
+                self.logger.error("Error reason: %s", ex)
             nMarked += 1
         return nMarked
 
