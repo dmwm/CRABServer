@@ -1,0 +1,7 @@
+# secrets
+crab_cronjob/secret_opensearch.txt
+crab_manual/secret_opensearch.txt
+
+# temp files
+crab_cronjob/__pycache__/
+crab_cronjob/cron_daily.log
