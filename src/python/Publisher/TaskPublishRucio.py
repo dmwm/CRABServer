@@ -792,6 +792,7 @@ def publishInDBS3(config, taskname, verbose, console):
         if dryRun:
             logger.info("DryRun: skip insertBulkBlock")
         else:
+            didPublish = 'FAIL'  # make sure this is initialized
             try:
                 DBSApis['destWrite'].insertBulkBlock(blockDump)
                 didPublish = 'OK'

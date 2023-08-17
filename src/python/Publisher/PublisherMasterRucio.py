@@ -436,7 +436,7 @@ class Master(object):
                         for proc in processes:
                             if not proc.is_alive():
                                 self.logger.info('Terminated: %s pid=%s', proc, proc.pid)
-                                processes.remove(proc)
+                                processes.remove(proc)  # pylint: disable=modified-iterating-list
 
         except Exception:
             self.logger.exception("Error during process mapping")
@@ -446,7 +446,7 @@ class Master(object):
             for proc in processes:
                 if not proc.is_alive():
                     self.logger.info('Terminated: %s pid=%s', proc, proc.pid)
-                    processes.remove(proc)
+                    processes.remove(proc)  # pylint: disable=modified-iterating-list
 
         self.logger.info("Algorithm iteration completed")
         self.logger.info("Wait %d sec for next cycle", self.pollInterval())
