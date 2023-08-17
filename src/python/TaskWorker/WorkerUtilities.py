@@ -6,6 +6,49 @@ from http.client import HTTPException
 from urllib.parse import urlencode
 
 from ServerUtilities import truncateError
+from ServerUtilities import SERVICE_INSTANCES
+from RESTInteractions import CRABRest
+from TaskWorker.WorkerExceptions import ConfigException
+
+def getCrabserver(restConfig=None, agentName='crabtest', logger=None):
+    """
+    given a configuration object which contains instance, cert and key
+    builds a crabserver object. It allows to set agent name so that
+    requests by different clients can be separately monitored
+    """
+
+    try:
+        instance = restConfig.instance
+    except AttributeError:
+        msg = "No instance provided: need to specify restConfig.instance in the configuration"
+        raise ConfigException(msg)
+
+    if instance in SERVICE_INSTANCES:
+        logger.info('Will connect to CRAB service: %s', instance)
+        restHost = SERVICE_INSTANCES[instance]['restHost']
+        dbInstance = SERVICE_INSTANCES[instance]['dbInstance']
+    else:
+        msg = "Invalid instance value '%s'" % instance
+        raise ConfigException(msg)
+    if instance == 'other':
+        logger.info('Will use restHost and dbInstance from config file')
+        try:
+            restHost = restConfig.restHost
+            dbInstance = restConfig.dbInstance
+        except AttributeError:
+            msg = "Need to specify restConfig.restHost and dbInstance in the configuration"
+            raise ConfigException(msg)
+
+    # Let's increase the server's retries for recoverable errors in the MasterWorker
+    # 20 means we'll keep retrying for about 1 hour
+    # we wait at 20*NUMRETRY seconds after each try, so retry at: 20s, 60s, 120s ... 20*(n*(n+1))/2
+    crabserver = CRABRest(restHost, restConfig.cert, restConfig.key, retry=20,
+                               logger=logger, userAgent=agentName)
+    crabserver.setDbInstance(dbInstance)
+
+    logger.info('Will connect to CRAB REST via: https://%s/crabserver/%s', restHost, dbInstance)
+
+    return crabserver
 
 
 def uploadWarning(warning=None, taskname=None, crabserver=None, logger=None):
