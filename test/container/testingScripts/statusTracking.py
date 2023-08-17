@@ -60,11 +60,15 @@ def parse_result(listOfTasks, checkPublication=False):
             if ('finished', total_jobs) in task['jobsPerStatus'].items():
                 result = 'TestPassed'
                 if checkPublication:
-                    if finished_jobs == published_in_transfersdb and finished_jobs == published_in_dbs:
+                    # remove probe jobs (job id of X-Y kind) if any from count
+                    jobsToPublish = total_jobs
+                    for job in task['jobs'].keys():
+                        if '-' in job:
+                            jobsToPublish -= 1
+                    if published_in_transfersdb == jobsToPublish and published_in_dbs == jobsToPublish:
                         result = 'TestPassed'
                     elif failedPublications:
                         result = 'TestFailed'
-
                     else:
                         result = 'TestRunning'
             elif any(k in task['jobsPerStatus'] for k in ('failed', 'held')):
