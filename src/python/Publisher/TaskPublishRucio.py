@@ -615,8 +615,10 @@ def publishInDBS3(config, taskname, verbose, console):
                         file['parents'].remove(parentFile)
             return (localParentBlocks, globalParentBlocks, parentFiles)
 
-    def prepareDbsPublishingConfigs( ):
+    def prepareDbsPublishingConfigs(aBlock=None, aFile=None):
         # fills the dictionary with the various configs needed to publish one block
+        # needs a few parameters from the a sample block/file to be published in the
+        # input json file
 
         logger = log['logger']
         inputDataset = DBSConfigs['inputDataset']
@@ -872,10 +874,10 @@ def publishInDBS3(config, taskname, verbose, console):
     # pick a couple params which are common to all blocks and files in the data file
     aBlock = blocksToPublish[0]
     aBlockName = aBlock['name']
+    originSite = aBlock["origin_site"]
     dataset = aBlockName.split('#')[0]
     DBSConfigs['outputDataset'] = dataset
     aFile = aBlock['files'][0]
-    originSite = aFile["destination"]
     logger.info("Will publish user files in %s", dataset)
 
     # Find all blocks and files already published in this dataset.
@@ -918,7 +920,7 @@ def publishInDBS3(config, taskname, verbose, console):
 
     # OK got something to do !
     try:
-        prepareDbsPublishingConfigs()
+        prepareDbsPublishingConfigs(aBlock=aBlock, aFile=aFile)
     except Exception as ex:
         logger.exception('Error looking up input dataset info:\n%s', ex)
         nothingToDo['result'] = 'FAIL'

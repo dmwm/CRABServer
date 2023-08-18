@@ -33,10 +33,11 @@ from WMCore.Services.Requests import Requests
 
 from RESTInteractions import CRABRest
 from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping, executeCommand
-from ServerUtilities import SERVICE_INSTANCES
-from ServerUtilities import getProxiedWebDir
+#from ServerUtilities import SERVICE_INSTANCES
+#from ServerUtilities import getProxiedWebDir
 from ServerUtilities import getHashLfn
 from TaskWorker import __version__
+from TaskWorker.WorkerUtilities import getCrabserver
 from TaskWorker.WorkerExceptions import ConfigException
 
 
@@ -183,36 +184,37 @@ class Master(object):
         self.logger = setRootLogger(self.config.logsDir, quiet=quiet, debug=debug, console=self.TestMode)
         logVersionAndConfig(config, self.logger)
 
-        try:
-            instance = self.config.instance
-        except:
-            msg = "No instance provided: need to specify config.General.instance in the configuration"
-            raise ConfigException(msg)
+        #try:
+        #    instance = self.config.instance
+        #except:
+        #    msg = "No instance provided: need to specify config.General.instance in the configuration"
+        #    raise ConfigException(msg)
 
-        if instance in SERVICE_INSTANCES:
-            self.logger.info('Will connect to CRAB service: %s', instance)
-            restHost = SERVICE_INSTANCES[instance]['restHost']
-            dbInstance = SERVICE_INSTANCES[instance]['dbInstance']
-        else:
-            msg = "Invalid instance value '%s'" % instance
-            raise ConfigException(msg)
-        if instance == 'other':
-            self.logger.info('Will use restHost and dbInstance from config file')
-            try:
-                restHost = self.config.restHost
-                dbInstance = self.config.dbInstance
-            except:
-                msg = "Need to specify config.General.restHost and dbInstance in the configuration"
-                raise ConfigException(msg)
+        #if instance in SERVICE_INSTANCES:
+        #    self.logger.info('Will connect to CRAB service: %s', instance)
+        #    restHost = SERVICE_INSTANCES[instance]['restHost']
+        #    dbInstance = SERVICE_INSTANCES[instance]['dbInstance']
+        #else:
+        #    msg = "Invalid instance value '%s'" % instance
+        #    raise ConfigException(msg)
+        #if instance == 'other':
+        #    self.logger.info('Will use restHost and dbInstance from config file')
+        #    try:
+        #        restHost = self.config.restHost
+        #        dbInstance = self.config.dbInstance
+        #    except:
+        #        msg = "Need to specify config.General.restHost and dbInstance in the configuration"
+        #        raise ConfigException(msg)
 
-        self.logger.info('Will connect to CRAB Data Base %s instance via URL: https://%s', dbInstance, restHost)
+        #self.logger.info('Will connect to CRAB Data Base %s instance via URL: https://%s', dbInstance, restHost)
 
         # CRAB REST API's
-        self.max_files_per_block = self.config.max_files_per_block
-        self.crabServer = CRABRest(hostname=restHost, localcert=self.config.serviceCert,
-                                   localkey=self.config.serviceKey, retry=3,
-                                   userAgent='CRABPublisher')
-        self.crabServer.setDbInstance(dbInstance=dbInstance)
+
+        self.crabServer = getCrabserver(restConfig=config.REST, agentName='CRABPublisher', logger=self.logger)
+        #self.crabServer = CRABRest(hostname=restHost, localcert=self.config.serviceCert,
+        #                           localkey=self.config.serviceKey, retry=3,
+        #                           userAgent='CRABPublisher')
+        #self.crabServer.setDbInstance(dbInstance=dbInstance)
         self.startTime = time.time()
 
         # tasks which are too loarge for us to deal with are
@@ -244,6 +246,7 @@ class Master(object):
             fileDoc['subresource'] = 'acquirePublication'
             data = encodeRequest(fileDoc)
             try:
+                # select files with transfer DONE and publication NEW and set publication to ACQUIRED
                 result = crabServer.post(api='filetransfers', data=data)  # pylint: disable=unused-variable
             except Exception as ex:
                 self.logger.error("Failed to acquire publications from crabserver: %s", ex)
@@ -257,7 +260,6 @@ class Master(object):
             fileDoc['limit'] = 100000
             data = encodeRequest(fileDoc)
             try:
-                # select files with transfer DONE and publication NEW and set publication to ACQUIRED
                 results = crabServer.get(api='filetransfers', data=data)
             except Exception as ex:
                 self.logger.error("Failed to acquire publications from crabserver: %s", ex)
@@ -581,7 +583,7 @@ class Master(object):
                 logger.info('marked %d files as Failed', nMarked)
 
             # call taskPublishRucio
-            #self.runTaskPublish(workflow, logger)
+            self.runTaskPublish(workflow, logger)
 
         except Exception as ex:
             logger.exception("Exception when calling TaskPublish!\n%s", str(ex))
