@@ -18,7 +18,7 @@ The folder contains code for pulling the data today from HDFS and upload to dash
 ### Tools
 **run_spark.sh** - Shell script for `source` environment and run `spark-submit` for `$1` file, where `$1` in the script supposes to be a data pulling file (.py) \
 **cron_daily.sh** - Shell script for running **run_spark.sh** in the docker container, for all four data pulling files. Note that the file directory here must be directory in the container, not the host. \
-**osearch.py** and **secret_opensearch.txt** - Tools for send data to Opensearch Dashboards, just have it in the same folder of data pulling files (.py)
+**osearch.py** and **secret_opensearch.txt** - Tools for send data to Opensearch Dashboards, just have it in the same folder of data pulling notebook (.ipynb)
 
 ## Dashboard 
 Grafana: https://monit-grafana.cern.ch/goto/STBZ3uCVz?orgId=11 \
