@@ -16,12 +16,8 @@ import logging
 from logging import FileHandler
 from logging.handlers import TimedRotatingFileHandler
 import os
-import traceback
 import sys
 import json
-import pickle
-import tempfile
-from datetime import datetime
 import time
 
 from pathlib import Path
@@ -29,17 +25,11 @@ from multiprocessing import Process
 from MultiProcessingLog import MultiProcessingLog
 
 from WMCore.Configuration import loadConfigurationFile
-from WMCore.Services.Requests import Requests
 
-from RESTInteractions import CRABRest
-from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping, executeCommand
-#from ServerUtilities import SERVICE_INSTANCES
-#from ServerUtilities import getProxiedWebDir
+from ServerUtilities import encodeRequest, oracleOutputMapping, executeCommand
 from ServerUtilities import getHashLfn
 from TaskWorker import __version__
 from TaskWorker.WorkerUtilities import getCrabserver
-from TaskWorker.WorkerExceptions import ConfigException
-
 
 def chunks(l, n):
     """
@@ -327,7 +317,7 @@ class Master(object):
             logger.info('TaskPublishScript done : %s', stdout)
 
         jsonSummary = stdout.split()[-1]
-        with open(jsonSummary, 'r') as fd:
+        with open(jsonSummary, 'r', encoding='utf8') as fd:
             summary = json.load(fd)
         result = summary['result']
         reason = summary['reason']
@@ -514,7 +504,6 @@ class Master(object):
                 filesInfo = []
                 for fileInTDB in FilesInfoFromTBDInBlock[blockName]:
                     # this is the same for the wholw block, actually for the whole task
-                    origin_site = fileInTDB['destination']
                     fileDict={'source_lfn': fileInTDB['source_lfn']}
                     metadataFound = False
                     for fmd in filesInfoFromFMD:
@@ -541,7 +530,7 @@ class Master(object):
                 blockDictsToPublish.append(blockDict)
 
             # save
-            with open(self.taskFilesDir + workflow + '.json', 'w') as outfile:
+            with open(self.taskFilesDir + workflow + '.json', 'w', encoding='utf8') as outfile:
                 json.dump(blockDictsToPublish, outfile)
 
             logger.debug('Unitarity check: active_:%d toPublish:%d toFail:%d', len(lfnsToPublish), len(toPublish),
@@ -575,7 +564,7 @@ class Master(object):
             data['list_of_retry_value'] = 1
             data['list_of_failure_reason'] = reason
             try:
-                result = self.crabServer.post(api='filetransfers', data=encodeRequest(data))
+                self.crabServer.post(api='filetransfers', data=encodeRequest(data))
                 # if nMarked % 10 == 0:
                 # logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
             except Exception as ex:

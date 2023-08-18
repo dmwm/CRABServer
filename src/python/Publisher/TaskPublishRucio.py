@@ -613,7 +613,7 @@ def publishInDBS3(config, taskname, verbose, console):
                     logger.info(msg)
                     if parentFile in file['parents']:
                         file['parents'].remove(parentFile)
-            return (localParentBlocks, globalParentBlocks, parentFiles)
+            return (localParentBlocks, globalParentBlocks)
 
     def prepareDbsPublishingConfigs(aBlock=None, aFile=None):
         # fills the dictionary with the various configs needed to publish one block
@@ -716,7 +716,7 @@ def publishInDBS3(config, taskname, verbose, console):
             logger.info(msg)
             return {'status': 'FAIL', 'reason': msg, 'dumpFile': None}
 
-        (localParentBlocks, globalParentBlocks, parentFiles) = findParents(dictsOfFilesToBePublished)
+        (localParentBlocks, globalParentBlocks) = findParents(dictsOfFilesToBePublished)
 
         # Print a message with the number of files to publish.
         msg = f"Found {len(dbsFiles)} files not already present in DBS which will be published."
