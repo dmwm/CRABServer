@@ -39,7 +39,7 @@ This dashboard is created to answer the following question: \
 ## Running Daily
 To upload all of the data daily, just setup crontab to run **cron_daily.sh** script everyday, for example: 
 ```
-34 05 * * * /home/crab3/workdir/crab-dp3/crab_cronjob/cron_daily.sh &> /home/crab3/workdir/crab-dp3/crab_cronjob/cron_daily.log
+37 05 * * * bash /home/crab3/workdir/CRABServer/src/script/Monitor/crab-spark/cronjobs/cron_daily.sh 2>&1 /var/log/crab/cron_daily_spark.log
 ```
 
 ## Debugging and recalculation
