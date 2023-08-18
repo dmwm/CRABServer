@@ -329,9 +329,11 @@ class Master(object):
             else:
                 msg = 'Taskname %s is OK. Published %d files in %d blocks.' % \
                       (taskname, summary['publishedFiles'], summary['publishedBlocks'])
-                if summary['nextIterFiles']:
-                    msg += ' %d files left for next iteration.' % summary['nextIterFiles']
-                logger.info(msg)
+                # TODO TaskPublisherRucio works on completed blocks, files left for next
+                # iterations must be counted here in PublisherMasterRucio
+                #if summary['nextIterFiles']:
+                #    msg += ' %d files left for next iteration.' % summary['nextIterFiles']
+                #logger.info(msg)
         if result == 'FAIL':
             logger.error('Taskname %s : TaskPublish failed with: %s', taskname, reason)
             if reason == 'DBS Publication Failure':
