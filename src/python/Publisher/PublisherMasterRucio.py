@@ -184,40 +184,12 @@ class Master(object):
         self.logger = setRootLogger(self.config.logsDir, quiet=quiet, debug=debug, console=self.TestMode)
         logVersionAndConfig(config, self.logger)
 
-        #try:
-        #    instance = self.config.instance
-        #except:
-        #    msg = "No instance provided: need to specify config.General.instance in the configuration"
-        #    raise ConfigException(msg)
-
-        #if instance in SERVICE_INSTANCES:
-        #    self.logger.info('Will connect to CRAB service: %s', instance)
-        #    restHost = SERVICE_INSTANCES[instance]['restHost']
-        #    dbInstance = SERVICE_INSTANCES[instance]['dbInstance']
-        #else:
-        #    msg = "Invalid instance value '%s'" % instance
-        #    raise ConfigException(msg)
-        #if instance == 'other':
-        #    self.logger.info('Will use restHost and dbInstance from config file')
-        #    try:
-        #        restHost = self.config.restHost
-        #        dbInstance = self.config.dbInstance
-        #    except:
-        #        msg = "Need to specify config.General.restHost and dbInstance in the configuration"
-        #        raise ConfigException(msg)
-
-        #self.logger.info('Will connect to CRAB Data Base %s instance via URL: https://%s', dbInstance, restHost)
-
-        # CRAB REST API's
-
+        # CRAB REST API
         self.crabServer = getCrabserver(restConfig=config.REST, agentName='CRABPublisher', logger=self.logger)
-        #self.crabServer = CRABRest(hostname=restHost, localcert=self.config.serviceCert,
-        #                           localkey=self.config.serviceKey, retry=3,
-        #                           userAgent='CRABPublisher')
-        #self.crabServer.setDbInstance(dbInstance=dbInstance)
+
         self.startTime = time.time()
 
-        # tasks which are too loarge for us to deal with are
+        # tasks which are too loarge for us to deal with
         self.taskBlackList = []
 
     def active_tasks(self, crabServer):
@@ -611,149 +583,6 @@ class Master(object):
                 self.logger.error("Error reason: %s", ex)
             nMarked += 1
         return nMarked
-
-
-        """
-        try:
-            if self.force_publication:
-                # - get info
-                # SB Oh MY !!! this stuff stinks, smells of CoucheDB leftover, a plain dictionawry will do
-                active_ = [{'key': [x['username'],
-                                    x['taskname']],
-                            'value': [x['destination'],
-                                      x['source_lfn'],
-                                      x['destination_lfn'],
-                                      x['input_dataset'],
-                                      x['dbs_url'],
-                                      x['last_update'],
-                                      x['dbs_blockname'],
-                                      x['block_complete']
-                                     ]}
-                           for x in task[1] if x['transfer_state'] == 3 and x['publication_state'] not in [2, 3, 5]]
-
-                lfn_ready = []
-                wf_jobs_endtime = []
-                pnn, input_dataset, input_dbs_url = "", "", ""
-                for active_file in active_:
-                    job_end_time = active_file['value'][5]
-                    if job_end_time:
-                        wf_jobs_endtime.append(int(job_end_time) - time.timezone)
-                    source_lfn = active_file['value'][1]
-                    dest_lfn = active_file['value'][2]
-                    self.lfn_map[dest_lfn] = source_lfn
-                    if not pnn or not input_dataset or not input_dbs_url:
-                        pnn = str(active_file['value'][0])
-                        input_dataset = str(active_file['value'][3])
-                        input_dbs_url = str(active_file['value'][4])
-                    lfn_ready.append(dest_lfn)
-
-                username = task[0][0]
-
-                # Get metadata
-                toPublish = []
-                toFail = []
-                if workflow in self.taskBlackList:
-                    logger.debug('++++++++ TASK %s IN BLACKLIST,SKIP FILEMETADATA RETRIEVE AND MARK FILES AS FAILED',
-                                 workflow)
-                else:
-                    filesInfoFromFMD = self.getInfoFromFMD(workflow, lfn_ready, logger)
-                for file_ in active_:
-                    if workflow in self.taskBlackList:
-                        toFail.append(file_["value"][1])  # mark all files as failed to avoid to look at them again
-                        continue
-                    metadataFound = False
-                    for doc in filesInfoFromFMD:
-                        # TODO SB OH MY.. another horrible CouchDB style thing !
-                        # logger.info(type(doc))
-                        # logger.info(doc)
-                        if doc["lfn"] == file_["value"][2]:
-                            doc["User"] = username
-                            doc["UserDN"] = self.myDN
-                            doc["Destination"] = file_["value"][0]
-                            doc["SourceLFN"] = file_["value"][1]
-                            doc["Block"] = file_["value"][6]
-                            doc["BlockComplete"] = file["value"][7]
-                            toPublish.append(doc)
-                            metadataFound = True
-                            break
-                    # if we failed to find metadata mark publication as failed to avoid to keep looking
-                    # at same files over and over
-                    if not metadataFound:
-                        toFail.append(file_["value"][1])
-                with open(self.taskFilesDir + workflow + '.json', 'w') as outfile:
-                    json.dump(toPublish, outfile)
-                logger.debug('Unitarity check: active_:%d toPublish:%d toFail:%d', len(active_), len(toPublish), len(toFail))
-                if len(toPublish) + len(toFail) != len(active_):
-                    logger.error("SOMETHING WRONG IN toPublish vs toFail !!")
-                if toFail:
-                    logger.info('Did not find useful metadata for %d files. Mark as failed', len(toFail))
-                    from ServerUtilities import getHashLfn
-                    nMarked = 0
-                    for lfn in toFail:
-                        source_lfn = lfn
-                        docId = getHashLfn(source_lfn)
-                        data = dict()
-                        data['asoworker'] = self.config.asoworker
-                        data['subresource'] = 'updatePublication'
-                        data['list_of_ids'] = docId
-                        data['list_of_publication_state'] = 'FAILED'
-                        data['list_of_retry_value'] = 1
-                        data['list_of_failure_reason'] = 'File type not EDM or metadata not found'
-                        try:
-                            result = self.crabServer.post(api='filetransfers', data=encodeRequest(data))
-                            #logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
-                        except Exception as ex:
-                            logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
-                            logger.error("Error reason: %s", ex)
-
-                        nMarked += 1
-                        #if nMarked % 10 == 0:
-                    logger.info('marked %d files as Failed', nMarked)
-
-                # find the location in the current environment of the script we want to run
-                import Publisher.TaskPublish as tp
-                taskPublishScript = tp.__file__
-                cmd = "python3 %s " % taskPublishScript
-                cmd += " --configFile=%s" % self.configurationFile
-                cmd += " --taskname=%s" % workflow
-                if self.TPconfig.dryRun:
-                    cmd += " --dry"
-                logger.info("Now execute: %s", cmd)
-                stdout, stderr, exitcode = executeCommand(cmd)
-                if exitcode != 0:
-                    errorMsg = 'Failed to execute command: %s.\n StdErr: %s.' % (cmd, stderr)
-                    raise Exception(errorMsg)
-                else:
-                    logger.info('TaskPublishScript done : %s', stdout)
-
-                jsonSummary = stdout.split()[-1]
-                with open(jsonSummary, 'r') as fd:
-                    summary = json.load(fd)
-                result = summary['result']
-                reason = summary['reason']
-
-                taskname = summary['taskname']
-                if result == 'OK':
-                    if reason == 'NOTHING TO DO':
-                        logger.info('Taskname %s is OK. Nothing to do', taskname)
-                    else:
-                        msg = 'Taskname %s is OK. Published %d files in %d blocks.' % \
-                              (taskname, summary['publishedFiles'], summary['publishedBlocks'])
-                        if summary['nextIterFiles']:
-                            msg += ' %d files left for next iteration.' % summary['nextIterFiles']
-                        logger.info(msg)
-                if result == 'FAIL':
-                    logger.error('Taskname %s : TaskPublish failed with: %s', taskname, reason)
-                    if reason == 'DBS Publication Failure':
-                        logger.error('Taskname %s : %d blocks failed for a total of %d files',
-                                     taskname, summary['failedBlocks'], summary['failedFiles'])
-                        logger.error('Taskname %s : Failed block(s) details have been saved in %s',
-                                     taskname, summary['failedBlockDumps'])
-        except Exception as ex:
-            logger.exception("Exception when calling TaskPublish!\n%s", str(ex))
-
-        return 0
-        """
 
     def pollInterval(self):
         """
