@@ -114,7 +114,8 @@ condor_df = (
             AND RecordTime < {end_date.timestamp() * 1000}
             """
         )
-        .drop_duplicates(["GlobalJobId"]).cache()
+        .drop_duplicates(["GlobalJobId"])
+#	.cache()
     )
 
 # Convert file type by saving and recall it again (.json too complex for spark)
