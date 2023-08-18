@@ -68,9 +68,9 @@ case $MODE in
     COMMAND_DIR=${PUBLISHER_ROOT}/lib/python3.8/site-packages/Publisher/
     CONFIG=${PUBLISHER_HOME}/PublisherConfig.py
     if [ "$debug" = true ]; then
-      python3 ${COMMAND_DIR}/SequentialPublisher.py --config ${CONFIG} --debug
+      python3 ${COMMAND_DIR}/RunPublisher.py --config ${CONFIG} --service ${SERVICE} --debug --testMode
     else
-      nohup python3 ${COMMAND_DIR}/PublisherMaster.py --config $PUBLISHER_HOME/PublisherConfig.py &
+      nohup python3 ${COMMAND_DIR}/RunPublisher.py --config ${CONFIG} --service ${SERVICE} &
     fi
   ;;
   private)
@@ -80,8 +80,8 @@ case $MODE in
     COMMAND_DIR=${GHrepoDir}/CRABServer/src/python/Publisher/
     CONFIG=$PUBLISHER_HOME/PublisherConfig.py
     if [ "$debug" = true ]; then
-      python3 ${COMMAND_DIR}/SequentialPublisher.py --config  ${CONFIG} --debug
+      python3 ${COMMAND_DIR}/RunPublisher.py --config ${CONFIG} --service ${SERVICE} --debug --testMode
     else
-      nohup python3 ${COMMAND_DIR}/PublisherMaster.py --config ${CONFIG} &
+      nohup python3 ${COMMAND_DIR}/RunPublisher.py --config ${CONFIG} --service ${SERVICE} &
     fi
 esac
