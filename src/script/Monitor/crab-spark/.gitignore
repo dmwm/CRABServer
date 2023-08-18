@@ -1,0 +1,5 @@
+# secrets
+workdir/secret_opensearch.txt
+
+# temp files
+workdir/__pycache__/
