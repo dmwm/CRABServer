@@ -205,8 +205,6 @@ class DBSDataDiscovery(DataDiscovery):
                     response = self.rucioClient.list_dataset_replicas(scope=scope, name=blockName, deep=True)
                     sizeBytes = 0
                     for item in response:
-                        if 'T2_UA_KIPT' in item['rse']:
-                            continue  # skip Ucrainan T2 until further notice
                         # same as complete='y' used for PhEDEx
                         if item['state'].upper() == 'AVAILABLE':
                             fullReplicas.add(item['rse'])

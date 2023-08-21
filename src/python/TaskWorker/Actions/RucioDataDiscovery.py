@@ -90,8 +90,6 @@ class RucioDataDiscovery(DataDiscovery):
                 replicas = set()
                 response = self.rucioClient.list_dataset_replicas(scope=rucioScope, name=blockName, deep=True)
                 for item in response:
-                    if 'T2_UA_KIPT' in item['rse']:
-                        continue  # skip Ucrainan T2 until further notice
                     if 'Tape' in item['rse']:
                         continue  # skip tape locations
                     if 'T3_CH_CERN_OpenData' in item['rse']:
