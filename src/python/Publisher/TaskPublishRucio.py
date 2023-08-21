@@ -5,22 +5,20 @@ be executed from CLI (in the Publisher environment) to retry or debug failures
 """
 import os
 import time
-import logging
 import json
 import traceback
 import argparse
 import pprint
 
-from dbs.apis.dbsClient import DbsApi
-
 from WMCore.Configuration import loadConfigurationFile
 
-from ServerUtilities import encodeRequest
 from TaskWorker.WorkerExceptions import CannotMigrateException
 from TaskWorker.WorkerUtilities import getCrabserver
 
-from PublisherUtils import format_file_3, createBulkBlock, migrateByBlockDBS3, \
-    createLogdir, prepareDummySummary, saveSummaryJson, mark_good, mark_failed
+from PublisherUtils import setupLogging, prepareDummySummary, saveSummaryJson, \
+                            mark_good, mark_failed, getDBSInputInformation
+
+from PublisherDbsUtils import format_file_3, setupDbsAPIs, createBulkBlock, migrateByBlockDBS3
 
 
 def publishInDBS3(config, taskname, verbose, console):
@@ -38,89 +36,6 @@ def publishInDBS3(config, taskname, verbose, console):
                   'processing_era_config': None, 'acquisition_era_config': None}
     nothingToDo = {}  # a pre-filled SummaryFile in case of no useful input or errors
 
-    def setupLogging(config, taskname, console):
-        # prepare log and work directories
-        taskFilesDir = config.General.taskFilesDir
-        username = taskname.split(':')[1].split('_')[0]
-        logdir = os.path.join(config.General.logsDir, 'tasks', username)
-        logfile = os.path.join(logdir, taskname + '.log')
-        createLogdir(logdir)
-        migrationLogDir = os.path.join(config.General.logsDir, 'migrations')
-        createLogdir(migrationLogDir)
-        # create logger
-        if console:
-            logger = logging.getLogger()
-            logger.addHandler(logging.StreamHandler())
-            logger.setLevel(logging.INFO)
-        else:
-            logger = logging.getLogger(taskname)
-            logging.basicConfig(filename=logfile, level=logging.INFO, format=config.TaskPublisher.logMsgFormat)
-        if verbose:
-            logger.setLevel(logging.DEBUG)
-        # pass info around
-        log['logger'] = logger
-        log['logdir'] = logdir
-        log['migrationLogDir'] = migrationLogDir
-        log['taskFilesDir'] = taskFilesDir
-
-    def getDBSInputInformation(taskname=None, crabServer=None):
-        # LOOK UP Input dataset for this task to know which DBS istance it was in
-        data = {'subresource': 'search',
-                'workflow': taskname}
-        results = crabServer.get(api='task', data=encodeRequest(data))
-        # TODO THERE are better ways to parse rest output into a dict !!
-        inputDatasetIndex = results[0]['desc']['columns'].index("tm_input_dataset")
-        inputDataset = results[0]['result'][inputDatasetIndex]
-        sourceURLIndex = results[0]['desc']['columns'].index("tm_dbs_url")
-        sourceURL = results[0]['result'][sourceURLIndex]
-        publishURLIndex = results[0]['desc']['columns'].index("tm_publish_dbs_url")
-        publishURL = results[0]['result'][publishURLIndex]
-        if not sourceURL.endswith("/DBSReader") and not sourceURL.endswith("/DBSReader/"):
-            sourceURL += "/DBSReader"
-        return (inputDataset, sourceURL, publishURL)
-
-    def setupDbsAPIs(sourceURL, publishURL):
-        # When looking up parents may need to look in global DBS as well.
-        logger = log['logger']
-
-        globalURL = sourceURL
-        globalURL = globalURL.replace('phys01', 'global')
-        globalURL = globalURL.replace('phys02', 'global')
-        globalURL = globalURL.replace('phys03', 'global')
-        globalURL = globalURL.replace('caf', 'global')
-
-        # allow to use a DBS REST host different from cmsweb.cern.ch (which is the
-        # default inserted by CRAB Client)
-        sourceURL = sourceURL.replace('cmsweb.cern.ch', config.TaskPublisher.DBShost)
-        globalURL = globalURL.replace('cmsweb.cern.ch', config.TaskPublisher.DBShost)
-        publishURL = publishURL.replace('cmsweb.cern.ch', config.TaskPublisher.DBShost)
-
-        # create DBS API objects
-        logger.info("DBS Source API URL: %s", sourceURL)
-        sourceApi = DbsApi(url=sourceURL, debug=False)
-        logger.info("DBS Global API URL: %s", globalURL)
-        globalApi = DbsApi(url=globalURL, debug=False)
-
-        if publishURL.endswith('/DBSWriter'):
-            publish_read_url = publishURL[:-len('/DBSWriter')] + '/DBSReader'
-            publish_migrate_url = publishURL[:-len('/DBSWriter')] + '/DBSMigrate'
-        else:
-            publish_migrate_url = publishURL + '/DBSMigrate'
-            publish_read_url = publishURL + '/DBSReader'
-            publishURL += '/DBSWriter'
-        logger.info("DBS Destination API URL: %s", publishURL)
-        destApi = DbsApi(url=publishURL, debug=False)
-        logger.info("DBS Destination read API URL: %s", publish_read_url)
-        destReadApi = DbsApi(url=publish_read_url, debug=False)
-        logger.info("DBS Migration API URL: %s", publish_migrate_url)
-        migrateApi = DbsApi(url=publish_migrate_url, debug=False)
-        DBSApis['source'] = sourceApi
-        DBSApis['destRead'] = destReadApi
-        DBSApis['destWrite'] = destApi
-        DBSApis['global'] = globalApi
-        DBSApis['migrate'] = migrateApi
-
-        return DBSApis
 
     def findParentBlocks(listOfFileDicts):
         #sourceApi, globalApi, destApi, destReadApi, migrateApi = DBSApis
@@ -310,9 +225,10 @@ def publishInDBS3(config, taskname, verbose, console):
             else:
                 try:
                     statusCode, failureMsg = migrateByBlockDBS3(
-                        taskname, DBSConfigs['inputDataset'],
+                        taskname,
                         DBSApis['migrate'], DBSApis['destRead'], DBSApis['source'],
-                        localParentBlocks, log['migrationLogDir'], verbose)
+                        localParentBlocks,
+                        log['migrationLogDir'], logger=logger, verbose=verbose)
                 except CannotMigrateException as ex:
                     # there is nothing we can do in this case
                     failureMsg = 'Cannot migrate. ' + str(ex)
@@ -335,9 +251,9 @@ def publishInDBS3(config, taskname, verbose, console):
             else:
                 try:
                     statusCode, failureMsg = migrateByBlockDBS3(
-                        taskname, DBSConfigs['inputDataset'],
+                        taskname,
                         DBSApis['migrate'], DBSApis['destRead'], DBSApis['global'],
-                        globalParentBlocks, verbose)
+                        globalParentBlocks, logger=logger, verbose=verbose)
                 except Exception as ex:
                     logger.exception('Exception raised inside migrateByBlockDBS3\n%s', ex)
                     statusCode = 1
@@ -366,10 +282,13 @@ def publishInDBS3(config, taskname, verbose, console):
             blockSize = f"{blockSizeKBytes // 1024}MB"
         else:
             blockSize = f"{blockSizeKBytes}KB"
+        # make sure these are initialized also in case we run with dryRun
+        didPublish = 'OK'
+        failureReason = ''
+        failedBlockDumpFile = None
         if dryRun:
             logger.info("DryRun: skip insertBulkBlock")
         else:
-            didPublish = 'FAIL'  # make sure this is initialized
             try:
                 DBSApis['destWrite'].insertBulkBlock(blockDump)
                 didPublish = 'OK'
@@ -377,7 +296,7 @@ def publishInDBS3(config, taskname, verbose, console):
                 failureReason = None
             except Exception as ex:
                 didPublish = 'FAIL'
-                msg = f"Error when publishing {blockDict['name']}"
+                msg = f"Error when publishing {blockDict['blockname']}"
                 logger.error(msg)
                 failedBlockDumpFile = os.path.join(
                     log['taskFilesDir'], 'FailedBlocks', f"failed-block-at-{time.time()}.txt")
@@ -404,7 +323,8 @@ def publishInDBS3(config, taskname, verbose, console):
     os.environ['X509_USER_CERT'] = config.TaskPublisher.cert
     os.environ['X509_USER_KEY'] = config.TaskPublisher.key
 
-    setupLogging(config, taskname, console)
+    log = setupLogging(config, taskname, verbose, console)
+
     logger = log['logger']
 
     dryRun = config.TaskPublisher.dryRun
@@ -441,7 +361,8 @@ def publishInDBS3(config, taskname, verbose, console):
 
     # prepare DBS API's
     try:
-        setupDbsAPIs(sourceURL, publishURL)
+        DBSApis = setupDbsAPIs(sourceURL=sourceURL, publishURL=publishURL,
+                               DBSHost=config.TaskPublisher.DBShost, logger=logger)
     except Exception as ex:
         logger.exception('Error creating DBS APIs, likely wrong DBS URL %s\n%s', publishURL, ex)
         nothingToDo['result'] = 'FAIL'
@@ -542,10 +463,10 @@ def publishInDBS3(config, taskname, verbose, console):
                 mark_failed(files=lfnsInBlock, crabServer=crabServer, asoworker=config.General.asoworker, logger=log['logger'])
             listOfFailedLFNs.extend(lfnsInBlock)
             if result['reason'] == 'failedToInsertInDBS':
-                log['logger'].err("Failed to insert block in DBS. Block Dump saved")
+                log['logger'].error("Failed to insert block in DBS. Block Dump saved")
                 dumpList.append(result['dumpFile'])
             else:
-                log['logger'].err("Could not publish block because %s", result['reason'])
+                log['logger'].error("Could not publish block because %s", result['reason'])
 
     # Print a publication status summary for this dataset.
     msg = "End of publication status:"
