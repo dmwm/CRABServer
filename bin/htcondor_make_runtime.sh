@@ -56,7 +56,7 @@ if [[ "x$RPM_RELEASE" != "x" ]]; then
     popd
 
     pushd $ORIGDIR/build/lib
-    zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface  TransferInterface -x \*.pyc || exit 3
+    zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface  TransferInterface ASO -x \*.pyc || exit 3
     popd
 
     mkdir -p bin
@@ -93,7 +93,7 @@ else
     popd
 
     pushd $CRABSERVER_PATH/src/python
-    zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface TransferInterface -x \*.pyc || exit 3
+    zip -rq $STARTDIR/CRAB3.zip RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface TransferInterface ASO -x \*.pyc || exit 3
     popd
 
     mkdir -p bin
