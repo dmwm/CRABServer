@@ -1,13 +1,16 @@
+"""
+Transfer object to share information between action classes.
+"""
 import logging
 import json
 import os
 import hashlib
 
+import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
 from ASO.Rucio.exception import RucioTransferException
 from ASO.Rucio.utils import writePath
-import ASO.Rucio.config as config
 
-class Transfer:
+class Transfer: # pylint: disable=too-many-instance-attributes
     """
     Use Transfer object to store state of process in memory.
     It responsible for read info from file and set its attribute.
@@ -21,6 +24,8 @@ class Transfer:
         self.restDBInstance = ''
         self.restProxyFile = ''
 
+        # content of transfers.txt
+        self.transferItems = []
 
         # from transfer info
         self.username = ''
@@ -68,13 +73,12 @@ class Transfer:
         :param rucioClient: Rucio client
         :type rucioClient: rucio.client.client.Client
         """
-        pass
 
     def readLastTransferLine(self):
         """
         Reading lastTransferLine from task_process/transfers/last_transfer.txt
         """
-        if config.args.force_last_line != None: #  Need explicitly compare to None
+        if not config.args.force_last_line is None: # Need explicitly compare to None
             self.lastTransferLine = config.args.force_last_line
             return
         path = config.args.last_line_path
@@ -102,7 +106,6 @@ class Transfer:
         Reading transferItems (whole files) from task_process/transfers.txt
         """
         path = config.args.transfers_txt_path
-        self.transferItems = []
         try:
             with open(path, 'r', encoding='utf-8') as r:
                 for line in r:

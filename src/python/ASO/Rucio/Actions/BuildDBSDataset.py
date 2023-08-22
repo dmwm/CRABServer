@@ -1,3 +1,6 @@
+"""
+Create Rucio's container and dataset.
+"""
 import logging
 import uuid
 
@@ -7,7 +10,7 @@ from ASO.Rucio.exception import RucioTransferException
 
 class BuildDBSDataset():
     """
-    Create Rucio's container and dataset.
+    Class to create Rucio's container and dataset.
 
     :param transfer: Transfer Object to get infomation.
     :type object: class:`ASO.Rucio.Transfer`
@@ -104,7 +107,7 @@ class BuildDBSDataset():
             metadata = []
             for ds in datasets:
                 metadata.append(self.rucioClient.get_metadata(self.transfer.rucioScope, ds["name"]))
-        openDatasets = [md['name'] for md in metadata if md['is_open'] == True]
+        openDatasets = [md['name'] for md in metadata if md['is_open']]
         self.logger.debug(f"open datasets: {datasets}")
         if len(openDatasets) == 0:
             self.logger.info("No dataset available yet, creating one")

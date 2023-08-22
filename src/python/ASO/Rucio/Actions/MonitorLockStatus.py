@@ -1,8 +1,11 @@
+"""
+Monitoring replicas' transfer status and adding them to publish the container.
+"""
 import logging
 import copy
 import datetime
 
-import ASO.Rucio.config as config
+import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
 from ASO.Rucio.utils import uploadToTransfersdb
 from ASO.Rucio.Actions.RegisterReplicas import RegisterReplicas
 

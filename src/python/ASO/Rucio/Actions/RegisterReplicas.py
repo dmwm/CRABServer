@@ -1,11 +1,14 @@
+"""
+Registering files to Rucio.
+"""
+
 import logging
 import itertools
 import copy
-from ASO.Rucio.Actions.BuildDBSDataset import BuildDBSDataset
 from rucio.rse.rsemanager import find_matching_scheme
-from rucio.common.exception import FileAlreadyExists
 
-import ASO.Rucio.config as config
+import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
+from ASO.Rucio.Actions.BuildDBSDataset import BuildDBSDataset
 from ASO.Rucio.exception import RucioTransferException
 from ASO.Rucio.utils import chunks, uploadToTransfersdb, tfcLFN2PFN, LFNToPFNFromPFN
 
@@ -73,7 +76,7 @@ class RegisterReplicas:
         num = len(logFileDocs)
         restFileDoc = {
             'asoworker': 'rucio',
-            'list_of_ids': [x for x in logFileDocs],
+            'list_of_ids': logFileDocs,
             'list_of_transfer_state': ['DONE']*num,
             'list_of_dbs_blockname': None,
             'list_of_block_complete': None,
@@ -111,7 +114,7 @@ class RegisterReplicas:
             if not rse in bucket:
                 bucket[rse] = []
             bucket[rse].append(xdict)
-        for rse in bucket:
+        for rse, _ in bucket.items():
             xdict = bucket[rse][0]
             # We determine PFN of Temp RSE from normal RSE.
             # Simply remove temp suffix before passing to getSourcePFN function.
