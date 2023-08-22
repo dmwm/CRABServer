@@ -28,9 +28,9 @@ def main():
     opt.add_argument("--force-total-files", dest="force_total_files", default=None, type=int,
                      help="")
     # default here must change because theses current value is too low (chunk=2/max=5)
-    opt.add_argument("--replicas-chunk-size", dest="replicas_chunk_size", default=2, type=int,
+    opt.add_argument("--replicas-chunk-size", dest="replicas_chunk_size", default=5, type=int,
                      help="")
-    opt.add_argument("--max-file-per-dataset", dest="max_file_per_dataset", default=5, type=int,
+    opt.add_argument("--max-file-per-dataset", dest="max_file_per_dataset", default=20, type=int,
                      help="")
     opt.add_argument("--last-line-path", dest="last_line_path",
                      default='task_process/transfers/last_transfer.txt',
@@ -56,7 +56,7 @@ def main():
     opt.add_argument("--ignore-bookkeeping-block-complete", dest="ignore_bookkeeping_block_complete",
                      action='store_true',
                      help="")
-    opt.add_argument("--open-dataset-timeout", dest="open_dataset_timeout", default=2*60*60, type=int, # 6 hours
+    opt.add_argument("--open-dataset-timeout", dest="open_dataset_timeout", default=1*60*60, type=int, # 1 hours
                      help="Open dataset timeout in seconds")
     opts = opt.parse_args()
 
