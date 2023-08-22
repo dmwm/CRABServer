@@ -329,9 +329,11 @@ class Master(object):
             else:
                 msg = 'Taskname %s is OK. Published %d files in %d blocks.' % \
                       (taskname, summary['publishedFiles'], summary['publishedBlocks'])
-                if summary['nextIterFiles']:
-                    msg += ' %d files left for next iteration.' % summary['nextIterFiles']
-                logger.info(msg)
+                # TODO TaskPublisherRucio works on completed blocks, files left for next
+                # iterations must be counted here in PublisherMasterRucio
+                #if summary['nextIterFiles']:
+                #    msg += ' %d files left for next iteration.' % summary['nextIterFiles']
+                #logger.info(msg)
         if result == 'FAIL':
             logger.error('Taskname %s : TaskPublish failed with: %s', taskname, reason)
             if reason == 'DBS Publication Failure':
@@ -475,7 +477,7 @@ class Master(object):
             # TODO this shoudl be a function
             # prepare json to save, will be a list of blocks, one dictionary per block
             #
-            # {'name':blockname,
+            # {'block_name':blockname,
             #    then a few parmeters common to the whole block (to the task! actuallY)
             #  'username', 'acquisitionera', 'swversion', globaltag', 'origin_site'
             # and finally a list of dictionariesx, one per file
@@ -498,7 +500,7 @@ class Master(object):
             toFail = []
 
             for blockName in blocksToPublish:
-                blockDict = {'name': blockName}
+                blockDict = {'block_name': blockName}
                 blockDict['username'] = task['username']
                 blockDict['origin_site'] = task['destination']
                 filesInfo = []
