@@ -176,7 +176,7 @@ def publishInDBS3(config, taskname, verbose, console):
     def publishOneBlockInDBS(blockDict):
         """
         get one complete block info and publish it
-        blockDict is a dictionary  {'blockname':name, 'files':[{},..,{}]}
+        blockDict is a dictionary  {'block_name':name, 'files':[{},..,{}]}
         files is a list of dictionaries, one per file with keys:
         filetype, jobid, outdataset, inevents, publishname, lfn, runlumi,
         adler32, cksum, filesize, parents, state, created, destination, source_lfn
@@ -263,7 +263,7 @@ def publishInDBS3(config, taskname, verbose, console):
                     logger.info(failureMsg)
                     return {'status': 'FAIL', 'reason': failureMsg, 'dumpFile': None}
 
-        block_name = blockDict['blockname']
+        block_name = blockDict['block_name']
         files_to_publish = dbsFiles
         # makes sure variabled defined in try/except/finally are defined for later use
         t1 = 0
@@ -296,7 +296,7 @@ def publishInDBS3(config, taskname, verbose, console):
                 failureReason = None
             except Exception as ex:
                 didPublish = 'FAIL'
-                msg = f"Error when publishing {blockDict['blockname']}"
+                msg = f"Error when publishing {blockDict['block_name']}"
                 logger.error(msg)
                 failedBlockDumpFile = os.path.join(
                     log['taskFilesDir'], 'FailedBlocks', f"failed-block-at-{time.time()}.txt")
@@ -372,7 +372,7 @@ def publishInDBS3(config, taskname, verbose, console):
 
     # pick a couple params which are common to all blocks and files in the data file
     aBlock = blocksToPublish[0]
-    aBlockName = aBlock['name']
+    aBlockName = aBlock['block_name']
     originSite = aBlock["origin_site"]
     dataset = aBlockName.split('#')[0]
     DBSConfigs['outputDataset'] = dataset
@@ -403,7 +403,7 @@ def publishInDBS3(config, taskname, verbose, console):
 
     for block in blocksToPublish:
         #print(existingFile)
-        if block['name'] not in existingBlocks:
+        if block['block_name'] not in existingBlocks:
             workToDo = True
             break
 
@@ -442,13 +442,13 @@ def publishInDBS3(config, taskname, verbose, console):
 
     # Publish one block at a time
     for block in blocksToPublish:
-        blockDict = {'blockname': block['name']}
+        blockDict = {'block_name': block['block_name']}
         blockDict['originSite'] = originSite
         blockDict['files'] = block['files']
         lfnsInBlock = [f['source_lfn'] for f in blockDict['files']]
         result = publishOneBlockInDBS(blockDict)
         if result['status'] == 'OK':
-            log['logger'].info('Publish OK   for Block: %s', blockDict['blockname'])
+            log['logger'].info('Publish OK   for Block: %s', blockDict['block_name'])
             publishedBlocks += 1
             publishedFiles += len(blockDict['files'])
             if not dryRun:
@@ -456,7 +456,7 @@ def publishInDBS3(config, taskname, verbose, console):
             listOfPublishedLFNs.extend(lfnsInBlock)
         elif result['status'] == 'FAIL':
             failedBlocks += 1
-            log['logger'].error('Publish FAIL for Block: %s', blockDict['blockname'])
+            log['logger'].error('Publish FAIL for Block: %s', blockDict['block_name'])
             failedBlocks += 1
             failedFiles += len(blockDict['files'])
             if not dryRun:

@@ -477,7 +477,7 @@ class Master(object):
             # TODO this shoudl be a function
             # prepare json to save, will be a list of blocks, one dictionary per block
             #
-            # {'name':blockname,
+            # {'block_name':blockname,
             #    then a few parmeters common to the whole block (to the task! actuallY)
             #  'username', 'acquisitionera', 'swversion', globaltag', 'origin_site'
             # and finally a list of dictionariesx, one per file
@@ -500,7 +500,7 @@ class Master(object):
             toFail = []
 
             for blockName in blocksToPublish:
-                blockDict = {'name': blockName}
+                blockDict = {'block_name': blockName}
                 blockDict['username'] = task['username']
                 blockDict['origin_site'] = task['destination']
                 filesInfo = []
