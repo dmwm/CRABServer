@@ -103,7 +103,7 @@ def publishInDBS3(config, taskname, verbose, console):
                     logger.info(msg)
                     if parentFile in file['parents']:
                         file['parents'].remove(parentFile)
-            return (localParentBlocks, globalParentBlocks)
+        return (localParentBlocks, globalParentBlocks)
 
     def prepareDbsPublishingConfigs(aBlock=None, aFile=None):
         # fills the dictionary with the various configs needed to publish one block
