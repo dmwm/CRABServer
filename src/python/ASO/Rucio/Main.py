@@ -1,11 +1,18 @@
+"""
+Main module.
+"""
+
 import logging
 from argparse import ArgumentParser
 
-import ASO.Rucio.config as config
+import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
 from ASO.Rucio.RunTransfer import RunTransfer
 from ASO.Rucio.exception import RucioTransferException
 
 def initLogger():
+    """
+    Initialize root logger
+    """
     logger = logging.getLogger('RucioTransfer')
     logger.setLevel(logging.DEBUG)
     hldr = logging.StreamHandler()

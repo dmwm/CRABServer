@@ -1,3 +1,7 @@
+"""
+Initialize neccessary clients, put all actions together and execute it.
+"""
+
 import logging
 import os
 from rucio.client.client import Client as RucioClient
@@ -8,6 +12,7 @@ from ASO.Rucio.exception import RucioTransferException
 from ASO.Rucio.Actions.BuildDBSDataset import BuildDBSDataset
 from ASO.Rucio.Actions.RegisterReplicas import RegisterReplicas
 from ASO.Rucio.Actions.MonitorLockStatus import MonitorLockStatus
+
 
 class RunTransfer:
     """
@@ -49,8 +54,21 @@ class RunTransfer:
         # do 2
         MonitorLockStatus(self.transfer, self.rucioClient, self.crabRESTClient).execute()
 
-    def _initRucioClient(self, username, proxypath=None):
+    def _initRucioClient(self, username, proxypath='/tmp/x509_uXXXX'):
+        """
+        Initialize Rucio client. Note that X509_USER_PROXY has higher
+        precedence than `proxypath` variable.
+
+        :param username: username
+        :type username: string
+        :param proxypath: x509 proxyfile path
+        :type proxypath: string
+
+        :return: rucio client object
+        :rtype: rucio.client.client.Client
+        """
         # maybe we can share with getNativeRucioClient
+        self.logger.info('Initializing Rucio Client')
         rucioLogger = logging.getLogger('RucioTransfer.RucioClient')
         rucioLogger.setLevel(logging.INFO)
         if os.environ.get('X509_USER_PROXY', None):
@@ -66,13 +84,24 @@ class RunTransfer:
             creds=creds,
             logger=rucioLogger
         )
-        self.logger.debug(f'RucioClient.whoami(): {rc.whoami()}')
         return rc
 
-    def _initCrabRESTClient(self, host, dbInstance, proxypath='/tmp/x509_u999999'):
+    def _initCrabRESTClient(self, host, dbInstance, proxypath='/tmp/x509_uXXXX'):
         """
-        Initialize client for CRAB REST
+        Initialize CRAB REST client.
+
+        :param host: hostname and port of REST instance,
+            e.g. `cmsweb-test12.cern.ch:8443`
+        :type host: string
+        :param dbInstance: database instance name e.g. `devthree`
+        :type dbInstance: string
+        :param proxypath: x509 proxyfile path
+        :type proxypath: string
+
+        :return: rest client object
+        :rtype: RESTInteractions.CRABRest
         """
+        self.logger.info('Initializing CRAB REST client')
         restLogger = logging.getLogger('RucioTransfer.RESTClient')
         restLogger.setLevel(logging.DEBUG)
         proxyPathEnv = os.environ.get('X509_USER_PROXY', None)

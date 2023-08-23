@@ -1,3 +1,6 @@
+"""
+The utility function of Rucio ASO.
+"""
 import shutil
 import re
 from contextlib import contextmanager
@@ -50,7 +53,7 @@ def chunks(l, n=1):
             else:
                 break
 
-def uploadToTransfersdb(client, api, subresource, fileDoc, logger=None):
+def uploadToTransfersdb(client, api, subresource, fileDoc):
     """
     Upload fileDoc to REST
 
@@ -81,7 +84,6 @@ def tfcLFN2PFN(lfn, tfc, proto, depth=0):
     for rule in tfc:
         if rule['proto'] == proto:
             if 'chain' in rule:
-                import pdb; pdb.set_trace()
                 lfn = tfcLFN2PFN(lfn, tfc, rule['chain'], depth + 1)
             regex = re.compile(rule['path'])
             if regex.match(lfn):

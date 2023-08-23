@@ -1,11 +1,14 @@
+"""
+Registering files to Rucio.
+"""
+
 import logging
 import itertools
 import copy
-from ASO.Rucio.Actions.BuildDBSDataset import BuildDBSDataset
 from rucio.rse.rsemanager import find_matching_scheme
-from rucio.common.exception import FileAlreadyExists
 
-import ASO.Rucio.config as config
+import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
+from ASO.Rucio.Actions.BuildDBSDataset import BuildDBSDataset
 from ASO.Rucio.exception import RucioTransferException
 from ASO.Rucio.utils import chunks, uploadToTransfersdb, tfcLFN2PFN, LFNToPFNFromPFN
 
@@ -73,7 +76,7 @@ class RegisterReplicas:
         num = len(logFileDocs)
         restFileDoc = {
             'asoworker': 'rucio',
-            'list_of_ids': [x for x in logFileDocs],
+            'list_of_ids': logFileDocs,
             'list_of_transfer_state': ['DONE']*num,
             'list_of_dbs_blockname': None,
             'list_of_block_complete': None,
@@ -82,7 +85,7 @@ class RegisterReplicas:
             'list_of_retry_value': None, # omit
             'list_of_fts_id': ['NA']*num,
         }
-        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc, self.logger)
+        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc)
         return newTransfers
 
     def prepare(self, transfers):
@@ -111,13 +114,13 @@ class RegisterReplicas:
             if not rse in bucket:
                 bucket[rse] = []
             bucket[rse].append(xdict)
-        for rse in bucket:
-            xdict = bucket[rse][0]
+        for rse, xdictList in bucket.items():
+            xdict = xdictList[0]
             # We determine PFN of Temp RSE from normal RSE.
             # Simply remove temp suffix before passing to getSourcePFN function.
             pfn = self.getSourcePFN(xdict["source_lfn"], rse.split('_Temp')[0], xdict["destination"])
             replicasByRSE[rse] = {}
-            for xdict in bucket[rse]:
+            for xdict in xdictList:
                 replica = {
                     xdict['id'] : {
                         'scope': self.transfer.rucioScope,
@@ -326,4 +329,4 @@ class RegisterReplicas:
             'list_of_retry_value': None, # omit
             'list_of_fts_id': [x['ruleid'] for x in fileDocs]
         }
-        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc, self.logger)
+        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc)

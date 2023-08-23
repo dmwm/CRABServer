@@ -1,10 +1,14 @@
+"""
+Monitoring replicas' transfer status and adding them to publish the container.
+"""
 import logging
 import copy
 import datetime
 
-import ASO.Rucio.config as config
+import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
 from ASO.Rucio.utils import uploadToTransfersdb
 from ASO.Rucio.Actions.RegisterReplicas import RegisterReplicas
+
 
 class MonitorLockStatus:
     """
@@ -190,7 +194,7 @@ class MonitorLockStatus:
             'list_of_retry_value': None, # omit
             'list_of_fts_id': [x['ruleid'] for x in fileDocs]*num,
         }
-        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc, self.logger)
+        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc)
 
     def updateRESTFileDocsBlockCompletionInfo(self, fileDocs):
         """
@@ -213,4 +217,4 @@ class MonitorLockStatus:
             'list_of_retry_value': None, # omit
             'list_of_fts_id': None,
         }
-        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateRucioInfo', restFileDoc, self.logger)
+        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateRucioInfo', restFileDoc)

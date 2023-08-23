@@ -1,3 +1,6 @@
+"""
+Create Rucio's container and dataset.
+"""
 import logging
 import uuid
 
@@ -7,7 +10,7 @@ from ASO.Rucio.exception import RucioTransferException
 
 class BuildDBSDataset():
     """
-    Create Rucio's container and dataset.
+    Class to create Rucio's container and dataset.
 
     :param transfer: Transfer Object to get infomation.
     :type object: class:`ASO.Rucio.Transfer`
@@ -71,7 +74,7 @@ class BuildDBSDataset():
                 ruleID = self.rucioClient.add_replication_rule([containerDID], 1, self.transfer.destination)[0]
             except DuplicateRule:
                 # TODO: it is possible that someone will create the rule for container, need better filter rule to match rules we create
-                self.logger.info(f"Rule already exists. Get rule ID from Rucio.")
+                self.logger.info("Rule already exists. Get rule ID from Rucio.")
                 ruleID = list(self.rucioClient.list_did_rules(self.transfer.rucioScope, container))[0]['id']
             self.transfer.updateContainerRuleID(ruleID)
 
@@ -104,7 +107,7 @@ class BuildDBSDataset():
             metadata = []
             for ds in datasets:
                 metadata.append(self.rucioClient.get_metadata(self.transfer.rucioScope, ds["name"]))
-        openDatasets = [md['name'] for md in metadata if md['is_open'] == True]
+        openDatasets = [md['name'] for md in metadata if md['is_open']]
         self.logger.debug(f"open datasets: {datasets}")
         if len(openDatasets) == 0:
             self.logger.info("No dataset available yet, creating one")
@@ -145,7 +148,8 @@ class BuildDBSDataset():
         except DuplicateContent:
             self.logger.info(f'{dataset} dataset has attached to {container}, doing nothing')
 
-    def generateDatasetName(self, container):
+    @staticmethod
+    def generateDatasetName(container):
         """
         Return a new dataset name.
 
