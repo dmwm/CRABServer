@@ -9,7 +9,6 @@ import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
 from ASO.Rucio.utils import uploadToTransfersdb
 from ASO.Rucio.Actions.RegisterReplicas import RegisterReplicas
 
-
 class MonitorLockStatus:
     """
     This class checks the status of the replicas by giving Rucio's rule ID and
