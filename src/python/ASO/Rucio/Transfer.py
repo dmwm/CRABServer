@@ -10,7 +10,7 @@ import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
 from ASO.Rucio.exception import RucioTransferException
 from ASO.Rucio.utils import writePath
 
-class Transfer: # pylint: disable=too-many-instance-attributes
+class Transfer:
     """
     Use Transfer object to store state of process in memory.
     It responsible for read info from file and set its attribute.

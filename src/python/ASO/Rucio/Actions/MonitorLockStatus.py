@@ -194,7 +194,7 @@ class MonitorLockStatus:
             'list_of_retry_value': None, # omit
             'list_of_fts_id': [x['ruleid'] for x in fileDocs]*num,
         }
-        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc, self.logger)
+        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc)
 
     def updateRESTFileDocsBlockCompletionInfo(self, fileDocs):
         """
@@ -217,4 +217,4 @@ class MonitorLockStatus:
             'list_of_retry_value': None, # omit
             'list_of_fts_id': None,
         }
-        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateRucioInfo', restFileDoc, self.logger)
+        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateRucioInfo', restFileDoc)

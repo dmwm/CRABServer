@@ -83,7 +83,6 @@ class RunTransfer:
             creds=creds,
             logger=rucioLogger
         )
-        self.logger.debug(f'RucioClient.whoami(): {rc.whoami()}')
         return rc
 
     def _initCrabRESTClient(self, host, dbInstance, proxypath='/tmp/x509_uXXXX'):

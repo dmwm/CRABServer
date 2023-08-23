@@ -85,7 +85,7 @@ class RegisterReplicas:
             'list_of_retry_value': None, # omit
             'list_of_fts_id': ['NA']*num,
         }
-        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc, self.logger)
+        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc)
         return newTransfers
 
     def prepare(self, transfers):
@@ -114,13 +114,13 @@ class RegisterReplicas:
             if not rse in bucket:
                 bucket[rse] = []
             bucket[rse].append(xdict)
-        for rse, _ in bucket.items():
-            xdict = bucket[rse][0]
+        for rse, xdictList in bucket.items():
+            xdict = xdictList[0]
             # We determine PFN of Temp RSE from normal RSE.
             # Simply remove temp suffix before passing to getSourcePFN function.
             pfn = self.getSourcePFN(xdict["source_lfn"], rse.split('_Temp')[0], xdict["destination"])
             replicasByRSE[rse] = {}
-            for xdict in bucket[rse]:
+            for xdict in xdictList:
                 replica = {
                     xdict['id'] : {
                         'scope': self.transfer.rucioScope,
@@ -329,4 +329,4 @@ class RegisterReplicas:
             'list_of_retry_value': None, # omit
             'list_of_fts_id': [x['ruleid'] for x in fileDocs]
         }
-        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc, self.logger)
+        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc)
