@@ -1,5 +1,10 @@
+import logging
+import multiprocessing
+import sys
+import threading
+import traceback
 from logging.handlers import TimedRotatingFileHandler
-import multiprocessing, threading, logging, sys, traceback
+
 
 class MultiProcessingLog(logging.Handler):
     def __init__(self, filename, when='h', interval=1, backupCount=0, encoding=None, delay=False, utc=False):

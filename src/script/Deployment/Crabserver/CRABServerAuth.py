@@ -1,6 +1,9 @@
 from __future__ import division
-import cx_Oracle as DB
+
 import socket
+
+import cx_Oracle as DB
+
 fqdn = socket.getfqdn().lower()
 s3 = {'access_key':'FIXME',
       'secret_key':'FIXME'}

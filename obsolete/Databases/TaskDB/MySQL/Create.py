@@ -6,7 +6,9 @@ MySQL Compatibility layer for Task Manager DB
 """
 
 import threading
+
 from WMCore.Database.DBCreator import DBCreator
+
 
 class Create(DBCreator):
     """

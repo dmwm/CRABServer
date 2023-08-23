@@ -2,6 +2,7 @@ import logging
 
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
+
 def getNativeRucioClient(config=None, logger=None):
     """
     instantiates a Rucio python Client for use in CRAB TaskWorker

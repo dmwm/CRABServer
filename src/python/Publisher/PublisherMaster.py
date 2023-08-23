@@ -9,33 +9,31 @@ Here's the algorithm
 4. spawn a process per task that publish their files
 """
 
-from __future__ import division
-from __future__ import print_function
+from __future__ import division, print_function
+
 import argparse
+import json
 import logging
+import os
+import pickle
+import sys
+import tempfile
+import time
+import traceback
+from datetime import datetime
 from logging import FileHandler
 from logging.handlers import TimedRotatingFileHandler
-import os
-import traceback
-import sys
-import json
-import pickle
-import tempfile
-from datetime import datetime
-import time
-from pathlib import Path
 from multiprocessing import Process
+from pathlib import Path
+
 from MultiProcessingLog import MultiProcessingLog
-
-from WMCore.Configuration import loadConfigurationFile
-from WMCore.Services.Requests import Requests
-
 from RESTInteractions import CRABRest
-from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping, executeCommand
-from ServerUtilities import SERVICE_INSTANCES
-from ServerUtilities import getProxiedWebDir
+from ServerUtilities import (SERVICE_INSTANCES, encodeRequest, executeCommand,
+                             getColumn, getProxiedWebDir, oracleOutputMapping)
 from TaskWorker import __version__
 from TaskWorker.WorkerExceptions import ConfigException
+from WMCore.Configuration import loadConfigurationFile
+from WMCore.Services.Requests import Requests
 
 
 def chunks(l, n):

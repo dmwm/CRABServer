@@ -3,24 +3,23 @@
 """
 
 """
-from __future__ import division
-from __future__ import print_function
+from __future__ import division, print_function
+
 import json
 import logging
 import os
 import subprocess
 from datetime import datetime, timedelta
+
 try:
     from httplib import HTTPException
 except:
     from http.client import HTTPException
 
 import fts3.rest.client.easy as fts3
-
+from RESTInteractions import CRABRest
 from rucio.client import Client as rucioclient
 from rucio.rse.rsemanager import find_matching_scheme
-
-from RESTInteractions import CRABRest
 from ServerUtilities import encodeRequest
 
 FTS_ENDPOINT = "https://fts3-cms.cern.ch:8446/"

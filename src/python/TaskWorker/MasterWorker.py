@@ -3,14 +3,14 @@
 from __future__ import print_function
 
 import json
+import logging
 import os
 import shutil
+import signal
 import sys
 import time
-import signal
-import logging
-
 from http.client import HTTPException
+
 from MultiProcessingLog import MultiProcessingLog
 
 if sys.version_info >= (3, 0):
@@ -19,19 +19,18 @@ if sys.version_info < (3, 0):
     from urllib import urlencode
 
 #WMcore dependencies
-from WMCore.Configuration import loadConfigurationFile
-
+import HTCondorLocator
 #CRAB dependencies
 from RESTInteractions import CRABRest
-import HTCondorLocator
-from ServerUtilities import newX509env
-from ServerUtilities import SERVICE_INSTANCES
+from ServerUtilities import SERVICE_INSTANCES, newX509env
 from TaskWorker import __version__
+from TaskWorker.Actions.Handler import (handleKill, handleNewTask,
+                                        handleResubmit)
+from TaskWorker.Actions.Recurring.BaseRecurringAction import handleRecurring
 from TaskWorker.TestWorker import TestWorker
 from TaskWorker.Worker import Worker, setProcessLogger
 from TaskWorker.WorkerExceptions import ConfigException
-from TaskWorker.Actions.Recurring.BaseRecurringAction import handleRecurring
-from TaskWorker.Actions.Handler import handleResubmit, handleNewTask, handleKill
+from WMCore.Configuration import loadConfigurationFile
 
 ## NOW placing this here, then to be verified if going into Action.Handler, or TSM
 ## The meaning of the elements in the 3-tuples are as follows:

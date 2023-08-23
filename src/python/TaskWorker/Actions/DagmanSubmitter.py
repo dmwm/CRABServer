@@ -3,13 +3,13 @@
 Submit a DAG directory created by the DagmanCreator component.
 """
 
-import os
 import copy
 import json
-import time
+import os
 import pickle
-
 import sys
+import time
+
 if sys.version_info >= (3, 0):
     from urllib.parse import urlencode  # pylint: disable=no-name-in-module
 if sys.version_info < (3, 0):
@@ -17,16 +17,13 @@ if sys.version_info < (3, 0):
 
 from http.client import HTTPException
 
-import HTCondorUtils
 import CMSGroupMapper
 import HTCondorLocator
-
-from ServerUtilities import FEEDBACKMAIL
-from ServerUtilities import TASKLIFETIME
-from ServerUtilities import MAX_MEMORY_PER_CORE, MAX_MEMORY_SINGLE_CORE
-
-import TaskWorker.DataObjects.Result as Result
+import HTCondorUtils
 import TaskWorker.Actions.TaskAction as TaskAction
+import TaskWorker.DataObjects.Result as Result
+from ServerUtilities import (FEEDBACKMAIL, MAX_MEMORY_PER_CORE,
+                             MAX_MEMORY_SINGLE_CORE, TASKLIFETIME)
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
 # Bootstrap either the native module or the BossAir variant.

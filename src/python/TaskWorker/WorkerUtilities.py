@@ -5,10 +5,10 @@ Common functions to be reused around TW and Publisher
 from http.client import HTTPException
 from urllib.parse import urlencode
 
-from ServerUtilities import truncateError
-from ServerUtilities import SERVICE_INSTANCES
 from RESTInteractions import CRABRest
+from ServerUtilities import SERVICE_INSTANCES, truncateError
 from TaskWorker.WorkerExceptions import ConfigException
+
 
 def getCrabserver(restConfig=None, agentName='crabtest', logger=None):
     """

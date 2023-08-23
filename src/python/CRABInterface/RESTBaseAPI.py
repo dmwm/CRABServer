@@ -1,33 +1,33 @@
 from __future__ import absolute_import
+
 import logging
 import logging.handlers
-import traceback
-import socket
 import os
+import socket
+import traceback
+from subprocess import getstatusoutput
+from time import gmtime, mktime
 
 import cherrypy
-from subprocess import getstatusoutput
-from time import mktime, gmtime
-
-# WMCore dependecies here
-from WMCore.REST.Server import DatabaseRESTApi, rows
-from WMCore.REST.Format import JSONFormat
-from WMCore.REST.Error import ExecutionError
-
-# CRABServer dependecies here
-from CRABInterface.Utilities import ConfigCache, globalinit, getCentralConfig
-from CRABInterface.RESTUserWorkflow import RESTUserWorkflow
-from CRABInterface.RESTTask import RESTTask
-from CRABInterface.RESTServerInfo import RESTServerInfo
+from CRABInterface.DataFileMetadata import DataFileMetadata
+from CRABInterface.DataUserWorkflow import DataUserWorkflow
+from CRABInterface.DataWorkflow import DataWorkflow
+from CRABInterface.RESTCache import RESTCache
 from CRABInterface.RESTFileMetadata import RESTFileMetadata
 from CRABInterface.RESTFileTransfers import RESTFileTransfers
 from CRABInterface.RESTFileUserTransfers import RESTFileUserTransfers
+from CRABInterface.RESTServerInfo import RESTServerInfo
+from CRABInterface.RESTTask import RESTTask
+from CRABInterface.RESTUserWorkflow import RESTUserWorkflow
 from CRABInterface.RESTWorkerWorkflow import RESTWorkerWorkflow
-from CRABInterface.RESTCache import RESTCache
-from CRABInterface.DataFileMetadata import DataFileMetadata
-from CRABInterface.DataWorkflow import DataWorkflow
-from CRABInterface.DataUserWorkflow import DataUserWorkflow
-from ServerUtilities import measure_size, MeasureTime
+# CRABServer dependecies here
+from CRABInterface.Utilities import ConfigCache, getCentralConfig, globalinit
+from ServerUtilities import MeasureTime, measure_size
+from WMCore.REST.Error import ExecutionError
+from WMCore.REST.Format import JSONFormat
+# WMCore dependecies here
+from WMCore.REST.Server import DatabaseRESTApi, rows
+
 
 #In case the log level is not specified in the configuration we use the NullHandler and we do not print messages
 #The NullHandler is included as of python 3.1

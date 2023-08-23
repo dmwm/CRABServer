@@ -1,12 +1,13 @@
 #!/usr/bin/python
 
 from __future__ import print_function
+
 import re
+import signal
 import sys
 import time
-import signal
-import commands
 
+import commands
 import WMCore.Services.PhEDEx.PhEDEx as PhEDEx
 
 fts_server = 'https://fts3-pilot.cern.ch:8443'

@@ -1,19 +1,21 @@
 """
 a Class to perform Actions useful to TaskWorker via Rucio
 """
-import random
 import copy
-from urllib.parse import urlencode
+import random
 from http.client import HTTPException
+from urllib.parse import urlencode
 
+from rucio.common.exception import (DataIdentifierAlreadyExists,
+                                    DuplicateContent, DuplicateRule,
+                                    FullStorage, InsufficientAccountLimit,
+                                    InsufficientTargetRSEs)
 from RucioUtils import getNativeRucioClient
-from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, DuplicateContent,
-                                    InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage)
-
-from ServerUtilities import MAX_DAYS_FOR_TAPERECALL, MAX_TB_TO_RECALL_AT_A_SINGLE_SITE
-from ServerUtilities import TASKLIFETIME
+from ServerUtilities import (MAX_DAYS_FOR_TAPERECALL,
+                             MAX_TB_TO_RECALL_AT_A_SINGLE_SITE, TASKLIFETIME)
+from TaskWorker.WorkerExceptions import (TapeDatasetException,
+                                         TaskWorkerException)
 from TaskWorker.WorkerUtilities import uploadWarning
-from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 
 
 class RucioAction():

@@ -1,20 +1,21 @@
 from __future__ import division
+
+import logging
 import os
 import uuid
-import logging
-import cherrypy
-import boto3
-from botocore.exceptions import ClientError
 
+import boto3
+import cherrypy
+from botocore.exceptions import ClientError
+from CRABInterface.Regexps import (RX_CACHE_OBJECTTYPE, RX_SUBRES_CACHE,
+                                   RX_TARBALLNAME, RX_TASKNAME, RX_USERNAME)
+# CRABServer dependecies here
+from CRABInterface.RESTExtensions import authz_login_valid, authz_operator
+from ServerUtilities import MeasureTime, getUsernameFromTaskname
+from WMCore.REST.Error import ExecutionError, MissingParameter
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str
-from WMCore.REST.Error import MissingParameter, ExecutionError
-
-# CRABServer dependecies here
-from CRABInterface.RESTExtensions import authz_login_valid, authz_operator
-from CRABInterface.Regexps import RX_SUBRES_CACHE, RX_CACHE_OBJECTTYPE, RX_TASKNAME, RX_USERNAME, RX_TARBALLNAME
-from ServerUtilities import getUsernameFromTaskname, MeasureTime
 
 
 class RESTCache(RESTEntity):

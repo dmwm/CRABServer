@@ -1,10 +1,12 @@
 # report health of TaskWorker to SLS
-import os
-import sys
 import logging
+import os
 import subprocess
+import sys
 from datetime import datetime
-from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
+
+from TaskWorker.Actions.Recurring.BaseRecurringAction import \
+    BaseRecurringAction
 
 fmt = "%Y-%m-%dT%H:%M:%S%z"
 

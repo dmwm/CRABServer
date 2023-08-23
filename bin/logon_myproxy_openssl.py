@@ -1,6 +1,9 @@
 from __future__ import print_function
-import logging, sys
+
+import logging
+import sys
 from hashlib import sha1
+
 from WMCore.Credential.SimpleMyProxy import SimpleMyProxy
 
 if len(sys.argv) is not 5:

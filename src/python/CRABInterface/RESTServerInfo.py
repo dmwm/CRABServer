@@ -1,15 +1,14 @@
 import logging
 
+from CRABInterface.__init__ import __version__
+from CRABInterface.Regexps import RX_SUBRES_SI, RX_TASKNAME
+# CRABServer dependecies here
+from CRABInterface.RESTExtensions import authz_login_valid
+from CRABInterface.Utilities import conn_handler
+from WMCore.REST.Error import ExecutionError
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str
-from WMCore.REST.Error import ExecutionError
-
-# CRABServer dependecies here
-from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import RX_SUBRES_SI, RX_TASKNAME
-from CRABInterface.Utilities import conn_handler
-from CRABInterface.__init__ import __version__
 
 
 class RESTServerInfo(RESTEntity):

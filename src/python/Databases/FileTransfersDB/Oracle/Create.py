@@ -6,7 +6,9 @@ Oracle Compatibility layer for File Transfers DB
 """
 
 import threading
+
 from WMCore.Database.DBCreator import DBCreator
+
 
 class Create(DBCreator):
     """

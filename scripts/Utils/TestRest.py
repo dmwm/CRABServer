@@ -9,15 +9,14 @@ voms-proxy-init -voms cms etc. etc.
 export X509_USER_PROXY etc.
 source /data/srv/TaskManager/env.sh (or equivalent)
 """
-from __future__ import division
-from __future__ import print_function
+from __future__ import division, print_function
+
+import argparse
 import os
 import time
-import argparse
 
 from RESTInteractions import CRABRest
 from ServerUtilities import encodeRequest
-
 
 #instance = preprod
 #hostname = cmsweb-testbed.cern.ch

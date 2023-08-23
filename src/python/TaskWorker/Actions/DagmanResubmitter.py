@@ -1,25 +1,23 @@
-import time
 import datetime
-
 import sys
+import time
+
 if sys.version_info >= (3, 0):
     from urllib.parse import urlencode  # pylint: disable=no-name-in-module
 if sys.version_info < (3, 0):
     from urllib import urlencode
 
+from http.client import HTTPException
+
 import classad
 import htcondor
-
 import HTCondorLocator
 import HTCondorUtils
-
-from ServerUtilities import FEEDBACKMAIL
-from TaskWorker.Actions.TaskAction import TaskAction
-from TaskWorker.Actions.DagmanSubmitter import checkMemoryWalltime
-from TaskWorker.WorkerExceptions import TaskWorkerException
 import TaskWorker.DataObjects.Result as Result
-
-from http.client import HTTPException
+from ServerUtilities import FEEDBACKMAIL
+from TaskWorker.Actions.DagmanSubmitter import checkMemoryWalltime
+from TaskWorker.Actions.TaskAction import TaskAction
+from TaskWorker.WorkerExceptions import TaskWorkerException
 
 
 class DagmanResubmitter(TaskAction):
@@ -172,8 +170,9 @@ class DagmanResubmitter(TaskAction):
         return Result.Result(task=kwargs['task'], result='OK')
 
 if __name__ == "__main__":
-    import os
     import logging
+    import os
+
     from RESTInteractions import CRABRest
     from WMCore.Configuration import Configuration
 

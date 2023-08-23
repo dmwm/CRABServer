@@ -1,6 +1,7 @@
 import re
 import socket
 import sys
+
 if sys.version_info >= (3, 0):
     from urllib.parse import urlencode  # pylint: disable=no-name-in-module
 if sys.version_info < (3, 0):
@@ -9,15 +10,12 @@ if sys.version_info < (3, 0):
 from http.client import HTTPException
 
 import htcondor
-
-from ServerUtilities import FEEDBACKMAIL, insertJobIdSid
-
-import TaskWorker.DataObjects.Result as Result
-from TaskWorker.Actions.TaskAction import TaskAction
-from TaskWorker.WorkerExceptions import TaskWorkerException
-
 import HTCondorLocator
 import HTCondorUtils
+import TaskWorker.DataObjects.Result as Result
+from ServerUtilities import FEEDBACKMAIL, insertJobIdSid
+from TaskWorker.Actions.TaskAction import TaskAction
+from TaskWorker.WorkerExceptions import TaskWorkerException
 
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
 

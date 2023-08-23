@@ -1,28 +1,25 @@
 
-from datetime import datetime, timedelta
 import os
-import pandas as pd
 import time
-from pyspark import SparkContext, StorageLevel
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import (
-    col, collect_list, concat_ws, greatest, lit, lower, when,
-    avg as _avg,
-    count as _count,
-    hex as _hex,
-    max as _max,
-    min as _min,
-    round as _round,
-    sum as _sum,
-)
-
-from pyspark.sql.types import (
-    LongType,
-)
+from datetime import datetime, timedelta
 
 import numpy as np
 import osearch
+import pandas as pd
+from pyspark import SparkContext, StorageLevel
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import avg as _avg
+from pyspark.sql.functions import col, collect_list, concat_ws
+from pyspark.sql.functions import count as _count
+from pyspark.sql.functions import greatest
+from pyspark.sql.functions import hex as _hex
+from pyspark.sql.functions import lit, lower
+from pyspark.sql.functions import max as _max
+from pyspark.sql.functions import min as _min
+from pyspark.sql.functions import round as _round
+from pyspark.sql.functions import sum as _sum
+from pyspark.sql.functions import when
+from pyspark.sql.types import LongType
 
 spark = SparkSession\
         .builder\

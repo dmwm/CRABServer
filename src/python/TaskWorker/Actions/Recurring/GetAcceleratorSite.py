@@ -1,10 +1,12 @@
 import json
-import shutil
 import os
+import shutil
 import traceback
 
 import htcondor
-from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
+from TaskWorker.Actions.Recurring.BaseRecurringAction import \
+    BaseRecurringAction
+
 
 class GetAcceleratorSite(BaseRecurringAction):
     """

@@ -9,11 +9,11 @@
     a file.
 """
 
-from WMCore.Configuration import loadConfigurationFile
-from TaskWorker.MasterWorker import MasterWorker, validateConfig
-
 import logging
 import sys
+
+from TaskWorker.MasterWorker import MasterWorker, validateConfig
+from WMCore.Configuration import loadConfigurationFile
 
 logging.getLogger().setLevel(logging.DEBUG)
 

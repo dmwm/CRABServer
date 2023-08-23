@@ -1,21 +1,20 @@
 from __future__ import print_function
 
-import os
-import sys
-import json
 import errno
-import types
+import json
+import os
 import pickle
 import pprint
+import sys
+import types
 
 import classad
-
-import TaskWorker.Actions.PostJob as PostJob
-import TaskWorker.Actions.PreJob as PreJob
-import TaskWorker.Actions.PreDAG as PreDAG
 import HTCondorUtils
-
+import TaskWorker.Actions.PostJob as PostJob
+import TaskWorker.Actions.PreDAG as PreDAG
+import TaskWorker.Actions.PreJob as PreJob
 import WMCore.Configuration as Configuration
+
 
 def bootstrap():
     print("Entering TaskManagerBootstrap with args: %s" % sys.argv)

@@ -1,10 +1,11 @@
 
 import logging
-from WMCore.Credential.Proxy import Proxy
-from TaskWorker.DataObjects.Result import Result
-from TaskWorker.Actions.TaskAction import TaskAction
-from TaskWorker.WorkerExceptions import TaskWorkerException
+
 from ServerUtilities import tempSetLogLevel
+from TaskWorker.Actions.TaskAction import TaskAction
+from TaskWorker.DataObjects.Result import Result
+from TaskWorker.WorkerExceptions import TaskWorkerException
+from WMCore.Credential.Proxy import Proxy
 
 # We won't do anything if the proxy is shorted then 1 hour
 # NB: in the PoC we had 24 hours, but does that make sense

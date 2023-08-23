@@ -2,6 +2,7 @@
 
 import logging
 
+
 class FileMetaData(object):
     """
     """

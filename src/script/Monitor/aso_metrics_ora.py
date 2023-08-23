@@ -2,17 +2,15 @@
 """
 Kibana monitor script for OracleAso
 """
-from __future__ import print_function
-from __future__ import division
+from __future__ import division, print_function
 
 import json
-
 from socket import gethostname
-import requests
 
+import requests
 from RESTInteractions import CRABRest
-from ServerUtilities import encodeRequest, oracleOutputMapping
-from ServerUtilities import TRANSFERDB_STATES, PUBLICATIONDB_STATES
+from ServerUtilities import (PUBLICATIONDB_STATES, TRANSFERDB_STATES,
+                             encodeRequest, oracleOutputMapping)
 
 MONIT = 'http://monit-metrics:10012/'
 CMSWEB = 'cmsweb.cern.ch'

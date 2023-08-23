@@ -3,17 +3,17 @@ functions used both in Publisher_rucio and Publisher_schedd
 which communicate with DBS
 """
 
-import os
-import logging
 import json
+import logging
+import os
 import time
 from datetime import datetime
 
 from dbs.apis.dbsClient import DbsApi
 from dbs.exceptions.dbsClientException import dbsClientException
 from RestClient.ErrorHandling.RestClientExceptions import HTTPError
-
 from TaskWorker.WorkerExceptions import CannotMigrateException
+
 
 def format_file_3(file_):
     """

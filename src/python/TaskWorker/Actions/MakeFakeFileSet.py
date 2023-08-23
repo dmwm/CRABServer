@@ -1,11 +1,10 @@
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.DataObjects.Result import Result
-
 from WMCore.DataStructs.File import File
 from WMCore.DataStructs.Fileset import Fileset
 from WMCore.DataStructs.Run import Run
-
 from WMCore.Services.CRIC.CRIC import CRIC
+
 
 class MakeFakeFileSet(TaskAction):
     """This is needed to make WMCore.JobSplitting lib working...

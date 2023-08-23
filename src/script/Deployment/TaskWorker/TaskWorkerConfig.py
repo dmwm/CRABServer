@@ -1,5 +1,5 @@
-from WMCore.Configuration import ConfigurationEx
 import HTCondorLocator
+from WMCore.Configuration import ConfigurationEx
 
 config = ConfigurationEx()
 

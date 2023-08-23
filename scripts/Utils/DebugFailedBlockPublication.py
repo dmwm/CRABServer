@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # coding: utf-8
-from __future__ import division
-from __future__  import print_function
-import os
-import json
-import subprocess
+from __future__ import division, print_function
+
 import argparse
+import json
+import os
+import subprocess
 
 from dbs.apis.dbsClient import DbsApi
+
 
 def main():
     # get a validate file name from args

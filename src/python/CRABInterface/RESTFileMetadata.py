@@ -1,15 +1,17 @@
 # WMCore dependecies here
-from WMCore.REST.Error import InvalidParameter
-from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
-
+from CRABInterface.DataFileMetadata import DataFileMetadata
+#from CRABInterface.Regexps import *
+from CRABInterface.Regexps import (RX_ANYTHING, RX_CHECKSUM, RX_CMSSITE,
+                                   RX_CMSSW, RX_FILESTATE, RX_GLOBALTAG,
+                                   RX_HOURS, RX_JOBID, RX_LFN, RX_LUMILIST,
+                                   RX_OUTDSLFN, RX_OUTTYPES, RX_PARENTLFN,
+                                   RX_PUBLISH, RX_RUNS, RX_TASKNAME)
 # CRABServer dependecies here
 from CRABInterface.RESTExtensions import authz_login_valid, authz_operator
-#from CRABInterface.Regexps import *
-from CRABInterface.Regexps import RX_CHECKSUM, RX_CMSSITE, RX_CMSSW, RX_FILESTATE, \
-    RX_GLOBALTAG, RX_HOURS, RX_JOBID, RX_LFN, RX_LUMILIST, RX_OUTDSLFN, RX_OUTTYPES, \
-    RX_PARENTLFN, RX_PUBLISH, RX_RUNS, RX_TASKNAME, RX_ANYTHING
-from CRABInterface.DataFileMetadata import DataFileMetadata
+from WMCore.REST.Error import InvalidParameter
+from WMCore.REST.Server import RESTEntity, restcall
+from WMCore.REST.Validation import validate_num, validate_str, validate_strlist
+
 
 class RESTFileMetadata(RESTEntity):
     """REST entity to handle job metadata information"""

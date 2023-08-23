@@ -1,13 +1,14 @@
 
+import logging
 import os
-import time
 import pickle
 import signal
-import logging
+import time
 import traceback
 
 import classad
 import htcondor
+
 
 # This is part of the classad module as of HTCondor 8.1.2
 def quote(value):

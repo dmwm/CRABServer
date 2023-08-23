@@ -4,6 +4,7 @@
 """
 import os.path
 
+
 def getCAFUtilitiesBase():
     """ returns the root of CAFUtilities install """
     if __file__.find("src/python") != -1:

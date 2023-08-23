@@ -4,12 +4,14 @@ This module is obsolete since we now cleanup FileMetaData and Transfersds tables
 via periodical partition dropping, but is kept as reference of how to use
 the filemetadata delete API
 """
-import sys
 import logging
+import sys
 from http.client import HTTPException
 
 from RESTInteractions import CRABRest
-from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
+from TaskWorker.Actions.Recurring.BaseRecurringAction import \
+    BaseRecurringAction
+
 
 class FMDCleaner(BaseRecurringAction):
     pollingTime = 60*24 #minutes

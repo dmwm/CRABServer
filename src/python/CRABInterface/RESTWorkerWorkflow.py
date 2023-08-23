@@ -1,21 +1,21 @@
 """ Interface used by the TaskWorker to ucquire tasks and change their state
 """
 # WMCore dependecies here
-from builtins import str
-from Utils.Utilities import decodeBytesToUnicode
-from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
-from WMCore.REST.Error import InvalidParameter
-
-from ServerUtilities import getEpochFromDBTime
-from CRABInterface.Utilities import getDBinstance
-from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import (RX_MANYLINES_SHORT, RX_TASKNAME, RX_WORKER_NAME, RX_STATUS, RX_SUBPOSTWORKER,
-                                  RX_JOBID)
-
+import json
 # external dependecies here
 from ast import literal_eval
-import json
+from builtins import str
+
+from CRABInterface.Regexps import (RX_JOBID, RX_MANYLINES_SHORT, RX_STATUS,
+                                   RX_SUBPOSTWORKER, RX_TASKNAME,
+                                   RX_WORKER_NAME)
+from CRABInterface.RESTExtensions import authz_login_valid
+from CRABInterface.Utilities import getDBinstance
+from ServerUtilities import getEpochFromDBTime
+from Utils.Utilities import decodeBytesToUnicode
+from WMCore.REST.Error import InvalidParameter
+from WMCore.REST.Server import RESTEntity, restcall
+from WMCore.REST.Validation import validate_num, validate_str, validate_strlist
 
 
 class RESTWorkerWorkflow(RESTEntity):

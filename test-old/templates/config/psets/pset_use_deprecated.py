@@ -1,4 +1,5 @@
 import FWCore.ParameterSet.Config as cms
+
 process = cms.Process('UseDeprecated')
 process.source = cms.Source('PoolSource',
         fileNames = cms.untracked.vstring('/store/data/Run2012C/SingleMu/RAW/v1/000/198/050/18073F7C-2DC4-E111-BEE0-003048D2BDD8.root'),

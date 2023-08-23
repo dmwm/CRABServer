@@ -78,39 +78,39 @@ The PostJob and cmscp are the only places in CRAB3 where we should use camel_cas
 """
 from __future__ import print_function
 
-import os
-import sys
-import time
+import datetime
 import json
-import uuid
-import pprint
-import signal
-import tarfile
 import logging
 import logging.handlers
-import subprocess
-import unittest
-import datetime
-import tempfile
+import os
 import pickle
-import traceback
+import pprint
 import random
 import shutil
-from shutil import move
+import signal
+import subprocess
+import sys
+import tarfile
+import tempfile
+import time
+import traceback
+import unittest
+import uuid
 from http.client import HTTPException
+from shutil import move
 
-import htcondor
 import classad
+import htcondor
+from RESTInteractions import CRABRest
+from ServerUtilities import (PUBLICATIONDB_STATES, TRANSFERDB_STATES,
+                             encodeRequest, getHashLfn, getLock,
+                             isFailurePermanent, mostCommon,
+                             oracleOutputMapping, parseJobAd)
+from TaskWorker import __version__
+from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES, RetryJob
 from WMCore import Lexicon
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.WMArchive.DataMap import createArchiverDoc
-
-from TaskWorker import __version__
-from TaskWorker.Actions.RetryJob import RetryJob
-from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
-from ServerUtilities import isFailurePermanent, parseJobAd, mostCommon, TRANSFERDB_STATES, PUBLICATIONDB_STATES, encodeRequest, oracleOutputMapping
-from ServerUtilities import getLock, getHashLfn
-from RESTInteractions import CRABRest
 
 ASO_JOB = None
 G_JOB_REPORT_NAME = None

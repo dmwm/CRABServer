@@ -1,21 +1,21 @@
 # pylint: disable=C0103, W0703, R0912, R0914, R0915
 
+import logging
 import os
 import sys
 import time
-import logging
 
 import classad
 import htcondor
-
 import HTCondorUtils
-from WMCore.Credential.Proxy import Proxy
 from RESTInteractions import CRABRest
 from ServerUtilities import SERVICE_INSTANCES, tempSetLogLevel
+from TaskWorker.Actions.Recurring.BaseRecurringAction import \
+    BaseRecurringAction
 from TaskWorker.MasterWorker import getRESTParams
 from TaskWorker.WorkerExceptions import ConfigException
+from WMCore.Credential.Proxy import Proxy
 
-from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 
 class RenewRemoteProxies(BaseRecurringAction):
     pollingTime = 60 * 12 #minutes

@@ -1,7 +1,9 @@
 from __future__ import division
-import time
-from WMCore.Configuration import Configuration
+
 import os
+import time
+
+from WMCore.Configuration import Configuration
 
 config = Configuration()
 

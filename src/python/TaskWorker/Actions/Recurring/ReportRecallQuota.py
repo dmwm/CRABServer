@@ -2,15 +2,15 @@
 report used Rucio quota to ElasticSearch via MONIT
 """
 import copy
-import sys
 import json
 import logging
+import sys
 from socket import gethostname
 
 import requests
-
-from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 from RucioUtils import getNativeRucioClient
+from TaskWorker.Actions.Recurring.BaseRecurringAction import \
+    BaseRecurringAction
 
 
 class ReportRecallQuota(BaseRecurringAction):

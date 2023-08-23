@@ -24,16 +24,14 @@
     You can see that if dicts are not converted to strings the allocated memory at the end of the process is 300 Mb.
     This was tested with python 2.6.6 (but I observed the same on python 2.7.5).
 """
-from __future__ import division
-from __future__ import print_function
-
+from __future__ import division, print_function
 
 import gc
-import os
-import sys
 import json
+import os
 import random
 import string
+import sys
 
 from ServerUtilities import executeCommand
 

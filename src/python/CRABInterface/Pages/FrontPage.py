@@ -1,5 +1,8 @@
+import os
+import re
+
 from WMCore.REST.Server import RESTFrontPage
-import os, re
+
 
 class FrontPage(RESTFrontPage):
   """CRABServer front page.

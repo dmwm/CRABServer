@@ -1,34 +1,34 @@
 from __future__ import absolute_import
 
-import re
-import json
-import time
 import copy
 import io
+import json
+import re
 import tempfile
+import time
 from ast import literal_eval
 
-import pycurl
 import classad
-
-from WMCore.WMSpec.WMTask import buildLumiMask
-from WMCore.DataStructs.LumiList import LumiList
+import pycurl
 from CRABInterface.DataWorkflow import DataWorkflow
-from WMCore.Services.pycurl_manager import ResponseHeader
-from WMCore.REST.Error import ExecutionError, InvalidParameter
-
 # WMCore Utils module
 from Utils.Throttled import UserThrottle
+from WMCore.DataStructs.LumiList import LumiList
+from WMCore.REST.Error import ExecutionError, InvalidParameter
+from WMCore.Services.pycurl_manager import ResponseHeader
+from WMCore.WMSpec.WMTask import buildLumiMask
+
 throttle = UserThrottle(limit=3)
 
-from CRABInterface.Utilities import conn_handler
-from ServerUtilities import FEEDBACKMAIL, PUBLICATIONDB_STATES, getEpochFromDBTime
-from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
-
-import HTCondorUtils
-import HTCondorLocator
 from functools import reduce
 
+import HTCondorLocator
+import HTCondorUtils
+from CRABInterface.Utilities import conn_handler
+from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import \
+    GetFromTaskAndType
+from ServerUtilities import (FEEDBACKMAIL, PUBLICATIONDB_STATES,
+                             getEpochFromDBTime)
 
 JOB_KILLED_HOLD_REASON = "Python-initiated action."
 

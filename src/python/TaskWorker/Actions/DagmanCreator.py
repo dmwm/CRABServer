@@ -4,30 +4,27 @@ Create a set of files for a DAG submission.
 Generates the condor submit files and the master DAG.
 """
 
-import os
-import re
+import hashlib
 import json
-import shutil
+import os
 import pickle
 import random
+import re
+import shutil
 import tarfile
-import hashlib
 import tempfile
 from ast import literal_eval
 
-from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import getLock, downloadFromS3
-
-import TaskWorker.WorkerExceptions
+import classad
 import TaskWorker.DataObjects.Result
+import TaskWorker.WorkerExceptions
+import WMCore.WMSpec.WMTask
+from CMSGroupMapper import get_egroup_users
+from RucioUtils import getWritePFN
+from ServerUtilities import (MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS,
+                             TASKLIFETIME, downloadFromS3, getLock)
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
-from RucioUtils import getWritePFN
-from CMSGroupMapper import get_egroup_users
-
-import classad
-
-import WMCore.WMSpec.WMTask
 from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS, SCRAM_TO_ARCH
 
@@ -228,6 +225,7 @@ def validateLFNs(path, outputFiles):
     :return: nothing if all OK. If LFN is not valid Lexicon raises an AssertionError exception
     """
     from WMCore import Lexicon
+
     # fake values to get proper LFN length, actual numbers chance job by job
     jobId = '10000'       # current max is 10k jobs per task
     dirCounter = '0001'   # need to be same length as 'counter' used later in makeDagSpecs
@@ -256,6 +254,7 @@ def validateUserLFNs(path, outputFiles):
     :return: nothing if all OK. If LFN is not valid Lexicon raises an AssertionError exception
     """
     from WMCore import Lexicon
+
     # fake values to get proper LFN length, actual numbers chance job by job
     jobId = '10000'       # current max is 10k jobs per task
     dirCounter = '0001'   # need to be same length as 'counter' used later in makeDagSpecs

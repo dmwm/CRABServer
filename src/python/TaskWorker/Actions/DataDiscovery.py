@@ -1,17 +1,18 @@
 from __future__ import print_function
-import os
+
 import json
 import logging
+import os
 
-from WMCore.DataStructs.Run import Run
+from ServerUtilities import tempSetLogLevel
+from TaskWorker.Actions.TaskAction import TaskAction
+from TaskWorker.DataObjects.Result import Result
 from WMCore.DataStructs.File import File
 from WMCore.DataStructs.Fileset import Fileset
 from WMCore.DataStructs.LumiList import LumiList
+from WMCore.DataStructs.Run import Run
 from WMCore.Services.CRIC.CRIC import CRIC
 
-from TaskWorker.Actions.TaskAction import TaskAction
-from TaskWorker.DataObjects.Result import Result
-from ServerUtilities import tempSetLogLevel
 
 class DataDiscovery(TaskAction):  # pylint: disable=abstract-method
     """

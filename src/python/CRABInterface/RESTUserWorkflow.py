@@ -1,27 +1,36 @@
 """ This module is used to validate requests to the /workflow resource and calls either HTCondorDataWorkflow or DataWorkflow methods
 """
 
+import logging
 # external dependecies here
 import re
-import logging
-import cherrypy
-# WMCore dependecies here
-from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Error import ExecutionError, InvalidParameter
-from WMCore.REST.Validation import validate_str, validate_strlist, validate_num, validate_real
-from WMCore.Services.TagCollector.TagCollector import TagCollector
-from WMCore.Lexicon import userprocdataset, userProcDSParts, primdataset
 
+import cherrypy
 # CRABServer dependecies here
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
+from CRABInterface.Regexps import (RX_ACTIVITY, RX_ADDFILE, RX_ANYTHING,
+                                   RX_ARCH, RX_BLOCK, RX_CACHENAME,
+                                   RX_CACHEURL, RX_CMSSITE, RX_CMSSW,
+                                   RX_COLLECTOR, RX_CUDA_VERSION, RX_DATASET,
+                                   RX_DATE, RX_DBSURL, RX_GENERATOR, RX_JOBID,
+                                   RX_JOBTYPE, RX_LFN, RX_LFNPRIMDS,
+                                   RX_LUMIEVENTS, RX_LUMIRANGE,
+                                   RX_MANYLINES_SHORT, RX_OUTFILES,
+                                   RX_RUCIODID, RX_RUCIOSCOPE, RX_RUNS,
+                                   RX_SCHEDD_NAME, RX_SCRIPTARGS, RX_SPLIT,
+                                   RX_SUBRESTAT, RX_TASKNAME, RX_USERFILE,
+                                   RX_USERNAME, RX_VOPARAMS)
 from CRABInterface.RESTExtensions import authz_owner_match
-from CRABInterface.Regexps import (RX_TASKNAME, RX_ACTIVITY, RX_JOBTYPE, RX_GENERATOR, RX_LUMIEVENTS, RX_CMSSW, RX_ARCH, RX_DATASET,
-    RX_CMSSITE, RX_SPLIT, RX_CACHENAME, RX_CACHEURL, RX_LFN, RX_USERFILE, RX_VOPARAMS, RX_DBSURL, RX_LFNPRIMDS, RX_OUTFILES,
-    RX_RUNS, RX_LUMIRANGE, RX_SCRIPTARGS, RX_SCHEDD_NAME, RX_COLLECTOR, RX_SUBRESTAT, RX_JOBID, RX_ADDFILE,
-    RX_ANYTHING, RX_USERNAME, RX_DATE, RX_MANYLINES_SHORT, RX_CUDA_VERSION, RX_BLOCK, RX_RUCIODID, RX_RUCIOSCOPE)
-from CRABInterface.Utilities import CMSSitesCache, conn_handler, getDBinstance, validate_dict
+from CRABInterface.Utilities import (CMSSitesCache, conn_handler,
+                                     getDBinstance, validate_dict)
 from ServerUtilities import checkOutLFN, generateTaskName
-
+from WMCore.Lexicon import primdataset, userprocdataset, userProcDSParts
+from WMCore.REST.Error import ExecutionError, InvalidParameter
+# WMCore dependecies here
+from WMCore.REST.Server import RESTEntity, restcall
+from WMCore.REST.Validation import (validate_num, validate_real, validate_str,
+                                    validate_strlist)
+from WMCore.Services.TagCollector.TagCollector import TagCollector
 
 
 class RESTUserWorkflow(RESTEntity):

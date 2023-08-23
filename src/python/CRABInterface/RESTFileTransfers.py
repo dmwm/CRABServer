@@ -1,18 +1,21 @@
 from __future__ import print_function
+
+import logging
+# external dependecies here
+import time
+
+from CRABInterface.Regexps import (RX_ANYTHING, RX_ASO_WORKERNAME, RX_CMSSITE,
+                                   RX_SUBGETTRANSFER, RX_SUBPOSTTRANSFER,
+                                   RX_TASKNAME, RX_USERNAME, RX_VOPARAMS)
+from CRABInterface.RESTExtensions import (authz_login_valid,
+                                          authz_operator_without_raise)
+from CRABInterface.Utilities import getDBinstance
+from ServerUtilities import PUBLICATIONDB_STATUSES, TRANSFERDB_STATUSES
 # WMCore dependecies here
 from Utils.Utilities import makeList
-from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_str, validate_num
 from WMCore.REST.Error import InvalidParameter, UnsupportedMethod
-
-from CRABInterface.Utilities import getDBinstance
-from CRABInterface.RESTExtensions import authz_login_valid, authz_operator_without_raise
-from CRABInterface.Regexps import RX_USERNAME, RX_VOPARAMS, RX_TASKNAME, RX_SUBGETTRANSFER, RX_SUBPOSTTRANSFER, \
-                                  RX_CMSSITE, RX_ASO_WORKERNAME, RX_ANYTHING
-
-from ServerUtilities import TRANSFERDB_STATUSES, PUBLICATIONDB_STATUSES
-# external dependecies here
-import time, logging
+from WMCore.REST.Server import RESTEntity, restcall
+from WMCore.REST.Validation import validate_num, validate_str
 
 
 class RESTFileTransfers(RESTEntity):

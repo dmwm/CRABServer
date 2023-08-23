@@ -1,18 +1,19 @@
 from __future__ import print_function
+
+import errno
+import json
+import logging
 import os
 import sys
 import time
-import json
-import errno
-import classad
-import logging
-import htcondor
 from ast import literal_eval
 
+import classad
+import CMSGroupMapper
+import htcondor
 from ServerUtilities import getWebdirForDb, insertJobIdSid
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
-import CMSGroupMapper
 
 class PreJob:
     """

@@ -3,6 +3,7 @@
 import logging
 from collections import namedtuple
 
+
 class GetFromTaskAndType():
     """ Used for indexing columns retrieved by the GetFromTaskAndType_sql query
         Order of parameters must be the same as it is in query GetFromTaskAndType_sql

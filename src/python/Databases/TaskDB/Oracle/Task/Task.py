@@ -2,6 +2,7 @@
 
 from collections import namedtuple
 
+
 class Task(object):
     """
     """

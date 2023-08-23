@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import os
 import re
+
 USE_LDAP = False
 try:
     import ldap

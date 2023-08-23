@@ -48,6 +48,7 @@ process.configurationMetadata = cms.untracked.PSet(
 # Other statements
 process.genstepfilter.triggerConditions=cms.vstring("generation_step")
 from Configuration.AlCa.GlobalTag import GlobalTag
+
 process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:startup', '')
 
 process.generator = cms.EDFilter("Pythia6GeneratorFilter",

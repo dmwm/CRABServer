@@ -4,13 +4,12 @@ mostly things which communicate with DBS or CRAB REST
 """
 
 
+import json
+import logging
 import os
 import sys
-import logging
-import json
 
-
-from ServerUtilities import getHashLfn, encodeRequest
+from ServerUtilities import encodeRequest, getHashLfn
 
 
 def createLogdir(dirname):

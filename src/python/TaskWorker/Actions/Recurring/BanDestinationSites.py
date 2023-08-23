@@ -1,13 +1,15 @@
 # pylint: disable=redefined-outer-name, pointless-string-statement
-import os
-import sys
 import json
-import shutil
-import urllib.request
 import logging
+import os
+import shutil
+import sys
 import traceback
+import urllib.request
 
-from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
+from TaskWorker.Actions.Recurring.BaseRecurringAction import \
+    BaseRecurringAction
+
 
 class BanDestinationSites(BaseRecurringAction):
     pollingTime = 15  # minutes

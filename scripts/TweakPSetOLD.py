@@ -27,10 +27,12 @@ On Worker nodes it has a tarball with all files. but for debugging purpose it is
 from __future__ import print_function
 
 from optparse import OptionParser
-from WMCore.Configuration import Configuration, ConfigSection
+
+from WMCore.Configuration import ConfigSection, Configuration
 from WMCore.DataStructs.Mask import Mask
-from WMCore.WMRuntime.Scripts.SetupCMSSWPset import SetupCMSSWPset
 from WMCore.WMRuntime.ScriptInterface import ScriptInterface
+from WMCore.WMRuntime.Scripts.SetupCMSSWPset import SetupCMSSWPset
+
 
 class jobDict(dict):
     def __init__(self, lheInputFiles, seeding):
@@ -131,11 +133,12 @@ class SetupCMSSWPsetCore(SetupCMSSWPset):
         self.job['agentNumber'] = agentNumber
         self.job['counter'] = 0
 
+import json
 import os
 import sys
-import json
 import tarfile
 from ast import literal_eval
+
 
 def readFileFromTarball(file, tarball):
     content = '{}'

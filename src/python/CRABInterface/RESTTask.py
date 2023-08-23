@@ -1,18 +1,19 @@
 # WMCore dependecies here
-from Utils.Utilities import decodeBytesToUnicode
-from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_str, validate_strlist
-from WMCore.REST.Error import InvalidParameter, ExecutionError, NotAcceptable
-
-from CRABInterface.Utilities import conn_handler, getDBinstance
-from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match
-from CRABInterface.Regexps import RX_MANYLINES_SHORT, RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME,\
-    RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE
-
+import logging
 # external dependecies here
 import re
-import logging
 from ast import literal_eval
+
+from CRABInterface.Regexps import (RX_MANYLINES_SHORT, RX_OUT_DATASET,
+                                   RX_RUCIORULE, RX_RUNS, RX_SCHEDD_NAME,
+                                   RX_STATUS, RX_SUBRES_TASK, RX_TASKNAME,
+                                   RX_URL, RX_USERNAME)
+from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match
+from CRABInterface.Utilities import conn_handler, getDBinstance
+from Utils.Utilities import decodeBytesToUnicode
+from WMCore.REST.Error import ExecutionError, InvalidParameter, NotAcceptable
+from WMCore.REST.Server import RESTEntity, restcall
+from WMCore.REST.Validation import validate_str, validate_strlist
 
 
 class RESTTask(RESTEntity):

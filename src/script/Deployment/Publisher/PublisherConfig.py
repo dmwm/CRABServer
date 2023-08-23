@@ -2,6 +2,7 @@
 Configuration file for CRAB standalone Publisher
 """
 from __future__ import division
+
 from WMCore.Configuration import Configuration
 
 config = Configuration()

@@ -1,29 +1,30 @@
 from __future__ import print_function
-import os
-import time
+
 import logging
+import os
 import tempfile
+import time
 import traceback
 
 from RESTInteractions import CRABRest
 from RucioUtils import getNativeRucioClient
-
+from ServerUtilities import uploadToS3
 from TaskWorker import __version__
-from TaskWorker.Actions.Splitter import Splitter
-from TaskWorker.Actions.DagmanKiller import DagmanKiller
-from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
-from TaskWorker.Actions.StageoutCheck import StageoutCheck
-from TaskWorker.Actions.DryRunUploader import DryRunUploader
-from TaskWorker.Actions.MakeFakeFileSet import MakeFakeFileSet
+from TaskWorker.Actions.DagmanKiller import DagmanKiller
+from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
 from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
 from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
-from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
+from TaskWorker.Actions.DryRunUploader import DryRunUploader
+from TaskWorker.Actions.MakeFakeFileSet import MakeFakeFileSet
+from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 from TaskWorker.Actions.RucioDataDiscovery import RucioDataDiscovery
-from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
-from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException, TaskWorkerException
-
-from ServerUtilities import uploadToS3
+from TaskWorker.Actions.Splitter import Splitter
+from TaskWorker.Actions.StageoutCheck import StageoutCheck
+from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
+from TaskWorker.WorkerExceptions import (TapeDatasetException,
+                                         TaskWorkerException,
+                                         WorkerHandlerException)
 
 
 class TaskHandler(object):

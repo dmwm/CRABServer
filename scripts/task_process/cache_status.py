@@ -3,19 +3,21 @@
 VERSION OF CACHE_STATUS USING HTCONDOR JobEventLog API
 THIS REQUIRES HTCONDOR 8.9.3 OR ABOVE
 """
-from __future__ import print_function, division
-import re
-import time
+from __future__ import division, print_function
+
+import ast
+import copy
+import glob
+import json
 import logging
 import os
-import ast
-import glob
-import copy
-from shutil import move
 import pickle
-import json
-import htcondor
+import re
+import time
+from shutil import move
+
 import classad
+import htcondor
 
 logging.basicConfig(filename='task_process/cache_status.log', level=logging.DEBUG)
 

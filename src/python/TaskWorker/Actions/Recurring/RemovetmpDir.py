@@ -1,11 +1,12 @@
 # pylint: disable=pointless-string-statement
+import logging
 import os
+import shutil
 import sys
 import time
-import shutil
-import logging
 
-from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
+from TaskWorker.Actions.Recurring.BaseRecurringAction import \
+    BaseRecurringAction
 
 SECONDS_IN_HOUR = 60 * 60
 SECONDS_IN_DAY = 60 * 60 * 24

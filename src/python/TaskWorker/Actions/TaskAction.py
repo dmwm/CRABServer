@@ -1,14 +1,16 @@
-import os
 import json
 import logging
-from http.client import HTTPException
+import os
 import sys
+from http.client import HTTPException
+
 if sys.version_info >= (3, 0):
     from urllib.parse import urlencode  # pylint: disable=no-name-in-module
 if sys.version_info < (3, 0):
     from urllib import urlencode
 
 from ServerUtilities import truncateError
+
 
 class TaskAction(object):
     """The ABC of all actions"""

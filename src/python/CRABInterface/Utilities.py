@@ -2,23 +2,23 @@
 """
 The module contains some utility functions used by the various modules of the CRAB REST interface
 """
-import os
-from contextlib import contextmanager
-from collections import namedtuple
-from time import mktime, gmtime
-import time
-import subprocess
+import copy
 import io
 import json
-import copy
-import pycurl
-import cherrypy
+import os
+import subprocess
+import time
+from collections import namedtuple
+from contextlib import contextmanager
+from time import gmtime, mktime
 
-from WMCore.WMFactory import WMFactory
+import cherrypy
+import pycurl
 from WMCore.REST.Error import ExecutionError, InvalidParameter
+from WMCore.REST.Server import RESTArgs
 from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.Services.pycurl_manager import ResponseHeader
-from WMCore.REST.Server import RESTArgs
+from WMCore.WMFactory import WMFactory
 
 CMSSitesCache = namedtuple("CMSSitesCache", ["cachetime", "sites"])
 ConfigCache = namedtuple("ConfigCache", ["cachetime", "centralconfig"])

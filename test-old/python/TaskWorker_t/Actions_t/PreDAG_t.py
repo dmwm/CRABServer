@@ -1,19 +1,16 @@
 #! /usr/bin/env python
 """ Test module for the PreDAG class
 """
-from __future__ import division
-from __future__ import print_function
+from __future__ import division, print_function
 
-import os
 import json
+import os
 import shutil
 import tempfile
 import unittest
 
 from ServerUtilities import getTestDataDirectory
-
 from TaskWorker.Actions.PreDAG import PreDAG
-
 
 MISSING_LUMI_EXAMPLE = ('{"1": [[41068, 41068], [41663, 41663], [42366, 42366], [42594, 42594], [43892, 43892], [44183, 44183], [44593, 44593], '
                         '[45596, 45596], [45598, 45599], [45601, 45601], [46023, 46023], [46197, 46197], [46460, 46460], [47199, 47199], [47203, '

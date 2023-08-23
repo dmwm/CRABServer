@@ -3,23 +3,23 @@ Manages recurring actions for tape recall functionalities
 1. for tasks in TAPERECALL check status of rule and set to NEW when rule is OK
 2. for tasks in KILLRECALL delete rule and set to KILLED
 """
-import logging
-import sys
-import os
-import time
 import copy
-
+import logging
+import os
+import sys
+import time
 from http.client import HTTPException
 from urllib.parse import urlencode
 
-from rucio.common.exception import RuleNotFound
-
-from ServerUtilities import MAX_DAYS_FOR_TAPERECALL, TASKLIFETIME, getTimeFromTaskname
 from RESTInteractions import CRABRest
+from rucio.common.exception import RuleNotFound
 from RucioUtils import getNativeRucioClient
+from ServerUtilities import (MAX_DAYS_FOR_TAPERECALL, TASKLIFETIME,
+                             getTimeFromTaskname)
+from TaskWorker.Actions.Recurring.BaseRecurringAction import \
+    BaseRecurringAction
 from TaskWorker.MasterWorker import getRESTParams
 from TaskWorker.Worker import failTask
-from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 
 
 class TapeRecallManager(BaseRecurringAction):

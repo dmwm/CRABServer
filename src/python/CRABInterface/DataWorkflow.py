@@ -1,19 +1,16 @@
 import copy
-import time
-import logging
 import json
+import logging
+import time
 from ast import literal_eval
 
+from CRABInterface.Utilities import CMSSitesCache, conn_handler, getDBinstance
+## CRAB dependencies
+from ServerUtilities import (NUM_DAYS_FOR_RESUBMITDRAIN,
+                             PUBLICATIONDB_STATUSES, checkTaskLifetime,
+                             getEpochFromDBTime)
 ## WMCore dependecies
 from WMCore.REST.Error import ExecutionError
-
-## CRAB dependencies
-from ServerUtilities import checkTaskLifetime
-from ServerUtilities import PUBLICATIONDB_STATUSES
-from ServerUtilities import NUM_DAYS_FOR_RESUBMITDRAIN
-from ServerUtilities import getEpochFromDBTime
-
-from CRABInterface.Utilities import CMSSitesCache, conn_handler, getDBinstance
 
 
 class DataWorkflow(object):

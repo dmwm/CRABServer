@@ -1,8 +1,9 @@
-import os
 import optparse
+import os
 
 from TaskWorker.Actions.Recurring.RenewRemoteProxies import CRAB3ProxyRenewer
 from WMCore.Configuration import loadConfigurationFile
+
 
 def main():
     parser = optparse.OptionParser()

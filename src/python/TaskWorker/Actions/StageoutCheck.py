@@ -1,12 +1,13 @@
 import os
 import re
 
+from RucioUtils import getWritePFN
+from ServerUtilities import (createDummyFile, execute_command,
+                             getCheckWriteCommand, isFailurePermanent,
+                             removeDummyFile)
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
-from ServerUtilities import isFailurePermanent
-from ServerUtilities import getCheckWriteCommand, createDummyFile
-from ServerUtilities import removeDummyFile, execute_command
-from RucioUtils import getWritePFN
+
 
 class StageoutCheck(TaskAction):
 

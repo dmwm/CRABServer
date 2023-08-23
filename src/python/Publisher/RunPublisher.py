@@ -13,9 +13,9 @@
 """
 from __future__ import division
 
+import argparse
 import logging
 import os
-import argparse
 import time
 
 logging.getLogger().setLevel(logging.DEBUG)

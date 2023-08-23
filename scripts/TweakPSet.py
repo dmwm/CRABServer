@@ -64,6 +64,7 @@ from ast import literal_eval
 from PSetTweaks.PSetTweak import PSetTweak
 from Utils.Utilities import decodeBytesToUnicode
 
+
 def readFileFromTarball(filename, tarball):
     content = '{}'
     if os.path.isfile(filename):

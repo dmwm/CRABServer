@@ -1,23 +1,18 @@
 # import pickle
-from datetime import datetime, timedelta
-
+import json
 # import click
 import os
-import pandas as pd
 # import pprint
 import time
+from datetime import datetime, timedelta
+
+import numpy as np
+import osearch
+import pandas as pd
 # from dateutil.relativedelta import relativedelta
 from pyspark import SparkContext, StorageLevel
 from pyspark.sql import SparkSession
-
-from pyspark.sql.types import (
-    LongType,
-)
-
-import numpy as np
-import json
-import osearch
-from pyspark.sql import SparkSession
+from pyspark.sql.types import LongType
 
 spark = SparkSession\
         .builder\

@@ -2,18 +2,16 @@
 Handles client interactions with remote REST interface
 """
 
+import logging
 import os
-import time
 import random
-
+import time
+from http.client import HTTPException
 from urllib.parse import quote as urllibQuote
 
-import logging
-from http.client import HTTPException
 import pycurl
-
-from WMCore.Services.Requests import JSONRequests
 from WMCore.Services.pycurl_manager import RequestHandler
+from WMCore.Services.Requests import JSONRequests
 
 try:
     from TaskWorker import __version__

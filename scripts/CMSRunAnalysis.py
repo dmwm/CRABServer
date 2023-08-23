@@ -4,24 +4,25 @@ CMSRunAnalysis.py - the runtime python portions to launch a CRAB3 / cmsRun job.
 """
 from __future__ import print_function
 
+import json
+import logging
 import os
 import os.path
-import re
-import sys
-import stat
-import time
-import json
-import shutil
 import pickle
+import re
+import shutil
 import signal
-import logging
+import stat
 import subprocess
+import sys
+import time
 import traceback
 from ast import literal_eval
-from optparse import OptionParser, BadOptionError, AmbiguousOptionError
+from optparse import AmbiguousOptionError, BadOptionError, OptionParser
 
-from WMCore.Storage import SiteLocalConfig
 from TweakPSet import prepareTweakingScript
+from WMCore.Storage import SiteLocalConfig
+
 
 # replicate here code from ServerUtilities.py to avoid importing CRABServer in jobs
 # see there for more documentation. Ideally could move this to WMCore
@@ -582,10 +583,9 @@ if __name__ == "__main__":
     try:
         options = parseArgs()
         prepSandbox(options)
-        from WMCore.WMRuntime.Bootstrap import setupLogging
-        from WMCore.FwkJobReport.Report import Report
-        from WMCore.FwkJobReport.Report import FwkJobReportException
         from Utils.FileTools import calculateChecksums
+        from WMCore.FwkJobReport.Report import FwkJobReportException, Report
+        from WMCore.WMRuntime.Bootstrap import setupLogging
         from WMCore.WMRuntime.Tools.Scram import Scram
     except Exception:
         # We may not even be able to create a FJR at this point.  Record

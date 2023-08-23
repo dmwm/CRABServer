@@ -1,19 +1,21 @@
 from __future__ import division
 
-import logging
-import sys
-import os
-import time
 import datetime
+import logging
+import os
+import sys
+import time
 
-from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
-from TaskWorker.MasterWorker import MasterWorker
-from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
-from TaskWorker.WorkerExceptions import TaskWorkerException
-from ServerUtilities import MAX_DAYS_FOR_TAPERECALL, getTimeFromTaskname
-from RucioUtils import getNativeRucioClient
-from TaskWorker.Worker import failTask
 from rucio.common.exception import RuleNotFound
+from RucioUtils import getNativeRucioClient
+from ServerUtilities import MAX_DAYS_FOR_TAPERECALL, getTimeFromTaskname
+from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
+from TaskWorker.Actions.Recurring.BaseRecurringAction import \
+    BaseRecurringAction
+from TaskWorker.MasterWorker import MasterWorker
+from TaskWorker.Worker import failTask
+from TaskWorker.WorkerExceptions import TaskWorkerException
+
 
 class TapeRecallStatus(BaseRecurringAction):
     pollingTime = 60*4 # minutes

@@ -3,19 +3,19 @@
 from __future__ import absolute_import, division, print_function
 
 import json
+import logging
 import math
 import re
 import time
-import logging
-
 from itertools import islice
 from subprocess import PIPE, Popen
+
 import requests
 from requests.exceptions import ReadTimeout
-
 from rucio.client.client import Client
-from rucio.common.exception import (DataIdentifierAlreadyExists, FileAlreadyExists, RucioException,
-                                    AccessDenied)
+from rucio.common.exception import (AccessDenied, DataIdentifierAlreadyExists,
+                                    FileAlreadyExists, RucioException)
+
 DEBUG_FLAG = False
 DEFAULT_DASGOCLIENT = '/usr/bin/dasgoclient'
 

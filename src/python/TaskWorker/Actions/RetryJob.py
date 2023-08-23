@@ -1,11 +1,13 @@
+import json
 import os
 import re
-import sys
-import json
 import shutil
 import subprocess
-import classad
+import sys
 from collections import namedtuple
+
+import classad
+
 JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERROR')(0, 1, 2)
 
 # Without this environment variable set, HTCondor takes a write lock per logfile entry
@@ -44,7 +46,7 @@ class RetryJob(object):
         self.validreport         = True
         self.integrated_job_time = 0
 
-        from ServerUtilities import MAX_DISK_SPACE, MAX_WALLTIME, MAX_MEMORY
+        from ServerUtilities import MAX_DISK_SPACE, MAX_MEMORY, MAX_WALLTIME
         self.MAX_DISK_SPACE = MAX_DISK_SPACE
         self.MAX_WALLTIME   = MAX_WALLTIME
         self.MAX_MEMORY     = MAX_MEMORY

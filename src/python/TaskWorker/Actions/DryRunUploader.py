@@ -1,23 +1,23 @@
 """
 Upload an archive containing all files needed to run the task to the Cache (necessary for crab submit --dryrun.)
 """
-import os
 import json
+import os
+import sys
 import tarfile
 import time
 
-import sys
 if sys.version_info >= (3, 0):
     from urllib.parse import urlencode  # pylint: disable=no-name-in-module
 if sys.version_info < (3, 0):
     from urllib import urlencode
 
+from ServerUtilities import downloadFromS3, uploadToS3
+from TaskWorker.Actions.TaskAction import TaskAction
+from TaskWorker.DataObjects.Result import Result
+from TaskWorker.WorkerExceptions import TaskWorkerException
 from WMCore.DataStructs.LumiList import LumiList
 
-from TaskWorker.DataObjects.Result import Result
-from TaskWorker.Actions.TaskAction import TaskAction
-from TaskWorker.WorkerExceptions import TaskWorkerException
-from ServerUtilities import uploadToS3, downloadFromS3
 
 class DryRunUploader(TaskAction):
     """

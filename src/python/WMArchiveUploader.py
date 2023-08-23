@@ -1,23 +1,22 @@
 #!/usr/bin/python
 
-from __future__ import print_function, division
+from __future__ import division, print_function
 
+import atexit
+import json
+import logging
 import os
+import signal
+import subprocess
 import sys
 import time
-import json
-import atexit
-import pycurl
-import signal
-import logging
-import subprocess
+from datetime import date
 from http.client import HTTPException
 from logging.handlers import TimedRotatingFileHandler
 
-from WMCore.WMException import WMException
+import pycurl
 from WMCore.Services.WMArchive.WMArchive import WMArchive
-
-from datetime import date
+from WMCore.WMException import WMException
 
 #sudo -u condor sh -c 'export LD_LIBRARY_PATH=/data/srv/SubmissionInfrastructureScripts/; export PYTHONPATH=/data/srv/SubmissionInfrastructureScripts/WMCore/src/python; python /data/srv/SubmissionInfrastructureScripts/WMArchiveUploaderNew.py'
 

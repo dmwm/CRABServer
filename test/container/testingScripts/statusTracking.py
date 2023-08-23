@@ -1,17 +1,19 @@
 #! /usr/bin/env python
 
-from __future__ import print_function
-from __future__ import division
+from __future__ import division, print_function
 
 import os
 import subprocess
+
 try:
-    from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
+    from http.client import \
+        HTTPException  # Python 3 and Python 2 in modern CMSSW
 except:  # pylint: disable=bare-except
     from httplib import HTTPException  # old Python 2 version in CMSSW_7
 
 from CRABAPI.RawCommand import crabCommand
 from CRABClient.ClientExceptions import ClientException
+
 
 def crab_cmd(configuration):
 

@@ -16,19 +16,20 @@ Script algorithm
         + update info in oracle accordingly
 """
 from __future__ import absolute_import, division, print_function
+
+import cProfile
 import json
 import logging
 import os
 import re
 import uuid
 
-from rucio.client.client import Client
-
 from RESTInteractions import CRABRest
+from rucio.client.client import Client
+from rucio.common.exception import (DataIdentifierAlreadyExists,
+                                    FileAlreadyExists, InvalidObject,
+                                    ReplicaNotFound)
 from ServerUtilities import encodeRequest
-from rucio.common.exception import DataIdentifierAlreadyExists, InvalidObject, FileAlreadyExists, ReplicaNotFound
-
-import cProfile
 
 
 class globals:

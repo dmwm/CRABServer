@@ -4,10 +4,11 @@ These are extensions which are not directly contained in WMCore.REST module
 and it shouldn't have any other dependencies a part of that and cherrypy.
 
 """
-from WMCore.REST.Error import MissingObject
+import traceback
 
 import cherrypy
-import traceback
+from WMCore.REST.Error import MissingObject
+
 
 def authz_user_action(username = None):
     if username and username == cherrypy.request.user['login']:

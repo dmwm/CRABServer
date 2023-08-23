@@ -3,26 +3,25 @@
 this is a standalone script. It is spawned by PushisherMaster or could
 be executed from CLI (in the Publisher environment) to retry or debug failures
 """
-from __future__ import division
-from __future__ import print_function
-import os
-import uuid
-import time
-from datetime import datetime
-import logging
-import sys
-import json
-import traceback
+from __future__ import division, print_function
+
 import argparse
+import json
+import logging
+import os
 import pprint
+import sys
+import time
+import traceback
+import uuid
+from datetime import datetime
 
 from dbs.apis.dbsClient import DbsApi
 from dbs.exceptions.dbsClientException import dbsClientException
 from RestClient.ErrorHandling.RestClientExceptions import HTTPError
-from ServerUtilities import getHashLfn, encodeRequest
-from ServerUtilities import SERVICE_INSTANCES
-from TaskWorker.WorkerExceptions import ConfigException, CannotMigrateException
 from RESTInteractions import CRABRest
+from ServerUtilities import SERVICE_INSTANCES, encodeRequest, getHashLfn
+from TaskWorker.WorkerExceptions import CannotMigrateException, ConfigException
 from WMCore.Configuration import loadConfigurationFile
 
 

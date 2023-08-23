@@ -1,25 +1,26 @@
 from __future__ import print_function
-import os
-import time
-import logging
-import traceback
-import multiprocessing
-from queue import Empty
-from logging import FileHandler
-from http.client import HTTPException
-from logging.handlers import TimedRotatingFileHandler
 
+import logging
+import multiprocessing
+import os
 import sys
+import time
+import traceback
+from http.client import HTTPException
+from logging import FileHandler
+from logging.handlers import TimedRotatingFileHandler
+from queue import Empty
+
 if sys.version_info >= (3, 0):
     from urllib.parse import urlencode  # pylint: disable=no-name-in-module
 if sys.version_info < (3, 0):
     from urllib import urlencode
 
 from RESTInteractions import CRABRest
+from ServerUtilities import executeCommand, truncateError
 from TaskWorker.DataObjects.Result import Result
-from ServerUtilities import truncateError, executeCommand
-from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException
-
+from TaskWorker.WorkerExceptions import (TapeDatasetException,
+                                         WorkerHandlerException)
 
 ## Creating configuration globals to avoid passing these around at every request
 ## and tell pylink to bare with this :-)

@@ -4,8 +4,9 @@ _Destroy_
 """
 import threading
 
-from WMCore.Database.DBCreator import DBCreator
 from Databases.FileMetaDataDB.Oracle.Create import Create
+from WMCore.Database.DBCreator import DBCreator
+
 
 class Destroy(DBCreator):
     def __init__(self, logger = None, dbi = None, param=None):

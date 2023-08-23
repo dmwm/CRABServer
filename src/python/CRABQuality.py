@@ -2,8 +2,7 @@
     CRABQuality - Entry module for CRAB testing functionality
 """
 from __future__ import print_function
-import nose
-from nose.tools import with_setup
+
 import os
 import os.path
 import shutil
@@ -11,7 +10,11 @@ import subprocess
 import sys
 import tempfile
 import time
+
 import CRABInterface.CRABServerBase as CRABServerBase
+import nose
+from nose.tools import with_setup
+
 
 def getTestRoot():
     return os.path.join(CRABServerBase.getCRABServerBase(),

@@ -59,6 +59,7 @@ process.MINIAODoutput = cms.OutputModule("PoolOutputModule",
 
 # Other statements
 from Configuration.AlCa.GlobalTag_condDBv2 import GlobalTag
+
 process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:run1_data_Fake', '')
 
 # Path and EndPath definitions
@@ -70,15 +71,18 @@ process.schedule = cms.Schedule(process.endjob_step,process.MINIAODoutput_step)
 
 #do not add changes to your config after this point (unless you know what you are doing)
 from FWCore.ParameterSet.Utilities import convertToUnscheduled
+
 process=convertToUnscheduled(process)
 process.load('Configuration.StandardSequences.PAT_cff')
 from FWCore.ParameterSet.Utilities import cleanUnscheduled
+
 process=cleanUnscheduled(process)
 
 # customisation of the process.
 
 # Automatic addition of the customisation function from PhysicsTools.PatAlgos.slimming.miniAOD_tools
-from PhysicsTools.PatAlgos.slimming.miniAOD_tools import miniAOD_customizeAllData
+from PhysicsTools.PatAlgos.slimming.miniAOD_tools import \
+    miniAOD_customizeAllData
 
 #call to customisation function miniAOD_customizeAllData imported from PhysicsTools.PatAlgos.slimming.miniAOD_tools
 process = miniAOD_customizeAllData(process)

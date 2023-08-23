@@ -12,6 +12,7 @@ import threading
 from WMCore.DAOFactory import DAOFactory
 from WMCore.WMFactory import WMFactory
 
+
 def getConnection(package):
     """
     _getConnection_

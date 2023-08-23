@@ -5,31 +5,19 @@ os.environ['PYSPARK_PYTHON'] = sys.executable
 os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
 
 import time
+from datetime import date, datetime, timedelta
 
-from datetime import datetime, date, timedelta
-from pyspark.sql.functions import (
-    col,
-    lit,
-    when,
-    sum as _sum,
-    count as _count,
-    first,
-    date_format,
-    from_unixtime
-)
 import numpy as np
-import pandas as pd
-from pyspark.sql.types import (
-    StructType,
-    LongType,
-    StringType,
-    StructField,
-    DoubleType,
-    IntegerType,
-)
-
 import osearch
+import pandas as pd
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
+from pyspark.sql.functions import count as _count
+from pyspark.sql.functions import date_format, first, from_unixtime, lit
+from pyspark.sql.functions import sum as _sum
+from pyspark.sql.functions import when
+from pyspark.sql.types import (DoubleType, IntegerType, LongType, StringType,
+                               StructField, StructType)
 
 spark = SparkSession\
         .builder\

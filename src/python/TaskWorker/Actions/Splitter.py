@@ -1,10 +1,9 @@
-from WMCore.DataStructs.Workflow import Workflow
-from WMCore.DataStructs.Subscription import Subscription
-from WMCore.JobSplitting.SplitterFactory import SplitterFactory
-
-from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.TaskAction import TaskAction
+from TaskWorker.DataObjects.Result import Result
 from TaskWorker.WorkerExceptions import TaskWorkerException
+from WMCore.DataStructs.Subscription import Subscription
+from WMCore.DataStructs.Workflow import Workflow
+from WMCore.JobSplitting.SplitterFactory import SplitterFactory
 
 
 class Splitter(TaskAction):

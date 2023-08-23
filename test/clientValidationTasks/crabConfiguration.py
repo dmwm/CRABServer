@@ -1,7 +1,9 @@
 from __future__ import division
-from datetime import datetime
-from WMCore.Configuration import Configuration
+
 import os
+from datetime import datetime
+
+from WMCore.Configuration import Configuration
 
 config = Configuration()
 

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # coding: utf-8
-from __future__ import print_function
-from __future__ import division
+from __future__ import division, print_function
 
+import argparse
 import os
 import time
-from  datetime import datetime
-import argparse
+from datetime import datetime
 
 from dbs.apis.dbsClient import DbsApi
+
 
 def main():
     parser = argparse.ArgumentParser()

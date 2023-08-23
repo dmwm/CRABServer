@@ -1,4 +1,5 @@
 from WMCore.Configuration import Configuration
+
 config = Configuration()
 
 config.section_("General")

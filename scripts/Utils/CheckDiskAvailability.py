@@ -39,9 +39,10 @@ Rules on this dataset:
 8bd6221520a547599b87bd327efea03b   wmcore_output        OK            None               T0_CH_CERN_Tape
 """
 import argparse
+import json
 import os
 import subprocess
-import json
+
 
 def main():
     rucio = ensure_environment()

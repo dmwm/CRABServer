@@ -7,30 +7,32 @@ PRESENT IN EARLIER CMSSW RELEASES
 # this is a weird and unclear message from pylint, better to ignore it
 # pylint: disable=W0715
 
-from __future__ import print_function
-from __future__ import division
-from __future__ import absolute_import
+from __future__ import absolute_import, division, print_function
 
-import os
-import sys
-import re
-import time
+import calendar
+import contextlib
+import datetime
 import fcntl
 import hashlib
-import calendar
-import datetime
-import traceback
+import os
+import re
 import subprocess
-import contextlib
+import sys
+import time
+import traceback
+
 try:
-    from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
+    from http.client import \
+        HTTPException  # Python 3 and Python 2 in modern CMSSW
 except:  # pylint: disable=bare-except
     from httplib import HTTPException  # old Python 2 version in CMSSW_7
 if sys.version_info >= (3, 0):
-    from urllib.parse import urlencode, quote  # pylint: disable=no-name-in-module
+    from urllib.parse import (quote,  # pylint: disable=no-name-in-module
+                              urlencode)
+
     from past.builtins import basestring
 if sys.version_info < (3, 0):
-    from urllib import urlencode, quote
+    from urllib import quote, urlencode
 
 BOOTSTRAP_CFGFILE_DUMP = 'PSetDump.py'
 FEEDBACKMAIL = 'cmstalk+computing-tools@dovecotmta.cern.ch'

@@ -9,8 +9,8 @@ example output:
 import os
 import sys
 import time
-import pandas as pd
 
+import pandas as pd
 from RESTInteractions import CRABRest
 from ServerUtilities import encodeRequest
 

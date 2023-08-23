@@ -1,8 +1,8 @@
-from __future__ import division
-from __future__ import absolute_import
-import time
+from __future__ import absolute_import, division
+
 import bisect
 import random
+import time
 
 import classad
 import htcondor

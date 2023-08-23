@@ -1,8 +1,9 @@
-import time
 import logging
 import os
+import time
 
 from TaskWorker.DataObjects.Result import Result
+
 
 def handleRecurring(resthost, dbInstance, config, task, procnum, action):
     actionClass = action.split('.')[-1]

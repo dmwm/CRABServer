@@ -30,13 +30,13 @@ The three files are:
      bash -x <scriptName> <taskName>
 
 """
-from __future__ import division
-from __future__ import print_function
+from __future__ import division, print_function
 
 import os
 
-from testUtils import writePset, writePset8cores, writeScriptExe, writeLumiMask, \
-    writeConfigFile, writeTestSubmitScript, writeValidationScript
+from testUtils import (writeConfigFile, writeLumiMask, writePset,
+                       writePset8cores, writeScriptExe, writeTestSubmitScript,
+                       writeValidationScript)
 
 # some tests needs changing if running on SL6
 # rely on $singularity which is set by Jenkins as

@@ -3,22 +3,20 @@
 this is a standalone script. It is spawned by PushisherMaster or could
 be executed from CLI (in the Publisher environment) to retry or debug failures
 """
-import os
-import time
-import json
-import traceback
 import argparse
+import json
+import os
 import pprint
+import time
+import traceback
 
-from WMCore.Configuration import loadConfigurationFile
-
+from PublisherDbsUtils import (createBulkBlock, format_file_3,
+                               migrateByBlockDBS3, setupDbsAPIs)
+from PublisherUtils import (getDBSInputInformation, mark_failed, mark_good,
+                            prepareDummySummary, saveSummaryJson, setupLogging)
 from TaskWorker.WorkerExceptions import CannotMigrateException
 from TaskWorker.WorkerUtilities import getCrabserver
-
-from PublisherUtils import setupLogging, prepareDummySummary, saveSummaryJson, \
-                            mark_good, mark_failed, getDBSInputInformation
-
-from PublisherDbsUtils import format_file_3, setupDbsAPIs, createBulkBlock, migrateByBlockDBS3
+from WMCore.Configuration import loadConfigurationFile
 
 
 def publishInDBS3(config, taskname, verbose, console):

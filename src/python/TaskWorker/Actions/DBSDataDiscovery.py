@@ -1,24 +1,23 @@
 """
 Performing the data discovery through CMS DBS service.
 """
+import logging
 # avoid pylint complainging about non-elegfant code . It is old and works. Do not touch.
 # pylint: disable=too-many-locals, too-many-branches, too-many-nested-blocks, too-many-statements
 import os
-import logging
 import sys
 
-from WMCore.DataStructs.LumiList import LumiList
-from WMCore.Services.DBS.DBSReader import DBSReader
-from WMCore.Services.DBS.DBSErrors import DBSReaderError
-from WMCore.Configuration import ConfigurationEx
-
 from RucioUtils import getNativeRucioClient
-
-from ServerUtilities import FEEDBACKMAIL, MAX_LUMIS_IN_BLOCK, parseDBSInstance, isDatasetUserDataset
-from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
+from ServerUtilities import (FEEDBACKMAIL, MAX_LUMIS_IN_BLOCK,
+                             isDatasetUserDataset, parseDBSInstance)
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 from TaskWorker.Actions.RucioActions import RucioAction
-
+from TaskWorker.WorkerExceptions import (TapeDatasetException,
+                                         TaskWorkerException)
+from WMCore.Configuration import ConfigurationEx
+from WMCore.DataStructs.LumiList import LumiList
+from WMCore.Services.DBS.DBSErrors import DBSReaderError
+from WMCore.Services.DBS.DBSReader import DBSReader
 
 
 class DBSDataDiscovery(DataDiscovery):

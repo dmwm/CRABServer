@@ -1,11 +1,10 @@
-from WMCore.DataStructs.Run import Run
+from TaskWorker.Actions.DataDiscovery import DataDiscovery
+from TaskWorker.DataObjects.Result import Result
+from TaskWorker.WorkerExceptions import TaskWorkerException
 from WMCore.DataStructs.File import File
 from WMCore.DataStructs.Fileset import Fileset
+from WMCore.DataStructs.Run import Run
 from WMCore.Services.CRIC.CRIC import CRIC
-
-from TaskWorker.DataObjects.Result import Result
-from TaskWorker.Actions.DataDiscovery import DataDiscovery
-from TaskWorker.WorkerExceptions import TaskWorkerException
 
 
 class UserDataDiscovery(DataDiscovery):

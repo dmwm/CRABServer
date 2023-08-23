@@ -1,6 +1,6 @@
 import re
-from WMCore.Lexicon import lfnParts, DATASET_RE
 
+from WMCore.Lexicon import DATASET_RE, lfnParts
 
 ## This regular expression matches any single-line string. It is useful for example for
 ## functions that require a regular expression against which they will match a

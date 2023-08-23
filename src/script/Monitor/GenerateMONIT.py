@@ -1,18 +1,19 @@
 # pylint: disable=W0703
 from __future__ import print_function
+
+import errno
+import json
+import logging
 import os
+import signal
+import subprocess
 import sys
 import time
-import logging
-import htcondor
 import traceback
-import subprocess
-import errno
-import signal
-
-from socket import gethostname
 from pprint import pprint
-import json
+from socket import gethostname
+
+import htcondor
 import requests
 from RESTInteractions import CRABRest
 

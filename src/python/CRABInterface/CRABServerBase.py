@@ -4,6 +4,7 @@
 """
 import os.path
 
+
 def getCRABServerBase():
     """ returns the root of CRABServer install """
     if __file__.find("src/python") != -1:

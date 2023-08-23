@@ -1,8 +1,9 @@
 
 import os
-from ServerUtilities import encodeRequest
-from TransferInterface import chunks, mark_failed, CRABDataInjector
 import threading
+
+from ServerUtilities import encodeRequest
+from TransferInterface import CRABDataInjector, chunks, mark_failed
 
 
 def submit(trans_tuple, job_data, log, direct=False):

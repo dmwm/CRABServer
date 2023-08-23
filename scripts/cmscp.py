@@ -1,17 +1,18 @@
 from __future__ import print_function
+
 import warnings
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category = DeprecationWarning)
 
-import os
-import sys
-import re
 import json
-import time
-import signal
 import logging
+import os
+import re
+import signal
+import sys
 import tarfile
+import time
 import traceback
 
 if os.path.exists("WMCore.zip") and "WMCore.zip" not in sys.path:
@@ -22,11 +23,11 @@ from ServerUtilities import cmd_exist, parseJobAd
 if 'http_proxy' in os.environ and not os.environ['http_proxy'].startswith("http://"):
     os.environ['http_proxy'] = "http://%s" % (os.environ['http_proxy'])
 
-import WMCore.Storage.StageOutMgr as StageOutMgr
 import WMCore.Storage.StageOutError as StageOutError
-from WMCore.Storage.Registry import retrieveStageOutImpl
-from WMCore.Algorithms.Alarm import Alarm, alarmHandler
+import WMCore.Storage.StageOutMgr as StageOutMgr
 import WMCore.WMException as WMException
+from WMCore.Algorithms.Alarm import Alarm, alarmHandler
+from WMCore.Storage.Registry import retrieveStageOutImpl
 
 ## See the explanation of this sentry file in CMSRunAnalysis.py.
 with open('wmcore_initialized', 'w') as fd_wmcore:

@@ -14,18 +14,18 @@ python3 StressTest_REST_POST.py -c 10 -l 2 \
 --filesintemplate 100
 """
 
-import os
-import sys
-import logging
-import pprint
-import asyncio
-import time
 import argparse
-import statistics
+import asyncio
 import functools
+import logging
+import os
+import pprint
+import statistics
+import sys
+import time
 
 from RESTInteractions import CRABRest
-from ServerUtilities import getHashLfn, encodeRequest
+from ServerUtilities import encodeRequest, getHashLfn
 
 logger = logging.getLogger()
 logformat = '%(asctime)s %(levelname)-10s: %(message)s'

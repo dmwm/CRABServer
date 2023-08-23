@@ -5,16 +5,16 @@
     NOTE: This is intended to run automagically. Keep the deps minimal
 """
 from __future__ import print_function
-import sys
+
 import os
 import os.path
 import re
 import shutil
-from distutils.core import setup, Command
+import sys
 from distutils.command.build import build
 from distutils.command.install import install
+from distutils.core import Command, setup
 from distutils.spawn import spawn
-
 
 systems = \
 {

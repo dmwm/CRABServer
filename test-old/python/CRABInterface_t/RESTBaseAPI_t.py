@@ -1,18 +1,19 @@
 helper = None
 # breaks in CP 3.2
 try:
-    from cherrypy.test import test, webtest, helper
+    from cherrypy.test import helper, test, webtest
 except:
     pass
 if helper:
-    from cherrypy import expose, response, config as cpconfig
     import os
-    import string, random
+    import random
+    import string
 
-    from WMCore.REST.Test import setup_test_server, fake_authz_headers
     import WMCore.REST.Test as RT
-
+    from cherrypy import config as cpconfig
+    from cherrypy import expose, response
     from CRABInterface import RESTBaseAPI
+    from WMCore.REST.Test import fake_authz_headers, setup_test_server
 
     COUCH_URL = os.getenv("COUCHURL")
     REQMGR_DB = 'test_reqmgrdb'

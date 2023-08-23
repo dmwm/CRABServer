@@ -1,10 +1,11 @@
 
-import os
 import json
-from rucio.common.exception import ReplicaNotFound
+import os
+
 from RESTInteractions import CRABRest
+from rucio.common.exception import ReplicaNotFound
 from ServerUtilities import encodeRequest
-from TransferInterface import mark_failed, mark_transferred, CRABDataInjector
+from TransferInterface import CRABDataInjector, mark_failed, mark_transferred
 
 
 def monitor(user, taskname, log):

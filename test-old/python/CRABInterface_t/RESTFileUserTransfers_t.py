@@ -6,18 +6,19 @@ Created on Tue Mar 23 13:30:04 2016
 
 @author: jbalcas
 """
-from __future__ import print_function
-from __future__ import division
-import unittest
+from __future__ import division, print_function
 
 import os
-import time
-import string
 import random
+import string
+import time
+import unittest
 import urllib
 
 from RESTInteractions import HTTPRequests
-from ServerUtilities import getHashLfn, generateTaskName, PUBLICATIONDB_STATUSES, encodeRequest, oracleOutputMapping
+from ServerUtilities import (PUBLICATIONDB_STATUSES, encodeRequest,
+                             generateTaskName, getHashLfn, oracleOutputMapping)
+
 
 class FileTransfersTest(unittest.TestCase):
     """

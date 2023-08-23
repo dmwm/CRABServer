@@ -3,20 +3,22 @@
 # pylint: disable=W0622  # allow using "id" as variable even if it redefines a built-in
 
 from __future__ import print_function
-# WMCore dependecies here
-from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_str, validate_num, validate_strlist
-from WMCore.REST.Error import InvalidParameter, UnsupportedMethod
 
-from CRABInterface.Utilities import getDBinstance
-from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import RX_USERNAME, RX_TASKNAME, RX_SUBGETUSERTRANSFER, RX_SUBPOSTUSERTRANSFER,\
-    RX_JOBID, RX_ANYTHING, RX_BLOCK, RX_STATUS
-
-from ServerUtilities import TRANSFERDB_STATUSES, PUBLICATIONDB_STATUSES
+import logging
 # external dependecies here
 import time
-import logging
+
+from CRABInterface.Regexps import (RX_ANYTHING, RX_BLOCK, RX_JOBID, RX_STATUS,
+                                   RX_SUBGETUSERTRANSFER,
+                                   RX_SUBPOSTUSERTRANSFER, RX_TASKNAME,
+                                   RX_USERNAME)
+from CRABInterface.RESTExtensions import authz_login_valid
+from CRABInterface.Utilities import getDBinstance
+from ServerUtilities import PUBLICATIONDB_STATUSES, TRANSFERDB_STATUSES
+from WMCore.REST.Error import InvalidParameter, UnsupportedMethod
+# WMCore dependecies here
+from WMCore.REST.Server import RESTEntity, restcall
+from WMCore.REST.Validation import validate_num, validate_str, validate_strlist
 
 
 class RESTFileUserTransfers(RESTEntity):

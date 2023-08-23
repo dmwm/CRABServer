@@ -16,35 +16,34 @@ it starts when N=Completion jobs have finished. Again, the splitting is
 performed but using as lumi mask the unprocessed lumis (lumis missing from
 jobs that did not complete in time). It also includes failed jobs.
 """
-from __future__ import division
-from __future__ import print_function
+from __future__ import division, print_function
 
-import os
-import re
-import sys
-import json
 import copy
 import errno
-import pickle
-import shutil
+import functools
+import json
 import logging
+import os
+import pickle
+import re
+import shutil
+import subprocess
+import sys
 import tarfile
 import tempfile
-import functools
-import subprocess
 from ast import literal_eval
 
 import classad
-
-from WMCore.DataStructs.LumiList import LumiList
-
-from ServerUtilities import getLock, newX509env, MAX_IDLE_JOBS, MAX_POST_JOBS, parseJobAd
 from RESTInteractions import CRABRest
 from RucioUtils import getNativeRucioClient
-from TaskWorker.Actions.Splitter import Splitter
+from ServerUtilities import (MAX_IDLE_JOBS, MAX_POST_JOBS, getLock, newX509env,
+                             parseJobAd)
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
-from TaskWorker.WorkerExceptions import TaskWorkerException
+from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Worker import failTask
+from TaskWorker.WorkerExceptions import TaskWorkerException
+from WMCore.DataStructs.LumiList import LumiList
+
 
 class PreDAG(object):
     """ Main class that implement all the necessary features
@@ -216,7 +215,8 @@ class PreDAG(object):
         config.TaskWorker.scratchDir = './scratchdir'
         if not os.path.exists(config.TaskWorker.scratchDir):
             os.makedirs(config.TaskWorker.scratchDir)
-        from TaskWorker.Actions.Recurring.BanDestinationSites import CRAB3BanDestinationSites
+        from TaskWorker.Actions.Recurring.BanDestinationSites import \
+            CRAB3BanDestinationSites
         banSites = CRAB3BanDestinationSites(config, self.logger)
         with config.TaskWorker.envForCMSWEB:
             banSites.execute()

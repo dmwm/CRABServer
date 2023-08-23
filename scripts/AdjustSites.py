@@ -7,23 +7,22 @@
 
 from __future__ import print_function
 
-import pickle
+import glob
 import os
+import pickle
 import re
+import shutil
 import sys
 import time
-import glob
-import shutil
-from urllib.parse import urlencode
 import traceback
 from datetime import datetime
 from http.client import HTTPException
+from urllib.parse import urlencode
 
 import classad
 import htcondor
-
 from RESTInteractions import CRABRest
-from ServerUtilities import getProxiedWebDir, getColumn
+from ServerUtilities import getColumn, getProxiedWebDir
 
 
 def printLog(msg):

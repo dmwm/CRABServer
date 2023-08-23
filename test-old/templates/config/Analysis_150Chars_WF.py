@@ -1,7 +1,9 @@
 from CRABClient.UserUtilities import config
+
 config = config()
 
 from time import time
+
 runNumber = str(time()).replace('.','-')
 
 head='HG1512d-rc4-new-client-2-100CharsWF'

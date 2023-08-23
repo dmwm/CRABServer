@@ -1,14 +1,15 @@
 from __future__ import print_function
-import os
-import logging
+
 import copy
+import logging
+import os
+import sys
 from http.client import HTTPException
 
-import sys
-
-from TaskWorker.WorkerExceptions import TaskWorkerException
-from TaskWorker.Actions.DataDiscovery import DataDiscovery
 from RucioUtils import getNativeRucioClient
+from TaskWorker.Actions.DataDiscovery import DataDiscovery
+from TaskWorker.WorkerExceptions import TaskWorkerException
+
 
 class RucioDataDiscovery(DataDiscovery):
     """Performing the data discovery through CMS Rucio service.
@@ -191,8 +192,8 @@ if __name__ == '__main__':
     did = f"{scope}:{container}"
 
     logging.basicConfig(level=logging.DEBUG)
-    from WMCore.Configuration import ConfigurationEx
     from ServerUtilities import newX509env
+    from WMCore.Configuration import ConfigurationEx
 
     config = ConfigurationEx()
     config.section_("Services")
