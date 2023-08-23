@@ -43,5 +43,5 @@ do
   fi
 done
 echo ""
-echo "Publisher is in waiting now. Killing PublisherMaster"
-pkill -f PublisherMaster
+echo "Publisher is in waiting now. Killing RunPublisher"
+pkill -f RunPublisher
