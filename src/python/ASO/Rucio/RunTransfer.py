@@ -68,6 +68,7 @@ class RunTransfer:
         :rtype: rucio.client.client.Client
         """
         # maybe we can share with getNativeRucioClient
+        self.logger.info('Initializing Rucio Client')
         rucioLogger = logging.getLogger('RucioTransfer.RucioClient')
         rucioLogger.setLevel(logging.INFO)
         if os.environ.get('X509_USER_PROXY', None):
@@ -100,6 +101,7 @@ class RunTransfer:
         :return: rest client object
         :rtype: RESTInteractions.CRABRest
         """
+        self.logger.info('Initializing CRAB REST client')
         restLogger = logging.getLogger('RucioTransfer.RESTClient')
         restLogger.setLevel(logging.DEBUG)
         proxyPathEnv = os.environ.get('X509_USER_PROXY', None)
