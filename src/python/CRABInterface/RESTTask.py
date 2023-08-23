@@ -391,11 +391,12 @@ class RESTTask(RESTEntity):
         authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
 
         import pdb; pdb.set_trace()
+
         self.api.modify(
             self.Task.SetRucioASOInfo_sql,
             tm_transfer_container=[kwargs['transfercontainer']],
             tm_transfer_rule=[kwargs['transferrule']],
             tm_publish_rule=[kwargs['publishrule']],
-            tm_transfercontainer=[], tm_taskname=[workflow])
+            tm_taskname=[workflow])
 
         return []
