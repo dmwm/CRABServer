@@ -7,7 +7,7 @@ from WMCore.REST.Error import InvalidParameter, ExecutionError, NotAcceptable
 from CRABInterface.Utilities import conn_handler, getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match
 from CRABInterface.Regexps import RX_MANYLINES_SHORT, RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME,\
-    RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE
+    RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE, RX_DATASET
 
 # external dependecies here
 import re
@@ -39,7 +39,7 @@ class RESTTask(RESTEntity):
             validate_strlist("outputdatasets", param, safe, RX_OUT_DATASET)
             validate_str("taskstatus", param, safe, RX_STATUS, optional=True)
             validate_str("ddmreqid", param, safe, RX_RUCIORULE, optional=True)
-            validate_str("transfercontainer", param, safe, RX_RUCIORULE, optional=True)
+            validate_str("transfercontainer", param, safe, RX_DATASET, optional=True)
             validate_str("transferrule", param, safe, RX_RUCIORULE, optional=True)
             validate_str("publishrule", param, safe, RX_RUCIORULE, optional=True)
         elif method in ['GET']:
