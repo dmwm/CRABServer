@@ -205,7 +205,7 @@ class RegisterReplicas:
             else:
                 newFileDocs.append(r)
 
-        b = BuildDBSDataset(self.transfer, self.rucioClient)
+        b = BuildDBSDataset(self.transfer, self.rucioClient, self.crabRESTClient)
         for chunk in chunks(newFileDocs, config.args.replicas_chunk_size):
             currentDataset = b.getOrCreateDataset(container)
             self.logger.debug(f'currentDataset: {currentDataset}')
