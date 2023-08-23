@@ -396,3 +396,5 @@ class RESTTask(RESTEntity):
             tm_transfer_rule=[kwargs['transferrule']],
             tm_publish_rule=[kwargs['publishrule']],
             tm_transfercontainer=[], tm_taskname=[workflow])
+
+        return []
