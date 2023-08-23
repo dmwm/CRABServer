@@ -48,7 +48,7 @@ class RunTransfer:
             self.transfer.restProxyFile,
         )
         # build dataset
-        BuildDBSDataset(self.transfer, self.rucioClient).execute()
+        BuildDBSDataset(self.transfer, self.rucioClient, self.crabRESTClient).execute()
         # do 1
         RegisterReplicas(self.transfer, self.rucioClient, self.crabRESTClient).execute()
         # do 2

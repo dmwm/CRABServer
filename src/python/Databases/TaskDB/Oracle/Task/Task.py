@@ -173,3 +173,11 @@ class Task(object):
     #TaskDDMReqId
     UpdateDDMReqId_sql = """UPDATE tasks SET tm_task_status = upper(:taskstatus), tm_DDM_reqid = :ddmreqid \
                               WHERE tm_taskname = :workflow"""
+
+    #Update rucio aso info
+    SetRucioASOInfo_sql = """UPDATE tasks \
+                                 SET \
+                                     tm_transfer_container = :tm_transfer_container \
+                                     tm_transfer_rule = :tm_transfer_rule \
+                                     tm_publish_rule = :tm_publish_rule \
+                                 WHERE tm_taskname = :tm_taskname"""
