@@ -31,15 +31,11 @@ def publishInDBS3(config, taskname, verbose, console):
     # initialized here to None simply as documentation
     log = {'logger': None, 'logdir': None, 'logTaskDir': None, 'taskFilesDir': None}
     DBSApis = {'source': None, 'destRead': None, 'destWrite': None, 'global': None, 'migrate': None}
-    DBSConfigs = {'inputDataset': None, 'outputDataset': None, 'primds_config':None,
-                  'dataset_config': None, 'output_config': None,
-                  'processing_era_config': None, 'acquisition_era_config': None}
     nothingToDo = {}  # a pre-filled SummaryFile in case of no useful input or errors
 
 
-    def findParentBlocks(listOfFileDicts):
+    def findParentBlocks(listOfFileDicts=None, logger=None):
         #sourceApi, globalApi, destApi, destReadApi, migrateApi = DBSApis
-        logger = log['logger']
 
         # Set of all the parent files from all the files requested to be published.
         parentFiles = set()
@@ -105,15 +101,21 @@ def publishInDBS3(config, taskname, verbose, console):
                         file['parents'].remove(parentFile)
         return (localParentBlocks, globalParentBlocks)
 
-    def prepareDbsPublishingConfigs(aBlock=None, aFile=None):
-        # fills the dictionary with the various configs needed to publish one block
-        # needs a few parameters from the a sample block/file to be published in the
-        # input json file
+    def prepareDbsPublishingConfigs(blockDict=None, inputDataset=None, logger=None):
+        """
+        Fills the DBSConfigs dictionary with the various configs needed to publish one block
+        Needs a few parameters from the a sample block to be published
+        DBSConfigs = {'primds_config', 'dataset_config', 'output_config',
+                  'processing_era_config', 'acquisition_era_config'}
+        """
 
-        logger = log['logger']
-        inputDataset = DBSConfigs['inputDataset']
+        releaseVersion = blockDict['release_version']
+        globalTag = blockDict['global_tag']
+        acquisitionEra = blockDict['acquisition_era_name']
+        aFile = blockDict['files'][0]
+        psetHash = aFile['publishname'].split("-")[-1]
+
         noInput = len(inputDataset.split("/")) <= 3
-
         if not noInput:
             existing_datasets = DBSApis['source'].listDatasets(dataset=inputDataset, detail=True, dataset_access_type='*')
             primary_ds_type = existing_datasets[0]['primary_ds_type']
@@ -121,42 +123,38 @@ def publishInDBS3(config, taskname, verbose, console):
             if not existing_output:
                 msg = f"Unable to list output config for input dataset {inputDataset}"
                 logger.error(msg)
-                global_tag = 'crab3_tag'
+                globalTag = 'crab3_tag'
             else:
-                global_tag = existing_output[0]['global_tag']
+                globalTag = existing_output[0]['global_tag']
         else:
             msg = "This publication appears to be for private MC."
             logger.info(msg)
             primary_ds_type = 'mc'
-            global_tag = 'crab3_tag'
-
-        acquisition_era_name = "CRAB"
-        processing_era_config = {'processing_version': 1, 'description': 'CRAB3_processing_era'}
+            globalTag = 'crab3_tag'
 
         appName = 'cmsRun'
-        appVer = aBlock["swversion"]
-        pset_hash = aFile['publishname'].split("-")[-1]
-        gtag = str(aBlock['globaltag'])
-        if gtag == "None":
-            gtag = global_tag
-        if aBlock['acquisitionera'] and not aBlock['acquisitionera'] in ["null"]:
-            acquisitionera = str(aBlock['acquisitionera'])
-        else:
-            acquisitionera = acquisition_era_name
+        if not globalTag or globalTag == 'null' or globalTag == 'None':
+            globalTag = 'crab3_tag'
+        if not acquisitionEra or acquisitionEra == 'null' or acquisitionEra == 'None':
+            acquisitionEra = 'CRAB'
 
-        _, primName, procName, tier = DBSConfigs['outputDataset'].split('/')
+
+        outputDataset = aBlock['block_name'].split('#')[0]
+        _, primName, procName, tier = outputDataset.split('/')
         primds_config = {'primary_ds_name': primName, 'primary_ds_type': primary_ds_type}
 
-        acquisition_era_config = {'acquisition_era_name': acquisitionera, 'start_date': 0}
+        acquisition_era_config = {'acquisition_era_name': acquisitionEra, 'start_date': 0}
 
-        output_config = {'release_version': appVer,
-                         'pset_hash': pset_hash,
+        processing_era_config = {'processing_version': 1, 'description': 'CRAB3_processing_era'}
+
+        output_config = {'release_version': releaseVersion,
+                         'pset_hash': psetHash,
                          'app_name': appName,
                          'output_module_label': 'o',
-                         'global_tag': global_tag,
+                         'global_tag': globalTag,
                          }
 
-        dataset_config = {'dataset': dataset,
+        dataset_config = {'dataset': outputDataset,
                           'processed_ds_name': procName,
                           'data_tier_name': tier,
                           'dataset_access_type': 'VALID',
@@ -166,28 +164,32 @@ def publishInDBS3(config, taskname, verbose, console):
 
         logger.info("Output dataset config: %s", str(dataset_config))
 
+        DBSConfigs = {}
         DBSConfigs['primds_config'] = primds_config
         DBSConfigs['dataset_config'] = dataset_config
         DBSConfigs['output_config'] = output_config
         DBSConfigs['processing_era_config'] = processing_era_config
         DBSConfigs['acquisition_era_config'] = acquisition_era_config
 
+        return DBSConfigs
 
-    def publishOneBlockInDBS(blockDict):
+
+    def publishOneBlockInDBS(blockDict=None, DBSConfigs=None, logger=None):
         """
         get one complete block info and publish it
         blockDict is a dictionary  {'block_name':name, 'files':[{},..,{}]}
         files is a list of dictionaries, one per file with keys:
         filetype, jobid, outdataset, inevents, publishname, lfn, runlumi,
         adler32, cksum, filesize, parents, state, created, destination, source_lfn
+        DBSConfigs is a dictionary with common information to be inserted in DBS
+        as returned returned by  prepareDbsPublishingConfigs
+
         it has 2 possible outcomes and returns a dictionary:
          if OK : {'status': 'OK', 'reason': None, 'dumpFile': None}
          if FAIL : {'status': 'FAIL', 'reason': reason, 'dumpFile': dumpFileName}
          When 'reason' is 'failedToInsertInDBS', 'dumpFile' is the full path to the
           file with the dump of the block. Otherwise is None.
         """
-
-        logger = log['logger']
 
         # List of all files that must (and can) be published.
         dbsFiles = []  # list in the format DBS likes
@@ -206,7 +208,7 @@ def publishInDBS3(config, taskname, verbose, console):
             logger.info(msg)
             return {'status': 'FAIL', 'reason': msg, 'dumpFile': None}
 
-        (localParentBlocks, globalParentBlocks) = findParentBlocks(dictsOfFilesToBePublished)
+        (localParentBlocks, globalParentBlocks) = findParentBlocks(dictsOfFilesToBePublished, logger=logger)
 
         # Print a message with the number of files to publish.
         msg = f"Found {len(dbsFiles)} files not already present in DBS which will be published."
@@ -264,6 +266,7 @@ def publishInDBS3(config, taskname, verbose, console):
                     return {'status': 'FAIL', 'reason': failureMsg, 'dumpFile': None}
 
         block_name = blockDict['block_name']
+        originSite = blockDict['origin_site']
         files_to_publish = dbsFiles
         # makes sure variabled defined in try/except/finally are defined for later use
         t1 = 0
@@ -324,7 +327,6 @@ def publishInDBS3(config, taskname, verbose, console):
     os.environ['X509_USER_KEY'] = config.TaskPublisher.key
 
     log = setupLogging(config, taskname, verbose, console)
-
     logger = log['logger']
 
     dryRun = config.TaskPublisher.dryRun
@@ -357,7 +359,6 @@ def publishInDBS3(config, taskname, verbose, console):
         summaryFileName = saveSummaryJson(nothingToDo, log['logdir'])
         return summaryFileName
     logger.info("inputDataset: %s", inputDataset)
-    DBSConfigs['inputDataset'] = inputDataset
 
     # prepare DBS API's
     try:
@@ -370,22 +371,19 @@ def publishInDBS3(config, taskname, verbose, console):
         summaryFileName = saveSummaryJson(nothingToDo, log['logdir'])
         return summaryFileName
 
-    # pick a couple params which are common to all blocks and files in the data file
+    # pick a few params which are common to all blocks and files to be published
     aBlock = blocksToPublish[0]
-    aBlockName = aBlock['block_name']
-    originSite = aBlock["origin_site"]
-    dataset = aBlockName.split('#')[0]
-    DBSConfigs['outputDataset'] = dataset
-    aFile = aBlock['files'][0]
-    logger.info("Will publish user files in %s", dataset)
+    outputDataset = aBlock['block_name'].split('#')[0]
+
+    logger.info("Will publish user files in %s", outputDataset)
 
     # Find all blocks and files already published in this dataset.
     try:
-        existingDBSBlocks = DBSApis['destRead'].listBlocks(dataset=dataset, detail=True)
-        existingDBSFiles = DBSApis['destRead'].listFiles(dataset=dataset, detail=True)
+        existingDBSBlocks = DBSApis['destRead'].listBlocks(dataset=outputDataset, detail=True)
+        existingDBSFiles = DBSApis['destRead'].listFiles(dataset=outputDataset, detail=True)
         existingBlocks = [f['block_name'] for f in existingDBSBlocks]
         existingFiles = [f['logical_file_name'] for f in existingDBSFiles]
-        msg = f"Dataset {dataset} already contains {len(existingBlocks)} blocks"
+        msg = f"Dataset {outputDataset} already contains {len(existingBlocks)} blocks"
         #msg += " (%d valid, %d invalid)." % (len(existingFile), len(existingFiles) - len(existingFile))
         logger.info(msg)
     except Exception as ex:
@@ -414,13 +412,13 @@ def publishInDBS3(config, taskname, verbose, console):
         # docId is the hash of the source LFN i.e. the file in the tmp area at the running site
         files = [f['source_lfn'] for f in block['files'] for block in blocksToPublish]
         if not dryRun:
-            mark_good(files=files, crabServer=crabServer, asoworker=config.General.asoworker, logger=log['logger'])
+            mark_good(files=files, crabServer=crabServer, asoworker=config.General.asoworker, logger=logger)
         summaryFileName = saveSummaryJson(nothingToDo, log['logdir'])
         return summaryFileName
 
     # OK got something to do !
     try:
-        prepareDbsPublishingConfigs(aBlock=aBlock, aFile=aFile)
+        DBSConfigs = prepareDbsPublishingConfigs(blockDict=blocksToPublish[0], inputDataset=inputDataset, logger=logger)
     except Exception as ex:
         logger.exception('Error looking up input dataset info:\n%s', ex)
         nothingToDo['result'] = 'FAIL'
@@ -443,30 +441,30 @@ def publishInDBS3(config, taskname, verbose, console):
     # Publish one block at a time
     for block in blocksToPublish:
         blockDict = {'block_name': block['block_name']}
-        blockDict['originSite'] = originSite
+        blockDict['origin_site'] = block['origin_site']
         blockDict['files'] = block['files']
         lfnsInBlock = [f['source_lfn'] for f in blockDict['files']]
-        result = publishOneBlockInDBS(blockDict)
+        result = publishOneBlockInDBS(blockDict=blockDict, DBSConfigs=DBSConfigs, logger=logger)
         if result['status'] == 'OK':
-            log['logger'].info('Publish OK   for Block: %s', blockDict['block_name'])
+            logger.info('Publish OK   for Block: %s', blockDict['block_name'])
             publishedBlocks += 1
             publishedFiles += len(blockDict['files'])
             if not dryRun:
-                mark_good(files=lfnsInBlock, crabServer=crabServer, asoworker=config.General.asoworker, logger=log['logger'])
+                mark_good(files=lfnsInBlock, crabServer=crabServer, asoworker=config.General.asoworker, logger=logger)
             listOfPublishedLFNs.extend(lfnsInBlock)
         elif result['status'] == 'FAIL':
             failedBlocks += 1
-            log['logger'].error('Publish FAIL for Block: %s', blockDict['block_name'])
+            logger.error('Publish FAIL for Block: %s', blockDict['block_name'])
             failedBlocks += 1
             failedFiles += len(blockDict['files'])
             if not dryRun:
-                mark_failed(files=lfnsInBlock, crabServer=crabServer, asoworker=config.General.asoworker, logger=log['logger'])
+                mark_failed(files=lfnsInBlock, crabServer=crabServer, asoworker=config.General.asoworker, logger=logger)
             listOfFailedLFNs.extend(lfnsInBlock)
             if result['reason'] == 'failedToInsertInDBS':
-                log['logger'].error("Failed to insert block in DBS. Block Dump saved")
+                logger.error("Failed to insert block in DBS. Block Dump saved")
                 dumpList.append(result['dumpFile'])
             else:
-                log['logger'].error("Could not publish block because %s", result['reason'])
+                logger.error("Could not publish block because %s", result['reason'])
 
     # Print a publication status summary for this dataset.
     msg = "End of publication status:"
@@ -474,7 +472,7 @@ def publishInDBS3(config, taskname, verbose, console):
     msg += f" succes blocks: {publishedBlocks}"
     msg += f" failed files: {failedFiles}"
     msg += f" succes files: {publishedFiles}"
-    log['logger'].info(msg)
+    logger.info(msg)
 
     # save summary for PublisherMasterRucio
     summary = {}

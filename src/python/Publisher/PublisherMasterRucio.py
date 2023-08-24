@@ -479,7 +479,8 @@ class Master(object):
             #
             # {'block_name':blockname,
             #    then a few parmeters common to the whole block (to the task! actuallY)
-            #  'username', 'acquisitionera', 'swversion', globaltag', 'origin_site'
+            #    where appropriate we use same key name as in DBS
+            #  'username', 'acquisition_era_name', 'release_version', global_tag', 'origin_site'
             # and finally a list of dictionariesx, one per file
             #    'files':[fileDict1, fileDict2,...] }
             # each fileDict has these keys, most values come straight from FileMetadata table
@@ -517,18 +518,18 @@ class Master(object):
                                 fileDict[key] = fmd[key]
                             # following three vars. only need to be saved once, are the same for all FMD
                             # but let's stay simple even if a bit redundant
-                            acquisitionera = fmd['acquisitionera']
-                            swversion = fmd['swversion']
-                            globaltag = fmd['globaltag']
+                            acquisitionEra = fmd['acquisitionera']
+                            releaseVersion = fmd['swversion']
+                            globalTag = fmd['globaltag']
                             break
                     if not metadataFound:
                         toFail.append(fileDict['lfn'])
                         continue
                     filesInfo.append(fileDict)
                 blockDict['files'] = filesInfo
-                blockDict['acquisitionera'] = acquisitionera
-                blockDict['swversion'] = swversion
-                blockDict['globaltag'] = globaltag
+                blockDict['acquisition_era_name'] = acquisitionEra
+                blockDict['release_version'] = releaseVersion
+                blockDict['global_tag'] = globalTag
                 blockDictsToPublish.append(blockDict)
 
             # save
