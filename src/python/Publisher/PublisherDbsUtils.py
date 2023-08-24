@@ -65,8 +65,11 @@ def setupDbsAPIs(sourceURL=None, publishURL=None, DBSHost=None, logger=None):
         globalURL = globalURL.replace('cmsweb.cern.ch', DBSHost)
         publishURL = publishURL.replace('cmsweb.cern.ch', DBSHost)
 
-    # for testing (broken as of Aug 21, see https://github.com/dmwm/dbs2go/issues/100
-    # publishURL = 'https://cmsweb-testbed.cern.ch:8443/dbs/int/phys03/DBSWriter'
+    # special case for testing, read from "standard" place and publish in int/phys03
+    if DBSHost == 'cmsweb-testbed.cern.ch':
+        sourceURL = sourceURL.replace(DBSHost, 'cmsweb.cern.ch')
+        globalURL = globalURL.replace(DBSHost, 'cmsweb.cern.ch')
+        publishURL = 'https://cmsweb-testbed.cern.ch:8443/dbs/int/phys03/DBSWriter'
 
     # create DBS API objects
     logger.info("DBS Source API URL: %s", sourceURL)
