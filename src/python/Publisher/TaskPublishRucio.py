@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name, invalid-name, broad-except, too-many-branches
+# pylint: disable=invalid-name, broad-except, too-many-branches
 """
 this is a standalone script. It is spawned by PushisherMaster or could
 be executed from CLI (in the Publisher environment) to retry or debug failures
@@ -16,12 +16,12 @@ from TaskWorker.WorkerExceptions import CannotMigrateException
 from TaskWorker.WorkerUtilities import getCrabserver
 
 from PublisherUtils import setupLogging, prepareDummySummary, saveSummaryJson, \
-                            mark_good, mark_failed, getDBSInputInformation
+    mark_good, mark_failed, getDBSInputInformation
 
 from PublisherDbsUtils import format_file_3, setupDbsAPIs, createBulkBlock, migrateByBlockDBS3
 
 
-def publishInDBS3(config, taskname, verbose, console):
+def publishInDBS3(config, taskname, verbose, console):  # pylint: disable=too-many-statements, too-many-locals
     """
     Publish output from one task in DBS
     It must return the name of the SummaryFile where result of the pbulication attempt is saved
@@ -33,9 +33,8 @@ def publishInDBS3(config, taskname, verbose, console):
     DBSApis = {'source': None, 'destRead': None, 'destWrite': None, 'global': None, 'migrate': None}
     nothingToDo = {}  # a pre-filled SummaryFile in case of no useful input or errors
 
-
     def findParentBlocks(listOfFileDicts=None, logger=None):
-        #sourceApi, globalApi, destApi, destReadApi, migrateApi = DBSApis
+        # sourceApi, globalApi, destApi, destReadApi, migrateApi = DBSApis
 
         # Set of all the parent files from all the files requested to be published.
         parentFiles = set()
@@ -49,7 +48,7 @@ def publishInDBS3(config, taskname, verbose, console):
         # to the destination DBS instance.
         globalParentBlocks = set()
 
-        for file in listOfFileDicts:
+        for file in listOfFileDicts:  # pylint: disable=too-many-nested-blocks
             if verbose:
                 logger.info(file)
             # Get the parent files and for each parent file do the following:
@@ -138,7 +137,6 @@ def publishInDBS3(config, taskname, verbose, console):
         if not acquisitionEra or acquisitionEra == 'null' or acquisitionEra == 'None':
             acquisitionEra = 'CRAB'
 
-
         outputDataset = aBlock['block_name'].split('#')[0]
         _, primName, procName, tier = outputDataset.split('/')
         primds_config = {'primary_ds_name': primName, 'primary_ds_type': primary_ds_type}
@@ -172,7 +170,6 @@ def publishInDBS3(config, taskname, verbose, console):
         DBSConfigs['acquisition_era_config'] = acquisition_era_config
 
         return DBSConfigs
-
 
     def publishOneBlockInDBS(blockDict=None, DBSConfigs=None, logger=None):
         """
@@ -213,7 +210,6 @@ def publishInDBS3(config, taskname, verbose, console):
         # Print a message with the number of files to publish.
         msg = f"Found {len(dbsFiles)} files not already present in DBS which will be published."
         logger.info(msg)
-
 
         # Migrate parent blocks before publishing.
         # First migrate the parent blocks that are in the same DBS instance
@@ -279,7 +275,7 @@ def publishInDBS3(config, taskname, verbose, console):
                                     DBSConfigs['primds_config'], DBSConfigs['dataset_config'],
                                     DBSConfigs['acquisition_era_config'],
                                     block_config, files_to_publish)
-        #logger.debug("Block to insert: %s\n %s" % (blockDump, destApi.__dict__ ))
+        # logger.debug("Block to insert: %s\n %s" % (blockDump, destApi.__dict__ ))
         blockSizeKBytes = len(json.dumps(blockDump)) // 1024
         if blockSizeKBytes > 1024:
             blockSize = f"{blockSizeKBytes // 1024}MB"
@@ -309,8 +305,8 @@ def publishInDBS3(config, taskname, verbose, console):
                 failureReason = 'failedToInsertInDBS'
             finally:
                 elapsed = int(time.time() - t1)
-                #msg = 'PUBSTAT: Nfiles=%4d, lumis=%7d, blockSize=%6s, time=%3ds, status=%s, task=%s' % \
-                #      (len(dbsFiles), nLumis, blockSize, elapsed, didPublish, taskname)
+                # msg = 'PUBSTAT: Nfiles=%4d, lumis=%7d, blockSize=%6s, time=%3ds, status=%s, task=%s' % \
+                #       (len(dbsFiles), nLumis, blockSize, elapsed, didPublish, taskname)
                 msg = f"PUBSTAT: Nfiles={len(dbsFiles):{4}}, lumis={nLumis:{7}}"
                 msg += f", blockSize={blockSize:{6}}, time={elapsed:{3}}"
                 msg += f", status={didPublish}, task={taskname}"
@@ -384,7 +380,7 @@ def publishInDBS3(config, taskname, verbose, console):
         existingBlocks = [f['block_name'] for f in existingDBSBlocks]
         existingFiles = [f['logical_file_name'] for f in existingDBSFiles]
         msg = f"Dataset {outputDataset} already contains {len(existingBlocks)} blocks"
-        #msg += " (%d valid, %d invalid)." % (len(existingFile), len(existingFiles) - len(existingFile))
+        # msg += " (%d valid, %d invalid)." % (len(existingFile), len(existingFiles) - len(existingFile))
         logger.info(msg)
     except Exception as ex:
         msg = f"Error when listing blocks in DBS: {ex}"
@@ -395,12 +391,11 @@ def publishInDBS3(config, taskname, verbose, console):
         summaryFileName = saveSummaryJson(nothingToDo, log['logdir'])
         return summaryFileName
 
-
     # check if actions are needed
     workToDo = False
 
     for block in blocksToPublish:
-        #print(existingFile)
+        # print(existingFile)
         if block['block_name'] not in existingBlocks:
             workToDo = True
             break
@@ -529,6 +524,7 @@ def main():
 
     summaryFile = publishInDBS3(config, taskname, verbose, console)
     print(f"Completed with result in {summaryFile}")
+
 
 if __name__ == '__main__':
     main()

@@ -1,3 +1,4 @@
+# pylint: disable=invalid-name, broad-except, too-many-branches
 """
 functions used both in Publisher_rucio and Publisher_schedd
 which communicate with DBS
@@ -15,6 +16,7 @@ from RestClient.ErrorHandling.RestClientExceptions import HTTPError
 
 from TaskWorker.WorkerExceptions import CannotMigrateException
 
+
 def format_file_3(file_):
     """
     format file for DBS
@@ -26,7 +28,7 @@ def format_file_3(file_):
           'file_size': file_['filesize'],
           'adler32': file_['adler32'],
           'file_parent_list': [{'file_parent_lfn': i} for i in set(file_['parents'])],
-         }
+          }
     file_lumi_list = []
     for run, lumis in file_['runlumi'].items():
         for lumi in lumis:
@@ -99,7 +101,7 @@ def setupDbsAPIs(sourceURL=None, publishURL=None, DBSHost=None, logger=None):
     return DBSApis
 
 
-def createBulkBlock(output_config, processing_era_config, primds_config, \
+def createBulkBlock(output_config, processing_era_config, primds_config,
                     dataset_config, acquisition_era_config, block_config, files):
     """
     manage blocks
@@ -123,14 +125,14 @@ def createBulkBlock(output_config, processing_era_config, primds_config, \
         'dataset': dataset_config,
         'acquisition_era': acquisition_era_config,
         'block': block_config,
-        'file_parent_list': file_parent_list
-    }
+        'file_parent_list': file_parent_list,
+        }
     blockDump['block']['file_count'] = len(files)
     blockDump['block']['block_size'] = sum([int(file_['file_size']) for file_ in files])
     return blockDump
 
 
-def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, blocks,
+def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, blocks,  # pylint: disable=too-many-arguments
                        migLogDir, logger=None, verbose=False):
     """
     Submit one migration request for each block that needs to be migrated.
@@ -138,8 +140,6 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, blocks,
     Returns a 2-element ntuple : (exitcode, message)
     exit codes:  0 OK, 1 taking too long, 2 failure
     """
-    #wfnamemsg = "%s: " % taskname
-
 
     if blocks:
         blocksToMigrate = set(blocks)
@@ -306,7 +306,7 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
             return True
         logger.error("Unexpected HTTP error %d", code)
         return False
-    except CannotMigrateException :
+    except CannotMigrateException:
         raise
     except Exception as ex:
         msg = f"Request to migrate {block} failed."
@@ -384,5 +384,3 @@ def checkBlockMigration(taskname, migrateApi, block, migLogDir):
         return inProgress, atDestination, failed
     # all OK, we got a usable status information
     return inProgress, atDestination, failed
-
-
