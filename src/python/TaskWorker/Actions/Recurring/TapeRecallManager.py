@@ -37,7 +37,7 @@ class TapeRecallManager(BaseRecurringAction):
     restHost = None
     dbInstance = None
 
-    def _execute(self, config, task):  # pylint: disable=unused-argument
+    def _execute(self, config, task):  # pylint: disable=unused-argument, invalid-name
         """ this is what we do at every polling cycle """
         self.config = config
         # setup logger, crabserver client, rucio client
@@ -125,7 +125,16 @@ class TapeRecallManager(BaseRecurringAction):
                 self.logger.info("Extending rule lifetime to last as long as the task")
                 self.privilegedRucioClient.update_replication_rule(reqId, {'lifetime': TASKLIFETIME})
             else:
-                pass  # keep waiting
+                # still in progress, report status and keep waiting
+                ok = rule['locks_ok_cnt']
+                rep = rule['locks_replicating_cnt']
+                stuck = rule['locks_stuck_cnt']
+                total = ok + rep + stuck
+                okFraction = ok * 100 / total
+                msg = f"Data recall from tape in progress: ok/all = {ok}/{total} = {okFraction}%"
+                msg += f"\nRucio rule details at https://cms-rucio-webui.cern.ch/rule?rule_id={reqId}"
+                self.deleteWarnings(taskName)
+                self.uploadWarning(taskname=taskName, msg=msg)
             self.logger.info("Done on this task")
 
     def init(self):
@@ -179,7 +188,7 @@ class TapeRecallManager(BaseRecurringAction):
         try:
             data = urlencode(configreq)
             tasks = self.crabserver.get(api='workflowdb', data=data)[0]['result']
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             pass
         if not tasks:
             msg = f"No {status} task retrieved."
