@@ -500,7 +500,6 @@ def main():
                            as passed in input to the failing DBS API insertBulkBlock(blockDump)
         publishedFiles   : integer, the number of published files
         failedFiles      : integer, the number of failed in the blocks which failed to be published
-        nextIterFiles    : integer, the number of files left to be handled in next iteration
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('--configFile', help='Publisher configuration file', default='PublisherConfig.py')

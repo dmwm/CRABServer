@@ -330,10 +330,9 @@ class Master():  # pylint: disable=too-many-instance-attributes
                 msg = f"Taskname {taskname} is OK."
                 msg += f" Published {summary['publishedFiles']} files"
                 msg += f" in {summary['publishedBlocks']} blocks."
-                # TODO TaskPublisherRucio works on completed blocks, files left for next
-                # iterations must be counted here in PublisherMasterRucio
-                # if summary['nextIterFiles']:
-                #    msg += ' %d files left for next iteration.' % summary['nextIterFiles']
+                nextIterFiles = self.numAcquiredFiles - summary['publishedFiles']
+                if nextIterFiles:
+                    msg += f" {nextIterFiles} files left for next iteration."
                 logger.info(msg)
         if result == 'FAIL':
             logger.error('Taskname %s : TaskPublish failed with: %s', taskname, reason)
@@ -436,6 +435,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
 
         # fill list of blocks completely transferred and closed in Rucio, which can be published in DBS
         blocksToPublish = set()
+        self.numAcquiredFiles = len(task['fileDicts'])  # pylint: disable=attribute-defined-outside-init
         for fileDict in task['fileDicts']:
             if fileDict['block_complete'] == 'OK':
                 blocksToPublish.add(fileDict['dbs_blockname'])
