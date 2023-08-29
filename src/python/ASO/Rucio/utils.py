@@ -53,7 +53,7 @@ def chunks(l, n=1):
             else:
                 break
 
-def uploadToTransfersdb(client, api, subresource, fileDoc):
+def updateToREST(client, api, subresource, fileDoc):
     """
     Upload fileDoc to REST
 

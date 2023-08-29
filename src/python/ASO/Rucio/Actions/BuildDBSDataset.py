@@ -7,7 +7,7 @@ import uuid
 from rucio.common.exception import DataIdentifierAlreadyExists, InvalidObject, DuplicateRule, DuplicateContent
 
 from ASO.Rucio.exception import RucioTransferException
-from ASO.Rucio.utils import uploadToTransfersdb
+from ASO.Rucio.utils import updateToREST
 
 class BuildDBSDataset():
     """
@@ -85,7 +85,7 @@ class BuildDBSDataset():
                 'transferrule': ruleID,
                 'publishrule': ruleID, # required argument. Will fix in locks publish container PR.
             }
-            uploadToTransfersdb(self.crabRESTClient, 'task', 'addrucioasoinfo', configreq)
+            updateToREST(self.crabRESTClient, 'task', 'addrucioasoinfo', configreq)
             self.transfer.updateContainerRuleID(ruleID)
 
     def getOrCreateDataset(self, container):

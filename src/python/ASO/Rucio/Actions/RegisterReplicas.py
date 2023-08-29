@@ -10,7 +10,7 @@ from rucio.rse.rsemanager import find_matching_scheme
 import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
 from ASO.Rucio.Actions.BuildDBSDataset import BuildDBSDataset
 from ASO.Rucio.exception import RucioTransferException
-from ASO.Rucio.utils import chunks, uploadToTransfersdb, tfcLFN2PFN, LFNToPFNFromPFN
+from ASO.Rucio.utils import chunks, updateToREST, tfcLFN2PFN, LFNToPFNFromPFN
 
 
 class RegisterReplicas:
@@ -85,7 +85,7 @@ class RegisterReplicas:
             'list_of_retry_value': None, # omit
             'list_of_fts_id': ['NA']*num,
         }
-        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc)
+        updateToREST(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc)
         return newTransfers
 
     def prepare(self, transfers):
@@ -329,4 +329,4 @@ class RegisterReplicas:
             'list_of_retry_value': None, # omit
             'list_of_fts_id': [x['ruleid'] for x in fileDocs]
         }
-        uploadToTransfersdb(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc)
+        updateToREST(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc)
