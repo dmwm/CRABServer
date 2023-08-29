@@ -16,9 +16,9 @@ nDays = int(args.days)
 retentionDays = timedelta(days=nDays)
 dryRun = args.dry
 
-rucio=Client()
-me=rucio.whoami()
-account=me['account']
+rucio = Client()
+me = rucio.whoami()
+account = me['account']
 print(f"using Rucio account: {account}")
 
 # get rules for this account
