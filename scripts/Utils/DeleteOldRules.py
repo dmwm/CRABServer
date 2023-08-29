@@ -30,16 +30,14 @@ print(f"{len(rules)} rules exist for account: {account}")
 now = datetime.now()
 
 for rule in rules:
-    created=rule['created_at']
+    created = rule['created_at']
     isOld = (now - created) > retentionDays
     if isOld:
         if dryRun:
             print(f"will delete rule {rule['id']} created on {created}")
         else:
-            pass
-            res = rucio.delete_replication_rule(rule_id=rule['id'], purge_replicas=True)
-            if res:
+            try:
+                rucio.delete_replication_rule(rule_id=rule['id'], purge_replicas=True)
                 print(f"deleted rule {rule['id']} created on {created}")
-            else:
+            except Exception:  # pylint: disable=broad-except
                 print(f"ERROR deletion of rule {rule['ruleId']} failed")
-  
