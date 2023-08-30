@@ -7,6 +7,7 @@ import uuid
 from rucio.common.exception import DataIdentifierAlreadyExists, InvalidObject, DuplicateRule, DuplicateContent
 
 from ASO.Rucio.exception import RucioTransferException
+from ASO.Rucio.utils import updateToREST
 
 class BuildDBSDataset():
     """
@@ -17,10 +18,11 @@ class BuildDBSDataset():
     :param rucioClient: Rucio Client object.
     :type object: class:`rucio.client.client.Client`
     """
-    def __init__(self, transfer, rucioClient):
+    def __init__(self, transfer, rucioClient, crabRESTClient):
         self.logger = logging.getLogger("RucioTransfer.Actions.BuildDBSDataset")
         self.rucioClient = rucioClient
         self.transfer = transfer
+        self.crabRESTClient = crabRESTClient
 
     def execute(self):
         """
@@ -63,7 +65,7 @@ class BuildDBSDataset():
 
         self.logger.debug(f'Add replication rule to container "{self.transfer.rucioScope}:{container}')
         if self.transfer.containerRuleID:
-            self.logger.info("Rule already exists, doing nothing")
+            self.logger.info(f"Rule already exists: {self.transfer.containerRuleID}")
         else:
             try:
                 containerDID = {
@@ -76,6 +78,14 @@ class BuildDBSDataset():
                 # TODO: it is possible that someone will create the rule for container, need better filter rule to match rules we create
                 self.logger.info("Rule already exists. Get rule ID from Rucio.")
                 ruleID = list(self.rucioClient.list_did_rules(self.transfer.rucioScope, container))[0]['id']
+
+            configreq = {
+                'workflow': self.transfer.taskname,
+                'transfercontainer': self.transfer.transferContainer,
+                'transferrule': ruleID,
+                'publishrule': ruleID, # required argument. Will fix in locks publish container PR.
+            }
+            updateToREST(self.crabRESTClient, 'task', 'addrucioasoinfo', configreq)
             self.transfer.updateContainerRuleID(ruleID)
 
     def getOrCreateDataset(self, container):

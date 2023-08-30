@@ -5,9 +5,10 @@ from WMCore.REST.Validation import validate_str, validate_strlist
 from WMCore.REST.Error import InvalidParameter, ExecutionError, NotAcceptable
 
 from CRABInterface.Utilities import conn_handler, getDBinstance
-from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match
+from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match, authz_operator
 from CRABInterface.Regexps import RX_MANYLINES_SHORT, RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME,\
-    RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE
+    RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE, RX_DATASET
+from ServerUtilities import getUsernameFromTaskname
 
 # external dependecies here
 import re
@@ -39,6 +40,9 @@ class RESTTask(RESTEntity):
             validate_strlist("outputdatasets", param, safe, RX_OUT_DATASET)
             validate_str("taskstatus", param, safe, RX_STATUS, optional=True)
             validate_str("ddmreqid", param, safe, RX_RUCIORULE, optional=True)
+            validate_str("transfercontainer", param, safe, RX_DATASET, optional=True)
+            validate_str("transferrule", param, safe, RX_RUCIORULE, optional=True)
+            validate_str("publishrule", param, safe, RX_RUCIORULE, optional=True)
         elif method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
             validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
@@ -374,3 +378,24 @@ class RESTTask(RESTEntity):
 
         return []
 
+    def addrucioasoinfo(self, **kwargs):
+        if 'workflow' not in kwargs or not kwargs['workflow']:
+            raise InvalidParameter("Task name not found in the input parameters")
+        if 'transfercontainer' not in kwargs or not kwargs['transfercontainer']:
+            raise InvalidParameter("Transfer container name not found in the input parameters")
+        if 'transferrule' not in kwargs or not kwargs['transferrule']:
+            raise InvalidParameter("Transfer container's rule id not found in the input parameters")
+        if 'publishrule' not in kwargs or not kwargs['publishrule']:
+            raise InvalidParameter("Transfer container's rule id not found in the input parameters")
+
+        taskname = kwargs['workflow']
+        ownerName = getUsernameFromTaskname(taskname)
+        authz_operator(username=ownerName, group='crab3', role='operator')
+        self.api.modify(
+            self.Task.SetRucioASOInfo_sql,
+            tm_transfer_container=[kwargs['transfercontainer']],
+            tm_transfer_rule=[kwargs['transferrule']],
+            tm_publish_rule=[kwargs['publishrule']],
+            tm_taskname=[taskname])
+
+        return []

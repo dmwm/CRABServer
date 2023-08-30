@@ -30,6 +30,7 @@ class Transfer:
         # from transfer info
         self.username = ''
         self.rucioScope = ''
+        self.taskname = ''
         self.destination = ''
         self.publishContainer = ''
         self.transferContainer = ''
@@ -152,6 +153,7 @@ class Transfer:
 
         self.username = info['username']
         self.rucioScope = f'user.{self.username}'
+        self.taskname = info['taskname']
         self.destination = info['destination']
         if config.args.force_publishname:
             containerName = config.args.force_publishname
