@@ -5,9 +5,10 @@ from WMCore.REST.Validation import validate_str, validate_strlist
 from WMCore.REST.Error import InvalidParameter, ExecutionError, NotAcceptable
 
 from CRABInterface.Utilities import conn_handler, getDBinstance
-from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match
+from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match, authz_operator
 from CRABInterface.Regexps import RX_MANYLINES_SHORT, RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME,\
     RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE, RX_DATASET
+from ServerUtilities import getUsernameFromTaskname
 
 # external dependecies here
 import re
@@ -387,14 +388,14 @@ class RESTTask(RESTEntity):
         if 'publishrule' not in kwargs or not kwargs['publishrule']:
             raise InvalidParameter("Transfer container's rule id not found in the input parameters")
 
-        workflow = kwargs['workflow']
-        authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
-
+        taskname = kwargs['workflow']
+        ownerName = getUsernameFromTaskname(taskname)
+        authz_operator(username=ownerName, group='crab3', role='operator')
         self.api.modify(
             self.Task.SetRucioASOInfo_sql,
             tm_transfer_container=[kwargs['transfercontainer']],
             tm_transfer_rule=[kwargs['transferrule']],
             tm_publish_rule=[kwargs['publishrule']],
-            tm_taskname=[workflow])
+            tm_taskname=[taskname])
 
         return []
