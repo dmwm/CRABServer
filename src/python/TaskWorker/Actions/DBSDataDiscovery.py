@@ -331,7 +331,9 @@ class DBSDataDiscovery(DataDiscovery):
             dataTier = inputDataset.split('/')[3]
             maxTierToBlockRecallSizeTB = getattr(self.config.TaskWorker, 'maxTierToBlockRecallSizeTB', 0)
             maxTierToBlockRecallSize = maxTierToBlockRecallSizeTB * 1e12
-            if dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []):
+            maxAnyTierRecallSizeTB = getattr(self.config.TaskWorker, 'maxAnyTierRecallSizeTB', 0)
+            maxAnyTierRecallSize = maxAnyTierRecallSizeTB * 1e12
+            if dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []) or totalSizeBytes < maxAnyTierRecallSize:
                 msg = f"Task could not be submitted because not all blocks of dataset {inputDataset} are on DISK"
                 msg += "\nWill request a full disk copy for you. See"
                 msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
