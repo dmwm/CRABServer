@@ -327,36 +327,10 @@ class DBSDataDiscovery(DataDiscovery):
         # check for tape recall
         #if set(locationsMap.keys()) != set(blocksWithLocation):
         if requestTapeRecall:
+            msg = self.executeTapeRecallPolicy(inputDataset, inputBlocks, totalSizeBytes)
             dataToRecall = inputDataset if not inputBlocks else list(blocksWithLocation)
-            dataTier = inputDataset.split('/')[3]
-            maxTierToBlockRecallSizeTB = getattr(self.config.TaskWorker, 'maxTierToBlockRecallSizeTB', 0)
-            maxTierToBlockRecallSize = maxTierToBlockRecallSizeTB * 1e12
-            maxAnyTierRecallSizeTB = getattr(self.config.TaskWorker, 'maxAnyTierRecallSizeTB', 0)
-            maxAnyTierRecallSize = maxAnyTierRecallSizeTB * 1e12
-            if dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []) or totalSizeBytes < maxAnyTierRecallSize:
-                msg = f"Task could not be submitted because not all blocks of dataset {inputDataset} are on DISK"
-                msg += "\nWill request a full disk copy for you. See"
-                msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
-                self.requestTapeRecall(dataToRecall=dataToRecall, sizeToRecall=totalSizeBytes,
-                                       tapeLocations=tapeLocations, system='Rucio', msgHead=msg)
-            elif inputBlocks:
-                if totalSizeBytes < maxTierToBlockRecallSize:
-                    msg = "Task could not be submitted because blocks specified in 'Data.inputBlocks' are not on disk."
-                    msg += "\nWill request a disk copy for you. See"
-                    msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
-                    self.requestTapeRecall(dataToRecall=dataToRecall, sizeToRecall=totalSizeBytes,
-                                           tapeLocations=tapeLocations, system='Rucio', msgHead=msg)
-                else:
-                    msg = "Some blocks are on TAPE only and will not be processed."
-                    msg += f"\nThere is no automatic recall from TAPE for data tier '{dataTier}' if 'Data.inputBlocks' is provided,"
-                    msg += f"\nbut the recall size ({totalSizeBytes/1e12:.3f} TB) is larger than the maximum allowed size ({maxTierToBlockRecallSizeTB} TB)."
-                    msg += f"\nIf you need these blocks, contact Data Transfer team via {FEEDBACKMAIL}"
-                    raise TaskWorkerException(msg)
-            else:
-                msg = "Some blocks are on TAPE only and will not be processed."
-                msg += f"\nThere is no automatic recall from tape for data tier '{dataTier}' if 'Data.inputBlocks' is not provided."
-                msg += f"\nIf you need the full dataset, contact Data Transfer team via {FEEDBACKMAIL}"
-                raise TaskWorkerException(msg)
+            self.requestTapeRecall(dataToRecall=dataToRecall, sizeToRecall=totalSizeBytes,
+                                   tapeLocations=tapeLocations, system='Rucio', msgHead=msg)
 
         # will not need lumi info if user has asked for split by file with no run/lumi mask
         splitAlgo = kwargs['task']['tm_split_algo']
@@ -476,6 +450,34 @@ class DBSDataDiscovery(DataDiscovery):
             msg += '\nIt is not possible to request a recall from tape.'
             msg += "\nPlease, check DAS (https://cmsweb.cern.ch/das) and make sure the dataset is accessible on DISK."
             raise TaskWorkerException(msg)
+
+    def executeTapeRecallPolicy(self, inputDataset, inputBlocks, totalSizeBytes):
+        dataTier = inputDataset.split('/')[3]
+        maxTierToBlockRecallSizeTB = getattr(self.config.TaskWorker, 'maxTierToBlockRecallSizeTB', 0)
+        maxTierToBlockRecallSize = maxTierToBlockRecallSizeTB * 1e12
+        maxAnyTierRecallSizeTB = getattr(self.config.TaskWorker, 'maxAnyTierRecallSizeTB', 0)
+        maxAnyTierRecallSize = maxAnyTierRecallSizeTB * 1e12
+        if dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []) or totalSizeBytes < maxAnyTierRecallSize:
+            msg = f"Task could not be submitted because not all blocks of dataset {inputDataset} are on DISK"
+            msg += "\nWill request a full disk copy for you. See"
+            msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
+        elif inputBlocks:
+            if totalSizeBytes < maxTierToBlockRecallSize:
+                msg = "Task could not be submitted because blocks specified in 'Data.inputBlocks' are not on disk."
+                msg += "\nWill request a disk copy for you. See"
+                msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
+            else:
+                msg = "Some blocks are on TAPE only and will not be processed."
+                msg += f"\nThere is no automatic recall from TAPE for data tier '{dataTier}' if 'Data.inputBlocks' is provided,"
+                msg += f"\nbut the recall size ({totalSizeBytes/1e12:.3f} TB) is larger than the maximum allowed size ({maxTierToBlockRecallSizeTB} TB)."
+                msg += f"\nIf you need these blocks, contact Data Transfer team via {FEEDBACKMAIL}"
+                raise TaskWorkerException(msg)
+        else:
+            msg = "Some blocks are on TAPE only and will not be processed."
+            msg += f"\nThere is no automatic recall from tape for data tier '{dataTier}' if 'Data.inputBlocks' is not provided."
+            msg += f"\nIf you need the full dataset, contact Data Transfer team via {FEEDBACKMAIL}"
+            raise TaskWorkerException(msg)
+        return msg
 
 
 
