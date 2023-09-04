@@ -468,14 +468,14 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
             else:
                 msg = "Some blocks are on TAPE only and will not be processed."
-                msg += f"\nThere is no automatic recall from TAPE for data tier '{dataTier}' if 'Data.inputBlocks' is provided,"
-                msg += f"\nbut the recall size ({totalSizeBytes/1e12:.3f} TB) is larger than the maximum allowed size ({maxTierToBlockRecallSizeTB} TB)."
-                msg += f"\nIf you need these blocks, contact Data Transfer team via {FEEDBACKMAIL}"
+                msg += f"\n'The 'Data.inputBlocks' size is larger than allowed size ({totalSizeBytes/1e12:.3f}TB/{maxTierToBlockRecallSizeTB}TB)"\
+                        "to issue automatically recall from TAPE."
+                msg += f"\nIf you need these blocks, contact Data Transfer team via https://its.cern.ch/jira/browse/CMSTRANSF"
                 raise TaskWorkerException(msg)
         else:
             msg = "Some blocks are on TAPE only and will not be processed."
-            msg += f"\nThere is no automatic recall from tape for data tier '{dataTier}' if 'Data.inputBlocks' is not provided."
-            msg += f"\nIf you need the full dataset, contact Data Transfer team via {FEEDBACKMAIL}"
+            msg += f"\nThis dataset is too large for automatic recall from TAPE. If you can do with only a piece, use Data.inputBlocks configuration."
+            msg += f"\nIf you need the full dataset, contact Data Transfer team via https://its.cern.ch/jira/browse/CMSTRANSF"
             raise TaskWorkerException(msg)
         return msg
 
