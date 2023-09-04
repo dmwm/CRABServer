@@ -452,6 +452,21 @@ class DBSDataDiscovery(DataDiscovery):
             raise TaskWorkerException(msg)
 
     def executeTapeRecallPolicy(self, inputDataset, inputBlocks, totalSizeBytes):
+        """
+        Execute taperecall policy. If it passes, the method will return
+        taperecall `msg` to pass to `self.requestTapeRecall`; otherwise, raise
+        an exception.
+
+        :param inputDataset: input dataset
+        :type inputDataset: str
+        :param inputBlocks: input blocks
+        :type inputBlocks: list of str or None
+        :param totalSizeBytes: size of input data
+        :type totalSizeBytes: int
+
+        :return: task's warning message
+        :rtype: str
+        """
         dataTier = inputDataset.split('/')[3]
         maxTierToBlockRecallSizeTB = getattr(self.config.TaskWorker, 'maxTierToBlockRecallSizeTB', 0)
         maxTierToBlockRecallSize = maxTierToBlockRecallSizeTB * 1e12
