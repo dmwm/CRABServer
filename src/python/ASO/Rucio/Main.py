@@ -49,7 +49,7 @@ def main():
                      default='task_process/RestInfoForFileTransfers.json',
                      help="")
     opt.add_argument("--container-ruleid-path", dest="container_ruleid_path",
-                     default='task_process/transfers/container_ruleid.txt',
+                     default='task_process/transfers/container_ruleid.json',
                      help="")
     opt.add_argument("--transfer-ok-path", dest="transfer_ok_path",
                      default='task_process/transfers/transfer_ok.txt',

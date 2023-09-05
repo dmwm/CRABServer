@@ -29,21 +29,34 @@ class BuildDBSDataset():
         Construct DBS Dataset by creating a new Rucio container and adding a
         LOGS dataset.
         """
-        # create publishContainer
-        self.checkOrCreateContainer(self.transfer.publishContainer)
-        # create transfer container and attach rule id
-        self.createTransferContainer(self.transfer.transferContainer)
+        # create container
+        if not self.transfer.containerRuleID or not self.transfer.publishRuleID:
+            self.transfer.containerRuleID = self.checkOrCreateContainer(self.transfer.transferContainer)
+            self.transfer.publishRuleID = self.checkOrCreateContainer(self.transfer.publishContainer)
+            configreq = {
+                'workflow': self.transfer.taskname,
+                'transfercontainer': self.transfer.transferContainer,
+                'transferrule': self.transfer.containerRuleID,
+                'publishrule': self.transfer.publishRuleID,
+            }
+            # upload rule id and transfer container name to TasksDB
+            updateToREST(self.crabRESTClient, 'task', 'addrucioasoinfo', configreq)
+            # bookkeeping
+            self.transfer.updateContainerRuleID()
         # create log dataset in transfer container
         self.createDataset(self.transfer.transferContainer, self.transfer.logsDataset)
 
     def checkOrCreateContainer(self, container):
         """
-        Creating container, ignore if it already exists.
+        Creating container and attach replication rules. ignore if it already
+        exists. Return rule ID to caller.
 
         :param container: container name
         :param type: str
+        :returns: rucio rule id
+        :rtype: str
         """
-        self.logger.debug(f'Creating container "{self.transfer.rucioScope}:{container}')
+        self.logger.info(f'Creating container "{self.transfer.rucioScope}:{container}')
         try:
             self.rucioClient.add_container(self.transfer.rucioScope, container)
             self.logger.info(f"{container} container created")
@@ -52,41 +65,21 @@ class BuildDBSDataset():
         except Exception as ex:
             raise RucioTransferException('Failed to create container') from ex
 
-    def createTransferContainer(self, container):
-        """
-        Creating container for files transfer and add replication rule to it.
-        Do nothing if container and rule are already created.
-
-        :param container: container name
-        :param type: str
-        """
-
-        self.checkOrCreateContainer(container)
-
-        self.logger.debug(f'Add replication rule to container "{self.transfer.rucioScope}:{container}')
-        if self.transfer.containerRuleID:
-            self.logger.info(f"Rule already exists: {self.transfer.containerRuleID}")
-        else:
-            try:
-                containerDID = {
-                    'scope': self.transfer.rucioScope,
-                    'name': container,
-                    'type': "CONTAINER",
-                }
-                ruleID = self.rucioClient.add_replication_rule([containerDID], 1, self.transfer.destination)[0]
-            except DuplicateRule:
-                # TODO: it is possible that someone will create the rule for container, need better filter rule to match rules we create
-                self.logger.info("Rule already exists. Get rule ID from Rucio.")
-                ruleID = list(self.rucioClient.list_did_rules(self.transfer.rucioScope, container))[0]['id']
-
-            configreq = {
-                'workflow': self.transfer.taskname,
-                'transfercontainer': self.transfer.transferContainer,
-                'transferrule': ruleID,
-                'publishrule': ruleID, # required argument. Will fix in locks publish container PR.
+        self.logger.info(f'Add replication rule to container "{self.transfer.rucioScope}:{container}')
+        try:
+            containerDID = {
+                'scope': self.transfer.rucioScope,
+                'name': container,
+                'type': "CONTAINER",
             }
-            updateToREST(self.crabRESTClient, 'task', 'addrucioasoinfo', configreq)
-            self.transfer.updateContainerRuleID(ruleID)
+            ruleID = self.rucioClient.add_replication_rule([containerDID], 1, self.transfer.destination)[0]
+        except DuplicateRule:
+            # TODO: it is possible that someone will create the rule for container, need better filter rule to match rules we create
+            self.logger.info("Rule already exists. Get rule ID from Rucio.")
+            ruleID = list(self.rucioClient.list_did_rules(self.transfer.rucioScope, container))[0]['id']
+        self.logger.info(f"Got rule ID [{ruleID}] for {container}.")
+        return ruleID
+
 
     def getOrCreateDataset(self, container):
         """

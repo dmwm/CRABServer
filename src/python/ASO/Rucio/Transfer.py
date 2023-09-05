@@ -42,6 +42,7 @@ class Transfer:
         # bookkeeping
         self.lastTransferLine = 0
         self.containerRuleID = ''
+        self.publishRuleID = ''
         self.bookkeepingOKLocks = None
         self.bookkeepingBlockComplete = None
 
@@ -177,20 +178,26 @@ class Transfer:
         path = config.args.container_ruleid_path
         try:
             with open(path, 'r', encoding='utf-8') as r:
-                self.containerRuleID = r.read()
-                self.logger.info(f'Got container rule ID from bookkeeping. Rule ID: {self.containerRuleID}')
+                tmp = json.load(r)
+                self.containerRuleID = tmp['containerRuleID']
+                self.publishRuleID = tmp['publishRuleID']
+                self.logger.info('Got container rule ID from bookkeeping.'\
+                                 f' Transfer Container rule ID: {self.containerRuleID}'\
+                                 f' Publish Container rule ID: {self.publishRuleID}')
         except FileNotFoundError:
             self.logger.info(f'Bookkeeping rules "{path}" does not exist. Assume it is first time it run.')
 
-    def updateContainerRuleID(self, ruleID):
+    def updateContainerRuleID(self):
         """
         update containerRuleID to task_process/transfers/container_ruleid.txt
         """
-        self.containerRuleID = ruleID
         path = config.args.container_ruleid_path
-        self.logger.info(f'Bookkeeping container rule ID [{ruleID}] to file: {path}')
+        self.logger.info(f'Bookkeeping Transfer Container rule ID [{self.containerRuleID}] and Pransfer Container and [{self.publishRuleID}] to file: {path}')
         with writePath(path) as w:
-            w.write(ruleID)
+            json.dump({
+                'containerRuleID': self.containerRuleID,
+                'publishRuleID': self.publishRuleID,
+            }, w)
 
     def readOKLocks(self):
         """
