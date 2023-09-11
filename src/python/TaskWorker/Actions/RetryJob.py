@@ -311,7 +311,13 @@ class RetryJob():
 
         ## Wrapper script sometimes returns the posix return code (8 bits).
         if exitCode in [8020, 8021, 8028] or exitCode in [84, 85, 92]:
-            self.check_corrupted_file(exitCode)
+            try:  # the following is still a bit experimental, make sure it never crashes the PJ
+                corruptedInputFile = self.check_corrupted_file(exitCode)
+            except Exception:
+                corruptedInputFile = False
+            if corruptedInputFile:
+                exitMsg = "Fatal Root Error maybe a corrupted input file. This error is being reported"
+                self.create_fake_fjr(exitMsg, 8022, 8022)
             raise RecoverableError("Job failed to open local and fallback files.")
 
         if exitCode == 1:
@@ -385,7 +391,13 @@ class RetryJob():
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def check_corrupted_file(self, exitCode):
+        """
+        check if job stdout contains a message indicating a corrupted file and reports this
+        via a json file taskname.corrupted.job.<crabid>.<retry>.json
+        returns True/Falso accordingly to corrupted yes/no
+        """
         corruptedFile = False
+        suspiciousFile = False
         fname = os.path.realpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
         self.logger.debug(f'exit code {exitCode}, look for corrupted file in {fname}')
         with open(fname, encoding='utf-8') as fd:
@@ -399,15 +411,20 @@ class RetryJob():
                     continue
                 if corruptedFile:
                     errorLines.append(line)
-                    # extract the '/store/...root' part of this line
-                    fragment1 = line.split('/store/')[1]
-                    fragment2 = fragment1.split('.root')[0]
-                    inputFileName = f"/store/{fragment2}.root"
-                    RSE = self.site
-                    RSE = RSE if not RSE.startswith('T1') else f'{RSE}_Disk'
-                    self.logger.info(f"RSE: {RSE} - ec: {exitCode} - file: {inputFileName}")
+                    if '/store/' in line and '.root' in line:
+                        # extract the '/store/...root' part of this line
+                        fragment1 = line.split('/store/')[1]
+                        fragment2 = fragment1.split('.root')[0]
+                        inputFileName = f"/store/{fragment2}.root"
+                        RSE = self.site
+                        RSE = RSE if not RSE.startswith('T1') else f'{RSE}_Disk'
+                        self.logger.info(f"RSE: {RSE} - ec: {exitCode} - file: {inputFileName}")
+                    else:
+                        corruptedFile = False
+                        suspiciousFile = True
+                        errorLines.append('NOT CLEARLY CORRUPTED, OTHER ROOT ERROR ?\n')
                     break
-        if corruptedFile:
+        if corruptedFile or suspiciousFile:
             # note it  down
             reportFileName = f'{self.reqname}.job.{self.job_id}.{self.crab_retry}.json'
             corruptionMessage = {'DID': f'cms:{inputFileName}', 'RSE': RSE,
@@ -417,12 +434,18 @@ class RetryJob():
             self.logger.info('corruption message prepared, gfal-copy to EOS')
             proxy = os.getenv('X509_USER_PROXY')
             self.logger.info(f"X509_USER_PROXY = {proxy}")
-            reportLocation = 'gsiftp://eoscmsftp.cern.ch/eos/cms/store/temp/user/corrupted/'
+            if corruptedFile:
+                reportLocation = 'gsiftp://eoscmsftp.cern.ch/eos/cms/store/temp/user/corrupted/new/'
+            if suspiciousFile:
+                reportLocation = 'gsiftp://eoscmsftp.cern.ch/eos/cms/store/temp/user/suspicious/new/'
+
             destination = reportLocation + reportFileName
-            cmd = f'gfal-copy -v {reportFileName} {destination}'
+            cmd = f'gfal-copy -v -t 60 {reportFileName} {destination}'
             out, err, ec = executeCommand(cmd)
             if ec:
                 self.logger.error(f'gfal-copy failed with out: {out} err: {err}')
+        return corruptedFile
+
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def check_empty_report(self):
