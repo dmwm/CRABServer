@@ -424,13 +424,15 @@ class RetryJob():
                         fragment1 = line.split('/store/')[1]
                         fragment2 = fragment1.split('.root')[0]
                         inputFileName = f"/store/{fragment2}.root"
-                        RSE = self.site
-                        RSE = RSE if not RSE.startswith('T1') else f'{RSE}_Disk'
                         self.logger.info(f"RSE: {RSE} - ec: {exitCode} - file: {inputFileName}")
                     else:
                         corruptedFile = False
                         suspiciousFile = True
+                        inputFileName = 'NotEasilyAvailable'
                         errorLines.append('NOT CLEARLY CORRUPTED, OTHER ROOT ERROR ?\n')
+                        self.logger.info("RootFatalError does not contain file info")
+                    RSE = self.site
+                    RSE = RSE if not RSE.startswith('T1') else f'{RSE}_Disk'
                     break
         if corruptedFile or suspiciousFile:
             # note it  down
