@@ -156,8 +156,11 @@ class RetryJob():
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def create_fake_fjr(self, exitMsg, exitCode, jobExitCode = None):
-        """If FatalError is got, fjr is not generated and it is needed for error_summary"""
+    def create_fake_fjr(self, exitMsg, exitCode, jobExitCode=None, fatalError=True):
+        """
+        If FatalError is got, fjr is not generated and it is needed for error_summary
+        Can also used to "fix" the exit code in the fjr yet allow a resubmission if fatalError is False
+        """
 
         fake_fjr = {}
         fake_fjr['exitMsg'] = exitMsg
@@ -181,7 +184,8 @@ class RetryJob():
             json.dump(fake_fjr, fd)
 
         # Fake FJR raises FatalError
-        raise FatalError(exitMsg)
+        if fatalError:
+            raise FatalError(exitMsg)
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -317,7 +321,7 @@ class RetryJob():
                 corruptedInputFile = False
             if corruptedInputFile:
                 exitMsg = "Fatal Root Error maybe a corrupted input file. This error is being reported"
-                self.create_fake_fjr(exitMsg, 8022, 8022)
+                self.create_fake_fjr(exitMsg, 8022, 8022, fatalError=False)  # retry the job
             raise RecoverableError("Job failed to open local and fallback files.")
 
         if exitCode == 1:
