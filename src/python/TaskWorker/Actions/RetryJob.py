@@ -412,6 +412,10 @@ class RetryJob():
                 if corruptedFile:
                     errorLines.append(line)
                     if '/store/' in line and '.root' in line:
+                        if '/store/user' in line or '/store/group' in line and not 'rucio' in line:
+                            # no point in reporting files unknown to Rucio
+                            corruptedFile = False
+                            break
                         # extract the '/store/...root' part of this line
                         fragment1 = line.split('/store/')[1]
                         fragment2 = fragment1.split('.root')[0]
