@@ -70,5 +70,10 @@ class Create(DBCreator):
         CONSTRAINT id_pk PRIMARY KEY(tm_id),
         CONSTRAINT fk_tm_taskname_ftdb FOREIGN KEY (tm_taskname) REFERENCES tasks (tm_taskname)
         )
+        PARTITION by RANGE (tm_creation_time)
+        INTERVAL (NUMTOYMINTERVAL(1, 'MONTH'))
+        (
+            PARTITION P1 VALUES LESS THAN (TO_DATE('2017-04-14 00:00:00', 'SYYYY-MM-DD HH24:MI:SS', 'NLS_CALENDAR=GREGORIAN'))
+        )
     """
 

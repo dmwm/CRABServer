@@ -113,4 +113,9 @@ class Create(DBCreator):
         CONSTRAINT check_tm_one_event_mode CHECK (tm_one_event_mode IN ('T', 'F')),
         CONSTRAINT ck_tm_nonvalid_input_dataset CHECK (tm_nonvalid_input_dataset IN ('T', 'F'))
         )
+        PARTITION by RANGE (tm_start_time)
+        INTERVAL (NUMTOYMINTERVAL(1, 'MONTH'))
+        (
+            PARTITION P1 VALUES LESS THAN (TO_DATE('2017-04-14 00:00:00', 'SYYYY-MM-DD HH24:MI:SS', 'NLS_CALENDAR=GREGORIAN'))
+        )
         """
