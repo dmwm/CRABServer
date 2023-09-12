@@ -43,7 +43,8 @@ systems = \
                        'ServerUtilities', 'MultiProcessingLog', 'CMSGroupMapper',
                        'RucioUtils', 'cache_status'],
         'python': ['TaskWorker', 'TaskWorker/Actions', 'TaskWorker/DataObjects',
-                   'TaskWorker/Actions/Recurring', 'Publisher', 'TransferInterface']
+                   'TaskWorker/Actions/Recurring', 'Publisher', 'TransferInterface',
+                   'ASO', 'ASO/Rucio', 'ASO/Rucio/Actions' ]
     },
     'Publisher':
     {
@@ -275,8 +276,7 @@ setup(name='crabserver',
       package_dir={'': 'src/python'},
       data_files=['scripts/%s' % x for x in \
                         ['CMSRunAnalysis.sh', 'cmscp.py', 'cmscp.sh',
-                         'gWMS-CMSRunAnalysis.sh', 'submit_env.sh', 
+                         'gWMS-CMSRunAnalysis.sh', 'submit_env.sh',
                          'dag_bootstrap_startup.sh',
                          'dag_bootstrap.sh', 'AdjustSites.py']] + getWebDir(),
      )
-
