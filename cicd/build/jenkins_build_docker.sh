@@ -12,16 +12,19 @@ echo "(DEBUG)   \- BRANCH: ${BRANCH}"
 echo "(DEBUG)   \- RELEASE_TAG: ${RELEASE_TAG}"
 echo "(DEBUG)   \- RPM_RELEASETAG_HASH: ${RPM_RELEASETAG_HASH}"
 echo "(DEBUG)   \- IMAGE_TAG: $IMAGE_TAG"
+echo "(DEBUG)   \- CI_CRABSERVER_REPO: ${CI_CRABSERVER_REPO}"
+echo "(DEBUG)   \- CI_CRABSERVER_BRANCH: ${CI_CRABSERVER_BRANCH}"
 echo "(DEBUG) jenkin job's env variables:"
 echo "(DEBUG)   \- WORKSPACE: $WORKSPACE"
 echo "(DEBUG) end"
 
+export CI_CRABSERVER_REPO=${CI_CRABSERVER_REPO:-https://github.com/dmwm/CRABServer.git}
+export CI_CRABSERVER_BRANCH=${CI_CRABSERVER_BRANCH:-master}
+git clone "${CI_CRABSERVER_REPO}" -b "${CI_CRABSERVER_BRANCH}" CRABServer
+cd CRABServer/Docker
+
 # use docker config on our WORKSPACE area, avoid replace default creds in ~/.docker that many pipeline depend on it
 export DOCKER_CONFIG=$PWD/docker_login
-
-#build and push crabtaskworker image
-git clone https://github.com/dmwm/CRABServer.git
-cd CRABServer/Docker
 
 #replace where RPMs are stored
 sed -i.bak -e "/export REPO=*/c\export REPO=comp.crab_${BRANCH}" install.sh
