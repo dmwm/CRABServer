@@ -367,7 +367,7 @@ class DagmanCreator(TaskAction):
         scram_arch = info['tm_job_arch']
         # Set defaults
         info['required_arch'] = "X86_64"
-        # The following regex matches a scram arch into four groups 
+        # The following regex matches a scram arch into four groups
         # for example el9_amd64_gcc10 is matched as (el)(9)_(amd64)_(gcc10)
         # later, only the third group is returned, the one corresponding to the arch.
         m = re.match("([a-z]+)(\d+)_(\w+)_(\w+)", scram_arch)
@@ -733,7 +733,8 @@ class DagmanCreator(TaskAction):
         subdags = []
 
         # disable direct stageout for rucio tasks
-        if kwargs['task']['tm_output_lfn'].startswith('/store/user/rucio'):
+        if kwargs['task']['tm_output_lfn'].startswith('/store/user/rucio') or \
+           kwargs['task']['tm_output_lfn'].startswith('/store/group/rucio'):
             kwargs['task']['stageoutpolicy'] = "local"
         elif hasattr(self.config.TaskWorker, 'stageoutPolicy'):
             kwargs['task']['stageoutpolicy'] = ",".join(self.config.TaskWorker.stageoutPolicy)
