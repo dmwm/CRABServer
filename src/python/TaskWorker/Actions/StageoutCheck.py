@@ -80,7 +80,8 @@ class StageoutCheck(TaskAction):
         # OK, we are interested in telling if output can be actually transferred to user destination
         # if user wants to user Rucio, we can only check quota, since transfer will be done
         # by Rucio robot without using user credentials
-        if self.task['tm_output_lfn'].startswith('/store/user/rucio'):
+        if self.task['tm_output_lfn'].startswith('/store/user/rucio') or \
+           self.task['tm_output_lfn'].startswith('/store/group/rucio'):
             # to be filled with actual quota check, for the time being.. just go
             return
         # if not using Rucio, old code:

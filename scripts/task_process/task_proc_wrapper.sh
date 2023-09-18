@@ -14,7 +14,8 @@ function manage_transfers {
 
     if [[ -f task_process/transfers.txt ]]; then
         DEST_LFN=`python3 -c 'import sys, json; print(json.loads( open("task_process/transfers.txt").readlines()[0] )["destination_lfn"])' `
-        if [[ $DEST_LFN =~ ^/store/user/rucio/* ]]; then
+        re='^/store/(user|group)/rucio/.*'
+        if [[ $DEST_LFN =~ $re  ]]; then
             PYTHONPATH=$PYTHONPATH:$RucioPy3 /usr/bin/time -v timeout 15m python3 task_process/RUCIO_Transfers.py >> task_process/transfer_rucio.log 2>&1
         else
             timeout 15m env PYTHONPATH=$PYTHONPATH:$RucioPy3 python3 task_process/FTS_Transfers.py
