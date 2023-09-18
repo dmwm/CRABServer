@@ -400,6 +400,9 @@ class RetryJob():
         via a json file taskname.corrupted.job.<crabid>.<retry>.json
         returns True/Falso accordingly to corrupted yes/no
         """
+        if not os.path.exists('/etc/use_corruption_check'):
+            return False
+
         corruptedFile = False
         suspiciousFile = False
         fname = os.path.realpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
