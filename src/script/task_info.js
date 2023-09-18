@@ -581,7 +581,8 @@ $(document).ready(function() {
         if (userWebDir !== "" && inputTaskName !== "" && inputTaskName !== undefined) {
 
             var monitDashboardUrl = "https://monit-grafana.cern.ch/d/cmsTMDetail/cms-task-monitoring-task-view?orgId=11" +
-                "&var-user=" + username + "&var-task=" + inputTaskName;
+                "&var-user=" + username + "&var-task=" + inputTaskName + "&from=" + (taskTimestampToEpoch(inputTaskName)-(3600*1000)) +
+                "&to=now";
 
             var dasInputUrl = "https://cmsweb.cern.ch/das/request?view=list&limit=50&instance=" + dbsInstance + "&input=" + inputDataset;
 
@@ -651,6 +652,17 @@ $(document).ready(function() {
                     })
             }
             queryApi(url);
+            /**
+             * Parse taskname's timestamp to (milisec) epoch.
+             *
+             * From taskname "230712_052247:tseethon_crab_wa_test12"
+             * To "23-07-12T05:22:47.000Z", and feed to Date.parse() to get epoch.
+             */
+            function taskTimestampToEpoch(taskname) {
+                var x = taskname.split(':')[0];
+                var t = `20${x[0]}${x[1]}-${x[2]}${x[3]}-${x[4]}${x[5]}T${x[7]}${x[8]}:${x[9]}${x[10]}:${x[11]}${x[12]}.000Z`
+                return Date.parse(t)
+            }
         } else {
             errHandler(new TaskInfoUndefinedError);
         }
