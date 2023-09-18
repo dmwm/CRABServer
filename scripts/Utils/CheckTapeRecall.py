@@ -39,9 +39,11 @@ def main():
     # select non-OK states
     stuck = df[df['state'] == 'STUCK'].sort_values(by=['days'], ascending=False)
     replicating = df[df['state'] == 'REPLICATING'].sort_values(by=['days'], ascending=False)
+    suspended = df[df['state'] == 'SUSPENDED'].sort_values(by=['days'], ascending=False)
+
 
     # combine all pending rules in a single dataframe
-    pending = pd.concat([stuck, replicating]).reset_index(drop=True)
+    pending = pd.concat([stuck, replicating, suspended]).reset_index(drop=True)
 
     # prepare an HTML table
     if pending.empty:
