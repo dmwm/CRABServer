@@ -28,7 +28,7 @@ class Transfer:
         self.transferItems = []
 
         # from transfer info
-        self.username = ''
+        self.rucioUsername = ''
         self.rucioScope = ''
         self.taskname = ''
         self.destination = ''
@@ -152,8 +152,15 @@ class Transfer:
                 info = t
                 break
 
-        self.username = info['username']
-        self.rucioScope = f'user.{self.username}'
+        if info['destination_lfn'].startswith('/store/group/rucio/'):
+            # Getting group's username from LFN path.
+            name = info['destination_lfn'].split('/')[4]
+            # Rucio group's username always has `_group` suffix.
+            self.rucioUsername = f'{name}_group'
+            self.rucioScope = f'group.{name}'
+        else:
+            self.rucioUsername = info['username']
+            self.rucioScope = f'user.{self.rucioUsername}'
         self.taskname = info['taskname']
         self.destination = info['destination']
         if config.args.force_publishname:

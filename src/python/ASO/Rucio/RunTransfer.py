@@ -39,7 +39,7 @@ class RunTransfer:
         self.transfer = Transfer()
         # Read info from files written by PostJobs and bookkeeping from previous run.
         self.transfer.readInfo()
-        self.rucioClient = self._initRucioClient(self.transfer.username, self.transfer.restProxyFile)
+        self.rucioClient = self._initRucioClient(self.transfer.rucioUsername, self.transfer.restProxyFile)
         # Get info what's already in Rucio containers
         self.transfer.readInfoFromRucio(self.rucioClient)
         self.crabRESTClient = self._initCrabRESTClient(
