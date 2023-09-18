@@ -12,14 +12,14 @@ import shutil
 ERROR_KINDS = [
     'not a ROOT file',
     'truncated',
-]
+    ]
 
 
 def main():
-    """" """
+    """" description is at line 1 """
     # location of files prepared by RetryJobs
     topDir = '/eos/cms/store/temp/user'
-    #topDir = '.'  # `for testing locally
+    # topDir = '.'  # `for testing locally
     # topDir = topDir + '/filechecker'  # currently not used`
 
     for subDir in ['corrupted']:  # maybe later on add suspicious files, initially ignore them
@@ -42,6 +42,7 @@ def main():
         # now that we have the totals for this run of the script, update the
         # daily tally
         addToDailyLog(logDir=myDir, totals=totals)
+
 
 def addToDailyLog(logDir=None, totals=None):
     """
@@ -76,7 +77,7 @@ def addToDailyLog(logDir=None, totals=None):
         logs[did]['RSEs'] = list(logs[did]['RSEs'])
         logs[did]['kind'] = list(logs[did]['kind'])
     newLog = dailyLog + '.NEW'
-    with open(newLog, 'w' , encoding='utf-8') as fp:
+    with open(newLog, 'w', encoding='utf-8') as fp:
         json.dump(logs, fp)
     shutil.move(newLog, dailyLog)
 
@@ -99,6 +100,7 @@ def parse(file=None):
             break
     return result
 
+
 def accumulate(totals=None, result=None):
     """
     totals is a dictionary with a single key (the DID) pointing to a dictionary of info
@@ -117,5 +119,6 @@ def accumulate(totals=None, result=None):
     totals[did]['RSEs'].add(rse)
     totals[did]['kind'].add(kind)
     print(totals[did]['kind'])
+
 
 main()
