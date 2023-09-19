@@ -20,12 +20,12 @@ def main():
     # location of files prepared by RetryJobs
     topDir = '/eos/cms/store/temp/user'
     # topDir = '.'  # `for testing locally
-    # topDir = topDir + '/filechecker'  # currently not used`
+    topDir = f"{topDir}/BadInputFiles"
 
-    for subDir in ['corrupted']:  # maybe later on add suspicious files, initially ignore them
+    for problemType in ['corrupted']:  # maybe later on add suspicious files, initially ignore them
         totals = {}
         doneFiles = []
-        myDir = f"{topDir}/{subDir}"
+        myDir = f"{topDir}/{problemType}"
         newFilesDir = myDir + '/new'
         doneFilesDir = myDir + '/done'
         newFiles = os.listdir(newFilesDir)
@@ -41,7 +41,8 @@ def main():
 
         # now that we have the totals for this run of the script, update the
         # daily tally
-        addToDailyLog(logDir=myDir, totals=totals)
+        summariesDir = f"{topDir}/summaries/{problemType}"
+        addToDailyLog(logDir=summariesDir, totals=totals)
 
 
 def addToDailyLog(logDir=None, totals=None):
