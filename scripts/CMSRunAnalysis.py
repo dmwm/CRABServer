@@ -646,7 +646,7 @@ if __name__ == "__main__":
         print(f"==== {applicationName} Execution started at {UTCNow()} ====")
         cmd = "stdbuf -oL -eL "
         if not options.scriptExe :
-            cmd += 'cmsRun -p PSet.py -j FrameworkJobReport.xml'
+            cmd += 'cmsRun -j FrameworkJobReport.xml PSet.py'
         else:
             # make sure scriptexe is executable
             st = os.stat(options.scriptExe)

@@ -131,7 +131,7 @@ echo "====== arg checking: \$1 = $1" >> My_output.txt
 echo "====== arg checking: \$2 = $2" >> My_output.txt
 echo "====== arg checking: \$3 = $3" >> My_output.txt
 
-cmsRun -j FrameworkJobReport.xml -p PSet.py
+cmsRun -j FrameworkJobReport.xml PSet.py
 ExeExit=$?
 echo "============ SB CMSRUN finished =================" >> My_output.txt
 echo "============ SB CMSRUN exit code was: $ExeExit ==" >> My_output.txt
