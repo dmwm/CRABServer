@@ -405,6 +405,8 @@ class RetryJob():
 
         corruptedFile = False
         suspiciousFile = False
+        RSE = self.site
+        RSE = RSE if not RSE.startswith('T1') else f"{RSE}_Disk"
         fname = os.path.realpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
         self.logger.debug(f'exit code {exitCode}, look for corrupted file in {fname}')
         with open(fname, encoding='utf-8') as fd:
@@ -414,7 +416,7 @@ class RetryJob():
                     self.logger.info("Corrupted input file found")
                     self.logger.debug(line)
                     errorLines = [line]
-                    # file name is n next line
+                    # file name is in next line
                     continue
                 if corruptedFile:
                     errorLines.append(line)
@@ -434,8 +436,6 @@ class RetryJob():
                         inputFileName = 'NotEasilyAvailable'
                         errorLines.append('NOT CLEARLY CORRUPTED, OTHER ROOT ERROR ?\n')
                         self.logger.info("RootFatalError does not contain file info")
-                    RSE = self.site
-                    RSE = RSE if not RSE.startswith('T1') else f'{RSE}_Disk'
                     break
         if corruptedFile or suspiciousFile:
             # note it  down
