@@ -13,7 +13,7 @@ echo "================= Dumping PSet ===================="
 python -c "import PSet; print PSet.process.dumpPython()"
 
 # Ok, let's stop fooling around and execute the job:
-cmsRun -j FrameworkJobReport.xml -p PSet.py
+cmsRun -j FrameworkJobReport.xml PSet.py
 
 # $@ will point to the all job passed job parameters
 echo "I am a simple output for job "$@ > simpleoutput.txt

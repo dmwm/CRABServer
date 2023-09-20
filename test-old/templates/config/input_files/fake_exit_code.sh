@@ -1,6 +1,6 @@
 set -x
 echo "================= CMSRUN starting ===================="
-cmsRun -j FrameworkJobReport.xml -p PSet.py
+cmsRun -j FrameworkJobReport.xml PSet.py
 echo "================= CMSRUN finished ===================="
 
 #Prepare exit codes
