@@ -405,12 +405,16 @@ class RetryJob():
 
         corruptedFile = False
         suspiciousFile = False
+        inputFileName = 'NotAvailable'
         RSE = self.site
         RSE = RSE if not RSE.startswith('T1') else f"{RSE}_Disk"
         fname = os.path.realpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
         self.logger.debug(f'exit code {exitCode}, look for corrupted file in {fname}')
         with open(fname, encoding='utf-8') as fd:
             for line in fd:
+                # remember last opened file, in case of 8021 that's the one that matters
+                if line.startswith("== CMSSW:") and ' Successfully opened file' in line:
+                    inputFileName = f"/store/{line.split('/store/')[1]}"  # strip protocol part
                 if line.startswith("== CMSSW:") and "Fatal Root Error:" in line:
                     corruptedFile = True
                     self.logger.info("Corrupted input file found")
@@ -435,7 +439,6 @@ class RetryJob():
                     else:
                         corruptedFile = False
                         suspiciousFile = True
-                        inputFileName = 'NotEasilyAvailable'
                         errorLines.append('NOT CLEARLY CORRUPTED, OTHER ROOT ERROR ?\n')
                         self.logger.info("RootFatalError does not contain file info")
                     break
