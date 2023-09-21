@@ -405,6 +405,8 @@ class RetryJob():
 
         corruptedFile = False
         suspiciousFile = False
+        RSE = self.site
+        RSE = RSE if not RSE.startswith('T1') else f"{RSE}_Disk"
         fname = os.path.realpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
         self.logger.debug(f'exit code {exitCode}, look for corrupted file in {fname}')
         with open(fname, encoding='utf-8') as fd:
@@ -414,15 +416,17 @@ class RetryJob():
                     self.logger.info("Corrupted input file found")
                     self.logger.debug(line)
                     errorLines = [line]
-                    # file name is n next line
+                    # file name is in next line
                     continue
                 if corruptedFile:
                     errorLines.append(line)
                     if '/store/' in line and '.root' in line:
-                        if '/store/user' in line or '/store/group' in line and not 'rucio' in line:
-                            # no point in reporting files unknown to Rucio
-                            corruptedFile = False
-                            break
+                        # this may be better done in the script which processes the BadInputFiles reports
+                        # if '/store/user' in line or '/store/group' in line and not 'rucio' in line:
+                        #    # no point in reporting files unknown to Rucio
+                        #    corruptedFile = False
+                        #    break
+
                         # extract the '/store/...root' part of this line
                         fragment1 = line.split('/store/')[1]
                         fragment2 = fragment1.split('.root')[0]
@@ -434,8 +438,6 @@ class RetryJob():
                         inputFileName = 'NotEasilyAvailable'
                         errorLines.append('NOT CLEARLY CORRUPTED, OTHER ROOT ERROR ?\n')
                         self.logger.info("RootFatalError does not contain file info")
-                    RSE = self.site
-                    RSE = RSE if not RSE.startswith('T1') else f'{RSE}_Disk'
                     break
         if corruptedFile or suspiciousFile:
             # note it  down
@@ -448,9 +450,9 @@ class RetryJob():
             proxy = os.getenv('X509_USER_PROXY')
             self.logger.info(f"X509_USER_PROXY = {proxy}")
             if corruptedFile:
-                reportLocation = 'gsiftp://eoscmsftp.cern.ch/eos/cms/store/temp/user/corrupted/new/'
+                reportLocation = 'gsiftp://eoscmsftp.cern.ch/eos/cms/store/temp/user/BadInputFiles/corrupted/new/'
             if suspiciousFile:
-                reportLocation = 'gsiftp://eoscmsftp.cern.ch/eos/cms/store/temp/user/suspicious/new/'
+                reportLocation = 'gsiftp://eoscmsftp.cern.ch/eos/cms/store/temp/user/BadInputFiles/suspicious/new/'
 
             destination = reportLocation + reportFileName
             cmd = f'gfal-copy -v -t 60 {reportFileName} {destination}'
