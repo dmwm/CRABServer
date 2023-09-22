@@ -120,8 +120,8 @@ condor_df = (
 
 # Convert file type by saving and recall it again (.json too complex for spark)
 
-condor_df.write.mode('overwrite').parquet("/cms/users/eatthaph/condor_vir_data" ,compression='zstd')
-condor_df = spark.read.format('parquet').load('/cms/users/eatthaph/condor_vir_data')
+condor_df.write.mode('overwrite').parquet("/cms/users/cmscrab/condor_vir_data" ,compression='zstd')
+condor_df = spark.read.format('parquet').load('/cms/users/cmscrab/condor_vir_data')
 
 # Import CRAB data
 
