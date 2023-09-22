@@ -4,6 +4,7 @@ import sys
 import json
 import shutil
 import subprocess
+import socket
 from collections import namedtuple
 
 import classad
@@ -317,7 +318,9 @@ class RetryJob():
         if exitCode in [8020, 8021, 8028] or exitCode in [84, 85, 92]:
             try:  # the following is still a bit experimental, make sure it never crashes the PJ
                 corruptedInputFile = self.check_corrupted_file(exitCode)
-            except Exception:
+            except Exception as e:
+                msg = f"check_corrupted_file raised an exception:\n{e}\nIgnore and go on"
+                self.logger.error(msg)
                 corruptedInputFile = False
             if corruptedInputFile:
                 exitMsg = "Fatal Root Error maybe a corrupted input file. This error is being reported"
@@ -412,6 +415,7 @@ class RetryJob():
         self.logger.debug(f'exit code {exitCode}, look for corrupted file in {fname}')
         with open(fname, encoding='utf-8') as fd:
             for line in fd:
+                line = line.rstrip()  # remove trailing new-line
                 # remember last opened file, in case of 8021 that's the one that matters
                 if line.startswith("== CMSSW:") and ' Successfully opened file' in line:
                     inputFileName = f"/store/{line.split('/store/')[1]}"  # strip protocol part
@@ -439,11 +443,20 @@ class RetryJob():
                     else:
                         corruptedFile = False
                         suspiciousFile = True
-                        errorLines.append('NOT CLEARLY CORRUPTED, OTHER ROOT ERROR ?\n')
+                        errorLines.append('NOT CLEARLY CORRUPTED, OTHER ROOT ERROR ?')
+                        errorLines.append('DID Identification may not be corrrect')
                         self.logger.info("RootFatalError does not contain file info")
                     break
         if corruptedFile or suspiciousFile:
-            # note it  down
+            # add pointers to logs
+            schedId = socket.gethostname().split('.')[0][-3:]  # last 3 char of hostname e.g. vomcs195.cern.ch --> 195
+            username = self.reqname.split(':')[1].split('_')[0]
+            webDirUrl = f"http://cmsweb.cern.ch:8443/scheddmon/{schedId}/{username}/{self.reqname}"
+            stdoutUrl = f"{webDirUrl}/job_out.{self.job_id}.{self.crab_retry}.txt"
+            postJobUrl = f"{webDirUrl}/postjob.{self.job_id}.{self.crab_retry}.txt"
+            errorLines.append(f"stdout: {stdoutUrl}")
+            errorLines.append(f"postjob: {postJobUrl}")
+            # note things  down
             reportFileName = f'{self.reqname}.job.{self.job_id}.{self.crab_retry}.json'
             corruptionMessage = {'DID': f'cms:{inputFileName}', 'RSE': RSE,
                                   'exitCode': exitCode, 'message': errorLines}
@@ -475,12 +488,13 @@ class RetryJob():
 
     ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def execute_internal(self, logger, reqname, job_return_code, dag_retry, crab_retry, job_id, dag_jobid, job_ad, used_job_ad):
+    def execute_internal(self, logger, reqname, username, job_return_code, dag_retry, crab_retry, job_id, dag_jobid, job_ad, used_job_ad):
         """
         Need a doc string here.
         """
         self.logger          = logger
         self.reqname         = reqname
+        self.username        = username
         self.job_return_code = job_return_code
         self.dag_retry       = dag_retry
         self.crab_retry      = crab_retry
