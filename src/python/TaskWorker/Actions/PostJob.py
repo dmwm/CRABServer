@@ -1731,8 +1731,9 @@ class PostJob():
         retry = RetryJob()
         if not os.environ.get('TEST_POSTJOB_DISABLE_RETRIES', False):
             self.logger.info("       -----> RetryJob log start -----")
-            self.retryjob_retval = retry.execute(self.logger, self.reqname, self.job_return_code,
-                                                 self.dag_retry, self.crab_retry,
+            username = self.job_ad['CRAB_UserHN']
+            self.retryjob_retval = retry.execute(self.logger, self.reqname, username,
+                                                 self.job_return_code, self.dag_retry, self.crab_retry,
                                                  self.job_id, self.dag_jobid,
                                                  self.job_ad, used_job_ad)
             self.logger.info("       <----- RetryJob log finish ----")
