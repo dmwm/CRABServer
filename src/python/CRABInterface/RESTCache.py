@@ -114,6 +114,8 @@ class RESTCache(RESTEntity):
                 if not tarballname:
                     raise MissingParameter("tarballname is missing")
                 ownerName = authenticatedUserName if subresource == 'upload' else username
+                if not ownerName:
+                    raise MissingParameter("username is missing")
                 # sandbox goes in bucket/username/sandboxes/
                 objectPath = ownerName + '/sandboxes/' + tarballname
             else:
@@ -155,7 +157,7 @@ class RESTCache(RESTEntity):
                 # need to build a single URL string to return
                 preSignedUrl = response
             except ClientError as e:
-                raise ExecutionError("Connection to s3.cern.ch failed:\n%s" % str(e))
+                raise ExecutionError(f"Connection to s3.cern.ch failed:\n{str(e)}") from e
             # somehow it does not work to return preSignedUrl as a single object
             return [preSignedUrl['url'], preSignedUrl['fields']]
 
@@ -174,7 +176,7 @@ class RESTCache(RESTEntity):
                         ExpiresIn=expiration)
                 preSignedUrl = response
             except ClientError as e:
-                raise ExecutionError("Connection to s3.cern.ch failed:\n%s" % str(e))
+                raise ExecutionError(f"Connection to s3.cern.ch failed:\n{str(e)}") from e
             return preSignedUrl
 
         if subresource == 'retrieve':
@@ -185,7 +187,7 @@ class RESTCache(RESTEntity):
                 with MeasureTime(self.logger, modulename=__name__, label="get.retrieve.download_file") as _:
                     self.s3_client.download_file(self.s3_bucket, s3_objectKey, tempFile)
             except ClientError as e:
-                raise ExecutionError("Connection to s3.cern.ch failed:\n%s" % str(e))
+                raise ExecutionError(f"Connection to s3.cern.ch failed:\n{str(e)}") from e
             with open(tempFile) as f:
                 txt = f.read()
             os.remove(tempFile)
