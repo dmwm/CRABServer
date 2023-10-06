@@ -24,8 +24,10 @@ def getNativeRucioClient(config=None, logger=None):
     cl = logging.getLogger('charset_normalizer')
     cl.setLevel(logging.ERROR)
 
-    rucio_cert = getattr(config.Services, "Rucio_cert", config.TaskWorker.cmscert)
-    rucio_key = getattr(config.Services, "Rucio_key", config.TaskWorker.cmskey)
+    # Need to use config from `config.TaskWorker` object instead to switch to
+    # user cert in PreDag.py
+    rucio_cert = getattr(config.TaskWorker, "Rucio_cert", config.TaskWorker.cmscert)
+    rucio_key = getattr(config.TaskWorker, "Rucio_key", config.TaskWorker.cmskey)
     logger.debug("Using cert [%s]\n and key [%s] for rucio client.", rucio_cert, rucio_key)
     nativeClient = Client(
         rucio_host=config.Services.Rucio_host,
