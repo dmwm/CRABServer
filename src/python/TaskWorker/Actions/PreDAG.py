@@ -204,6 +204,8 @@ class PreDAG(object):
         # need to use user proxy as credential for talking with cmsweb
         config.TaskWorker.cmscert = os.environ.get('X509_USER_PROXY')
         config.TaskWorker.cmskey = os.environ.get('X509_USER_PROXY')
+        config.TaskWorker.Rucio_cert = os.environ.get('X509_USER_PROXY')
+        config.TaskWorker.Rucio_key = os.environ.get('X509_USER_PROXY')
         config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=config.TaskWorker.cmscert,
                                                     X509_USER_KEY=config.TaskWorker.cmskey)
 
