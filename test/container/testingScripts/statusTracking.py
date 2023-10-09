@@ -30,6 +30,7 @@ def parse_result(listOfTasks, checkPublication=False):
 
     for task in listOfTasks:
         task['pubSummary'] = 'None'  # make sure this is initialized
+        needToResubmit = False
         if task['dbStatus'] == 'SUBMITTED':
             # remove failed probe jobs (job id of X-Y kind) if any from count
             for job in task['jobs'].keys():
@@ -58,7 +59,10 @@ def parse_result(listOfTasks, checkPublication=False):
             task['pubSummary'] = '%d/%d/%d' % (failedPublications, published_in_transfersdb, published_in_dbs)
 
             if ('finished', total_jobs) in task['jobsPerStatus'].items():
-                result = 'TestPassed'
+                if task['status'] == 'COMPLETED':
+                    result = 'TestPassed'
+                else:
+                    needToResubmit = True
                 if checkPublication:
                     # remove probe jobs (job id of X-Y kind) if any from count
                     jobsToPublish = total_jobs
@@ -72,13 +76,14 @@ def parse_result(listOfTasks, checkPublication=False):
                     else:
                         result = 'TestRunning'
             elif any(k in task['jobsPerStatus'] for k in ('failed', 'held')):
-                resubmit = crab_cmd({'cmd': 'resubmit', 'args': {'dir': task['workdir']}})
-                result = 'TestResubmitted'
+                needToResubmit = True
             else:
                 result = 'TestRunning'
         elif task['dbStatus'] in ['HOLDING', 'QUEUED', 'NEW']:
             result = 'TestRunning'
         else:
+            needToResubmit = True
+        if needToResubmit:
             resubmit = crab_cmd({'cmd': 'resubmit', 'args': {'dir': task['workdir']}})
             result = 'TestResubmitted'
 
