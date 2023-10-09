@@ -92,10 +92,13 @@ class TapeRecallManager(BaseRecurringAction):
             msg = f"Working on task {taskName}"
             self.logger.info(msg)
             # 1.) check for "waited too long"
-            if (time.time() - getTimeFromTaskname(str(taskName))) > MAX_DAYS_FOR_TAPERECALL * 24 * 60 * 60:
+            waitDays = (time.time() - getTimeFromTaskname(str(taskName))) // 3600 // 24  # from sec to days
+            if waitDays > MAX_DAYS_FOR_TAPERECALL:
                 msg = f"Tape recall request did not complete in {MAX_DAYS_FOR_TAPERECALL} days."
                 self.logger.info(msg)
                 failTask(taskName, self.crabserver, msg, self.logger, 'FAILED')
+                # there is no need to remove the rule since it will expire one month after
+                # last task requesting those data was submitted.
                 continue
             # 2.) integrity checks
             reqId = aTask['tm_DDM_reqid']
@@ -130,9 +133,14 @@ class TapeRecallManager(BaseRecurringAction):
                 rep = rule['locks_replicating_cnt']
                 stuck = rule['locks_stuck_cnt']
                 total = ok + rep + stuck
-                okFraction = ok * 100 / total
+                okFraction = ok * 100 // total
                 msg = f"Data recall from tape in progress: ok/all = {ok}/{total} = {okFraction}%"
                 msg += f"\nRucio rule details at https://cms-rucio-webui.cern.ch/rule?rule_id={reqId}"
+                enoughData = okFraction > 99 or (rule['name'].endswith('SIM') and okFraction > 90 )
+                if waitDays > 7 and enoughData:
+                    mag += (f"This recall has lasted {waitDays} already and it is > 99% complete")
+                    msg += ("Your needs are very likely to be satisfied with what's on disk now")
+                    msg += ("Suggestion: kill this task and submit another one with config.Data.partialDataset=True")
                 self.deleteWarnings(taskName)
                 self.uploadWarning(taskname=taskName, msg=msg)
             self.logger.info("Done on this task")
