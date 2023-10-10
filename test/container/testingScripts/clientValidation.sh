@@ -88,6 +88,9 @@ source setupCRABClient.sh
       exit 1
     fi
 
+    voms-prxy-info -all
+    export X509_USER_PROXY=$PROXY
+
   }
 
   TMP_PARM1=("")
