@@ -88,7 +88,7 @@ source setupCRABClient.sh
       exit 1
     fi
 
-    voms-prxy-info -all
+    voms-proxy-info -all
     export X509_USER_PROXY=$PROXY
 
   }
