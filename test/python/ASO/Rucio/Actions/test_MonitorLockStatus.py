@@ -17,7 +17,7 @@ from argparse import Namespace
 from unittest.mock import patch, Mock, call
 
 import ASO.Rucio.config as config
-from ASO.Rucio.Actions.MonitorLocksStatus import MonitorLocksStatus
+from ASO.Rucio.Actions.MonitorLockStatus import MonitorLockStatus
 from ASO.Rucio.Actions.RegisterReplicas import RegisterReplicas
 
 @pytest.fixture
@@ -41,12 +41,12 @@ def loadDatasetMetadata():
         return json.load(r)
 
 def test_checkLockStatus_all_ok(mock_Transfer, mock_rucioClient):
-    listRuleIDs = ['b43a554244c54dba954aa29cb2fdde0a']
     outputAllOK = [
         {
+            "name": "/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root",
             "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca",
-            "dataset": '/GenericTTbar/tseethon-autotest-1679671056-94ba0e06145abd65ccb1d21786dc7e1d/USER#c9b28b96-5d16-41cd-89af-2678971132c9',
-            "blockcomplete": 'OK',
+            "dataset": None,
+            "blockcomplete": 'NO',
             "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
         }
     ]
@@ -56,206 +56,215 @@ def test_checkLockStatus_all_ok(mock_Transfer, mock_rucioClient):
     }]
 
     mock_rucioClient.list_replica_locks.side_effect = ((x for x in listReplicaLocksReturnValue), ) # list_replica_locks return generator
-    mock_Transfer.replicaLFN2IDMap = {
-        '/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root' : '98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca'
-    }
     mock_Transfer.replicasInContainer = {
         '/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root' : '/GenericTTbar/tseethon-autotest-1679671056-94ba0e06145abd65ccb1d21786dc7e1d/USER#c9b28b96-5d16-41cd-89af-2678971132c9'
     }
     mock_Transfer.containerRuleID = 'b43a554244c54dba954aa29cb2fdde0a'
+    mock_Transfer.LFN2transferItemMap = {
+        '/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root': {
+            'id': '98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca',
+        }
+    }
     config.args = Namespace(max_file_per_dataset=1)
-    m = MonitorLocksStatus(mock_Transfer, mock_rucioClient, Mock())
-    assert m.checkLocksStatus() == (outputAllOK, [])
+    m = MonitorLockStatus(mock_Transfer, mock_rucioClient, Mock())
+    assert m.checkLockStatus() == (outputAllOK, [])
 
 def test_checkLockStatus_all_replicating(mock_Transfer, mock_rucioClient):
-    listRuleIDs = ['b43a554244c54dba954aa29cb2fdde0a']
     outputNotOK = [
         {
+            "name": "/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root",
             "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca",
-            "dataset": '/GenericTTbar/tseethon-autotest-1679671056-94ba0e06145abd65ccb1d21786dc7e1d/USER#c9b28b96-5d16-41cd-89af-2678971132c9',
+            "dataset": None,
             "blockcomplete": 'NO',
             "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
-        }
+        },
     ]
-    getReplicationRuleReturnValue = {
-        'id': 'b43a554244c54dba954aa29cb2fdde0a',
-        'name': '/GenericTTbar/tseethon-autotest-1679671056-94ba0e06145abd65ccb1d21786dc7e1d/USER#c9b28b96-5d16-41cd-89af-2678971132c9',
-        'state': 'REPLICATING',
-    }
     listReplicaLocksReturnValue = [{
         'name': '/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root',
         'state': 'REPLICATING',
     }]
-    mock_rucioClient.get_replication_rule.return_value = getReplicationRuleReturnValue
+    mock_Transfer.containerRuleID = 'b43a554244c54dba954aa29cb2fdde0a'
+    mock_Transfer.LFN2transferItemMap = {
+        '/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root': {
+            'id': '98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca',
+        }
+    }
     mock_rucioClient.list_replica_locks.side_effect = ((x for x in listReplicaLocksReturnValue), ) # list_replica_locks return generator
     mock_Transfer.getIDFromLFN.return_value = '98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca'
-    m = MonitorLocksStatus(mock_Transfer, mock_rucioClient, Mock())
-    assert m.checkLocksStatus(listRuleIDs) == ([], outputNotOK, [])
+    m = MonitorLockStatus(mock_Transfer, mock_rucioClient, Mock())
+    assert m.checkLockStatus() == ([], outputNotOK)
 
 @pytest.mark.skip(reason="Skip it for now due deadline.")
 def test_checkLockStatus_mix():
     assert True == False
 
-# bookkeeping rule
-# - bookkeeping per dataset
-# - save rule id if rule ok to another file
-@patch.object(MonitorLocksStatus, 'checkLocksStatus')
-def test_execute_bookkeeping_none(mock_checkLockStatus, mock_Transfer):
-    allRules = ['b43a554244c54dba954aa29cb2fdde0a']
-    okRules = []
-    mock_Transfer.allRules = allRules
-    mock_Transfer.okRules = okRules
-    m = MonitorLocksStatus(mock_Transfer, mock_rucioClient, Mock())
-    mock_checkLockStatus.return_value = ([], [], okRules)
-    m.execute()
-    mock_checkLockStatus.assert_called_once_with(allRules)
-    mock_Transfer.updateOKRules.assert_called_once()
-
-@patch.object(MonitorLocksStatus, 'checkLocksStatus')
-def test_execute_bookkeeping_all(mock_checkLockStatus, mock_Transfer):
-    allRules = ['b43a554244c54dba954aa29cb2fdde0a']
-    okRules = ['b43a554244c54dba954aa29cb2fdde0a']
-    mock_Transfer.allRules = allRules
-    mock_Transfer.okRules = okRules
-    m = MonitorLocksStatus(mock_Transfer, mock_rucioClient, Mock())
-    mock_checkLockStatus.return_value = ([], [], [])
-    m.execute()
-    mock_checkLockStatus.assert_called_once_with([])
-    mock_Transfer.updateOKRules.assert_called_once()
-
-
-def generateExpectedOutput(doctype):
-    if doctype == 'complete':
-        return {
-            'asoworker': 'rucio',
-            'list_of_ids': ['98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca'], # hmm, how do we get this
-            'list_of_transfer_state': ['DONE'],
-            'list_of_dbs_blockname': ['/TestDataset/cmscrab-unittest-1/USER#c9b28b96-5d16-41cd-89af-2678971132ca'],
-            'list_of_block_complete': ['OK'],
-            'list_of_fts_instance': ['https://fts3-cms.cern.ch:8446/'],
-            'list_of_failure_reason': None, # omit
-            'list_of_retry_value': None, # omit
-            'list_of_fts_id': ['NA'],
+@patch.object(RegisterReplicas, 'addReplicasToContainer')
+def test_registerToPublishContainer(mock_addReplicasToContainer, mock_Transfer, mock_rucioClient):
+    mock_Transfer.publishContainer = '/GenericTTbar/integration-test-30_TRANSFER.befe3559/USER'
+    outputAllOK = [
+        {
+            "name": "/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root",
+            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca",
+            "dataset": None,
+            "blockcomplete": 'NO',
+            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
         }
-    elif doctype == 'notcomplete':
-        return {
-            'asoworker': 'rucio',
-            'list_of_ids': ['98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20cb'], # hmm, how do we get this
-            'list_of_transfer_state': ['SUBMITTED'],
-            'list_of_dbs_blockname': None,
-            'list_of_block_complete': None,
-            'list_of_fts_instance': ['https://fts3-cms.cern.ch:8446/'],
-            'list_of_failure_reason': None, # omit
-            'list_of_retry_value': None, # omit
-            'list_of_fts_id': ['b43a554244c54dba954aa29cb2fdde0b'],
+    ]
+    result = [
+        {
+            "name": "/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root",
+            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca",
+            "dataset": "/GenericTTbar/integration-test-30_TRANSFER.befe3559/USER#a86fca3a-1e38-467d-a2ac-98a8ff4299bd",
+            "blockcomplete": 'NO',
+            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
         }
+    ]
+    mock_addReplicasToContainer.return_value = result
+    m = MonitorLockStatus(mock_Transfer, mock_rucioClient, Mock())
+    assert m.registerToPublishContainer(outputAllOK) == result
 
-def test_prepareOKFileDoc(mock_Transfer):
-    okFileDoc = generateExpectedOutput('complete')
+def test_checkBlockCompleteStatus_close(mock_Transfer, mock_rucioClient):
+    fileDocs = [
+        {
+            "name": "/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root",
+            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca",
+            "dataset": "/GenericTTbar/integration-test-30_TRANSFER.befe3559/USER#a86fca3a-1e38-467d-a2ac-98a8ff4299bd",
+            "blockcomplete": 'NO',
+            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
+        }
+    ]
+    result = [
+        {
+            "name": "/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root",
+            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca",
+            "dataset": "/GenericTTbar/integration-test-30_TRANSFER.befe3559/USER#a86fca3a-1e38-467d-a2ac-98a8ff4299bd",
+            "blockcomplete": 'OK',
+            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
+        }
+    ]
+    config.args = Namespace(open_dataset_timeout=1*60*60)
+    mock_rucioClient.get_metadata.side_effect = [{
+        'is_open': False,
+        'updated_at': datetime.datetime.now()
+    }]
+    m = MonitorLockStatus(mock_Transfer, mock_rucioClient, Mock())
+    assert m.checkBlockCompleteStatus(fileDocs) == result
+
+def test_checkBlockCompleteStatus_shouldClose(mock_Transfer, mock_rucioClient):
+    fileDocs = [
+        {
+            "name": "/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root",
+            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca",
+            "dataset": "/GenericTTbar/integration-test-30_TRANSFER.befe3559/USER#a86fca3a-1e38-467d-a2ac-98a8ff4299bd",
+            "blockcomplete": 'NO',
+            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
+        }
+    ]
+    result = [
+        {
+            "name": "/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root",
+            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca",
+            "dataset": "/GenericTTbar/integration-test-30_TRANSFER.befe3559/USER#a86fca3a-1e38-467d-a2ac-98a8ff4299bd",
+            "blockcomplete": 'OK',
+            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
+        }
+    ]
+    config.args = Namespace(open_dataset_timeout=1*60*60)
+    mock_rucioClient.get_metadata.side_effect = [{
+        'is_open': False,
+        'updated_at': datetime.datetime.now() - datetime.timedelta(seconds=config.args.open_dataset_timeout - 1) # 1 hour and 1 second ago
+    }]
+    m = MonitorLockStatus(mock_Transfer, mock_rucioClient, Mock())
+    assert m.checkBlockCompleteStatus(fileDocs) == result
+
+def test_checkBlockCompleteStatus_notclose(mock_Transfer, mock_rucioClient):
+    fileDocs = [
+        {
+            "name": "/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root",
+            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca",
+            "dataset": "/GenericTTbar/integration-test-30_TRANSFER.befe3559/USER#a86fca3a-1e38-467d-a2ac-98a8ff4299bd",
+            "blockcomplete": 'NO',
+            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
+        }
+    ]
+    config.args = Namespace(open_dataset_timeout=1*60*60)
+    mock_rucioClient.get_metadata.side_effect = [{
+        'is_open': True,
+        'updated_at': datetime.datetime.now() - datetime.timedelta(seconds=1) # 1 sec ago
+    }]
+    m = MonitorLockStatus(mock_Transfer, mock_rucioClient, Mock())
+    assert m.checkBlockCompleteStatus(fileDocs) == []
+
+@pytest.mark.skip(reason="We did not use it, for now. Likely to revisit again in the future.")
+def test_filterFilesNeedToPublish():
+    assert True == False
+
+
+@patch('ASO.Rucio.Actions.MonitorLockStatus.updateToREST')
+def test_updateRESTFileDocsStateToDone(mock_updateToREST):
+    expectedRestFileDocs = {
+        'asoworker': 'rucio',
+        'list_of_ids': ['98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca', "0fbdabe9311c07ad901652dc998af04c3f16997ba62f03bf5a13e769"],
+        'list_of_transfer_state': ['DONE', 'DONE'],
+        'list_of_dbs_blockname': None,
+        'list_of_block_complete': None,
+        'list_of_fts_instance': ['https://fts3-cms.cern.ch:8446/', 'https://fts3-cms.cern.ch:8446/'],
+        'list_of_failure_reason': None, # omit
+        'list_of_retry_value': None, # omit
+        'list_of_fts_id': ['b43a554244c54dba954aa29cb2fdde0a', 'b43a554244c54dba954aa29cb2fdde0a'],
+    }
     outputOK = [
         {
             "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca",
+            "name": '/store/user/rucio/tseethon/random/dir/output_9.root',
             "dataset": '/TestDataset/cmscrab-unittest-1/USER#c9b28b96-5d16-41cd-89af-2678971132ca',
             "blockcomplete": 'OK',
             "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
-        }
-    ]
-    m = MonitorLocksStatus(mock_Transfer, Mock(), Mock())
-    assert okFileDoc == m.prepareOKFileDoc(outputOK)
-
-
-def test_prepareNotOKFileDoc(mock_Transfer):
-    notOKFileDoc = generateExpectedOutput('notcomplete')
-    outputNotOK = [
+        },
         {
-            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20cb",
-            "dataset": '/GenericTTbar/tseethon-autotest-1679671056-94ba0e06145abd65ccb1d21786dc7e1d/USER#c9b28b96-5d16-41cd-89af-2678971132c9',
+            "id": "0fbdabe9311c07ad901652dc998af04c3f16997ba62f03bf5a13e769",
+            "name": '/store/user/rucio/tseethon/random/dir/output_10.root',
+            "dataset": '/TestDataset/cmscrab-unittest-1/USER#ebe712e4-d53a-48e4-87d8-32c582ef4fab',
             "blockcomplete": 'NO',
-            "ruleid": "b43a554244c54dba954aa29cb2fdde0b",
+            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
         }
     ]
-    m = MonitorLocksStatus(mock_Transfer, Mock(), Mock())
-    assert notOKFileDoc == m.prepareNotOKFileDoc(outputNotOK)
+    rest = Mock()
+    m = MonitorLockStatus(Mock(), Mock(), rest)
+    m.updateRESTFileDocsStateToDone(outputOK)
+    mock_updateToREST.assert_called_with(rest, 'filetransfers', 'updateTransfers', expectedRestFileDocs)
 
-def test_addReplicasToPublishContainer():
+
+@patch('ASO.Rucio.Actions.MonitorLockStatus.updateToREST')
+def test_updateRESTFileDocsBlockCompletionInfo(mock_updateToREST):
+    expectedRestFileDocs = {
+        'asoworker': 'rucio',
+        'list_of_ids': ['98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca', "0fbdabe9311c07ad901652dc998af04c3f16997ba62f03bf5a13e769"],
+        'list_of_transfer_state': ['DONE', 'DONE'],
+        'list_of_dbs_blockname': ['/TestDataset/cmscrab-unittest-1/USER#c9b28b96-5d16-41cd-89af-2678971132ca', '/TestDataset/cmscrab-unittest-1/USER#ebe712e4-d53a-48e4-87d8-32c582ef4fab'],
+        'list_of_block_complete': ['OK', 'OK'],
+        'list_of_fts_instance': ['https://fts3-cms.cern.ch:8446/', 'https://fts3-cms.cern.ch:8446/'],
+        'list_of_failure_reason': None, # omit
+        'list_of_retry_value': None, # omit
+        'list_of_fts_id': None,
+    }
     outputOK = [
         {
             "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca",
+            "name": '/store/user/rucio/tseethon/random/dir/output_9.root',
             "dataset": '/TestDataset/cmscrab-unittest-1/USER#c9b28b96-5d16-41cd-89af-2678971132ca',
-            "blockcomplete": 'NO',
+            "blockcomplete": 'OK',
+            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
+        },
+        {
+            "id": "0fbdabe9311c07ad901652dc998af04c3f16997ba62f03bf5a13e769",
+            "name": '/store/user/rucio/tseethon/random/dir/output_10.root',
+            "dataset": '/TestDataset/cmscrab-unittest-1/USER#ebe712e4-d53a-48e4-87d8-32c582ef4fab',
+            "blockcomplete": 'OK',
             "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
         }
     ]
-    m = MonitorLocksStatus(mock_Transfer, mock_rucioClient, Mock())
-    m.addReplicasToPublishContainer(outputOK)
-
-
-@patch.object(RegisterReplicas, 'addReplicasToDataset')
-def test_updateBlockCompleteStatus(mock_addReplicasToDataset, mock_Transfer, mock_rucioClient, loadDatasetMetadata):
-    outputOK = [
-        {
-            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca",
-            "dataset": None,
-            "blockcomplete": 'NO',
-            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
-        },
-        {
-            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20cb",
-            "dataset": None,
-            "blockcomplete": 'NO',
-            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
-        },
-        {
-            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20cc",
-            "dataset": None,
-            "blockcomplete": 'NO',
-            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
-        },
-    ]
-    retAddReplicasToDataset = [
-        {
-            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca",
-            "dataset": '/TestPrimary/test-dataset_TRANSFER-bc8b2558/USER#c3800048-d946-45f7-9e83-1f420b4fc32e',
-            "blockcomplete": 'NO',
-            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
-        },
-        {
-            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20cb",
-            "dataset": '/TestPrimary/test-dataset_TRANSFER-bc8b2558/USER#c3800048-d946-45f7-9e83-1f420b4fc32e',
-            "blockcomplete": 'NO',
-            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
-        },
-        {
-            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20cc",
-            "dataset": '/TestPrimary/test-dataset_TRANSFER-bc8b2558/USER#b74d9bde-9a36-4e40-af17-3d614f19d380',
-            "blockcomplete": 'NO',
-            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
-        },
-    ]
-    expectedOutput = [
-        {
-            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca",
-            "dataset": '/TestPrimary/test-dataset_TRANSFER-bc8b2558/USER#c3800048-d946-45f7-9e83-1f420b4fc32e',
-            "blockcomplete": 'OK',
-            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
-        },
-        {
-            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20cb",
-            "dataset": '/TestPrimary/test-dataset_TRANSFER-bc8b2558/USER#c3800048-d946-45f7-9e83-1f420b4fc32e',
-            "blockcomplete": 'OK',
-            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
-        },
-        {
-            "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20cc",
-            "dataset": '/TestPrimary/test-dataset_TRANSFER-bc8b2558/USER#b74d9bde-9a36-4e40-af17-3d614f19d380',
-            "blockcomplete": 'NO',
-            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
-        },
-    ]
-    mock_addReplicasToDataset.return_value = retAddReplicasToDataset
-    datasetMetadata = loadDatasetMetadata[:2]
-    datasetMetadata[0]['is_open'] = False
-    datasetMetadata[1]['is_open'] = True
-    mock_rucioClient.get_metadata.side_effect = datasetMetadata
-    m = MonitorLocksStatus(mock_Transfer, mock_rucioClient, Mock())
-    assert m.updateBlockCompleteStatus(outputOK) == expectedOutput
+    rest = Mock()
+    m = MonitorLockStatus(Mock(), Mock(), rest)
+    m.updateRESTFileDocsBlockCompletionInfo(outputOK)
+    mock_updateToREST.assert_called_with(rest, 'filetransfers', 'updateRucioInfo', expectedRestFileDocs)
