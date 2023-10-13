@@ -438,9 +438,9 @@ class Master(object):
         maxSlaves = self.config.max_slaves
         self.logger.info('kicking off pool for %s tasks using up to %s concurrent slaves', len(tasks), maxSlaves)
         self.taskBlackList = os.listdir(self.blackListedTaskDir)
-        self.logger.debug('++++++ Using this taskBlackList: %s', self.taskBlackList)
+        self.logger.info('++++++ Using this taskBlackList: %s', self.taskBlackList)
         # print one line per task with the number of files to be published. Allow to find stuck tasks
-        self.logger.debug(' # of acquired files : taskname')
+        self.logger.info(' # of acquired files : taskname')
         for task in tasks:
             taskName = task[0][3]
             acquiredFiles = len(task[1])
