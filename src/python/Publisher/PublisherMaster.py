@@ -445,7 +445,7 @@ class Master(object):
             taskName = task[0][3]
             acquiredFiles = len(task[1])
             flag = '  OK' if acquiredFiles < 1000 else 'WARN' # mark suspicious tasks
-            self.logger.debug('acquired_files: %s %5d : %s', flag, acquiredFiles, taskName)
+            self.logger.info('acquired_files: %s %5d : %s', flag, acquiredFiles, taskName)
 
         processes = []
         try:
