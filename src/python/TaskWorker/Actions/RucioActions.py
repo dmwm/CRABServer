@@ -61,7 +61,7 @@ class RucioAction():
 
     def createOrReuseRucioRule(self, did=None, grouping=None,
                                rseExpression='', comment='', lifetime=0):
-        """ if Rucio report duplicate rule exception, reuse exisitn one """
+        """ if Rucio reports duplicate rule exception, reuse existing one """
         # Some RSE_EXPR for testing
         # rseExpression = 'ddm_quota>0&(tier=1|tier=2)&rse_type=DISK'
         # rseExpression = 'T3_IT_Trieste' # for testing
