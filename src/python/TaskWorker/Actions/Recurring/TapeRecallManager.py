@@ -138,7 +138,7 @@ class TapeRecallManager(BaseRecurringAction):
                 msg += f"\nRucio rule details at https://cms-rucio-webui.cern.ch/rule?rule_id={reqId}"
                 enoughData = okFraction > 99 or (rule['name'].endswith('SIM') and okFraction > 90 )
                 if waitDays > 7 and enoughData:
-                    mag += (f"This recall has lasted {waitDays} already and it is > 99% complete")
+                    mag += (f"This recall has lasted {waitDays} already and it is > {okFraction}% complete")
                     msg += ("Your needs are very likely to be satisfied with what's on disk now")
                     msg += ("Suggestion: kill this task and submit another one with config.Data.partialDataset=True")
                 self.deleteWarnings(taskName)
