@@ -35,14 +35,16 @@ class MonitorLockStatus:
         self.updateRESTFileDocsStateToDone(newDoneFileDocs)
         self.transfer.updateOKLocks([x['name'] for x in newDoneFileDocs])
 
-        # Filter only files need to publish
-        needToPublishFileDocs = self.filterFilesNeedToPublish(okFileDocs)
-        self.logger.debug(f'needToPublishFileDocs: {needToPublishFileDocs}')
-        # Register transfer complete replicas to publish container.
-        # Note that replicas that already add to publish container will do
-        # nothing but return fileDoc containing the block name replica belongs
-        # to.
-        publishedFileDocs = self.registerToPublishContainer(needToPublishFileDocs)
+        # NOTE: See https://github.com/dmwm/CRABServer/issues/7940
+        ## Filter only files need to publish
+        #needToPublishFileDocs = self.filterFilesNeedToPublish(okFileDocs)
+        #self.logger.debug(f'needToPublishFileDocs: {needToPublishFileDocs}')
+        ## Register transfer complete replicas to publish container.
+        ## Note that replicas that already add to publish container will do
+        ## nothing but return fileDoc containing the block name replica belongs
+        ## to.
+        #publishedFileDocs = self.registerToPublishContainer(needToPublishFileDocs)
+        publishedFileDocs = self.registerToPublishContainer(okFileDocs)
         self.logger.debug(f'publishedFileDocs: {publishedFileDocs}')
         # skip filedocs that already update it status to rest.
         newPublishFileDocs = [doc for doc in publishedFileDocs if not doc['dataset'] in self.transfer.bookkeepingBlockComplete]
