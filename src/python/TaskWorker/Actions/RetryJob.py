@@ -449,9 +449,10 @@ class RetryJob():
                     break
         if corruptedFile or suspiciousFile:
             # add pointers to logs
-            schedId = socket.gethostname().split('.')[0][-3:]  # last 3 char of hostname e.g. vomcs195.cern.ch --> 195
+            schedHostname = socket.gethostname().split('.')[0]
+            schedId = schedHostname.split('0')[1]  # vomcs059 --> 59, vocms0144 --> 144 etc,
             username = self.reqname.split(':')[1].split('_')[0]
-            webDirUrl = f"http://cmsweb.cern.ch:8443/scheddmon/{schedId}/{username}/{self.reqname}"
+            webDirUrl = f"https://cmsweb.cern.ch:8443/scheddmon/0{schedId}/{username}/{self.reqname}"
             stdoutUrl = f"{webDirUrl}/job_out.{self.job_id}.{self.crab_retry}.txt"
             postJobUrl = f"{webDirUrl}/postjob.{self.job_id}.{self.crab_retry}.txt"
             errorLines.append(f"stdout: {stdoutUrl}")
