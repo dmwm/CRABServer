@@ -17,15 +17,18 @@ JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERRO
 # Without this environment variable set, HTCondor takes a write lock per logfile entry
 os.environ['_condor_ENABLE_USERLOG_LOCKING'] = 'false'
 
-##==============================================================================
+# ==============================================================================
+
 
 class FatalError(Exception):
     pass
 
+
 class RecoverableError(Exception):
     pass
 
-##==============================================================================
+
+# ==============================================================================
 
 class RetryJob():
     """
@@ -35,27 +38,27 @@ class RetryJob():
         """
         Class constructor.
         """
-        self.logger              = None
-        self.reqname             = None
-        self.job_return_code     = None
-        self.dag_retry           = None
-        self.crab_retry          = None
-        self.job_id              = None
-        self.dag_jobid           = None
-        self.dag_clusterid       = None
-        self.site                = None
-        self.ads                 = []
-        self.ad                  = {}
-        self.report              = {}
-        self.validreport         = True
+        self.logger = None
+        self.reqname = None
+        self.job_return_code = None
+        self.dag_retry = None
+        self.crab_retry = None
+        self.job_id = None
+        self.dag_jobid = None
+        self.dag_clusterid = None
+        self.site = None
+        self.username = None
+        self.ads = []
+        self.ad = {}
+        self.report = {}
+        self.validreport = True
         self.integrated_job_time = 0
 
         self.MAX_DISK_SPACE = MAX_DISK_SPACE
-        self.MAX_WALLTIME   = MAX_WALLTIME
-        self.MAX_MEMORY     = MAX_MEMORY
+        self.MAX_WALLTIME = MAX_WALLTIME
+        self.MAX_MEMORY = MAX_MEMORY
 
-
-    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def get_job_ad_from_condor_q(self):
         """
@@ -63,16 +66,15 @@ class RetryJob():
         """
         if self.dag_clusterid == -1:
             return
-
         shutil.copy("job_log", "job_log.%s" % str(self.dag_jobid))
-
-        p = subprocess.Popen(["condor_q", "-debug", "-l", "-userlog", "job_log.%s" % str(self.dag_jobid), str(self.dag_jobid)], stdout=subprocess.PIPE, stderr=sys.stderr)
+        p = subprocess.Popen(["condor_q", "-debug", "-l", "-userlog", "job_log.%s" %
+                              str(self.dag_jobid), str(self.dag_jobid)], stdout=subprocess.PIPE, stderr=sys.stderr)
         output, _ = p.communicate()
         status = p.returncode
 
         try:
             os.unlink("job_log.%s" % str(self.dag_jobid))
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             pass
 
         if status:
@@ -87,7 +89,7 @@ class RetryJob():
                 self.ads.append(ad)
         self.ad = self.ads[-1]
 
-    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def get_job_ad_from_file(self):
         """
@@ -104,7 +106,7 @@ class RetryJob():
                 try:
                     with open(job_ad_file, encoding='utf-8') as fd:
                         ad = classad.parseOld(fd)
-                except Exception:
+                except Exception:  # pylint: disable=broad-except
                     msg = "Unable to parse classads from file %s. Continuing." % (job_ad_file)
                     self.logger.warning(msg)
                     continue
@@ -114,7 +116,7 @@ class RetryJob():
                 msg = "File %s does not exist. Continuing." % (job_ad_file)
                 self.logger.warning(msg)
 
-    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def get_report(self):
         """
@@ -132,7 +134,7 @@ class RetryJob():
         except IOError:
             self.validreport = False
 
-    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def record_site(self, job_status):
         """
@@ -145,17 +147,17 @@ class RetryJob():
         try:
             with os.fdopen(os.open("task_statistics.%s.%s" % (self.site, job_status_name), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0o644), 'a') as fd:
                 fd.write("%s\n" % (self.job_id))
-        except Exception as ex:
+        except Exception as ex:  # pylint: disable=broad-except
             self.logger.error(str(ex))
             # Swallow the exception - record_site is advisory only
         try:
             with os.fdopen(os.open("task_statistics.%s" % (job_status_name), os.O_APPEND | os.O_CREAT | os.O_RDWR, 0o644), 'a') as fd:
                 fd.write("%s\n" % (self.job_id))
-        except Exception as ex:
+        except Exception as ex:  # pylint: disable=broad-except
             self.logger.error(str(ex))
             # Swallow the exception - record_site is advisory only
 
-    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def create_fake_fjr(self, exitMsg, exitCode, jobExitCode=None, fatalError=True):
         """
@@ -172,8 +174,8 @@ class RetryJob():
             fake_fjr['exitCode'] = exitCode
         jobReport = "job_fjr.%s.%d.json" % (self.job_id, self.crab_retry)
         if os.path.isfile(jobReport) and os.path.getsize(jobReport) > 0:
-            #File exists and it is not empty
-            msg  = "%s file exists and it is not empty!" % (jobReport)
+            # File exists and it is not empty
+            msg = "%s file exists and it is not empty!" % (jobReport)
             msg += " CRAB3 will overwrite it, because the job got FatalError"
             self.logger.info(msg)
             with open(jobReport, 'r', encoding='utf-8') as fd:
@@ -188,7 +190,7 @@ class RetryJob():
         if fatalError:
             raise FatalError(exitMsg)
 
-    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def check_cpu_report(self):
         """
@@ -219,11 +221,11 @@ class RetryJob():
         if total_job_time > self.MAX_WALLTIME:
             exitMsg = "Not retrying a long running job (job ran for %d hours)" % (total_job_time / 3600)
             self.create_fake_fjr(exitMsg, 50664)  # this raises FatalError
-        if integrated_job_time > 1.5*self.MAX_WALLTIME:
+        if integrated_job_time > (1.5 * self.MAX_WALLTIME):
             exitMsg = "Not retrying a job because the integrated time (across all retries) is %d hours." % (integrated_job_time / 3600)
             self.create_fake_fjr(exitMsg, 50664)  # this raises FatalError
 
-    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def check_memory_report(self):
         """
@@ -231,7 +233,7 @@ class RetryJob():
         """
         # If job was killed on the worker node, we probably don't have a FJR.
         if self.ad.get("RemoveReason", "").startswith("Removed due to memory use"):
-            job_rss = int(self.ad.get("ResidentSetSize","0")) // 1000
+            job_rss = int(self.ad.get("ResidentSetSize", "0")) // 1000
             exitMsg = "Job killed by HTCondor due to excessive memory use"
             exitMsg += " (RSS=%d MB)." % job_rss
             exitMsg += " Will not retry it."
@@ -250,7 +252,7 @@ class RetryJob():
             exitMsg = "Not retrying job due to excessive memory use (%d MB vs %d MB requested)" % (total_job_memory, self.MAX_MEMORY)
             self.create_fake_fjr(exitMsg, 50660, 50660)
 
-    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def check_disk_report(self):
         """
@@ -275,8 +277,7 @@ class RetryJob():
                 msg = "Unable to get DiskUsage from job classads. Will not perform Disk Usage check."
                 self.logger.debug(msg)
 
-
-    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def check_expired_report(self):
         """
@@ -286,7 +287,7 @@ class RetryJob():
             exitMsg = "Not retrying job due to excessive idle time (job automatically killed on the grid scheduler)"
             self.create_fake_fjr(exitMsg, 50665, 50665)
 
-    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def check_exit_code(self):
         """
@@ -310,15 +311,15 @@ class RetryJob():
             self.logger.info(msg)
             return 0
 
-        msg  = "Job or stageout wrapper finished with exit code %d." % (exitCode)
+        msg = "Job or stageout wrapper finished with exit code %d." % (exitCode)
         msg += " Trying to determine the meaning of the exit code and if it is a recoverable or fatal error."
         self.logger.info(msg)
 
-        ## Wrapper script sometimes returns the posix return code (8 bits).
+        # Wrapper script sometimes returns the posix return code (8 bits).
         if exitCode in [8020, 8021, 8028] or exitCode in [84, 85, 92]:
             try:  # the following is still a bit experimental, make sure it never crashes the PJ
                 corruptedInputFile = self.check_corrupted_file(exitCode)
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 msg = f"check_corrupted_file raised an exception:\n{e}\nIgnore and go on"
                 self.logger.error(msg)
                 corruptedInputFile = False
@@ -347,8 +348,8 @@ class RetryJob():
                         if line.startswith("== CMSSW:  A fatal system signal has occurred: illegal instruction"):
                             recoverable_signal = True
                             break
-            except Exception:
-                msg  = "Error analyzing abort signal."
+            except Exception:  # pylint: disable=broad-except
+                msg = "Error analyzing abort signal."
                 msg += "\nDetails follow:"
                 self.logger.exception(msg)
             if recoverable_signal:
@@ -364,8 +365,8 @@ class RetryJob():
                         if cvmfs_issue_re.match(line):
                             cvmfs_issue = True
                             break
-            except Exception:
-                msg  = "Error analyzing output for CVMFS issues."
+            except Exception:  # pylint: disable=broad-except
+                msg = "Error analyzing output for CVMFS issues."
                 msg += "\nDetails follow:"
                 self.logger.exception(msg)
             if cvmfs_issue:
@@ -395,7 +396,7 @@ class RetryJob():
 
         return 0
 
-    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def check_corrupted_file(self, exitCode):
         """
@@ -440,6 +441,7 @@ class RetryJob():
                         fragment2 = fragment1.split('.root')[0]
                         inputFileName = f"/store/{fragment2}.root"
                         self.logger.info(f"RSE: {RSE} - ec: {exitCode} - file: {inputFileName}")
+
                     else:
                         corruptedFile = False
                         suspiciousFile = True
@@ -460,7 +462,7 @@ class RetryJob():
             # note things  down
             reportFileName = f'{self.reqname}.job.{self.job_id}.{self.crab_retry}.json'
             corruptionMessage = {'DID': f'cms:{inputFileName}', 'RSE': RSE,
-                                  'exitCode': exitCode, 'message': errorLines}
+                                 'exitCode': exitCode, 'message': errorLines}
             with open(reportFileName, 'w', encoding='utf-8') as fp:
                 json.dump(corruptionMessage, fp)
             self.logger.info('corruption message prepared, gfal-copy to EOS')
@@ -478,7 +480,7 @@ class RetryJob():
                 self.logger.error(f'gfal-copy failed with out: {out} err: {err}')
         return corruptedFile
 
-    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def check_empty_report(self):
         """
@@ -487,20 +489,20 @@ class RetryJob():
         if not self.report or not self.validreport:
             raise RecoverableError("Job did not produce a usable framework job report.")
 
-    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def execute_internal(self, logger, reqname, username, job_return_code, dag_retry, crab_retry, job_id, dag_jobid, job_ad, used_job_ad):
         """
         Need a doc string here.
         """
-        self.logger          = logger
-        self.reqname         = reqname
-        self.username        = username
+        self.logger = logger
+        self.reqname = reqname
+        self.username = username
         self.job_return_code = job_return_code
-        self.dag_retry       = dag_retry
-        self.crab_retry      = crab_retry
-        self.job_id          = job_id
-        self.dag_jobid       = dag_jobid
+        self.dag_retry = dag_retry
+        self.crab_retry = crab_retry
+        self.job_id = job_id
+        self.dag_jobid = dag_jobid
 
         try:
             self.dag_clusterid = int(self.dag_jobid.split(".")[0])
@@ -508,7 +510,7 @@ class RetryJob():
             pass
 
         if used_job_ad:
-            #We can determine walltime and max memory from job ad.
+            # We can determine walltime and max memory from job ad.
             self.ad = job_ad
             if 'MaxWallTimeMinsRun' in self.ad:
                 self.MAX_WALLTIME = int(self.ad['MaxWallTimeMinsRun']) * 60
@@ -528,8 +530,8 @@ class RetryJob():
             self.logger.debug(msg)
             self.get_job_ad_from_condor_q()
 
-        ## Do we still need identification of site in self.get_report()?
-        ## We can always get it from job ad.
+        # Do we still need identification of site in self.get_report()?
+        # We can always get it from job ad.
         if 'JOBGLIDEIN_CMSSite' in self.ad:
             self.site = self.ad['JOBGLIDEIN_CMSSite']
 
@@ -541,8 +543,8 @@ class RetryJob():
 
         try:
             self.check_empty_report()
-            ## Raises a RecoverableError or FatalError exception depending on the exitCode
-            ## saved in the job report.
+            # Raises a RecoverableError or FatalError exception depending on the exitCode
+            # saved in the job report.
             check_exit_code_retval = self.check_exit_code()
         except RecoverableError as e:
             orig_msg = str(e)
@@ -551,28 +553,28 @@ class RetryJob():
                 self.check_cpu_report()
                 self.check_disk_report()
                 self.check_expired_report()
-            except Exception:
+            except Exception:  # pylint: disable=broad-except
                 msg = "Original error: %s" % (orig_msg)
                 self.logger.error(msg)
                 raise
             raise
 
-        ## The fact that check_exit_code() has not raised RecoverableError or FatalError
-        ## doesn't necessarily mean that the job was successful; check_exit_code() reads
-        ## the job exit code from the job report and it might be that the exit code is
-        ## not there, in which case check_exit_code() returns silently. So as a safety
-        ## measure we check here the job return code passed to the post-job via the
-        ## DAGMan $RETURN argument macro. This is equal to the return code of the job
-        ## when the job was executed, and is equal to -100[1,2,3,4] when ["job failed to
-        ## be submitted to the batch system", "job externally removed from the batch
-        ## system queue", "error in the job log monitor", "job not executed because PRE
-        ## script returned non-zero"] respectively. In the particular case of job return
-        ## code = -1004 and job exit code from (previous job retry) job report = 0, we
-        ## should continue and not do the check. The reason is: the pre-job is not
-        ## expected to fail; if the pre-job returned non-zero we assume it was done so
-        ## in order to intentionally skip the job execution.
+        # The fact that check_exit_code() has not raised RecoverableError or FatalError
+        # doesn't necessarily mean that the job was successful; check_exit_code() reads
+        # the job exit code from the job report and it might be that the exit code is
+        # not there, in which case check_exit_code() returns silently. So as a safety
+        # measure we check here the job return code passed to the post-job via the
+        # DAGMan $RETURN argument macro. This is equal to the return code of the job
+        # when the job was executed, and is equal to -100[1,2,3,4] when ["job failed to
+        # be submitted to the batch system", "job externally removed from the batch
+        # system queue", "error in the job log monitor", "job not executed because PRE
+        # script returned non-zero"] respectively. In the particular case of job return
+        # code = -1004 and job exit code from (previous job retry) job report = 0, we
+        # should continue and not do the check. The reason is: the pre-job is not
+        # expected to fail; if the pre-job returned non-zero we assume it was done so
+        # in order to intentionally skip the job execution.
         if not (self.job_return_code == -1004 and check_exit_code_retval == 0):
-            if self.job_return_code != JOB_RETURN_CODES.OK: # Probably means stageout failed!
+            if self.job_return_code != JOB_RETURN_CODES.OK:  # Probably means stageout failed!
                 msg = "Payload job was successful, but wrapper exited with non-zero status %d" % (self.job_return_code)
                 if self.job_return_code > 0:
                     msg += " (stageout failure)?"
@@ -580,7 +582,7 @@ class RetryJob():
 
         return JOB_RETURN_CODES.OK
 
-    ##= = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def execute(self, *args, **kw):
         """
@@ -598,6 +600,6 @@ class RetryJob():
             self.logger.error(str(e))
             self.record_site(JOB_RETURN_CODES.FATAL_ERROR)
             return JOB_RETURN_CODES.FATAL_ERROR
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             self.logger.exception(str(e))
             return 0  # Why do we return 0 here ?
