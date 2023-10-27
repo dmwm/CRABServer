@@ -1,12 +1,13 @@
 import os
 import re
+import copy
 
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from ServerUtilities import isFailurePermanent
 from ServerUtilities import getCheckWriteCommand, createDummyFile
-from ServerUtilities import removeDummyFile, execute_command
-from RucioUtils import getWritePFN
+from ServerUtilities import removeDummyFile, execute_command, isEnoughRucioQuota, getRucioAccountFromLFN
+from RucioUtils import getWritePFN, getNativeRucioClient
 
 class StageoutCheck(TaskAction):
 
@@ -19,6 +20,7 @@ class StageoutCheck(TaskAction):
     def __init__(self, config, crabserver, procnum=-1, rucioClient=None):
         TaskAction.__init__(self, config, crabserver, procnum)
         self.rucioClient = rucioClient
+        self.privilegedRucioClient = None
         self.task = None
         self.proxy = None
         self.workflow = None
@@ -82,8 +84,32 @@ class StageoutCheck(TaskAction):
         # by Rucio robot without using user credentials
         if self.task['tm_output_lfn'].startswith('/store/user/rucio') or \
            self.task['tm_output_lfn'].startswith('/store/group/rucio'):
-            # to be filled with actual quota check, for the time being.. just go
-            return
+            # copy from TapeRecallManager
+            #if not self.privilegedRucioClient:
+            #    tapeRecallConfig = copy.deepcopy(self.config)
+            #    tapeRecallConfig.Services.Rucio_account = 'crab_input'
+            #    self.privilegedRucioClient = getNativeRucioClient(tapeRecallConfig, self.logger)
+            # patch for test with non superuser account, will remove later
+            userRucioConfig = copy.deepcopy(self.config)
+            userRucioConfig.TaskWorker.Rucio_cert = self.task['user_proxy']
+            userRucioConfig.TaskWorker.Rucio_key = self.task['user_proxy']
+            userRucioConfig.Services.Rucio_account, _ = getRucioAccountFromLFN(self.task['tm_output_lfn'])
+            userRucioClient = getNativeRucioClient(userRucioConfig, self.logger)
+            ###
+            rucioAccount = getRucioAccountFromLFN(self.task['tm_output_lfn'])
+            self.logger.info(f"Checking Rucio quota from account {rucioAccount}.")
+            _, isEnough, isQuotaWarning, quota = isEnoughRucioQuota(userRucioClient, self.task['tm_asyncdest'], rucioAccount)
+            _, _, freeGB = quota
+            if not isEnough:
+                msg = f"Not enough Rucio quota at {self.task['tm_asyncdest']}:{self.task['tm_output_lfn']}."\
+                      f" Remain quota: {freeGB} GB."
+                raise TaskWorkerException(msg)
+            self.logger.info(f" Remain quota: {freeGB} GB.")
+            if isQuotaWarning:
+                msg = 'Rucio Quota is very little and although CRAB will submit, stageout may fail.'
+                self.logger.warning(msg)
+                self.uploadWarning(msg, self.task['user_proxy'], self.task['tm_taskname'])
+
         # if not using Rucio, old code:
         else:
             cpCmd, rmCmd, append = getCheckWriteCommand(self.proxy, self.logger)
