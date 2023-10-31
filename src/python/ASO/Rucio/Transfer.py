@@ -44,6 +44,7 @@ class Transfer:
         self.lastTransferLine = 0
         self.containerRuleID = ''
         self.publishRuleID = ''
+        self.multiPubRuleIDs = {}
         self.bookkeepingOKLocks = None
         self.bookkeepingBlockComplete = None
 
@@ -216,6 +217,7 @@ class Transfer:
             json.dump({
                 'containerRuleID': self.containerRuleID,
                 'publishRuleID': self.publishRuleID,
+                'multiPubRuleIDs': self.multiPubRuleIDs,
             }, w)
 
     def readOKLocks(self):

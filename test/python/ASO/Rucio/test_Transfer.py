@@ -3,7 +3,7 @@
 import pytest
 import builtins
 import json
-from unittest.mock import patch, mock_open
+from unittest.mock import patch, mock_open, MagicMock
 from argparse import Namespace
 
 from ASO.Rucio.Transfer import Transfer
@@ -48,6 +48,13 @@ def transferDicts():
     path = 'test/assets/transferDicts.json'
     with open(path, 'r', encoding='utf-8') as r:
         return json.load(r)
+
+@pytest.fixture
+def containerRuleIDJSONContent():
+    path = 'test/assets/container_ruleid.json'
+    with open(path, 'r', encoding='utf-8') as r:
+        return r.read()
+
 
 #old relic
 #def test_Transfer_readInfo():
@@ -276,3 +283,26 @@ def test_buildMultiPubContainers(transferDicts):
         '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__miniaodfake.root/USER',
         '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__output.root/USER',
     ]
+
+def test_updateContainerRuleID(containerRuleIDJSONContent, fs):
+    path = '/path/to/container_ruleid.json'
+    config.args = Namespace(container_ruleid_path=path)
+    # we should mock writePath(), not function inside writePath()
+    fs.create_file(path)
+    with open(path, 'w', encoding='utf-8') as mock_file:
+        with patch('ASO.Rucio.Transfer.writePath') as mock_writePath:
+            mock_writePath.return_value.__enter__.return_value = mock_file
+            t = Transfer()
+            t.containerRuleID = 'c88abb899f744efb8f33fd197ee77ecd'
+            t.publishRuleID = '141a41b6b54f45f59dc0703182f1257f'
+            t.multiPubRuleIDs = {
+                '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__cmsRun.log.tar.gz/USER': '9653f39f686944128028fd25888ae2d3',
+                '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__output.root/USER': 'e609d75e4a7a4fa3a880ea0bb6681371',
+                '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__miniaodfake.root/USER': '6b159d7e5dc940daa2188658a68c4b23',
+            }
+            t.updateContainerRuleID()
+            mock_writePath.assert_called_once_with(path)
+    with open(path, 'r', encoding='utf-8') as mock_file:
+        x = json.loads(mock_file.read())
+        y = json.loads(containerRuleIDJSONContent)
+        assert x == y
