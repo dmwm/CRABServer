@@ -243,7 +243,7 @@ class RegisterReplicas:
                     'id': c['id'],
                     'name': c['name'],
                     'dataset': currentDataset,
-                    'blockcomplete': None,
+                    'blockcomplete': 'NO',
                     'ruleid': self.transfer.containerRuleID,
                 }
                 containerFileDocs.append(success)

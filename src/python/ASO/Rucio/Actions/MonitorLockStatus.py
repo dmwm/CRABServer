@@ -101,14 +101,17 @@ class MonitorLockStatus:
         :return: replicas info with updated dataset name.
         :rtype: list of dict
         """
+
         r = RegisterReplicas(self.transfer, self.rucioClient, None)
         publishContainerFileDocs = r.addReplicasToContainer(fileDocs, self.transfer.publishContainer)
+
         # Update dataset name for each replicas
-        tmpLFN2DatasetMap = {x['name']:x['dataset'] for x in publishContainerFileDocs}
-        tmpFileDocs = copy.deepcopy(fileDocs)
-        for f in tmpFileDocs:
-            f['dataset'] = tmpLFN2DatasetMap[f['name']]
-        return tmpFileDocs
+        #tmpLFN2DatasetMap = {x['name']:x['dataset'] for x in publishContainerFileDocs}
+        #tmpFileDocs = copy.deepcopy(fileDocs)
+        #for f in tmpFileDocs:
+        #    f['dataset'] = tmpLFN2DatasetMap[f['name']]
+        #return tmpFileDocs
+        return publishContainerFileDocs
 
     def checkBlockCompleteStatus(self, fileDocs):
         """
@@ -194,7 +197,7 @@ class MonitorLockStatus:
             'list_of_fts_instance': ['https://fts3-cms.cern.ch:8446/']*num,
             'list_of_failure_reason': None, # omit
             'list_of_retry_value': None, # omit
-            'list_of_fts_id': [x['ruleid'] for x in fileDocs]*num,
+            'list_of_fts_id': [x['ruleid'] for x in fileDocs],
         }
         updateToREST(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc)
 
