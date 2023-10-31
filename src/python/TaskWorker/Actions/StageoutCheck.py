@@ -85,20 +85,13 @@ class StageoutCheck(TaskAction):
         if self.task['tm_output_lfn'].startswith('/store/user/rucio') or \
            self.task['tm_output_lfn'].startswith('/store/group/rucio'):
             # copy from TapeRecallManager
-            #if not self.privilegedRucioClient:
-            #    tapeRecallConfig = copy.deepcopy(self.config)
-            #    tapeRecallConfig.Services.Rucio_account = 'crab_input'
-            #    self.privilegedRucioClient = getNativeRucioClient(tapeRecallConfig, self.logger)
-            # patch for test with non superuser account, will remove later
-            userRucioConfig = copy.deepcopy(self.config)
-            userRucioConfig.TaskWorker.Rucio_cert = self.task['user_proxy']
-            userRucioConfig.TaskWorker.Rucio_key = self.task['user_proxy']
-            userRucioConfig.Services.Rucio_account, _ = getRucioAccountFromLFN(self.task['tm_output_lfn'])
-            userRucioClient = getNativeRucioClient(userRucioConfig, self.logger)
-            ###
+            if not self.privilegedRucioClient:
+                tapeRecallConfig = copy.deepcopy(self.config)
+                tapeRecallConfig.Services.Rucio_account = 'crab_input'
+                self.privilegedRucioClient = getNativeRucioClient(tapeRecallConfig, self.logger)
             rucioAccount = getRucioAccountFromLFN(self.task['tm_output_lfn'])
             self.logger.info(f"Checking Rucio quota from account {rucioAccount}.")
-            _, isEnough, isQuotaWarning, quota = isEnoughRucioQuota(userRucioClient, self.task['tm_asyncdest'], rucioAccount)
+            _, isEnough, isQuotaWarning, quota = isEnoughRucioQuota(self.privilegedRucioClient, self.task['tm_asyncdest'], rucioAccount)
             _, _, freeGB = quota
             if not isEnough:
                 msg = f"Not enough Rucio quota at {self.task['tm_asyncdest']}:{self.task['tm_output_lfn']}."\
