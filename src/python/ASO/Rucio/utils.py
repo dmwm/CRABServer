@@ -3,6 +3,7 @@ The utility function of Rucio ASO.
 """
 import shutil
 import re
+import os
 from contextlib import contextmanager
 import itertools
 
@@ -112,3 +113,28 @@ def LFNToPFNFromPFN(lfn, pfn):
     else:
         fileid = '/'.join(lfn.split("/")[-2:])
     return f'{pfnPrefix}/{fileid}'
+
+def addSuffixToDatasetName(dataset, txt):
+    tmp = dataset.split('/')
+    tmp[2] += txt
+    return '/'.join(tmp)
+
+
+def parseFileNameFromLFN(lfn):
+    # cmsRun_3.log.tar.gz => cmsRun.log.tar.gz
+    # output_3.root => output.root
+    filename = os.path.basename(lfn)
+    regex = re.compile(r'^cmsRun_[0-9]+\.log\.tar\.gz$')
+    if regex.match(filename):
+        return 'cmsRun.log.tar.gz'
+    leftPiece, jobid_fileext = filename.rsplit("_", 1)
+    origFileName = leftPiece
+    if "." in jobid_fileext:
+        fileExt = jobid_fileext.rsplit(".", 1)[-1]
+        origFileName = leftPiece + "." + fileExt
+    return origFileName
+
+
+def parseFileNameFromDatasetName(dataset):
+    tmp = dataset.split('/')
+    return tmp[2].split('__')[-1]

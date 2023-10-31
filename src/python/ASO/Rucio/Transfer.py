@@ -8,7 +8,7 @@ import hashlib
 
 import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
 from ASO.Rucio.exception import RucioTransferException
-from ASO.Rucio.utils import writePath
+from ASO.Rucio.utils import writePath, parseFileNameFromLFN, addSuffixToDatasetName
 
 class Transfer:
     """
@@ -35,6 +35,7 @@ class Transfer:
         self.publishContainer = ''
         self.transferContainer = ''
         self.logsDataset = ''
+        self.multiPubContainers = []
 
         # dynamically change throughout the scripts
         self.currentDataset = ''
@@ -174,6 +175,17 @@ class Transfer:
         self.transferContainer = '/'.join(tmp)
         self.logger.info(f'Publish container: {self.publishContainer}, Transfer container: {self.transferContainer}')
         self.logsDataset = f'{self.transferContainer}#LOGS'
+
+    def buildMultiPubContainers(self):
+        multiPubContainers = []
+        jobID = self.transferItems[0]['job_id']
+        for item in self.transferItems:
+            if item['job_id'] != jobID:
+                break
+            filename = parseFileNameFromLFN(item['destination_lfn'])
+            containerName = addSuffixToDatasetName(self.publishContainer, f'__{filename}')
+            multiPubContainers.append(containerName)
+        self.multiPubContainers = multiPubContainers
 
     def readContainerRuleID(self):
         """

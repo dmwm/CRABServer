@@ -9,7 +9,7 @@ from argparse import Namespace
 from ASO.Rucio.Transfer import Transfer
 from ASO.Rucio.exception import RucioTransferException
 import ASO.Rucio.config as config
-from .fixtures import mock_rucioClient
+#from .fixtures import mock_rucioClient
 
 
 @pytest.fixture
@@ -40,6 +40,12 @@ def listContentDatasets():
 @pytest.fixture
 def listContentFiles():
     path = 'test/assets/rucio_list_content_datasets.json'
+    with open(path, 'r', encoding='utf-8') as r:
+        return json.load(r)
+
+@pytest.fixture
+def transferDicts():
+    path = 'test/assets/transferDicts.json'
     with open(path, 'r', encoding='utf-8') as r:
         return json.load(r)
 
@@ -258,3 +264,15 @@ def test_getContainerInfo(mock_rucioClient, listContentDatasets, listContentFile
 @pytest.mark.skip(reason='I am really lazy')
 def test_buildReplica2IDMap():
     assert 0 == 1
+
+
+def test_buildMultiPubContainers(transferDicts):
+    t = Transfer()
+    t.transferItems = transferDicts
+    t.publishContainer = '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d/USER'
+    t.buildMultiPubContainers()
+    assert t.multiPubContainers == [
+        '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__cmsRun.log.tar.gz/USER',
+        '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__miniaodfake.root/USER',
+        '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__output.root/USER',
+    ]
