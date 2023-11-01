@@ -45,7 +45,8 @@ class MonitorLockStatus:
         ## nothing but return fileDoc containing the block name replica belongs
         ## to.
         #publishedFileDocs = self.registerToPublishContainer(needToPublishFileDocs)
-        publishedFileDocs = self.registerToPublishContainer(okFileDocs)
+        #publishedFileDocs = self.registerToPublishContainer(okFileDocs)
+        publishedFileDocs = self.registerToMutiPubContainers(okFileDocs)
         self.logger.debug(f'publishedFileDocs: {publishedFileDocs}')
         # skip filedocs that already update it status to rest.
         newPublishFileDocs = [doc for doc in publishedFileDocs if not doc['dataset'] in self.transfer.bookkeepingBlockComplete]

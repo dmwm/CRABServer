@@ -348,3 +348,7 @@ def test_registerToMutiPubContainers(mock_addReplicasToContainer):
 
     # check return value
     assert sorted(ret, key=lambda d: d['id']) == sorted(returnValue, key=lambda d: d['id'])
+
+
+def test_checkBlockCompleteStatus():
+    assert 1 == 0
