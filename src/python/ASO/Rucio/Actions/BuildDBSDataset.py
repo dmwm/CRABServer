@@ -30,7 +30,7 @@ class BuildDBSDataset():
         LOGS dataset.
         """
         # create container
-        if not self.transfer.containerRuleID or not self.transfer.publishRuleID:
+        if not self.transfer.containerRuleID:
             self.transfer.containerRuleID = self.checkOrCreateContainer(self.transfer.transferContainer)
             self.transfer.publishRuleID = self.checkOrCreateContainer(self.transfer.publishContainer)
             configreq = {
@@ -39,12 +39,25 @@ class BuildDBSDataset():
                 'transferrule': self.transfer.containerRuleID,
                 'publishrule': self.transfer.publishRuleID,
             }
+            # multi pub container
+            for containerName  in self.transfer.mutiPubContainers:
+                ruleID = self.checkOrCreateContainer(containerName)
+                self.transfer.mutliPubRuleIds[containerName] = ruleID
             # upload rule id and transfer container name to TasksDB
+            # TODO: need to figure it out how to display this info in crab client
             updateToREST(self.crabRESTClient, 'task', 'addrucioasoinfo', configreq)
             # bookkeeping
             self.transfer.updateContainerRuleID()
+
         # create log dataset in transfer container
         self.createDataset(self.transfer.transferContainer, self.transfer.logsDataset)
+
+    def buildMultiPubContainer(self):
+
+        publishContainerRuleIDs = {}
+        mutiPubContainers = ['/a/b_output.root/USER']
+        self.transfer.bookkeepingmultipubcontainer(publishContainerRuleIDs)
+
 
     def checkOrCreateContainer(self, container):
         """
