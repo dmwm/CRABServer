@@ -92,7 +92,7 @@ class TapeRecallManager(BaseRecurringAction):
             msg = f"Working on task {taskName}"
             self.logger.info(msg)
             # 1.) check for "waited too long"
-            waitDays = (time.time() - getTimeFromTaskname(str(taskName))) // 3600 // 24  # from sec to days
+            waitDays = int((time.time() - getTimeFromTaskname(str(taskName))) // 3600 // 24)  # from sec to days
             if waitDays > MAX_DAYS_FOR_TAPERECALL:
                 msg = f"Tape recall request did not complete in {MAX_DAYS_FOR_TAPERECALL} days."
                 self.logger.info(msg)
@@ -136,11 +136,11 @@ class TapeRecallManager(BaseRecurringAction):
                 okFraction = ok * 100 // total
                 msg = f"Data recall from tape in progress: ok/all = {ok}/{total} = {okFraction}%"
                 msg += f"\nRucio rule details at https://cms-rucio-webui.cern.ch/rule?rule_id={reqId}"
-                enoughData = okFraction > 99 or (rule['name'].endswith('SIM') and okFraction > 90 )
+                enoughData = okFraction > 99 or (rule['name'].endswith('SIM') and okFraction > 90)
                 if waitDays > 7 and enoughData:
-                    mag += (f"This recall has lasted {waitDays} already and it is > {okFraction}% complete")
-                    msg += ("Your needs are very likely to be satisfied with what's on disk now")
-                    msg += ("Suggestion: kill this task and submit another one with config.Data.partialDataset=True")
+                    msg += (f"\nThis recall has lasted {waitDays} days already and it is > {okFraction}% complete")
+                    msg += ("\nYour needs are very likely to be satisfied with what's on disk now")
+                    msg += ("\nSuggestion: kill this task and submit another one with config.Data.partialDataset=True")
                 self.deleteWarnings(taskName)
                 self.uploadWarning(taskname=taskName, msg=msg)
             self.logger.info("Done on this task")
