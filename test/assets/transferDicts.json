@@ -1,0 +1,70 @@
+[
+    {
+        "id": "7652449e07afeaf00abe804e8507f4172e5b04f09a2c5e0d883a3193",
+        "username": "tseethon",
+        "taskname": "231012_154207:tseethon_crab_rucio_transfers_hc1kj_withnonedm_test12_20231012_174204",
+        "start_time": 1697125531,
+        "destination": "T2_CH_CERN",
+        "destination_lfn": "/store/user/rucio/tseethon/test-rucio/ruciotransfers-1697125324/GenericTTbar/ruciotransfers-1697125324/231012_154207/0000/log/cmsRun_3.log.tar.gz",
+        "source": "T2_CH_CERN",
+        "source_lfn": "/store/temp/user/tseethon.d6830fc3715ee01030105e83b81ff3068df7c8e0/tseethon/test-rucio/ruciotransfers-1697125324/GenericTTbar/ruciotransfers-1697125324/231012_154207/0000/log/cmsRun_3.log.tar.gz",
+        "filesize": 10910,
+        "publish": 0,
+        "transfer_state": "NEW",
+        "publication_state": "NOT_REQUIRED",
+        "job_id": "3",
+        "job_retry_count": 0,
+        "type": "log",
+        "publishname": "ruciotransfers-1697125324-00000000000000000000000000000000",
+        "checksums": {
+            "adler32": "abc"
+        },
+        "outputdataset": "/FakeDataset/fakefile-FakePublish-befe3559057072761674520fdaee5005/USER"
+    },
+    {
+        "id": "10ba0d321da1a9d7ecc17e2bf411932ec5268ae12d5be76b5928dc29",
+        "username": "tseethon",
+        "taskname": "231012_154207:tseethon_crab_rucio_transfers_hc1kj_withnonedm_test12_20231012_174204",
+        "start_time": 1697125531,
+        "destination": "T2_CH_CERN",
+        "destination_lfn": "/store/user/rucio/tseethon/test-rucio/ruciotransfers-1697125324/GenericTTbar/ruciotransfers-1697125324/231012_154207/0000/miniaodfake_3.root",
+        "source": "T2_CH_CERN",
+        "source_lfn": "/store/temp/user/tseethon.d6830fc3715ee01030105e83b81ff3068df7c8e0/tseethon/test-rucio/ruciotransfers-1697125324/GenericTTbar/ruciotransfers-1697125324/231012_154207/0000/miniaodfake_3.root",
+        "filesize": 104857600,
+        "publish": 0,
+        "transfer_state": "NEW",
+        "publication_state": "NOT_REQUIRED",
+        "job_id": "3",
+        "job_retry_count": 0,
+        "type": "output",
+        "publishname": "ruciotransfers-1697125324-00000000000000000000000000000000",
+        "checksums": {
+            "adler32": "141d411c",
+            "cksum": "2726547828"
+        },
+        "outputdataset": "/FakeDataset/fakefile-FakePublish-befe3559057072761674520fdaee5005/USER"
+    },
+    {
+        "id": "091bfc9fb03fe326b1ace7cac5b71e034ce4b44ed46be14ae88b472a",
+        "username": "tseethon",
+        "taskname": "231012_154207:tseethon_crab_rucio_transfers_hc1kj_withnonedm_test12_20231012_174204",
+        "start_time": 1697125531,
+        "destination": "T2_CH_CERN",
+        "destination_lfn": "/store/user/rucio/tseethon/test-rucio/ruciotransfers-1697125324/GenericTTbar/ruciotransfers-1697125324/231012_154207/0000/output_3.root",
+        "source": "T2_CH_CERN",
+        "source_lfn": "/store/temp/user/tseethon.d6830fc3715ee01030105e83b81ff3068df7c8e0/tseethon/test-rucio/ruciotransfers-1697125324/GenericTTbar/ruciotransfers-1697125324/231012_154207/0000/output_3.root",
+        "filesize": 632378,
+        "publish": 0,
+        "transfer_state": "NEW",
+        "publication_state": "NOT_REQUIRED",
+        "job_id": "3",
+        "job_retry_count": 0,
+        "type": "output",
+        "publishname": "ruciotransfers-1697125324-00000000000000000000000000000000",
+        "checksums": {
+            "adler32": "cd95e2da",
+            "cksum": "2038182269"
+        },
+        "outputdataset": "/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d/USER"
+    }
+]
