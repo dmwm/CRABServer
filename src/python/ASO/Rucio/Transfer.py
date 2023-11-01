@@ -192,7 +192,8 @@ class Transfer:
         """
         Read containerRuleID from task_process/transfers/container_ruleid.txt
         """
-        # skip reading rule from bookkeeping in case rerun with new transferContainerName.
+        # Skip reading rule from bookkeeping in case to intend to create
+        # different container name when test.
         if config.args.force_publishname:
             return
         path = config.args.container_ruleid_path
@@ -201,9 +202,11 @@ class Transfer:
                 tmp = json.load(r)
                 self.containerRuleID = tmp['containerRuleID']
                 self.publishRuleID = tmp['publishRuleID']
-                self.logger.info('Got container rule ID from bookkeeping.'\
-                                 f' Transfer Container rule ID: {self.containerRuleID}'\
-                                 f' Publish Container rule ID: {self.publishRuleID}')
+                self.multiPubRuleIDs = tmp['multiPubRuleIDs']
+                self.logger.info('Got container rule ID from bookkeeping:')
+                self.logger.info(f'  Transfer Container rule ID: {self.containerRuleID}')
+                self.logger.info(f'  Publish Container rule ID: {self.publishRuleID}')
+                self.logger.info(f'  Publish Container rule ID: {self.multiPubRuleIDs}')
         except FileNotFoundError:
             self.logger.info(f'Bookkeeping rules "{path}" does not exist. Assume it is first time it run.')
 

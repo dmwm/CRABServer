@@ -306,3 +306,17 @@ def test_updateContainerRuleID(containerRuleIDJSONContent, fs):
         x = json.loads(mock_file.read())
         y = json.loads(containerRuleIDJSONContent)
         assert x == y
+
+def test_readContainerRuleID(containerRuleIDJSONContent, fs):
+    path = '/path/to/container_ruleid.json'
+    config.args = Namespace(container_ruleid_path=path, force_publishname=False)
+    with patch('ASO.Rucio.Transfer.open', new_callable=mock_open, read_data=containerRuleIDJSONContent):
+        t = Transfer()
+        t.readContainerRuleID()
+        assert t.containerRuleID == 'c88abb899f744efb8f33fd197ee77ecd'
+        assert t.publishRuleID == '141a41b6b54f45f59dc0703182f1257f'
+        assert t.multiPubRuleIDs == {
+            '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__cmsRun.log.tar.gz/USER': '9653f39f686944128028fd25888ae2d3',
+            '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__output.root/USER': 'e609d75e4a7a4fa3a880ea0bb6681371',
+            '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__miniaodfake.root/USER': '6b159d7e5dc940daa2188658a68c4b23',
+        }
