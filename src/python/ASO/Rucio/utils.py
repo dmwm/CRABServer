@@ -133,8 +133,3 @@ def parseFileNameFromLFN(lfn):
         fileExt = jobid_fileext.rsplit(".", 1)[-1]
         origFileName = leftPiece + "." + fileExt
     return origFileName
-
-
-def parseFileNameFromDatasetName(dataset):
-    tmp = dataset.split('/')
-    return tmp[2].split('__')[-1]

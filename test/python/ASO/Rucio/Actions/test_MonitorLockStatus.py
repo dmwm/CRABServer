@@ -14,9 +14,10 @@ import json
 import pytest
 import datetime
 from argparse import Namespace
-from unittest.mock import patch, Mock, call
+from unittest.mock import patch, Mock, call, create_autospec
 
 import ASO.Rucio.config as config
+from ASO.Rucio.Transfer import Transfer
 from ASO.Rucio.Actions.MonitorLockStatus import MonitorLockStatus
 from ASO.Rucio.Actions.RegisterReplicas import RegisterReplicas
 
@@ -268,3 +269,82 @@ def test_updateRESTFileDocsBlockCompletionInfo(mock_updateToREST):
     m = MonitorLockStatus(Mock(), Mock(), rest)
     m.updateRESTFileDocsBlockCompletionInfo(outputOK)
     mock_updateToREST.assert_called_with(rest, 'filetransfers', 'updateRucioInfo', expectedRestFileDocs)
+
+
+@patch.object(RegisterReplicas, 'addReplicasToContainer')
+def test_registerToMutiPubContainers(mock_addReplicasToContainer):
+    mock_Transfer.publishContainer = '/GenericTTbar/integration-test-30_TRANSFER.befe3559/USER'
+    outputAllOK = [
+        {
+            "id": "7652449e07afeaf00abe804e8507f4172e5b04f09a2c5e0d883a3193",
+            "name": "/store/user/rucio/tseethon/test-rucio/ruciotransfers-1697125324/GenericTTbar/ruciotransfers-1697125324/231012_154207/0000/log/cmsRun_3.log.tar.gz",
+            "dataset": None,
+            "blockcomplete": 'NO',
+            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
+        },
+        {
+            "id": "10ba0d321da1a9d7ecc17e2bf411932ec5268ae12d5be76b5928dc29",
+            "name": "/store/user/rucio/tseethon/test-rucio/ruciotransfers-1697125324/GenericTTbar/ruciotransfers-1697125324/231012_154207/0000/miniaodfake_3.root",
+            "dataset": None,
+            "blockcomplete": 'NO',
+            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
+        },
+        {
+            "id": "091bfc9fb03fe326b1ace7cac5b71e034ce4b44ed46be14ae88b472a",
+            "name": "/store/user/rucio/tseethon/test-rucio/ruciotransfers-1697125324/GenericTTbar/ruciotransfers-1697125324/231012_154207/0000/output_3.root",
+            "dataset": None,
+            "blockcomplete": 'NO',
+            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
+        },
+    ]
+
+    returnValue = [
+        {
+            "id": "7652449e07afeaf00abe804e8507f4172e5b04f09a2c5e0d883a3193",
+            "name": "/store/user/rucio/tseethon/test-rucio/ruciotransfers-1697125324/GenericTTbar/ruciotransfers-1697125324/231012_154207/0000/log/cmsRun_3.log.tar.gz",
+            "dataset": "/GenericTTbar/integration-test-30_TRANSFER.befe3559/USER#a86fca3a-1e38-467d-a2ac-98a8ff4299bd",
+            "blockcomplete": 'NO',
+            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
+        },
+        {
+            "id": "10ba0d321da1a9d7ecc17e2bf411932ec5268ae12d5be76b5928dc29",
+            "name": "/store/user/rucio/tseethon/test-rucio/ruciotransfers-1697125324/GenericTTbar/ruciotransfers-1697125324/231012_154207/0000/miniaodfake_3.root",
+            "dataset": "/GenericTTbar/integration-test-30_TRANSFER.befe3559/USER#a86fca3a-1e38-467d-a2ac-98a8ff4299bd",
+            "blockcomplete": 'NO',
+            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
+        },
+        {
+            "id": "091bfc9fb03fe326b1ace7cac5b71e034ce4b44ed46be14ae88b472a",
+            "name": "/store/user/rucio/tseethon/test-rucio/ruciotransfers-1697125324/GenericTTbar/ruciotransfers-1697125324/231012_154207/0000/output_3.root",
+            "dataset": "/GenericTTbar/integration-test-30_TRANSFER.befe3559/USER#a86fca3a-1e38-467d-a2ac-98a8ff4299bd",
+            "blockcomplete": 'NO',
+            "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
+        },
+    ]
+
+    multiPubContainers = [
+        '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__cmsRun.log.tar.gz/USER',
+        '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__miniaodfake.root/USER',
+        '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__output.root/USER',
+    ]
+
+    def side_effect(*args):
+        container = args[1]
+        index = multiPubContainers.index(container)
+        return [returnValue[index]]
+
+    t = create_autospec(Transfer, instance=True)
+    t.multiPubContainers = multiPubContainers
+    mock_addReplicasToContainer.side_effect = side_effect
+    m = MonitorLockStatus(t, Mock(), Mock())
+    ret = m.registerToMutiPubContainers(outputAllOK)
+
+
+    # check args pass to addReplicasToContainer()
+    allcall = []
+    for i in range(len(returnValue)):
+        allcall.append(call([outputAllOK[i]], multiPubContainers[i]))
+    mock_addReplicasToContainer.assert_has_calls(allcall, any_order=True)
+
+    # check return value
+    assert sorted(ret, key=lambda d: d['id']) == sorted(returnValue, key=lambda d: d['id'])

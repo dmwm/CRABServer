@@ -6,8 +6,9 @@ import copy
 import datetime
 
 import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
-from ASO.Rucio.utils import updateToREST
+from ASO.Rucio.utils import updateToREST, parseFileNameFromLFN
 from ASO.Rucio.Actions.RegisterReplicas import RegisterReplicas
+from ASO.Rucio.exception import RucioTransferException
 
 
 class MonitorLockStatus:
@@ -111,6 +112,31 @@ class MonitorLockStatus:
         #for f in tmpFileDocs:
         #    f['dataset'] = tmpLFN2DatasetMap[f['name']]
         #return tmpFileDocs
+        return publishContainerFileDocs
+
+    def registerToMutiPubContainers(self, fileDocs):
+        """
+
+        """
+        r = RegisterReplicas(self.transfer, self.rucioClient, None)
+        publishContainerFileDocs = []
+        groupFileDocs = {}
+        for fileDoc in fileDocs:
+            filename = parseFileNameFromLFN(fileDoc['name'])
+            if filename in groupFileDocs:
+                groupFileDocs[filename].append(fileDoc)
+            else:
+                groupFileDocs[filename] = [fileDoc]
+        for filename, fileDocsInGroup in groupFileDocs.items():
+            container = ''
+            for c in self.transfer.multiPubContainers:
+                tmp = c.split('/')[2].rsplit('__', 1)[1]
+                if tmp == filename:
+                    container = c
+                    break
+            if not container:
+                raise RucioTransferException(f'Cannot find container for file: {filename} . There is a bug in the code.')
+            publishContainerFileDocs += r.addReplicasToContainer(fileDocsInGroup, container)
         return publishContainerFileDocs
 
     def checkBlockCompleteStatus(self, fileDocs):
