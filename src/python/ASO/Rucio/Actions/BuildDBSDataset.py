@@ -40,9 +40,9 @@ class BuildDBSDataset():
                 'publishrule': self.transfer.publishRuleID,
             }
             # multi pub container
-            for containerName  in self.transfer.mutiPubContainers:
+            for containerName  in self.transfer.multiPubContainers:
                 ruleID = self.checkOrCreateContainer(containerName)
-                self.transfer.mutliPubRuleIds[containerName] = ruleID
+                self.transfer.multiPubRuleIDs[containerName] = ruleID
             # upload rule id and transfer container name to TasksDB
             # TODO: need to figure it out how to display this info in crab client
             updateToREST(self.crabRESTClient, 'task', 'addrucioasoinfo', configreq)

@@ -66,6 +66,7 @@ class Transfer:
         self.buildLFN2transferItemMap()
         self.readRESTInfo()
         self.readInfoFromTransferItems()
+        self.buildMultiPubContainers()
         self.readContainerRuleID()
         self.readOKLocks()
         self.readBlockComplete()
