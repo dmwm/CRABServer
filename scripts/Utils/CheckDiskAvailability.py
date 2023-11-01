@@ -46,6 +46,9 @@ import json
 def main():
     rucio = ensure_environment()
     scope, dataset, blocks = get_inputs(rucio)
+    if not blocks:
+         print("Dataset is empty or unknown to Rucio")
+         return
     blackListedSites = get_crab_blacklist()
     nBlocks = len(blocks)
     print("Checking blocks availabiliyt on disk ...")
