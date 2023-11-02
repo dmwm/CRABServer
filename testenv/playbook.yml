@@ -1,0 +1,54 @@
+- hosts: schedd
+  become: yes
+  gather_facts: no
+  tasks:
+    - set_fact:
+        task_name: "{{ input_task_name }}"
+        task_path: "/home/grid/tseethon/{{ input_task_name }}/SPOOL_DIR/"
+        local_dir_name: "{{ input_task_name | replace(':', '-') }}"
+    - name: tar task_process
+      shell:
+        cmd: "tar zcvf task_process.tar.gz task_process"
+        chdir: "{{ task_path }}"
+    - name: get proxy filename
+      shell: >
+        cd {{ task_path }};
+        ls -alh | grep -- '-rw-------' | grep -v _condor | awk '{print $9}'
+      register: proxyfilename_tmp
+    - set_fact:
+        proxyfilename: "{{ proxyfilename_tmp.stdout }}"
+
+- hosts: localhost
+  become: no
+  connection: local
+  gather_facts: yes
+  tasks:
+    - debug:
+        msg: "{{ hostvars }}"
+    - set_fact:
+        task_name: "{{ hostvars[schedd_name]['input_task_name'] }}"
+        local_dir_name: "{{ hostvars[schedd_name]['input_task_name'] | replace(':', '__') }}"
+        task_path: "/home/grid/tseethon/{{ hostvars[schedd_name]['input_task_name'] }}/SPOOL_DIR/"
+
+    - name: create new dir
+      ansible.builtin.file:
+        path: "{{ local_dir_name }}"
+        state: directory
+        mode: '0755'
+
+    - name: rsync task_process.tar.gz to local
+      command: "rsync -av {{ schedd_name }}:'{{ task_path }}/task_process.tar.gz' {{ local_dir_name }}"
+
+
+    - name: ensure file exists
+      copy:
+        content: ""
+        dest: "{{ local_dir_name }}/{{ hostvars[schedd_name]['proxyfilename']}}"
+        force: false
+        group: '{{ ansible_user_uid }}'
+        owner: '{{ ansible_user_gid }}'
+        mode: '0600'
+
+    - name: untar task_process
+      command: >
+        tar zxvf {{ local_dir_name }}/task_process.tar.gz -C {{ local_dir_name }}

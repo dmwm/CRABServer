@@ -6,3 +6,8 @@ nosetests.xml
 tmp/runtime/*
 *.gz
 *.zip
+
+testenv/*
+!testenv/inventory
+!testenv/playbook.yml
+!testenv/README.md
