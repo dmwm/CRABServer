@@ -7,7 +7,7 @@ tmp/runtime/*
 *.gz
 *.zip
 
-testenv/*
-!testenv/inventory
-!testenv/playbook.yml
-!testenv/README.md
+test/Playbook/ASORucio/*
+!test/Playbook/ASORucio/inventory
+!test/Playbook/ASORucio/playbook.yml
+!test/Playbook/ASORucio/README.md

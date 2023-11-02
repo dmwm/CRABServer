@@ -28,5 +28,5 @@ Before we run, setup python environment and ensure connection to CRABRest and Ru
 cd <to_task_name_directory>
 cp /tmp/x509up_u1000 <x509-proxy-file-name> # update your proxy cert, Rucio ASO use this files as creds to talk with rucio and crabserver
 # rm -rf task_process/transfers # in case you want to clean up bookkeeping
-python3 ../../scripts/task_process/RUCIO_Transfers.py --force-publishanme /GenericTTbar/tseethon-integrationtest-1/USER
+python3 ../../../../scripts/task_process/RUCIO_Transfers.py --force-publishanme /GenericTTbar/tseethon-integrationtest-1/USER
 ```

@@ -1,0 +1,9 @@
+[schedd]
+vocms059
+[schedd:vars]
+input_task_name=231102_144033:tseethon_crab_rucio_transfers_hc1kj_nonedmonly_test12_20231102_154029
+
+[localhost]
+localhost
+[localhost:vars]
+schedd_name=vocms059
