@@ -992,56 +992,53 @@ def isEnoughRucioQuota(rucioClient, site, account=''):
     """
     Check quota with Rucio server.
 
-    Return tuple of result to construct message on caller, where
+    Return dict of result to construct message on caller, where
     - `hasQuota`: `True` if user has quota on that site
     - `isEnough`: `True` if user has remain quota more than `RUCIO_QUOTA_MINIMUM_GB`
     - `isQuotaWarning`: `True` if user has remain quota more than
       `RUCIO_QUOTA_MINIMUM_GB`, but less than `RUCIO_QUOTA_WARNING_GB`
-    - `quota`: tuple of
-      - `totalGB`: (float) total quota
-      - `usedGB`: (float) used quota
-      - `freeGB`: (float) remain quota
+    - `total`: (float) total quota in GiB
+    - `used`: (float) used quota in GiB
+    - `free`: (float) remain quota in GiB
 
     :param rucioClient: Rucio's client object
     :type rucioClient: rucio.client.client.Client
     :param site: RSE name
     :type site: str
-    :param account: optional account name (for server where it has priviledge to
-         get usage from all users)
+    :param account: optional account name (for server)
     :type account: str
 
-    :return: tuple of result of quota checking (see details above)
-    :rtype: tuple
+    :return: dict of result of quota checking (see details above)
+    :rtype: dict
     """
-    hasQuota = False
-    isEnough = False
-    isQuotaWarning = False
-    totalGB = 0
-    usedGB = 0
-    freeGB = 0
+    ret = {
+        'hasQuota': False,
+        'isEnough': False,
+        'isQuotaWarning': False,
+        'total': 0,
+        'used': 0,
+        'free':0,
+    }
     if not account:
         account = rucioClient.account
     quotas = list(rucioClient.get_local_account_usage(account, site))
-    if not quotas:
-        hasQuota = False
-    else:
-        hasQuota = True
+    if quotas:
+        ret['hasQuota'] = True
         quota = quotas[0]
-        totalGB = quota['bytes_limit'] / 2**(10*3) # GiB
-        usedGB = quota['bytes'] / 2**(10*3) # GiB
-        freeGB = quota['bytes_remaining'] / 2**(10*3) # GiB
-        if freeGB > RUCIO_QUOTA_MINIMUM_GB:
-            isEnough = True
-            if freeGB <= RUCIO_QUOTA_WARNING_GB:
-                isQuotaWarning = True
-    return (hasQuota, isEnough, isQuotaWarning, (totalGB, usedGB, freeGB))
+        ret['total'] = quota['bytes_limit'] / 2**(10*3) # GiB
+        ret['used'] = quota['bytes'] / 2**(10*3) # GiB
+        ret['free'] = quota['bytes_remaining'] / 2**(10*3) # GiB
+        if ret['free'] > RUCIO_QUOTA_MINIMUM_GB:
+            ret['isEnough'] = True
+            if ret['free'] <= RUCIO_QUOTA_WARNING_GB:
+                ret['isQuotaWarning'] = True
+    return ret
 
 def getRucioAccountFromLFN(lfn):
     """
     Extract Rucio account from LFN.
     For Rucio's group account, account always has `_group` suffix, but path and
     scope do not contains `_group` suffix.
-    `_group` suffix.
 
     :param lfn: LFN
     :type lfn: str
@@ -1054,4 +1051,4 @@ def getRucioAccountFromLFN(lfn):
         if lfn.startswith('/store/group/rucio/'):
             return f'{account}_group'
         return account
-    raise Exception(f'Expected /store/{{user,group}}/rucio/<account>, got {lfn}') from None
+    raise Exception(f'Expected /store/{{user,group}}/rucio/<account>, got {lfn}')

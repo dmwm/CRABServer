@@ -84,21 +84,15 @@ class StageoutCheck(TaskAction):
         # by Rucio robot without using user credentials
         if self.task['tm_output_lfn'].startswith('/store/user/rucio') or \
            self.task['tm_output_lfn'].startswith('/store/group/rucio'):
-            # copy from TapeRecallManager
-            if not self.privilegedRucioClient:
-                tapeRecallConfig = copy.deepcopy(self.config)
-                tapeRecallConfig.Services.Rucio_account = 'crab_input'
-                self.privilegedRucioClient = getNativeRucioClient(tapeRecallConfig, self.logger)
             rucioAccount = getRucioAccountFromLFN(self.task['tm_output_lfn'])
             self.logger.info(f"Checking Rucio quota from account {rucioAccount}.")
-            _, isEnough, isQuotaWarning, quota = isEnoughRucioQuota(self.privilegedRucioClient, self.task['tm_asyncdest'], rucioAccount)
-            _, _, freeGB = quota
-            if not isEnough:
+            quotaCheck = isEnoughRucioQuota(self.rucioClient, self.task['tm_asyncdest'], rucioAccount)
+            if not quotaCheck['isEnough']:
                 msg = f"Not enough Rucio quota at {self.task['tm_asyncdest']}:{self.task['tm_output_lfn']}."\
-                      f" Remain quota: {freeGB} GB."
+                      f" Remain quota: {quotaCheck['free']} GB."
                 raise TaskWorkerException(msg)
-            self.logger.info(f" Remain quota: {freeGB} GB.")
-            if isQuotaWarning:
+            self.logger.info(f" Remain quota: {quotaCheck['free']} GB.")
+            if quotaCheck['isQuotaWarning']:
                 msg = 'Rucio Quota is very little and although CRAB will submit, stageout may fail.'
                 self.logger.warning(msg)
                 self.uploadWarning(msg, self.task['user_proxy'], self.task['tm_taskname'])
