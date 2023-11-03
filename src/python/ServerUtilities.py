@@ -4,8 +4,9 @@ IMPORTANT : SINCE THIS NEEDS TO RUN IN THE CLIENT, CODE NEEDS TO WORK
 IN BOTH PYTHON2 AND PYTHON3 WITHOUT CALLS TO FUTURIZE OR OTHER UTILITIES NOT
 PRESENT IN EARLIER CMSSW RELEASES
 """
-# this is a weird and unclear message from pylint, better to ignore it
-# pylint: disable=W0715
+# W0715: this is a weird and unclear message from pylint, better to ignore it
+# W1514,W0707 for python2 compatibility. Will refactor later in https://github.com/dmwm/CRABServer/issues/7765 task.
+# pylint: disable=W0715,W1514,W0707
 
 from __future__ import print_function
 from __future__ import division
@@ -1003,9 +1004,9 @@ def isEnoughRucioQuota(rucioClient, site, account=''):
 
     :param rucioClient: Rucio's client object
     :type rucioClient: rucio.client.client.Client
-    :param site: RSE name
+    :param site: RSE name, e.g. T2_CH_CERN
     :type site: str
-    :param account: optional account name (for server)
+    :param account: (optional) Rucio account name (for server)
     :type account: str
 
     :return: dict of result of quota checking (see details above)
@@ -1039,6 +1040,11 @@ def getRucioAccountFromLFN(lfn):
     Extract Rucio account from LFN.
     For Rucio's group account, account always has `_group` suffix, but path and
     scope do not contains `_group` suffix.
+
+    >>> getRucioAccountFromLFN(lfn='/store/user/rucio/cmsbot/path/to/dir')
+    'cmsbot'
+    >>> getRucioAccountFromLFN(lfn='/store/group/rucio/crab_test/path/to/dir')
+    'crab_test_group'
 
     :param lfn: LFN
     :type lfn: str
