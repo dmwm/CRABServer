@@ -117,7 +117,20 @@ class MonitorLockStatus:
 
     def registerToMutiPubContainers(self, fileDocs):
         """
+        Register replicas to it own publish container.
 
+        In example, we have
+        - output dataset name `/GenericTTbar/cmsbot-integration-1/USER`
+        - 2 output files:
+          - `output.root` (EDM)
+          - `myfile.txt` (Misc)
+        All `output_{job_id}.root` files will registering to `/GenericTTbar/cmsbot-integration-1__output.root/USER`
+
+        :param fileDocs: replicas info return from `checkLockStatus` method.
+        :type fileDocs: list of dict (fileDoc)
+
+        :return: replicas info with updated dataset name.
+        :rtype: list of dict
         """
         r = RegisterReplicas(self.transfer, self.rucioClient, None)
         publishContainerFileDocs = []

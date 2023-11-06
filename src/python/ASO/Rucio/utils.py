@@ -114,15 +114,56 @@ def LFNToPFNFromPFN(lfn, pfn):
         fileid = '/'.join(lfn.split("/")[-2:])
     return f'{pfnPrefix}/{fileid}'
 
-def addSuffixToDatasetName(dataset, txt):
+def addSuffixToDatasetName(dataset, strsuffix):
+    """
+    Adding suffix to dataset name in the "name" part.
+
+    :param dataset: Fully qualified dataset's name
+    :type dataset: str
+    :param strsuffix: string suffix to add
+    :type strsuffix: str
+
+    :return: new dataset name
+    :rtype: str
+
+    >>> addSuffixToDatasetName('/GenericTTbar/cmsbot-mypublishdbsname-1/USER', '__output.root')
+    '/GenericTTbar/cmsbot-mypublishdbsname-1__output.root/USER'
+
+    """
     tmp = dataset.split('/')
-    tmp[2] += txt
+    tmp[2] += strsuffix
     return '/'.join(tmp)
 
 
 def parseFileNameFromLFN(lfn):
-    # cmsRun_3.log.tar.gz => cmsRun.log.tar.gz
-    # output_3.root => output.root
+    """
+    Parsing file name from LFN.
+
+    For the job's output files, we append `_{job_id}` before the last file
+    extension. But for the log file, we use the format
+    `cmsRun_{job_id}.log.tar.gz` instead. So, the log file will be hardcode to
+    always return 'cmsRun.log.tar.gz'.
+
+    See https://github.com/dmwm/CRABServer/blob/f5fa82078ff858fd35cf11773020f258abd2c3c7/src/python/TaskWorker/Actions/DagmanCreator.py#L621-L626
+    and https://github.com/dmwm/CRABServer/blob/f5fa82078ff858fd35cf11773020f258abd2c3c7/src/python/TaskWorker/Actions/DagmanCreator.py#L644
+    on how file name is created.
+
+    :param lfn: LFN
+    :type lfn: str
+
+    :return: file name
+    :rtype: str
+
+    >>>parseFileNameFromLFN('/store/user/rucio/cmsbot/somedir/output_3.root')
+    'output.root'
+
+    >>>parseFileNameFromLFN('/store/user/rucio/cmsbot/somedir/file.with.long.ext_3.txt')
+    'file.with.long.ext.txt'
+
+    >>>parseFileNameFromLFN('/store/user/rucio/cmsbot/somedir/cmsRun_3.log.tar.gz')
+    'cmsRun.log.tar.gz'
+
+    """
     filename = os.path.basename(lfn)
     regex = re.compile(r'^cmsRun_[0-9]+\.log\.tar\.gz$')
     if regex.match(filename):

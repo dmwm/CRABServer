@@ -179,6 +179,13 @@ class Transfer:
         self.logsDataset = f'{self.transferContainer}#LOGS'
 
     def buildMultiPubContainers(self):
+        """
+        Create the self.multiPubContainers attribute by reading all transfers
+        dict from the same job id.
+
+        Note that this method does not check the limit of the new container name
+        length, but only relies on validation from REST.
+        """
         multiPubContainers = []
         jobID = self.transferItems[0]['job_id']
         for item in self.transferItems:
