@@ -386,6 +386,7 @@ class RESTTask(RESTEntity):
             raise InvalidParameter("Transfer container's rule id not found in the input parameters")
         # Fail validation if  both `publishrule` and `multipubrule` does not exists.
         # We want to deprecate `publishrule` in the future
+        import pdb; pdb.set_trace()
         if (('publishrule' not in kwargs or not kwargs['publishrule'])
            and ('multipubrule' not in kwargs or not kwargs['multipubrule'])):
             raise InvalidParameter("`publishrule` and `multipubrule` are not found in the input parameters")
