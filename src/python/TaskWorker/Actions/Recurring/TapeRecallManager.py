@@ -137,7 +137,7 @@ class TapeRecallManager(BaseRecurringAction):
                 msg = f"Data recall from tape in progress: ok/all = {ok}/{total} = {okFraction}%"
                 msg += f"\nRucio rule details at https://cms-rucio-webui.cern.ch/rule?rule_id={reqId}"
                 enoughData = okFraction > 99 or (rule['name'].endswith('SIM') and okFraction > 90)
-                if waitDays > 7 and enoughData:
+                if waitDays >= 7 and enoughData:
                     msg += (f"\nThis recall has lasted {waitDays} days already and it is > {okFraction}% complete")
                     msg += ("\nYour needs are very likely to be satisfied with what's on disk now")
                     msg += ("\nSuggestion: kill this task and submit another one with config.Data.partialDataset=True")
