@@ -33,18 +33,18 @@ class BuildDBSDataset():
         if not self.transfer.containerRuleID:
             self.transfer.containerRuleID = self.checkOrCreateContainer(self.transfer.transferContainer)
             self.transfer.publishRuleID = self.checkOrCreateContainer(self.transfer.publishContainer)
-            configreq = {
-                'workflow': self.transfer.taskname,
-                'transfercontainer': self.transfer.transferContainer,
-                'transferrule': self.transfer.containerRuleID,
-                'publishrule': self.transfer.publishRuleID,
-            }
             # multi pub container
             for containerName  in self.transfer.multiPubContainers:
                 ruleID = self.checkOrCreateContainer(containerName)
                 self.transfer.multiPubRuleIDs[containerName] = ruleID
             # upload rule id and transfer container name to TasksDB
-            # TODO: need to figure it out how to display this info in crab client
+            configreq = {
+                'workflow': self.transfer.taskname,
+                'transfercontainer': self.transfer.transferContainer,
+                'transferrule': self.transfer.containerRuleID,
+                'publishrule': self.transfer.publishRuleID,
+                'mulipubrule': self.transfer.multiPubRuleIDs
+            }
             updateToREST(self.crabRESTClient, 'task', 'addrucioasoinfo', configreq)
             # bookkeeping
             self.transfer.updateContainerRuleID()

@@ -359,7 +359,6 @@ class RESTTask(RESTEntity):
 
         return []
 
-
     def addddmreqid(self, **kwargs):
         """ Add DDM request ID to DDM_reqid column in the database. Can be tested with:
             curl -X POST https://balcas-crab.cern.ch/crabserver/dev/task -k --key $X509_USER_PROXY --cert $X509_USER_PROXY \
@@ -385,9 +384,22 @@ class RESTTask(RESTEntity):
             raise InvalidParameter("Transfer container name not found in the input parameters")
         if 'transferrule' not in kwargs or not kwargs['transferrule']:
             raise InvalidParameter("Transfer container's rule id not found in the input parameters")
+        # Fail validation if  both `publishrule` and `multipubrule` does not exists.
+        # We want to deprecate `publishrule` in the future
+        if (('publishrule' not in kwargs or not kwargs['publishrule'])
+           and ('multipubrule' not in kwargs or not kwargs['multipubrule'])):
+            raise InvalidParameter("`publishrule` and `multipubrule` are not found in the input parameters")
+        # set default value if `publishrule` or `multipubrule` does not exists.
         if 'publishrule' not in kwargs or not kwargs['publishrule']:
-            raise InvalidParameter("Transfer container's rule id not found in the input parameters")
-
+            publishrule = '00000000000000000000000000000000'
+        else:
+            publishrule = kwargs['publishrule']
+        if 'multipubrule' not in kwargs or not kwargs['multipubrule']:
+            multipubrule = '{}'
+        else:
+            multipubrule = kwargs['multipubrule']
+            if not isinstance(multipubrule, str):
+                raise InvalidParameter(f"`multipubrule` expect str, got {type(multipubrule)}")
         taskname = kwargs['workflow']
         ownerName = getUsernameFromTaskname(taskname)
         authz_operator(username=ownerName, group='crab3', role='operator')
@@ -395,7 +407,7 @@ class RESTTask(RESTEntity):
             self.Task.SetRucioASOInfo_sql,
             tm_transfer_container=[kwargs['transfercontainer']],
             tm_transfer_rule=[kwargs['transferrule']],
-            tm_publish_rule=[kwargs['publishrule']],
+            tm_publish_rule=[publishrule],
+            tm_multipub_rule=[multipubrule],
             tm_taskname=[taskname])
-
         return []

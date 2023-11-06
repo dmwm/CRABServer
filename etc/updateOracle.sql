@@ -136,3 +136,6 @@ ALTER TABLE filetransfersdb ADD tm_block_complete VARCHAR(10);
 ALTER TABLE tasks ADD tm_transfer_container VARCHAR(1000);
 ALTER TABLE tasks ADD tm_transfer_rule VARCHAR(255);
 ALTER TABLE tasks ADD tm_publish_rule VARCHAR(255);
+
+--Add Rucio ASO's json kv for store container names and its rules.
+ALTER TABLE tasks ADD tm_multipub_rule CLOB;
