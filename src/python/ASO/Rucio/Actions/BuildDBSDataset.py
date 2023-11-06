@@ -52,13 +52,6 @@ class BuildDBSDataset():
         # create log dataset in transfer container
         self.createDataset(self.transfer.transferContainer, self.transfer.logsDataset)
 
-    def buildMultiPubContainer(self):
-
-        publishContainerRuleIDs = {}
-        mutiPubContainers = ['/a/b_output.root/USER']
-        self.transfer.bookkeepingmultipubcontainer(publishContainerRuleIDs)
-
-
     def checkOrCreateContainer(self, container):
         """
         Creating container and attach replication rules. ignore if it already
