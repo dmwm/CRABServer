@@ -7,6 +7,7 @@ PRESENT IN EARLIER CMSSW RELEASES
 # W0715: this is a weird and unclear message from pylint, better to ignore it
 # W1514,W0707 for python2 compatibility. Will refactor later in https://github.com/dmwm/CRABServer/issues/7765 task.
 # pylint: disable=W0715,W1514,W0707
+# pylint: disable=consider-using-f-string   # for python2 compatibility as long as this is used in client too
 
 from __future__ import print_function
 from __future__ import division
@@ -23,41 +24,40 @@ import datetime
 import traceback
 import subprocess
 import contextlib
-try:
-    from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
-except:  # pylint: disable=bare-except
-    from httplib import HTTPException  # old Python 2 version in CMSSW_7
+
 if sys.version_info >= (3, 0):
+    from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
     from urllib.parse import urlencode, quote  # pylint: disable=no-name-in-module
     from past.builtins import basestring
 if sys.version_info < (3, 0):
     from urllib import urlencode, quote
+    from httplib import HTTPException  # old Python 2 version in CMSSW_7
 
 BOOTSTRAP_CFGFILE_DUMP = 'PSetDump.py'
 FEEDBACKMAIL = 'cmstalk+computing-tools@dovecotmta.cern.ch'
 
 # Parameters for User File Cache
 # 120 MB is the maximum allowed size of a single file
-FILE_SIZE_LIMIT = 120*1048576
+FILE_SIZE_LIMIT = 120 * 1048576
 # 0.5MB is the maximum limit for file completely loaded into memory
-FILE_MEMORY_LIMIT = 512*1024
+FILE_MEMORY_LIMIT = 512 * 1024
 
 # these are known, pre-defined nickames for "CRAB configuration" at large
 # which correspond to a well known and specified REST host name and DataBase instance
-SERVICE_INSTANCES = {'prod': {'restHost':'cmsweb.cern.ch', 'dbInstance':'prod'},
-                     'preprod': {'restHost':'cmsweb-testbed.cern.ch', 'dbInstance':'preprod'},
-                     'auth' : {'restHost':'cmsweb-auth.cern.ch', 'dbInstance':'preprod'},
-                     'test1': {'restHost':'cmsweb-test1.cern.ch', 'dbInstance':'dev'},
-                     'test2': {'restHost':'cmsweb-test2.cern.ch', 'dbInstance':'dev'},
-                     'test3': {'restHost':'cmsweb-test3.cern.ch', 'dbInstance':'dev'},
-                     'test4': {'restHost':'cmsweb-test4.cern.ch', 'dbInstance':'dev'},
-                     'test5': {'restHost':'cmsweb-test5.cern.ch', 'dbInstance':'dev'},
-                     'test6': {'restHost':'cmsweb-test6.cern.ch', 'dbInstance':'dev'},
-                     'test11': {'restHost':'cmsweb-test11.cern.ch', 'dbInstance':'devtwo'},
-                     'test12': {'restHost':'cmsweb-test12.cern.ch', 'dbInstance':'devthree'},
-                     'stefanovm': {'restHost':'stefanovm.cern.ch', 'dbInstance':'dev'},
-                     'stefanovm2': {'restHost':'stefanovm2.cern.ch', 'dbInstance':'dev'},
-                     'other': {'restHost':None, 'dbInstance':None},
+SERVICE_INSTANCES = {'prod': {'restHost': 'cmsweb.cern.ch', 'dbInstance': 'prod'},
+                     'preprod': {'restHost': 'cmsweb-testbed.cern.ch', 'dbInstance': 'preprod'},
+                     'auth': {'restHost': 'cmsweb-auth.cern.ch', 'dbInstance': 'preprod'},
+                     'test1': {'restHost': 'cmsweb-test1.cern.ch', 'dbInstance': 'dev'},
+                     'test2': {'restHost': 'cmsweb-test2.cern.ch', 'dbInstance': 'dev'},
+                     'test3': {'restHost': 'cmsweb-test3.cern.ch', 'dbInstance': 'dev'},
+                     'test4': {'restHost': 'cmsweb-test4.cern.ch', 'dbInstance': 'dev'},
+                     'test5': {'restHost': 'cmsweb-test5.cern.ch', 'dbInstance': 'dev'},
+                     'test6': {'restHost': 'cmsweb-test6.cern.ch', 'dbInstance': 'dev'},
+                     'test11': {'restHost': 'cmsweb-test11.cern.ch', 'dbInstance': 'devtwo'},
+                     'test12': {'restHost': 'cmsweb-test12.cern.ch', 'dbInstance': 'devthree'},
+                     'stefanovm': {'restHost': 'stefanovm.cern.ch', 'dbInstance': 'dev'},
+                     'stefanovm2': {'restHost': 'stefanovm2.cern.ch', 'dbInstance': 'dev'},
+                     'other': {'restHost': None, 'dbInstance': None},
                      }
 
 # Limits for TaskWorker
@@ -67,8 +67,8 @@ MAX_LUMIS_IN_BLOCK = 100000  # 100K lumis to avoid blowing up memory
 # Fatal error limits for job resource usage
 # Defaults are used if unable to load from .job.ad
 # Otherwise it uses these values.
-MAX_WALLTIME = 21*60*60 + 30*60
-MAX_MEMORY = 2*1024
+MAX_WALLTIME = 21 * 60 * 60 + 30 * 60
+MAX_MEMORY = 2 * 1024
 # see https://github.com/dmwm/CRABServer/issues/5995
 MAX_MEMORY_PER_CORE = 2500
 MAX_MEMORY_SINGLE_CORE = 5000
@@ -77,31 +77,31 @@ MAX_DISK_SPACE = 20000000  # Disk usage is not used from .job.ad as CRAB3 is not
 MAX_IDLE_JOBS = 1000
 MAX_POST_JOBS = 20
 
-## Parameter used to set the LeaveJobInQueue and the PeriodicRemoveclassads.
-## It's also used during resubmissions since we don't allow a resubmission during the last week
-## Before changing this value keep in mind that old running DAGs have the old value in the CRAB_TaskSubmitTime
-## classad expression but DagmanResubmitter uses this value to calculate if a resubmission is possible
-TASKLIFETIME = 30*24*60*60  # 30 days in seconds
-## Number of days where the resubmission is not possible if the task is expiring
+# Parameter used to set the LeaveJobInQueue and the PeriodicRemoveclassads.
+# It's also used during resubmissions since we don't allow a resubmission during the last week
+# Before changing this value keep in mind that old running DAGs have the old value in the CRAB_TaskSubmitTime
+# classad expression but DagmanResubmitter uses this value to calculate if a resubmission is possible
+TASKLIFETIME = 30 * 24 * 60 * 60  # 30 days in seconds
+# Number of days where the resubmission is not possible if the task is expiring
 NUM_DAYS_FOR_RESUBMITDRAIN = 7
-## Maximum number of days a task can stay in TAPERECALL status
+# Maximum number of days a task can stay in TAPERECALL status
 MAX_DAYS_FOR_TAPERECALL = 15
-## Threshold (in TB) to split a dataset among multiple sites when recalling from tape
+# Threshold (in TB) to split a dataset among multiple sites when recalling from tape
 MAX_TB_TO_RECALL_AT_A_SINGLE_SITE = 10000  # effectively no limit. See https://github.com/dmwm/CRABServer/issues/7610
 
-## These are all possible statuses of a task in the TaskDB.
+# These are all possible statuses of a task in the TaskDB.
 TASKDBSTATUSES_TMP = ['NEW', 'HOLDING', 'QUEUED', 'TAPERECALL', 'KILLRECALL']
 TASKDBSTATUSES_FAILURES = ['SUBMITFAILED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']
 TASKDBSTATUSES_FINAL = ['UPLOADED', 'SUBMITTED', 'KILLED'] + TASKDBSTATUSES_FAILURES
 TASKDBSTATUSES = TASKDBSTATUSES_TMP + TASKDBSTATUSES_FINAL
 
-## These are all possible statuses of a task as returned by the `status' API.
+# These are all possible statuses of a task as returned by the `status' API.
 TASKSTATUSES = TASKDBSTATUSES + ['COMPLETED', 'UNKNOWN', 'InTransition']
 
 
-## These are all allowed transfer and publication status. P.S. See below for allowed statuses for user
-## to put into database. For sure we don`t want to allow or make mistakes and add KILL status for files
-## which were not transferred at all. Just a bit of security
+# These are all allowed transfer and publication status. P.S. See below for allowed statuses for user
+# to put into database. For sure we don`t want to allow or make mistakes and add KILL status for files
+# which were not transferred at all. Just a bit of security
 TRANSFERDB_STATES = {0: "NEW",
                      1: "ACQUIRED",
                      2: "FAILED",
@@ -120,8 +120,8 @@ PUBLICATIONDB_STATES = {0: "NEW",
                         5: "NOT_REQUIRED"}
 PUBLICATIONDB_STATUSES = dict((v, k) for k, v in PUBLICATIONDB_STATES.items())
 
-## Whenever user is putting a new Doc, these statuses will be used for double checking
-## and also for adding in database correct value
+# Whenever user is putting a new Doc, these statuses will be used for double checking
+# and also for adding in database correct value
 USER_ALLOWED_TRANSFERDB_STATES = {0: "NEW",
                                   3: "DONE"}
 USER_ALLOWED_TRANSFERDB_STATUSES = dict((v, k) for k, v in TRANSFERDB_STATES.items())
@@ -193,32 +193,17 @@ STAGEOUT_ERRORS = {60317: [{"regex": ".*Cancelled ASO transfer after timeout.*",
                             "isPermanent": True},
                           ]}
 
-def USER_SANDBOX_EXCLUSIONS(tarmembers):
-    """ The function is used by both the client and the crabcache to get a list of files to exclude during the
-        calculation of the checksum of the user input sandbox.
 
-        In particular the client tries to put the process object obtained with dumpPython in the sandbox, so that
-        this can be used to calculate the checksum. If we used the process object saved with pickle.dump we would
-        run into a problem since the same process objects have different dumps, see:
-        https://github.com/dmwm/CRABServer/issues/4948#issuecomment-132984687
-    """
-    if BOOTSTRAP_CFGFILE_DUMP in map(lambda x: x.name, tarmembers):  # pylint: disable=deprecated-lambda
-        #exclude the pickle pset if the dumpPython PSet is there
-        return ['PSet.py', 'PSet.pkl', 'debug/crabConfig.py', 'debug/originalPSet.py.py']
-    else:
-        return ['debug/crabConfig.py', 'debug/originalPSet.py.py']
-
-def NEW_USER_SANDBOX_EXCLUSIONS(tarmembers):
+def NEW_USER_SANDBOX_EXCLUSIONS(tarmembers):  # TODO move to CRABClient !!!
     """ Exclusion function used with the new crabclient (>= 3.3.1607). Since the new client sandbox no longer
         contains the debug files, it's pointless to exclude them. Also, this function is used when getting
         the hash of the debug tarball (a new addition in 3.3.1607). If the debug files are excluded, the tarball
         would always have the same hash and stay the same, serving no purpose.
     """
-    if BOOTSTRAP_CFGFILE_DUMP in map(lambda x: x.name, tarmembers): # pylint: disable=deprecated-lambda
-        #exclude the pickle pset if the dumpPython PSet is there
+    if BOOTSTRAP_CFGFILE_DUMP in map(lambda x: x.name, tarmembers):
+        # exclude the pickle pset if the dumpPython PSet is there
         return ['PSet.py', 'PSet.pkl']
-    else:
-        return []
+    return []
 
 
 def getTestDataDirectory():
@@ -227,21 +212,21 @@ def getTestDataDirectory():
     testdirList = __file__.split(os.sep)[:-3] + ["test", "data"]
     return os.sep.join(testdirList)
 
+
 def truncateError(msg):
     """Truncate the error message to the first 1000 chars if needed, and add a message if we truncate it.
        See https://github.com/dmwm/CRABServer/pull/4867#commitcomment-12086393
     """
-    MSG_LIMIT = 1100
+    msgLimit = 1100
     # hack to avoid passing HTTP error code to message parsing code in CRABClient/CrabRestInterface.py
     codeString = 'HTTP/1.'
-    if codeString in msg :
-        msg = msg.replace(codeString,'HTTP 1.')
-    if len(msg) > MSG_LIMIT:
-        truncMsg = msg[:MSG_LIMIT - 100]
-        truncMsg += "\n[... message truncated to the first %d chars ...]" % (MSG_LIMIT-100)
+    if codeString in msg:
+        msg = msg.replace(codeString, 'HTTP 1.')
+    if len(msg) > msgLimit:
+        truncMsg = msg[:msgLimit - 100]
+        truncMsg += f"\n[... message truncated to the first {msgLimit - 100} chars ...]"
         return truncMsg
-    else:
-        return msg
+    return msg
 
 
 def checkOutLFN(lfn, username):
@@ -287,6 +272,7 @@ def getProxiedWebDir(crabserver=None, task=None, logFunction=print):
 
     return res
 
+
 def insertJobIdSid(jinfo, jobid, workflow, jobretry):
     """ Modifies passed dictionary (jinfo) to contain jobId and sid keys and values.
         Used when creating dashboard reports.
@@ -295,13 +281,13 @@ def insertJobIdSid(jinfo, jobid, workflow, jobretry):
     jinfo['sid'] = "https://glidein.cern.ch/%s%s" % (jobid, workflow.replace("_", ":"))
 
 
-def getWebdirForDb(reqname, storage_rules):
+def getWebdirForDb(reqname, storageRules):
     """ Get the location of the webdir. This method is called on the schedd by AdjustSites
     """
-    path = os.path.expanduser("~/%s" % reqname)
-    sinfo = storage_rules.split(",")
-    storage_re = re.compile(sinfo[0])
-    val = storage_re.sub(sinfo[1], path)
+    path = os.path.expanduser(f"~/{reqname}")
+    sinfo = storageRules.split(",")
+    storageRegex = re.compile(sinfo[0])
+    val = storageRegex.sub(sinfo[1], path)
     return val
 
 
@@ -309,11 +295,11 @@ def cmd_exist(cmd):
     """ Check if linux command exist
     """
     try:
-        null = open("/dev/null", "w")
-        p = subprocess.Popen("/usr/bin/which %s" % cmd, stdout=null, stderr=null, shell=True)
-        p.communicate()
-        null.close()
-        if p.returncode == 0:
+        p = None
+        with open("/dev/null", "w") as null:
+            p = subprocess.Popen("/usr/bin/which %s" % cmd, stdout=null, stderr=null, shell=True)
+            p.communicate()
+        if p and p.returncode == 0:
             return True
     except OSError:
         return False
@@ -356,8 +342,9 @@ def removeDummyFile(filename, logger):
     abspath = os.path.abspath(filename)
     try:
         os.remove(abspath)
-    except Exception:
+    except (OSError, FileNotFoundError):
         logger.info('Warning: Failed to delete file %s' % filename)
+
 
 def executeCommand(command):
     """ Execute passed bash command. There is no check for command success or failure. Who`s calling
@@ -367,6 +354,7 @@ def executeCommand(command):
     out, err = process.communicate()
     exitcode = process.returncode
     return out, err, exitcode
+
 
 def execute_command(command=None, logger=None, timeout=None, redirect=True):
     """
@@ -389,7 +377,7 @@ def execute_command(command=None, logger=None, timeout=None, redirect=True):
     if timeout:
         if logger:
             logger.debug('add timeout at %s seconds', timeout)
-        command = ('timeout %s ' % timeout ) + command
+        command = ('timeout %s ' % timeout) + command
     if redirect:
         proc = subprocess.Popen(
             command, shell=True,
@@ -404,7 +392,7 @@ def execute_command(command=None, logger=None, timeout=None, redirect=True):
     rc = proc.returncode
     if rc == 124 and timeout:
         if logger:
-            logger.error('ERROR: Timeout after %s seconds in executing:\n %s' % (timeout,command))
+            logger.error('ERROR: Timeout after %s seconds in executing:\n %s' % (timeout, command))
     # for Py3 compatibility
     stdout = out.decode(encoding='UTF-8') if out else ''
     stderr = err.decode(encoding='UTF-8') if err else ''
@@ -436,7 +424,7 @@ def parseJobAd(filename):
     """
     jobAd = {}
     with open(filename) as fd:
-        #classad.parseOld(fd)
+        # classad.parseOld(fd)
         for adline in fd.readlines():
             info = adline.split(' = ', 1)
             if len(info) != 2:
@@ -477,6 +465,7 @@ def getHashLfn(lfn):
     """
     return hashlib.sha224(lfn.encode('utf-8')).hexdigest()
 
+
 def generateTaskName(username, requestname, timestamp=None):
     """ Generate a taskName which is saved in database
     """
@@ -485,7 +474,8 @@ def generateTaskName(username, requestname, timestamp=None):
     taskname = "%s:%s_%s" % (timestamp, username, requestname)
     return taskname
 
-def getUsernameFromTaskname (taskname):
+
+def getUsernameFromTaskname(taskname):
     """
     extract username from a taskname constructed as in generateTaskName above
     :param taskname:
@@ -494,21 +484,23 @@ def getUsernameFromTaskname (taskname):
     username = taskname.split(':')[1].split('_')[0]
     return username
 
+
 def getTimeFromTaskname(taskname):
     """ Get the submission time from the taskname and return the seconds since epoch
         corresponding to it. The function is not currently used.
     """
 
-    #validate taskname. In principle not necessary, but..
+    # validate taskname. In principle not necessary, but..
     if not isinstance(taskname, str):
         raise TypeError('In ServerUtilities.getTimeFromTaskname: "taskname" parameter must be a string')
-    stime = taskname.split(':')[0] #s stands for string
+    stime = taskname.split(':')[0]  # s stands for string
     stimePattern = '^\d{6}_\d{6}$'
     if not re.match(stimePattern, stime):
         raise ValueError('In ServerUtilities.getTimeFromTaskname: "taskname" parameter must match %s' % stimePattern)
-    #convert the time
-    dtime = time.strptime(stime, '%y%m%d_%H%M%S') #d stands for data structured
+    # convert the time
+    dtime = time.strptime(stime, '%y%m%d_%H%M%S')  # d stands for data structured
     return calendar.timegm(dtime)
+
 
 # TODO: Remove this from CRABClient. This is kind of common for WMCore not only for CRAB. Maybe better place to have this in WMCore?
 def encodeRequest(configreq, listParams=None):
@@ -524,7 +516,7 @@ def encodeRequest(configreq, listParams=None):
                 encodedLists += ('&%s=' % lparam) + ('&%s=' % lparam).join(map(quote, configreq[lparam]))
             del configreq[lparam]
     if isinstance(configreq, dict):
-        #Make sure parameters we encode are streing. Otherwise u'IamAstring' may become 'uIamAstring' in the DB
+        # Make sure parameters we encode are streing. Otherwise u'IamAstring' may become 'uIamAstring' in the DB
         for k, v in configreq.items():
             if isinstance(v, basestring):
                 configreq[k] = str(v)
@@ -551,7 +543,7 @@ def oracleOutputMapping(result, key=None):
         docOut = {}
         for dockey in docInfo:
             # Remove first 3 characters as they are tm_*
-            docOut[dockey[3:]] = docInfo[dockey] # rm tm_ which is specific for database
+            docOut[dockey[3:]] = docInfo[dockey]  # rm tm_ which is specific for database
         if key:
             if docOut[key] not in outputDict:
                 outputDict[docOut[key]] = []
@@ -559,6 +551,7 @@ def oracleOutputMapping(result, key=None):
         else:
             outputDict.append(docOut)
     return outputDict
+
 
 def checkTaskLifetime(submissionTime):
     """ Verify that at least 7 days are left before the task periodic remove expression
@@ -569,14 +562,16 @@ def checkTaskLifetime(submissionTime):
     """
 
     msg = "ok"
-    ## resubmitLifeTime is 23 days expressed in seconds
+    # resubmitLifeTime is 23 days expressed in seconds
     resubmitLifeTime = TASKLIFETIME - NUM_DAYS_FOR_RESUBMITDRAIN * 24 * 60 * 60
     if time.time() > (submissionTime + resubmitLifeTime):
-        msg = ("Resubmission of the task is not possble since less than %s days are left before the task is removed from the""schedulers.\n" % NUM_DAYS_FOR_RESUBMITDRAIN)
-        msg += "A task expires %s days after its submission\n" % (TASKLIFETIME / (24 * 60 * 60))
+        msg = f"Resubmission of the task is not possble since less than {NUM_DAYS_FOR_RESUBMITDRAIN} days"
+        msg += "are left before the task is removed from the""schedulers.\n"
+        msg += f"A task expires {TASKLIFETIME / (24 * 60 * 60)} days after its submission\n"
         msg += "You can submit a 'recovery task' if you need to execute again the failed jobs\n"
         msg += "See https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ for more information about recovery tasks"
     return msg
+
 
 def getEpochFromDBTime(startTime):
     """
@@ -587,6 +582,7 @@ def getEpochFromDBTime(startTime):
     """
     return calendar.timegm(startTime.utctimetuple())
 
+
 def getColumn(dictresult, columnName):
     """ Given a dict returned by REST calls, return the value of columnName
     """
@@ -594,8 +590,8 @@ def getColumn(dictresult, columnName):
     value = dictresult['result'][columnIndex]
     if value == 'None':
         return None
-    else:
-        return value
+    return value
+
 
 class newX509env():
     """
@@ -629,28 +625,37 @@ class newX509env():
         self.oldCert = os.getenv('X509_USER_CERT')
         self.oldKey = os.getenv('X509_USER_KEY')
         # Clean previous env. only delete env. vars if they were defined
-        if self.oldProxy: del os.environ['X509_USER_PROXY']
-        if self.oldCert:  del os.environ['X509_USER_CERT']
-        if self.oldKey:   del os.environ['X509_USER_KEY']
+        if self.oldProxy:
+            del os.environ['X509_USER_PROXY']
+        if self.oldCert:
+            del os.environ['X509_USER_CERT']
+        if self.oldKey:
+            del os.environ['X509_USER_KEY']
         # set environment to whatever user wants
-        if self.newProxy: os.environ['X509_USER_PROXY'] = self.newProxy
-        if self.newCert:  os.environ['X509_USER_CERT'] = self.newCert
-        if self.newKey:   os.environ['X509_USER_KEY'] = self.newKey
+        if self.newProxy:
+            os.environ['X509_USER_PROXY'] = self.newProxy
+        if self.newCert:
+            os.environ['X509_USER_CERT'] = self.newCert
+        if self.newKey:
+            os.environ['X509_USER_KEY'] = self.newKey
 
     def __exit__(self, a, b, c):
         # restore X509 environment
         if self.oldProxy:
             os.environ['X509_USER_PROXY'] = self.oldProxy
         else:
-            if os.getenv('X509_USER_PROXY'): del os.environ['X509_USER_PROXY']
+            if os.getenv('X509_USER_PROXY'):
+                del os.environ['X509_USER_PROXY']
         if self.oldCert:
             os.environ['X509_USER_CERT'] = self.oldCert
         else:
-            if os.getenv('X509_USER_CERT'): del os.environ['X509_USER_CERT']
+            if os.getenv('X509_USER_CERT'):
+                del os.environ['X509_USER_CERT']
         if self.oldKey:
             os.environ['X509_USER_KEY'] = self.oldKey
         else:
-            if os.getenv('X509_USER_KEY'): del os.environ['X509_USER_KEY']
+            if os.getenv('X509_USER_KEY'):
+                del os.environ['X509_USER_KEY']
 
 
 class tempSetLogLevel():
@@ -688,16 +693,19 @@ class tempSetLogLevel():
         got exception at 5
         after the loop
     """
-    import logging
+
     def __init__(self, logger=None, level=None):
         self.previousLogLevel = None
         self.newLogLevel = level
         self.logger = logger
+
     def __enter__(self):
         self.previousLogLevel = self.logger.getEffectiveLevel()
         self.logger.setLevel(self.newLogLevel)
-    def __exit__(self,a,b,c):
+
+    def __exit__(self, a, b, c):
         self.logger.setLevel(self.previousLogLevel)
+
 
 ####################################################################
 # Below a few convenience functions to access the S3 implementation of crabcache
@@ -713,7 +721,7 @@ class tempSetLogLevel():
 # Other functions are uploadToS3viaPSU and downloadFromS3viaPSU are for internal use.
 ####################################################################
 def downloadFromS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
-                    username=None, tarballname=None, logger=None):
+                   username=None, tarballname=None, logger=None):
     """
     one call to make a 2-step operation:
     obtains a preSignedUrl from crabserver RESTCache and use it to download a file
@@ -726,24 +734,25 @@ def downloadFromS3(crabserver=None, filepath=None, objecttype=None, taskname=Non
     :param tarballname: string : for sandbox, taskname is not used but tarballname is needed
     :return: nothing. Raises an exception in case of error
     """
-    preSignedUrl = getDownloadUrlFromS3 (crabserver=crabserver, objecttype=objecttype,
-            taskname=taskname, username=username, tarballname=tarballname, logger=logger)
+    preSignedUrl = getDownloadUrlFromS3(crabserver=crabserver, objecttype=objecttype,
+                                        taskname=taskname, username=username,
+                                        tarballname=tarballname, logger=logger)
     downloadFromS3ViaPSU(filepath=filepath, preSignedUrl=preSignedUrl, logger=logger)
-    return
 
-def retrieveFromS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
+
+def retrieveFromS3(crabserver=None, objecttype=None, taskname=None,
                    username=None, tarballname=None, logger=None):
     """
-    obtains a preSignedUrl from crabserver RESTCache and use it to retrieve a file
+    obtains a preSignedUrl from crabserver RESTCache and use it to retrieve a file content as JSON
     :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
     :param objecttype: string : the kind of object to retrieve: clientlog|twlog|sandbox|debugfiles|runtimefiles
     :param taskname: string : the task this object belongs to, if applicable
     :param username: string : the username this sandbox belongs to, in case objecttype=sandbox
     :param tarballname: string : when retrieving sandbox taskname is not used but tarballname is needed
-    :return: the content of the S3 object as a string object
+    :return: the content of the S3 object as a string containing JSON data (to be used with json.loads)
     """
     api = 'cache'
-    dataDict = {'subresource':'retrieve', 'objecttype':objecttype}
+    dataDict = {'subresource': 'retrieve', 'objecttype': objecttype}
     if taskname:
         dataDict['taskname'] = taskname
     if username:
@@ -760,6 +769,7 @@ def retrieveFromS3(crabserver=None, filepath=None, objecttype=None, taskname=Non
     logger.debug("%s retrieved OK", objecttype)
     return result
 
+
 def uploadToS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
                username=None, tarballname=None, logger=None):
     """
@@ -774,7 +784,7 @@ def uploadToS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
     :return: nothing. Raises an exception in case of error
     """
     api = 'cache'
-    dataDict = {'subresource':'upload', 'objecttype':objecttype}
+    dataDict = {'subresource': 'upload', 'objecttype': objecttype}
     if taskname:
         dataDict['taskname'] = taskname
     if username:
@@ -796,16 +806,16 @@ def uploadToS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
         logger.debug("%s %s is already in the S3 store, will not upload again", objecttype, tarballname)
         return
     fields = result[1]
-    preSignedUrl = {'url':url}
+    preSignedUrl = {'url': url}
     preSignedUrl.update(fields)
     try:
         uploadToS3ViaPSU(filepath=filepath, preSignedUrlFields=preSignedUrl, logger=logger)
     except Exception as e:
         raise Exception('Upload to S3 failed\n%s' % str(e))
     logger.debug('%s %s successully uploaded to S3', objecttype, filepath)
-    return
 
-def getDownloadUrlFromS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
+
+def getDownloadUrlFromS3(crabserver=None, objecttype=None, taskname=None,
                          username=None, tarballname=None, logger=None):
     """
     obtains a PreSigned URL to access an existing object in S3
@@ -817,7 +827,7 @@ def getDownloadUrlFromS3(crabserver=None, filepath=None, objecttype=None, taskna
     :return: a (short lived) pre-signed URL to use e.g. in a wget
     """
     api = 'cache'
-    dataDict = {'subresource':'download', 'objecttype':objecttype}
+    dataDict = {'subresource': 'download', 'objecttype': objecttype}
     if taskname:
         dataDict['taskname'] = taskname
     if username:
@@ -834,7 +844,8 @@ def getDownloadUrlFromS3(crabserver=None, filepath=None, objecttype=None, taskna
     logger.debug("PreSignedUrl to download %s received OK", objecttype)
     return result
 
-def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
+
+def uploadToS3ViaPSU(filepath=None, preSignedUrlFields=None, logger=None):
     """
     uploads a file to s3.cern.ch usign PreSigned URLs obtained e.g. from a call to
     crabserver RESTCache API /crabserver/prod/cache?subresource=upload
@@ -850,11 +861,11 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
     """
 
     # validate args
-    if not filepath :
+    if not filepath:
         raise Exception("mandatory filepath argument missing")
-    if not os.path.exists(filepath) :
+    if not os.path.exists(filepath):
         raise Exception("filepath argument points to non existing file")
-    if not preSignedUrlFields :
+    if not preSignedUrlFields:
         raise Exception("mandatory preSignedUrlFields argument missing")
 
     # parse field disctionary into a list of arguments for curl
@@ -904,7 +915,7 @@ def uploadToS3ViaPSU (filepath=None, preSignedUrlFields=None, logger=None):
 
     if exitcode != 0:
         raise Exception('Failed to upload file with %s. stderr is:\n%s' % (uploadCommand, stderr))
-    return
+
 
 def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
     """
@@ -920,9 +931,9 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
     """
 
     # validate args
-    if not filepath :
+    if not filepath:
         raise Exception("mandatory filepath argument missing")
-    if not preSignedUrl :
+    if not preSignedUrl:
         raise Exception("mandatory preSignedUrl argument missing")
 
     downloadCommand = ''
@@ -946,10 +957,8 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
 
     if exitcode != 0:
         raise Exception('Download command %s failed. stderr is:\n%s' % (downloadCommand, stderr))
-    if not os.path.exists(filepath) :
+    if not os.path.exists(filepath):
         raise Exception("Download failure with %s. File %s was not created" % (downloadCommand, filepath))
-
-    return
 
 
 class MeasureTime:
@@ -990,10 +999,11 @@ class MeasureTime:
         self.process_time = time.process_time() - self.process_time
         self.perf_counter = time.perf_counter() - self.perf_counter
         self.readout = 'tot={:.4f} proc={:.4f} thread={:.4f}'.format(
-                 self.perf_counter, self.process_time, self.thread_time )
+            self.perf_counter, self.process_time, self.thread_time)
         if self.logger:
             self.logger.info("MeasureTime:seconds - modulename=%s label='%s' %s",
-                    self.modulename, self.label, self.readout)
+                             self.modulename, self.label, self.readout)
+
 
 def measure_size(obj, logger=None, modulename="", label=""):
     with MeasureTime() as size_time:
@@ -1045,7 +1055,8 @@ def isDatasetUserDataset(inputDataset, dbsInstance):
     True
     """
     return (dbsInstance.split('/')[1] != 'global') and \
-                (inputDataset.split('/')[-1] == 'USER')
+        (inputDataset.split('/')[-1] == 'USER')
+
 
 def isEnoughRucioQuota(rucioClient, site, account=''):
     """
@@ -1076,7 +1087,7 @@ def isEnoughRucioQuota(rucioClient, site, account=''):
         'isQuotaWarning': False,
         'total': 0,
         'used': 0,
-        'free':0,
+        'free': 0,
     }
     if not account:
         account = rucioClient.account
@@ -1084,14 +1095,15 @@ def isEnoughRucioQuota(rucioClient, site, account=''):
     if quotas:
         ret['hasQuota'] = True
         quota = quotas[0]
-        ret['total'] = quota['bytes_limit'] / 2**(10*3) # GiB
-        ret['used'] = quota['bytes'] / 2**(10*3) # GiB
-        ret['free'] = quota['bytes_remaining'] / 2**(10*3) # GiB
+        ret['total'] = quota['bytes_limit'] / 2 ** (10 * 3)  # GiB
+        ret['used'] = quota['bytes'] / 2 ** (10 * 3)  # GiB
+        ret['free'] = quota['bytes_remaining'] / 2 ** (10 * 3)  # GiB
         if ret['free'] > RUCIO_QUOTA_MINIMUM_GB:
             ret['isEnough'] = True
             if ret['free'] <= RUCIO_QUOTA_WARNING_GB:
                 ret['isQuotaWarning'] = True
     return ret
+
 
 def getRucioAccountFromLFN(lfn):
     """
