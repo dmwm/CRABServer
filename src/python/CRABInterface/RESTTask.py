@@ -44,6 +44,7 @@ class RESTTask(RESTEntity):
             validate_str("transfercontainer", param, safe, RX_DATASET, optional=True)
             validate_str("transferrule", param, safe, RX_RUCIORULE, optional=True)
             validate_str("publishrule", param, safe, RX_RUCIORULE, optional=True)
+            # Save json string directly to tm_multipub_rule CLOB column.
             validate_str("multipubrulejson", param, safe, RX_ANYTHING_10K, optional=True)
         elif method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
@@ -386,9 +387,9 @@ class RESTTask(RESTEntity):
             raise InvalidParameter("Transfer container name not found in the input parameters")
         if 'transferrule' not in kwargs or not kwargs['transferrule']:
             raise InvalidParameter("Transfer container's rule id not found in the input parameters")
-        import pdb; pdb.set_trace()
-        # Fail validation if  both `publishrule` and `multipubrule` does not exists.
-        # We want to deprecate `publishrule` in the future
+        # For backward compatiblity, either `publishrule` or `multipubrulejson`
+        # is enough, and set default value to variable that not supply by
+        # client.
         if (('publishrule' not in kwargs or not kwargs['publishrule'])
            and ('multipubrulejson' not in kwargs or not kwargs['multipubrulejson'])):
             raise InvalidParameter("`publishrule` or `multipubrulejson` are not found in the input parameters.")

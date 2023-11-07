@@ -38,17 +38,17 @@ class BuildDBSDataset():
             for containerName  in self.transfer.multiPubContainers:
                 ruleID = self.checkOrCreateContainer(containerName)
                 self.transfer.multiPubRuleIDs[containerName] = ruleID
-            # upload rule id and transfer container name to TasksDB
+            # Upload rule id and transfer container name to TasksDB.
+            # Note that we upload multiPubRuleIDs as json string to REST and
+            # manually load back in client side later.
             configreq = {
                 'workflow': self.transfer.taskname,
                 'transfercontainer': self.transfer.transferContainer,
                 'transferrule': self.transfer.containerRuleID,
                 'publishrule': self.transfer.publishRuleID,
-                'mulipubrule_name'
-                'mulipubrule_ruleid': self.transfer.multiPubRuleIDs)
+                'multipubrulejson': json.dumps(self.transfer.multiPubRuleIDs),
             }
             updateToREST(self.crabRESTClient, 'task', 'addrucioasoinfo', configreq)
-            import pdb; pdb.set_trace()
             # bookkeeping
             self.transfer.updateContainerRuleID()
 
