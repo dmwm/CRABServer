@@ -22,7 +22,7 @@ def main():
     # topDir = '.'  # `for testing locally
     topDir = f"{topDir}/BadInputFiles"
 
-    for problemType in ['corrupted']:  # maybe later on add suspicious files, initially ignore them
+    for problemType in ('corrupted', 'suspicious'):  # maybe later on add suspicious files, initially ignore them
         totals = {}
         doneFiles = []
         myDir = f"{topDir}/{problemType}"
