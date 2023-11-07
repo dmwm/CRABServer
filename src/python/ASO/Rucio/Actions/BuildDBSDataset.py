@@ -3,6 +3,7 @@ Create Rucio's container and dataset.
 """
 import logging
 import uuid
+import json
 
 from rucio.common.exception import DataIdentifierAlreadyExists, InvalidObject, DuplicateRule, DuplicateContent
 
@@ -43,9 +44,11 @@ class BuildDBSDataset():
                 'transfercontainer': self.transfer.transferContainer,
                 'transferrule': self.transfer.containerRuleID,
                 'publishrule': self.transfer.publishRuleID,
-                'mulipubrule': self.transfer.multiPubRuleIDs
+                'mulipubrule_name'
+                'mulipubrule_ruleid': self.transfer.multiPubRuleIDs)
             }
             updateToREST(self.crabRESTClient, 'task', 'addrucioasoinfo', configreq)
+            import pdb; pdb.set_trace()
             # bookkeeping
             self.transfer.updateContainerRuleID()
 

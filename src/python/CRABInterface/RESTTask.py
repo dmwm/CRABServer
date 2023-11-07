@@ -43,6 +43,8 @@ class RESTTask(RESTEntity):
             validate_str("transfercontainer", param, safe, RX_DATASET, optional=True)
             validate_str("transferrule", param, safe, RX_RUCIORULE, optional=True)
             validate_str("publishrule", param, safe, RX_RUCIORULE, optional=True)
+            validate_strlist("multipubrule_name", param, safe, RX_ANYTHING)
+            validate_strlist("multipubrule_id", param, safe, RX_ANYTHING)
         elif method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
             validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
@@ -384,23 +386,24 @@ class RESTTask(RESTEntity):
             raise InvalidParameter("Transfer container name not found in the input parameters")
         if 'transferrule' not in kwargs or not kwargs['transferrule']:
             raise InvalidParameter("Transfer container's rule id not found in the input parameters")
+        import pdb; pdb.set_trace()
         # Fail validation if  both `publishrule` and `multipubrule` does not exists.
         # We want to deprecate `publishrule` in the future
-        import pdb; pdb.set_trace()
         if (('publishrule' not in kwargs or not kwargs['publishrule'])
-           and ('multipubrule' not in kwargs or not kwargs['multipubrule'])):
-            raise InvalidParameter("`publishrule` and `multipubrule` are not found in the input parameters")
+           and (('multipubrule_name' not in kwargs or not kwargs['multipubrule_name'])
+                or ('multipubrule_id' not in kwargs or not kwargs['multipubrule_id']))):
+            raise InvalidParameter("`publishrule` or (`multipubrule_name`,`multipubrule_id`) are not found in the input parameters")
         # set default value if `publishrule` or `multipubrule` does not exists.
         if 'publishrule' not in kwargs or not kwargs['publishrule']:
             publishrule = '00000000000000000000000000000000'
         else:
             publishrule = kwargs['publishrule']
-        if 'multipubrule' not in kwargs or not kwargs['multipubrule']:
-            multipubrule = '{}'
+        if 'multipubrule_name' not in kwargs or not kwargs['multipubrule_name']:
+            multipubrule = {}
+        elif len(kwargs['multipubrule_name']) != (kwargs['multipubrule_id']):
+            raise InvalidParameter("Length of list `multipubrule_name` and `multipubrule_id` is not equal")
         else:
-            multipubrule = kwargs['multipubrule']
-            if not isinstance(multipubrule, str):
-                raise InvalidParameter(f"`multipubrule` expect str, got {type(multipubrule)}")
+            multipubrule = { kwargs['multipubrule_name']: kwargs['multipubrule_id'] for i in range(len(multipubrule_name)) }
         taskname = kwargs['workflow']
         ownerName = getUsernameFromTaskname(taskname)
         authz_operator(username=ownerName, group='crab3', role='operator')
@@ -409,6 +412,6 @@ class RESTTask(RESTEntity):
             tm_transfer_container=[kwargs['transfercontainer']],
             tm_transfer_rule=[kwargs['transferrule']],
             tm_publish_rule=[publishrule],
-            tm_multipub_rule=[multipubrule],
+            tm_multipub_rule=[json.dumps(multipubrule)],
             tm_taskname=[taskname])
         return []
