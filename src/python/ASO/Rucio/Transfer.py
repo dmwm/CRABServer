@@ -214,7 +214,7 @@ class Transfer:
                 self.logger.info('Got container rule ID from bookkeeping:')
                 self.logger.info(f'  Transfer Container rule ID: {self.containerRuleID}')
                 self.logger.info(f'  Publish Container rule ID: {self.publishRuleID}')
-                self.logger.info(f'  Publish Container rule ID: {self.multiPubRuleIDs}')
+                self.logger.info(f'  Multiple Publish Container rule ID: {self.multiPubRuleIDs}')
         except FileNotFoundError:
             self.logger.info(f'Bookkeeping rules "{path}" does not exist. Assume it is first time it run.')
 

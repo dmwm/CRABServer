@@ -103,17 +103,14 @@ class MonitorLockStatus:
         :return: replicas info with updated dataset name.
         :rtype: list of dict
         """
-
         r = RegisterReplicas(self.transfer, self.rucioClient, None)
         publishContainerFileDocs = r.addReplicasToContainer(fileDocs, self.transfer.publishContainer)
-
         # Update dataset name for each replicas
-        #tmpLFN2DatasetMap = {x['name']:x['dataset'] for x in publishContainerFileDocs}
-        #tmpFileDocs = copy.deepcopy(fileDocs)
-        #for f in tmpFileDocs:
-        #    f['dataset'] = tmpLFN2DatasetMap[f['name']]
-        #return tmpFileDocs
-        return publishContainerFileDocs
+        tmpLFN2DatasetMap = {x['name']:x['dataset'] for x in publishContainerFileDocs}
+        tmpFileDocs = copy.deepcopy(fileDocs)
+        for f in tmpFileDocs:
+            f['dataset'] = tmpLFN2DatasetMap[f['name']]
+        return tmpFileDocs
 
     def registerToMutiPubContainers(self, fileDocs):
         """
