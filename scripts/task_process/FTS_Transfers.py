@@ -1,19 +1,14 @@
 #!/usr/bin/python
-# pylint: disable=line-too-long
+# pylint: disable=line-too-long, broad-except, invalid-name
 """
 
 """
-from __future__ import division
-from __future__ import print_function
 import json
 import logging
 import os
 import subprocess
 from datetime import datetime, timedelta
-try:
-    from httplib import HTTPException
-except:
-    from http.client import HTTPException
+from http.client import HTTPException
 
 import fts3.rest.client.easy as fts3
 
@@ -36,24 +31,21 @@ logging.basicConfig(
 )
 
 if os.path.exists('task_process/RestInfoForFileTransfers.json'):
-    with open('task_process/RestInfoForFileTransfers.json') as fp:
+    with open('task_process/RestInfoForFileTransfers.json', encoding='utf-8') as fp:
         restInfo = json.load(fp)
         proxy = os.getcwd() + "/" + str(restInfo['proxyfile'])  # make sure no to unicode to FTS clients
-        #rest_filetransfers = restInfo['host'] + '/crabserver/' + restInfo['dbInstance']
+        # rest_filetransfers = restInfo['host'] + '/crabserver/' + restInfo['dbInstance']
         os.environ["X509_USER_PROXY"] = proxy
 
-#if os.path.exists('task_process/rest_filetransfers.txt'):
+# if os.path.exists('task_process/rest_filetransfers.txt'):
 #    with open("task_process/rest_filetransfers.txt", "r") as _rest:
 #        rest_filetransfers = _rest.readline().split('\n')[0]
 #        proxy = os.getcwd() + "/" + _rest.readline()
 #        print("Proxy: %s" % proxy)
 
 asoworker = 'schedd'
+ftsReuse = os.path.exists('USE_FTS_REUSE')
 
-if os.path.exists('USE_FTS_REUSE'):
-    ftsReuse = True
-else:
-    ftsReuse = False
 
 def chunks(l, n):
     """
@@ -65,6 +57,7 @@ def chunks(l, n):
     for i in range(0, len(l), n):
         yield l[i:i + n]
 
+
 def mark_transferred(ids, crabserver):
     """
     Mark the list of files as tranferred
@@ -75,7 +68,7 @@ def mark_transferred(ids, crabserver):
     try:
         logging.debug("Marking done %s", ids)
 
-        data = dict()
+        data = {}
         data['asoworker'] = asoworker
         data['subresource'] = 'updateTransfers'
         data['list_of_ids'] = ids
@@ -88,6 +81,7 @@ def mark_transferred(ids, crabserver):
         return False
     return True
 
+
 def mark_failed(ids, failures_reasons, crabserver):
     """
     Mark the list of files as failed
@@ -97,12 +91,12 @@ def mark_failed(ids, failures_reasons, crabserver):
     :return: True success, False failure
     """
     try:
-        data = dict()
+        data = {}
         data['asoworker'] = asoworker
         data['subresource'] = 'updateTransfers'
         data['list_of_ids'] = ids
         data['list_of_transfer_state'] = ["FAILED" for _ in ids]
-        reasons = [r.replace(',','.') for r in failures_reasons]  # commas would confuse REST
+        reasons = [r.replace(',', '.') for r in failures_reasons]  # commas would confuse REST
         data['list_of_failure_reason'] = reasons
         data['list_of_retry_value'] = [0 for _ in ids]
 
@@ -112,6 +106,7 @@ def mark_failed(ids, failures_reasons, crabserver):
         logging.exception("Error updating documents")
         return False
     return True
+
 
 def remove_files_in_bkg(pfns, logFile, timeout=None):
     """
@@ -127,13 +122,13 @@ def remove_files_in_bkg(pfns, logFile, timeout=None):
     """
 
     if not timeout:
-        timeout = '%dm' % (len(pfns) * 3)    # default is 3minutes per file to be removed
-    command = 'env -i X509_USER_PROXY=%s timeout %s gfal-rm -v -t 180 %s >> %s 2>&1 &'  % \
-              (proxy, timeout, pfns, logFile)
+        timeout = f"{len(pfns) * 3}m"  # default is 3minutes per file to be removed
+    command = f"env -i X509_USER_PROXY={proxy} timeout {timeout} gfal-rm -v -t 180 {pfns} >> {logFile} 2>&1 &"
     logging.debug("Running remove command %s", command)
     subprocess.call(command, shell=True)
 
     return
+
 
 def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, failed_id, failed_reasons):
     """
@@ -154,26 +149,26 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
     - update states on oracle
     """
 
-    logger.info("Getting state of job %s" % jobid)
+    logger.info(f"Getting state of job {jobid}")
 
     jobs_ongoing.append(jobid)
 
     try:
         status = fts3.get_job_status(ftsContext, jobid, list_files=False)
     except HTTPException as hte:
-        logger.exception("failed to retrieve status for %s " % jobid)
-        logger.exception("httpExeption headers %s " % hte.headers)
+        logger.exception(f"failed to retrieve status for {jobid}")
+        logger.exception(f"httpExeption headers {hte.headers}")
         if hte.status == 404:
-            logger.exception("%s not found in FTS3 DB" % jobid)
+            logger.exception(f"{jobid} not found in FTS3 DB")
             jobs_ongoing.remove(jobid)
         return
     except Exception:
-        logger.exception("failed to retrieve status for %s " % jobid)
+        logger.exception(f"failed to retrieve status for {jobid}")
         return
 
-    logger.info("State of job %s: %s" % (jobid, status["job_state"]))
+    logger.info("State of job %s: %s", (jobid, status["job_state"]))
 
-    if status["job_state"] in ['FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"]:
+    if status["job_state"] in ('FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"):
         jobsEnded.append(jobid)
     if status["job_state"] in ['ACTIVE', 'FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"]:
         file_statuses = fts3.get_job_status(ftsContext, jobid, list_files=True)['files']
@@ -185,12 +180,12 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
 
         # get the job content from local file
         jobContentFileName = 'task_process/transfers/' + jobid + '.json'
-        with open(jobContentFileName, 'r') as fp:
-            fileIds = json.load(fp)
+        with open(jobContentFileName, 'r', encoding='utf-8') as fh:
+            fileIds = json.load(fh)
 
         for file_status in file_statuses:
             _id = file_status['file_metadata']['oracleId']
-            if not _id in fileIds:
+            if _id not in fileIds:
                 # this file xfer has been handled already in a previous iteration
                 # nothing to do
                 continue
@@ -204,7 +199,7 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
                 done_id[jobid].append(_id)
                 files_to_remove.append(file_status['source_surl'])
                 fileIds_to_remove.append(_id)
-            elif tx_state == 'FAILED' or tx_state == 'CANCELED':
+            elif tx_state in ('FAILED', 'CANCELED'):
                 logger.info('file XFER FAIL will remove %s', file_status['source_surl'])
                 failed_id[jobid].append(_id)
                 if file_status['reason']:
@@ -234,16 +229,17 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
             for f in files_to_remove:
                 list_of_surls += str(f) + ' '  # convert JSON u'srm://....' to plain srm://...
             removeLogFile = './task_process/transfers/remove_files.log'
-            msg = str(datetime.now()) + ': Will remove: %s' % list_of_surls
-            with open(removeLogFile, 'a') as removeLog:
+            msg = str(datetime.now()) + f": Will remove: {list_of_surls}"
+            with open(removeLogFile, 'a', encoding='utf-8') as removeLog:
                 removeLog.write(msg)
             remove_files_in_bkg(list_of_surls, removeLogFile)
             # remove those file Id's from the list and update the json disk file
-            fileIds = list(set(fileIds)-set(fileIds_to_remove))
+            fileIds = list(set(fileIds) - set(fileIds_to_remove))
             jobContentTmp = jobContentFileName + '.tmp'
-            with open(jobContentTmp, 'w') as fp:
-                json.dump(fileIds, fp)
+            with open(jobContentTmp, 'w', encoding='utf-8') as fh:
+                json.dump(fileIds, fh)
             os.rename(jobContentTmp, jobContentFileName)
+
 
 def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
     """
@@ -276,11 +272,9 @@ def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
                                            metadata={'oracleId': lfn[2]}
                                            )
                          )
-    logger.info("Submitting %s transfers to FTS server" % len(files))
-    #SB#
+    logger.info(f"Submitting {len(files)} transfers to FTS server")
     for lfn in files:
-        logger.info("%s %s %s %s", lfn[0],lfn[1],lfn[6],{'oracleId': lfn[2]})
-    #SB#
+        logger.info("%s %s %s %s", lfn[0], lfn[1], lfn[6], {'oracleId': lfn[2]})
 
     # Submit fts job
     job = fts3.new_job(transfers,
@@ -329,7 +323,7 @@ def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
 
     jobids.append(jobid)
 
-    fileDoc = dict()
+    fileDoc = {}
     fileDoc['asoworker'] = asoworker
     fileDoc['subresource'] = 'updateTransfers'
     fileDoc['list_of_ids'] = [x[2] for x in files]
@@ -337,10 +331,11 @@ def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
     fileDoc['list_of_fts_instance'] = [FTS_ENDPOINT for _ in files]
     fileDoc['list_of_fts_id'] = [jobid for _ in files]
 
-    logger.info("Will mark as submitted %s files" % (len(fileDoc['list_of_ids'])))
+    logger.info(f"Will mark as submitted {len(fileDoc['list_of_ids'])} files")
     toUpdate.append(fileDoc)
 
     return jobid
+
 
 def submit(rucioClient, ftsContext, toTrans, crabserver):
     """
@@ -367,7 +362,7 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
 
     # some things are the same for all files, pick them from the first one
     username = toTrans[0][5]
-    scope = "user."+username
+    scope = "user." + username
     taskname = toTrans[0][6]
     dst_rse = toTrans[0][4]
     a_dst_lfn = toTrans[0][1]
@@ -382,22 +377,22 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
     # xxxx is 0000/log, 00001/log etc. for log if user selected TransferLogs=True i.e. LFN's are like
     # /store/temp/user/.../0000/output_1.root or /store/temp/user/.../0000/log/cmsRun_1.log.tar.gz
 
-    if a_dst_lfn.split("/")[-2] == 'log' :
+    if a_dst_lfn.split("/")[-2] == 'log':
         dst_lfn_prefix = '/'.join(a_dst_lfn.split("/")[:-3])
     else:
         dst_lfn_prefix = '/'.join(a_dst_lfn.split("/")[:-2])
     dst_did = scope + ':' + dst_lfn_prefix + '/0000/file.root'
 
-    if a_src_lfn.split("/")[-2] == 'log' :
+    if a_src_lfn.split("/")[-2] == 'log':
         src_lfn_prefix = '/'.join(a_src_lfn.split("/")[:-3])
     else:
         src_lfn_prefix = '/'.join(a_src_lfn.split("/")[:-2])
     src_did = scope + ':' + src_lfn_prefix + '/0000/file.root'
 
-    sourceSites = list(set([x[3] for x in toTrans]))
+    sourceSites = list(set(x[3] for x in toTrans))
 
     for source in sourceSites:
-        logging.info("Processing transfers from: %s" % source)
+        logging.info("Processing transfers from: %s", source)
 
         # find all files for this source
         toTransFromThisSource = [x for x in toTrans if x[3] == source]
@@ -426,19 +421,19 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
         # OK, have good protocols and PFNs, build info for FTS
         tx_from_source = []
         for f in toTransFromThisSource:
-            id = f[2]
+            jobid = f[2]
             size = f[7]
             checksums = f[8]
-            src_lfn = f[0]
+            # src_lfn = f[0]  # currently unused
             dst_lfn = f[1]
-            if dst_lfn.split("/")[-2] == 'log' :
+            if dst_lfn.split("/")[-2] == 'log':
                 fileid = '/'.join(dst_lfn.split("/")[-3:])
             else:
                 fileid = '/'.join(dst_lfn.split("/")[-2:])
             src_pfn = src_pfn_prefix + '/' + fileid
             dst_pfn = dst_pfn_prefix + '/' + fileid
 
-            xfer = [src_pfn, dst_pfn, id, source, username, taskname, size, checksums['adler32'].rjust(8, '0')]
+            xfer = [src_pfn, dst_pfn, jobid, source, username, taskname, size, checksums['adler32'].rjust(8, '0')]
             tx_from_source.append(xfer)
 
         xfersPerFTSJob = 50 if ftsReuse else 200
@@ -446,16 +441,15 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
             ftsJobId = submitToFTS(logging, ftsContext, files, jobids, to_update)
             # save oracleIds of files in this job in a local file
             jobContentFileName = 'task_process/transfers/' + ftsJobId + '.json'
-            with open(jobContentFileName, 'w') as fp:
-                json.dump([f[2] for f in files], fp)
-                #for f in files:
-                #    jobContent.write(str(f[0]))  # save the list of src_lfn's in this job
+            with open(jobContentFileName, 'w', encoding='utf-8') as fh:
+                json.dump([f[2] for f in files], fh)
 
     for fileDoc in to_update:
         _ = crabserver.post('filetransfers', data=encodeRequest(fileDoc))
         logging.info("Marked submitted %s files", fileDoc['list_of_ids'])
 
     return jobids
+
 
 def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient, crabserver):
     """
@@ -472,7 +466,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient, c
     transfers = []
     logging.info("starting from line: %s", lastLine)
 
-    with open(inputFile) as _list:
+    with open(inputFile, encoding='utf-8') as _list:
         for _data in _list.readlines()[lastLine:]:
             try:
                 lastLine += 1
@@ -502,6 +496,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient, c
 
     return transfers, jobids
 
+
 def state_manager(ftsContext, crabserver):
     """
 
@@ -516,7 +511,7 @@ def state_manager(ftsContext, crabserver):
     # TODO: puo esser utile togliere questo file? mmm forse no
 
     if os.path.exists('task_process/transfers/fts_jobids.txt'):
-        with open("task_process/transfers/fts_jobids.txt", "r") as _jobids:
+        with open("task_process/transfers/fts_jobids.txt", "r", encoding='utf-8') as _jobids:
             lines = _jobids.readlines()
             for line in list(set(lines)):
                 if line:
@@ -524,7 +519,6 @@ def state_manager(ftsContext, crabserver):
                 if jobid:
                     check_FTSJob(logging, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, failed_id, failed_reasons)
             _jobids.close()
-
 
         # the loop above has filled:
         # job_ongoing: list of FTS jobs processed
@@ -555,14 +549,15 @@ def state_manager(ftsContext, crabserver):
     else:
         logging.warning('No FTS job ID to monitor yet')
 
-    with open("task_process/transfers/fts_jobids_new.txt", "w+") as _jobids:
+    with open("task_process/transfers/fts_jobids_new.txt", "w+", encoding='utf-8') as _jobids:
         for line in jobs_ongoing:
             logging.info("Writing: %s", line)
-            _jobids.write(line+"\n")
+            _jobids.write(line + "\n")
 
     os.rename("task_process/transfers/fts_jobids_new.txt", "task_process/transfers/fts_jobids.txt")
 
     return jobs_ongoing
+
 
 def submission_manager(rucioClient, ftsContext, crabserver):
     """
@@ -570,24 +565,25 @@ def submission_manager(rucioClient, ftsContext, crabserver):
     """
     last_line = 0
     if os.path.exists('task_process/transfers/last_transfer.txt'):
-        with open("task_process/transfers/last_transfer.txt", "r") as _last:
+        with open("task_process/transfers/last_transfer.txt", "r", encoding='utf-8') as _last:
             read = _last.readline()
             last_line = int(read)
             logging.info("last line is: %s", last_line)
             _last.close()
 
     # TODO: if the following fails check not to leave a corrupted file
-    with open("task_process/transfers/last_transfer_new.txt", "w+") as _last:
+    with open("task_process/transfers/last_transfer_new.txt", "w+", encoding='utf-8') as _last:
         _, jobids = perform_transfers("task_process/transfers.txt", last_line, _last, ftsContext, rucioClient, crabserver)
         _last.close()
         os.rename("task_process/transfers/last_transfer_new.txt", "task_process/transfers/last_transfer.txt")
 
-    with open("task_process/transfers/fts_jobids.txt", "a") as _jobids:
+    with open("task_process/transfers/fts_jobids.txt", "a", encoding='utf-8') as _jobids:
         for job in jobids:
-            _jobids.write(str(job)+"\n")
+            _jobids.write(str(job) + "\n")
         _jobids.close()
 
     return jobids
+
 
 def algorithm():
     """
@@ -622,16 +618,16 @@ def algorithm():
         logging.exception("Failed to set connection to crabserver")
         return
 
-    with open("task_process/transfers.txt") as _list:
+    with open("task_process/transfers.txt", encoding='utf-8') as _list:
         _data = _list.readlines()[0]
         try:
             doc = json.loads(_data)
             username = doc["username"]
-            taskname = doc["taskname"]
-            destination = doc["destination"]
+            # taskname = doc["taskname"]  # currently unused
+            # destination = doc["destination"]  # currently unused
         except Exception as ex:
-            msg = "Username gathering failed with\n%s" % str(ex)
-            logging.warn(msg)
+            msg = f"Username gathering failed with\n{str(ex)}"
+            logging.warning(msg)
             raise ex
 
     try:
@@ -640,8 +636,8 @@ def algorithm():
         os.environ["X509_USER_PROXY"] = proxy
         rucioClient = rucioclient(account=username, auth_type='x509_proxy')
     except Exception as exc:
-        msg = "Rucio initialization failed with\n%s" % str(exc)
-        logging.warn(msg)
+        msg = f"Rucio initialization failed with\n{str(ex)}"
+        logging.warning(msg)
         raise exc
 
     jobs_ongoing = state_manager(ftsContext, crabserver)
