@@ -7,7 +7,7 @@ from WMCore.REST.Error import InvalidParameter, ExecutionError, NotAcceptable
 from CRABInterface.Utilities import conn_handler, getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match, authz_operator
 from CRABInterface.Regexps import RX_MANYLINES_SHORT, RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME,\
-    RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE, RX_DATASET
+    RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE, RX_DATASET, RX_ANYTHING
 from ServerUtilities import getUsernameFromTaskname
 
 # external dependecies here
