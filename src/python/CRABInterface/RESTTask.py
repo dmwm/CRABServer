@@ -7,7 +7,7 @@ from WMCore.REST.Error import InvalidParameter, ExecutionError, NotAcceptable
 from CRABInterface.Utilities import conn_handler, getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match, authz_operator
 from CRABInterface.Regexps import RX_MANYLINES_SHORT, RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME,\
-    RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE, RX_DATASET, RX_ANYTHING
+    RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE, RX_DATASET, RX_ANYTHING_10K
 from ServerUtilities import getUsernameFromTaskname
 
 # external dependecies here
@@ -44,7 +44,7 @@ class RESTTask(RESTEntity):
             validate_str("transfercontainer", param, safe, RX_DATASET, optional=True)
             validate_str("transferrule", param, safe, RX_RUCIORULE, optional=True)
             validate_str("publishrule", param, safe, RX_RUCIORULE, optional=True)
-            validate_str("multipubrulejson", param, safe, RX_MANYLINES_SHORT, optional=True)
+            validate_str("multipubrulejson", param, safe, RX_ANYTHING_10K, optional=True)
         elif method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
             validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
