@@ -3,6 +3,7 @@ Create Rucio's container and dataset.
 """
 import logging
 import uuid
+import json
 
 from rucio.common.exception import DataIdentifierAlreadyExists, InvalidObject, DuplicateRule, DuplicateContent
 
@@ -30,19 +31,27 @@ class BuildDBSDataset():
         LOGS dataset.
         """
         # create container
-        if not self.transfer.containerRuleID or not self.transfer.publishRuleID:
+        if not self.transfer.containerRuleID:
             self.transfer.containerRuleID = self.checkOrCreateContainer(self.transfer.transferContainer)
             self.transfer.publishRuleID = self.checkOrCreateContainer(self.transfer.publishContainer)
+            # multi pub container
+            for containerName  in self.transfer.multiPubContainers:
+                ruleID = self.checkOrCreateContainer(containerName)
+                self.transfer.multiPubRuleIDs[containerName] = ruleID
+            # Upload rule id and transfer container name to TasksDB.
+            # Note that we upload multiPubRuleIDs as json string to REST and
+            # manually load back in client side later.
             configreq = {
                 'workflow': self.transfer.taskname,
                 'transfercontainer': self.transfer.transferContainer,
                 'transferrule': self.transfer.containerRuleID,
                 'publishrule': self.transfer.publishRuleID,
+                'multipubrulejson': json.dumps(self.transfer.multiPubRuleIDs),
             }
-            # upload rule id and transfer container name to TasksDB
             updateToREST(self.crabRESTClient, 'task', 'addrucioasoinfo', configreq)
             # bookkeeping
             self.transfer.updateContainerRuleID()
+
         # create log dataset in transfer container
         self.createDataset(self.transfer.transferContainer, self.transfer.logsDataset)
 

@@ -8,7 +8,7 @@ import hashlib
 
 import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
 from ASO.Rucio.exception import RucioTransferException
-from ASO.Rucio.utils import writePath
+from ASO.Rucio.utils import writePath, parseFileNameFromLFN, addSuffixToDatasetName
 
 class Transfer:
     """
@@ -35,6 +35,7 @@ class Transfer:
         self.publishContainer = ''
         self.transferContainer = ''
         self.logsDataset = ''
+        self.multiPubContainers = []
 
         # dynamically change throughout the scripts
         self.currentDataset = ''
@@ -43,6 +44,7 @@ class Transfer:
         self.lastTransferLine = 0
         self.containerRuleID = ''
         self.publishRuleID = ''
+        self.multiPubRuleIDs = {}
         self.bookkeepingOKLocks = None
         self.bookkeepingBlockComplete = None
 
@@ -64,6 +66,7 @@ class Transfer:
         self.buildLFN2transferItemMap()
         self.readRESTInfo()
         self.readInfoFromTransferItems()
+        self.buildMultiPubContainers()
         self.readContainerRuleID()
         self.readOKLocks()
         self.readBlockComplete()
@@ -175,11 +178,30 @@ class Transfer:
         self.logger.info(f'Publish container: {self.publishContainer}, Transfer container: {self.transferContainer}')
         self.logsDataset = f'{self.transferContainer}#LOGS'
 
+    def buildMultiPubContainers(self):
+        """
+        Create the self.multiPubContainers attribute by reading all transfers
+        dict from the same job id.
+
+        Note that this method does not check the limit of the new container name
+        length, but only relies on validation from REST.
+        """
+        multiPubContainers = []
+        jobID = self.transferItems[0]['job_id']
+        for item in self.transferItems:
+            if item['job_id'] != jobID:
+                break
+            filename = parseFileNameFromLFN(item['destination_lfn'])
+            containerName = addSuffixToDatasetName(self.publishContainer, f'__{filename}')
+            multiPubContainers.append(containerName)
+        self.multiPubContainers = multiPubContainers
+
     def readContainerRuleID(self):
         """
         Read containerRuleID from task_process/transfers/container_ruleid.txt
         """
-        # skip reading rule from bookkeeping in case rerun with new transferContainerName.
+        # Skip reading rule from bookkeeping in case to intend to create
+        # different container name when test.
         if config.args.force_publishname:
             return
         path = config.args.container_ruleid_path
@@ -188,9 +210,11 @@ class Transfer:
                 tmp = json.load(r)
                 self.containerRuleID = tmp['containerRuleID']
                 self.publishRuleID = tmp['publishRuleID']
-                self.logger.info('Got container rule ID from bookkeeping.'\
-                                 f' Transfer Container rule ID: {self.containerRuleID}'\
-                                 f' Publish Container rule ID: {self.publishRuleID}')
+                self.multiPubRuleIDs = tmp['multiPubRuleIDs']
+                self.logger.info('Got container rule ID from bookkeeping:')
+                self.logger.info(f'  Transfer Container rule ID: {self.containerRuleID}')
+                self.logger.info(f'  Publish Container rule ID: {self.publishRuleID}')
+                self.logger.info(f'  Multiple Publish Container rule ID: {self.multiPubRuleIDs}')
         except FileNotFoundError:
             self.logger.info(f'Bookkeeping rules "{path}" does not exist. Assume it is first time it run.')
 
@@ -204,6 +228,7 @@ class Transfer:
             json.dump({
                 'containerRuleID': self.containerRuleID,
                 'publishRuleID': self.publishRuleID,
+                'multiPubRuleIDs': self.multiPubRuleIDs,
             }, w)
 
     def readOKLocks(self):
