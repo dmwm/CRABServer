@@ -102,7 +102,8 @@ def mark_failed(ids, failures_reasons, crabserver):
         data['subresource'] = 'updateTransfers'
         data['list_of_ids'] = ids
         data['list_of_transfer_state'] = ["FAILED" for _ in ids]
-        data['list_of_failure_reason'] = failures_reasons
+        reasons = [r.replace(',','.') for r in failures_reasons]  # commas would confuse REST
+        data['list_of_failure_reason'] = reasons
         data['list_of_retry_value'] = [0 for _ in ids]
 
         crabserver.post('filetransfers', data=encodeRequest(data))
