@@ -191,6 +191,9 @@ STAGEOUT_ERRORS = {60317: [{"regex": ".*Cancelled ASO transfer after timeout.*",
                            {"regex": ".*HTTP 507.*",
                             "error-msg": "HTTP 507: Disk quota exceeded or Disk full.",
                             "isPermanent": True},
+                           {"regex": ".*status code 507.*",
+                            "error-msg": "HTTP 507: Disk quota exceeded or Disk full.",
+                            "isPermanent": True},
                           ]}
 
 
