@@ -400,7 +400,7 @@ class RESTTask(RESTEntity):
             publishrule = kwargs['publishrule']
         if 'multipubrule_name' not in kwargs or not kwargs['multipubrule_name']:
             multipubrule = {}
-        elif len(kwargs['multipubrule_name']) != (kwargs['multipubrule_id']):
+        elif len(kwargs['multipubrule_name']) != len(kwargs['multipubrule_id']):
             raise InvalidParameter("Length of list `multipubrule_name` and `multipubrule_id` is not equal")
         else:
             multipubrule = { kwargs['multipubrule_name']: kwargs['multipubrule_id'] for i in range(len(multipubrule_name)) }
