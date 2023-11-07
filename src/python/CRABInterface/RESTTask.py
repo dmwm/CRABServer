@@ -403,7 +403,7 @@ class RESTTask(RESTEntity):
         elif len(kwargs['multipubrule_name']) != len(kwargs['multipubrule_id']):
             raise InvalidParameter("Length of list `multipubrule_name` and `multipubrule_id` is not equal")
         else:
-            multipubrule = { kwargs['multipubrule_name']: kwargs['multipubrule_id'] for i in range(len(kwargs['multipubrule_name'])) }
+            multipubrule = { kwargs['multipubrule_name'][i]: kwargs['multipubrule_id'][i] for i in range(len(kwargs['multipubrule_name'])) }
         taskname = kwargs['workflow']
         ownerName = getUsernameFromTaskname(taskname)
         authz_operator(username=ownerName, group='crab3', role='operator')
