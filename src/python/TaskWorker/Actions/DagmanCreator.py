@@ -779,6 +779,7 @@ class DagmanCreator(TaskAction):
         # This config setting acts as a global black list
         global_blacklist = set(self.loadJSONFromFileInScratchDir('blacklistedSites.txt'))
         self.logger.debug("CRAB site blacklist: %s", list(global_blacklist))
+        globalBlacklistUrl = self.config.Sites.DashboardURL
 
         # Get accleratorsites from GetAcceleratorSite recurring action.
         acceleratorsites = set(self.loadJSONFromFileInScratchDir('acceleratorSites.json'))
@@ -946,7 +947,10 @@ class DagmanCreator(TaskAction):
         def getBlacklistMsg():
             tmp = ""
             if len(global_blacklist) != 0:
-                tmp += " Global CRAB3 blacklist is %s.\n" % global_blacklist
+                t12 = [s for s in global_blacklist if 'T1' in s or 'T2' in s]
+                t3 = [s for s in global_blacklist if 'T3' in s]
+                tmp += f"\nGlobal blacklist contain these T1/T2: {t12} and {len(t3)} T3's\n"
+                tmp += f" Full list at {globalBlacklistUrl}\n"
             if len(siteBlacklist) != 0:
                 tmp += " User blacklist is %s.\n" % siteBlacklist
             if len(siteWhitelist) != 0:
