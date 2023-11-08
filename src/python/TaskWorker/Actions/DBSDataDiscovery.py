@@ -14,7 +14,7 @@ from WMCore.Configuration import ConfigurationEx
 
 from RucioUtils import getNativeRucioClient
 
-from ServerUtilities import FEEDBACKMAIL, MAX_LUMIS_IN_BLOCK, parseDBSInstance, isDatasetUserDataset
+from ServerUtilities import MAX_LUMIS_IN_BLOCK, parseDBSInstance, isDatasetUserDataset
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 from TaskWorker.Actions.RucioActions import RucioAction
@@ -309,6 +309,7 @@ class DBSDataDiscovery(DataDiscovery):
                     tapeLocations.add(rse)
         # then filter out TAPE locations
         self.keepOnlyDiskRSEs(locationsMap)
+        self.keepOnlyDiskRSEs(partialLocationsMap)
 
         notAllOnDisk = set(locationsMap.keys()) != set(blocksWithLocation)
         requestTapeRecall = notAllOnDisk and not usePartialDataset
@@ -397,11 +398,14 @@ class DBSDataDiscovery(DataDiscovery):
         # a configuration mistake and retry, i.e. they really want these data, so let's lock anyhow
 
         #  only lock data in CMS scope and only if user did no say "I'll take whatever is on disk"
-        if not isUserDataset and not usePartialDataset:
-            if not inputBlocks:
-                dataToLock = inputDataset
-            else:
+        if not isUserDataset:
+            if inputBlocks:
                 dataToLock = inputBlocks
+            else:
+                if not usePartialDataset:
+                    dataToLock = inputDataset
+                else:
+                    dataToLock = list[locationsMap]  # this is a list of blocks
             try:
                 locker = RucioAction(config=self.config, crabserver=self.crabserver,
                                      rucioAcccount='crab_input',
@@ -485,12 +489,13 @@ class DBSDataDiscovery(DataDiscovery):
                 msg = "Some blocks are on TAPE only and will not be processed."
                 msg += f"\n'The 'Data.inputBlocks' size is larger than allowed size ({totalSizeBytes/1e12:.3f}TB/{maxTierToBlockRecallSizeTB}TB)"\
                         "to issue automatically recall from TAPE."
-                msg += f"\nIf you need these blocks, contact Data Transfer team via https://its.cern.ch/jira/browse/CMSTRANSF"
+                msg += "\nIf you need these blocks, contact Data Transfer team via https://its.cern.ch/jira/browse/CMSTRANSF"
                 raise TaskWorkerException(msg)
         else:
             msg = "Some blocks are on TAPE only and will not be processed."
-            msg += f"\nThis dataset is too large for automatic recall from TAPE. If you can do with only a piece, use Data.inputBlocks configuration."
-            msg += f"\nIf you need the full dataset, contact Data Transfer team via https://its.cern.ch/jira/browse/CMSTRANSF"
+            msg += "\nThis dataset is too large for automatic recall from TAPE."
+            msg += "\nIf you can do with only a piece, use Data.inputBlocks configuration."
+            msg += "\nIf you need the full dataset, contact Data Transfer team via https://its.cern.ch/jira/browse/CMSTRANSF"
             raise TaskWorkerException(msg)
         return msg
 
