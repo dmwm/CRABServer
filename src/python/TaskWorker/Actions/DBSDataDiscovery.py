@@ -405,7 +405,7 @@ class DBSDataDiscovery(DataDiscovery):
                 if not usePartialDataset:
                     dataToLock = inputDataset
                 else:
-                    dataToLock = list[locationsMap]  # this is a list of blocks
+                    dataToLock = list(locationsMap)  # this is a list of blocks
             try:
                 locker = RucioAction(config=self.config, crabserver=self.crabserver,
                                      rucioAcccount='crab_input',
