@@ -76,7 +76,9 @@ class DataDiscovery(TaskAction):  # pylint: disable=abstract-method
                 wmfiles.append(wmfile)
 
         if blocksWithNoLocations:
-            msg = "%d blocks will be skipped because are not completely replicated on DISK: %s" % (len(blocksWithNoLocations), list(blocksWithNoLocations))
+            trimmedList = sorted(list(blocksWithNoLocations))[:3] + ['...']
+            msg = ("%d blocks will be skipped because are not completely replicated on DISK: %s" %
+                   (len(blocksWithNoLocations), trimmedList))
             self.logger.warning(msg)
             self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
 

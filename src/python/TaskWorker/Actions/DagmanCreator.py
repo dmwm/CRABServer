@@ -915,16 +915,18 @@ class DagmanCreator(TaskAction):
             if siteWhitelist:
                 available &= siteWhitelist
                 if not available:
-                    msg = 'block(s) %s present at %s will be skipped because those sites are not in user white list'
-                    msg = msg % (jgblocks, list(availablesites))
+                    msg = '%s block(s) %s present at %s will be skipped because those sites are not in user white list'
+                    trimmedList = sorted(list(jgblocks))[:3] + ['...']
+                    msg = msg % (len(list(jgblocks)), trimmedList, list(availablesites))
                     self.logger.warning(msg)
                     self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
                     blocksWithBannedLocations = blocksWithBannedLocations.union(jgblocks)
                     continue
             available -= (siteBlacklist - siteWhitelist)
             if not available:
-                msg = 'block(s) %s present at %s will be skipped because those sites are in user black list'
-                msg = msg % (jgblocks, list(availablesites))
+                msg = '%s block(s) %s present at %s will be skipped because those sites are in user black list'
+                trimmedList = sorted(list(jgblocks))[:3] + ['...']
+                msg = msg % (len(list(jgblocks)), trimmedList, list(availablesites))
                 self.logger.warning(msg)
                 self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
                 blocksWithBannedLocations = blocksWithBannedLocations.union(jgblocks)
@@ -964,17 +966,18 @@ class DagmanCreator(TaskAction):
                 msg += "No locations found for dataset '%s'. " % (kwargs['task']['tm_input_dataset'])
                 msg += "(or at least for the part of the dataset that passed the lumi-mask and/or run-range selection).\n"
             if blocksWithBannedLocations:
-                msg += " Found %s (out of %s) blocks present only at blacklisted sites." %\
+                msg += " Found %s (out of %s) blocks present only at blacklisted not-whitelisted, and/or non-accelerator sites." %\
                        (len(blocksWithBannedLocations), len(allblocks))
                 msg += getBlacklistMsg()
             raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
         msg = "Some blocks from dataset '%s' were skipped " % (kwargs['task']['tm_input_dataset'])
         if blocksWithNoLocations:
-            msgBlocklist = sorted(list(blocksWithNoLocations)[:10]) + ['...']
-            msg += " because they have no locations.\n List is (first 10 elements only): %s.\n" % msgBlocklist
+            msgBlocklist = sorted(list(blocksWithNoLocations)[:5]) + ['...']
+            msg += " because they have no locations.\n List is (first 5 elements only): %s.\n" % msgBlocklist
         if blocksWithBannedLocations:
             msg += " because they are only present at blacklisted, not-whitelisted, and/or non-accelerator sites.\n"
-            msg += " List is: %s.\n" % (sorted(list(blocksWithBannedLocations)))
+            msgBlocklist = sorted(list(blocksWithBannedLocations)[:5]) + ['...']
+            msg += " List is (first 5 elements only): %s.\n" % (msgBlocklist)
             msg += getBlacklistMsg()
         if blocksWithNoLocations or blocksWithBannedLocations:
             msg += " Dataset processing will be incomplete because %s (out of %s) blocks" %\
