@@ -964,10 +964,13 @@ class DagmanCreator(TaskAction):
             if blocksWithNoLocations or blocksWithBannedLocations:
                 msg = "The CRAB server backend refuses to send jobs to the Grid scheduler. "
                 msg += "No locations found for dataset '%s'. " % (kwargs['task']['tm_input_dataset'])
-                msg += "(or at least for the part of the dataset that passed the lumi-mask and/or run-range selection).\n"
+                msg += "(or at least for what passed the lumi-mask and/or run-range selection).\n"
+                msg += "Use `crab checkdataset` command to find block locations\n"
+                msg += "and compare with your black/white list\n"
             if blocksWithBannedLocations:
-                msg += " Found %s (out of %s) blocks present only at blacklisted not-whitelisted, and/or non-accelerator sites." %\
-                       (len(blocksWithBannedLocations), len(allblocks))
+                msg += (" Found %s (out of %s) blocks present only at blacklisted\n" %\
+                       (len(blocksWithBannedLocations), len(allblocks)))
+                msg += "not-whitelisted, and/or non-accelerator sites."
                 msg += getBlacklistMsg()
             raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
         msg = "Some blocks from dataset '%s' were skipped " % (kwargs['task']['tm_input_dataset'])
