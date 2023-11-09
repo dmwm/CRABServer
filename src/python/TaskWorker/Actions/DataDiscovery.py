@@ -76,7 +76,9 @@ class DataDiscovery(TaskAction):  # pylint: disable=abstract-method
                 wmfiles.append(wmfile)
 
         if blocksWithNoLocations:
-            msg = "%d blocks will be skipped because are not completely replicated on DISK: %s" % (len(blocksWithNoLocations), list(blocksWithNoLocations))
+            trimmedList = sorted(list(blocksWithNoLocations))[:3] + ['...']
+            msg = ("%d blocks will be skipped because are not completely replicated on DISK: %s" %
+                   (len(blocksWithNoLocations), trimmedList))
             self.logger.warning(msg)
             self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
 
@@ -91,9 +93,9 @@ class DataDiscovery(TaskAction):  # pylint: disable=abstract-method
         datasetLumis = datasetLumiList.getCompactList()
         datasetDuplicateLumis = datasetLumiList.getDuplicates().getCompactList()
         self.logger.debug("Finished to create compact lumilists for input dataset")
-        with open(os.path.join(tempDir, "input_dataset_lumis.json"), "w") as fd:
+        with open(os.path.join(tempDir, "input_dataset_lumis.json"), "w", encoding='utf-8') as fd:
             json.dump(datasetLumis, fd)
-        with open(os.path.join(tempDir, "input_dataset_duplicate_lumis.json"), "w") as fd:
+        with open(os.path.join(tempDir, "input_dataset_duplicate_lumis.json"), "w", encoding='utf-8') as fd:
             json.dump(datasetDuplicateLumis, fd)
 
         return Result(task=task, result=Fileset(name='FilesToSplit', files=set(wmfiles)))

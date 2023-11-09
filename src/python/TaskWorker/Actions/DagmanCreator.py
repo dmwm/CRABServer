@@ -779,6 +779,7 @@ class DagmanCreator(TaskAction):
         # This config setting acts as a global black list
         global_blacklist = set(self.loadJSONFromFileInScratchDir('blacklistedSites.txt'))
         self.logger.debug("CRAB site blacklist: %s", list(global_blacklist))
+        globalBlacklistUrl = self.config.Sites.DashboardURL
 
         # Get accleratorsites from GetAcceleratorSite recurring action.
         acceleratorsites = set(self.loadJSONFromFileInScratchDir('acceleratorSites.json'))
@@ -914,16 +915,18 @@ class DagmanCreator(TaskAction):
             if siteWhitelist:
                 available &= siteWhitelist
                 if not available:
-                    msg = 'block(s) %s present at %s will be skipped because those sites are not in user white list'
-                    msg = msg % (jgblocks, list(availablesites))
+                    msg = '%s block(s) %s present at %s will be skipped because those sites are not in user white list'
+                    trimmedList = sorted(list(jgblocks))[:3] + ['...']
+                    msg = msg % (len(list(jgblocks)), trimmedList, list(availablesites))
                     self.logger.warning(msg)
                     self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
                     blocksWithBannedLocations = blocksWithBannedLocations.union(jgblocks)
                     continue
             available -= (siteBlacklist - siteWhitelist)
             if not available:
-                msg = 'block(s) %s present at %s will be skipped because those sites are in user black list'
-                msg = msg % (jgblocks, list(availablesites))
+                msg = '%s block(s) %s present at %s will be skipped because those sites are in user black list'
+                trimmedList = sorted(list(jgblocks))[:3] + ['...']
+                msg = msg % (len(list(jgblocks)), trimmedList, list(availablesites))
                 self.logger.warning(msg)
                 self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
                 blocksWithBannedLocations = blocksWithBannedLocations.union(jgblocks)
@@ -946,7 +949,10 @@ class DagmanCreator(TaskAction):
         def getBlacklistMsg():
             tmp = ""
             if len(global_blacklist) != 0:
-                tmp += " Global CRAB3 blacklist is %s.\n" % global_blacklist
+                t12 = [s for s in global_blacklist if 'T1' in s or 'T2' in s]
+                t3 = [s for s in global_blacklist if 'T3' in s]
+                tmp += f"\nGlobal blacklist contain these T1/T2: {t12} and {len(t3)} T3's\n"
+                tmp += f" Full list at {globalBlacklistUrl}\n"
             if len(siteBlacklist) != 0:
                 tmp += " User blacklist is %s.\n" % siteBlacklist
             if len(siteWhitelist) != 0:
@@ -958,19 +964,23 @@ class DagmanCreator(TaskAction):
             if blocksWithNoLocations or blocksWithBannedLocations:
                 msg = "The CRAB server backend refuses to send jobs to the Grid scheduler. "
                 msg += "No locations found for dataset '%s'. " % (kwargs['task']['tm_input_dataset'])
-                msg += "(or at least for the part of the dataset that passed the lumi-mask and/or run-range selection).\n"
+                msg += "(or at least for what passed the lumi-mask and/or run-range selection).\n"
+                msg += "Use `crab checkdataset` command to find block locations\n"
+                msg += "and compare with your black/white list\n"
             if blocksWithBannedLocations:
-                msg += " Found %s (out of %s) blocks present only at blacklisted sites." %\
-                       (len(blocksWithBannedLocations), len(allblocks))
+                msg += (" Found %s (out of %s) blocks present only at blacklisted\n" %\
+                       (len(blocksWithBannedLocations), len(allblocks)))
+                msg += "not-whitelisted, and/or non-accelerator sites."
                 msg += getBlacklistMsg()
             raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
         msg = "Some blocks from dataset '%s' were skipped " % (kwargs['task']['tm_input_dataset'])
         if blocksWithNoLocations:
-            msgBlocklist = sorted(list(blocksWithNoLocations)[:10]) + ['...']
-            msg += " because they have no locations.\n List is (first 10 elements only): %s.\n" % msgBlocklist
+            msgBlocklist = sorted(list(blocksWithNoLocations)[:5]) + ['...']
+            msg += " because they have no locations.\n List is (first 5 elements only): %s.\n" % msgBlocklist
         if blocksWithBannedLocations:
             msg += " because they are only present at blacklisted, not-whitelisted, and/or non-accelerator sites.\n"
-            msg += " List is: %s.\n" % (sorted(list(blocksWithBannedLocations)))
+            msgBlocklist = sorted(list(blocksWithBannedLocations)[:5]) + ['...']
+            msg += " List is (first 5 elements only): %s.\n" % (msgBlocklist)
             msg += getBlacklistMsg()
         if blocksWithNoLocations or blocksWithBannedLocations:
             msg += " Dataset processing will be incomplete because %s (out of %s) blocks" %\
@@ -1132,7 +1142,7 @@ class DagmanCreator(TaskAction):
             for _, _, filenames in os.walk('debug'):
                 for f in filenames:
                     os.chmod('debug/' + f, 0o644)
-        except Exception as ex:
+        except Exception as ex:  # pylint: disable=broad-except
             self.logger.exception(ex)
             self.uploadWarning("Extracting files from %s failed, ops monitor will not work." % tarFileName, \
                     kw['task']['user_proxy'], kw['task']['tm_taskname'])
@@ -1149,7 +1159,7 @@ class DagmanCreator(TaskAction):
         try:
             for egroup in egroups:
                 highPrioUsers.update(get_egroup_users(egroup))
-        except Exception as ex:
+        except Exception as ex:  # pylint: disable=broad-except
             msg = "Error when getting the high priority users list." \
                   " Will ignore the high priority list and continue normally." \
                   " Error reason: %s" % str(ex)
@@ -1199,7 +1209,7 @@ class DagmanCreator(TaskAction):
             try:
                 downloadFromS3(crabserver=self.crabserver, objecttype='sandbox', username=username,
                                tarballname=dbgFilesName, filepath=debugTarBall, logger=self.logger)
-            except Exception as ex:
+            except Exception as ex:   # pylint: disable=broad-except
                 self.logger.exception(ex)
 
         # Bootstrap the runtime if it is available.
