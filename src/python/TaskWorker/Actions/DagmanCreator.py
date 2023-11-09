@@ -1142,7 +1142,7 @@ class DagmanCreator(TaskAction):
             for _, _, filenames in os.walk('debug'):
                 for f in filenames:
                     os.chmod('debug/' + f, 0o644)
-        except Exception as ex:
+        except Exception as ex:  # pylint: disable=broad-except
             self.logger.exception(ex)
             self.uploadWarning("Extracting files from %s failed, ops monitor will not work." % tarFileName, \
                     kw['task']['user_proxy'], kw['task']['tm_taskname'])
@@ -1159,7 +1159,7 @@ class DagmanCreator(TaskAction):
         try:
             for egroup in egroups:
                 highPrioUsers.update(get_egroup_users(egroup))
-        except Exception as ex:
+        except Exception as ex:  # pylint: disable=broad-except
             msg = "Error when getting the high priority users list." \
                   " Will ignore the high priority list and continue normally." \
                   " Error reason: %s" % str(ex)
@@ -1209,7 +1209,7 @@ class DagmanCreator(TaskAction):
             try:
                 downloadFromS3(crabserver=self.crabserver, objecttype='sandbox', username=username,
                                tarballname=dbgFilesName, filepath=debugTarBall, logger=self.logger)
-            except Exception as ex:
+            except Exception as ex:   # pylint: disable=broad-except
                 self.logger.exception(ex)
 
         # Bootstrap the runtime if it is available.
