@@ -19,7 +19,6 @@ class StageoutCheck(TaskAction):
     def __init__(self, config, crabserver, procnum=-1, rucioClient=None):
         TaskAction.__init__(self, config, crabserver, procnum)
         self.rucioClient = rucioClient
-        self.privilegedRucioClient = None
         self.task = None
         self.proxy = None
         self.workflow = None
