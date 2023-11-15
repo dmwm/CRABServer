@@ -29,7 +29,7 @@ def main():
     """" description is at line 1 """
     # location of files prepared by RetryJobs
     topDir = '/eos/cms/store/temp/user'
-    topDir = '..'  # `for testing locally
+    #topDir = '..'  # `for testing locally
     topDir = f"{topDir}/BadInputFiles"
 
     totals = []
