@@ -45,8 +45,8 @@ def main():
             accumulate(totals, result)
             doneFiles.append(filePath)
 
-        ##for file in doneFiles:
-        ##    shutil.move(file, doneFilesDir)
+        for file in doneFiles:
+            shutil.move(file, doneFilesDir)
 
     # now that we have the totals for this run of the script, update the
     # daily tally
