@@ -206,15 +206,14 @@ class PreDAG(object):
         config.TaskWorker.cmskey = os.environ.get('X509_USER_PROXY')
         config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=config.TaskWorker.cmscert,
                                                     X509_USER_KEY=config.TaskWorker.cmskey)
-        # also for talking with rucio
-        config.TaskWorker.Rucio_cert = os.environ.get('X509_USER_PROXY')
-        config.TaskWorker.Rucio_key = os.environ.get('X509_USER_PROXY')
-
 
         # need to get username from classAd to setup for Rucio access
+        # and use user cert to talking with rucio
         task_ad = classad.parseOne(open(os.environ['_CONDOR_JOB_AD']))
         username = task_ad['CRAB_UserHN']
         config.Services.Rucio_account = username
+        config.Services.Rucio_cert = os.environ.get('X509_USER_PROXY')
+        config.Services.Rucio_key = os.environ.get('X509_USER_PROXY')
 
         # need the global black list
         config.TaskWorker.scratchDir = './scratchdir'
