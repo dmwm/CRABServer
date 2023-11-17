@@ -65,12 +65,12 @@ def main():
                 print(rse)
             replicaDict['sizeOK'] = checkReplicaSize(pfn[0], referenceSize, debug)
             replicaDict['OK'] = replicaDict['sizeOK']
-            if replicaDict['OK'] == 'FileNotFound':
+            if replicaDict['OK'] in ['FileNotFound', 'NA'] :
                 globalList.append(replicaDict)
                 continue
             if replicaDict['sizeOK']:
                 replicaDict['adlerOK'] = checkReplicaAdler32(pfn[0], referenceAdler2, debug)
-                if replicaDict == 'NA':
+                if replicaDict['adlerOK'] == 'NA':
                     replicaDict['OK'] = replicaDict['sizeOK']
                 else:
                     replicaDict['OK'] &= replicaDict['adlerOK']
@@ -80,15 +80,15 @@ def main():
 
     myf=pd.DataFrame(globalList)
     table=myf[['kind','fileId','onTape', '#disk',  'site', 'sizeOK', 'adlerOK', 'OK', 'markBAD', 'did']].to_html()
-    writeOutHtmlTable(table)
+    writeOutHtmlTable(table, filelist)
 
 
-def writeOutHtmlTable(table):
+def writeOutHtmlTable(table, fileName):
 
     beginningOfDoc = '<!DOCTYPE html>\n<html>\n'
     header = htmlHeader()
     now = time.strftime("%Y-%m-%d %H:%M:%S %Z")
-    title = f"\n<center><b>Status of Files in Input list and Action to take- (at {now}</b></center><hr>\n"
+    title = f"\n<center><b>Status of Files in {fileName} and Action to take - {now}</b></center><hr>\n"
     endOfDoc = '\n</html>'
     with open('FileStatusAndAction.html', 'w', encoding='utf-8') as fh:
         fh.write(beginningOfDoc)
@@ -108,10 +108,16 @@ def prepareEmptyDict():
 
 def checkReplicaSize(pfn, referenceSize, debug):
     cmd = f"gfal-ls -l {pfn}"
-    out=subprocess.getoutput(cmd)
-    if 'File not found' in out:
-        return 'FileNotFound'
-    replicaSize = int(out.split()[4])
+    out, err, ec = executeCommand(cmd)
+    if ec:
+        if 'File not found' in err or 'No such file' in err:
+            return 'FileNotFound'
+        if 'HTTP 500' in err:
+            return 'NA'
+    try:
+        replicaSize = int(out.split()[4])
+    except Exception:
+        return 'NA'
     check = replicaSize == referenceSize
     return check
 
