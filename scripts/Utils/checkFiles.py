@@ -80,15 +80,15 @@ def main():
 
     myf=pd.DataFrame(globalList)
     table=myf[['kind','fileId','onTape', '#disk',  'site', 'sizeOK', 'adlerOK', 'OK', 'markBAD', 'did']].to_html()
-    writeOutHtmlTable(table)
+    writeOutHtmlTable(table, filelist)
 
 
-def writeOutHtmlTable(table):
+def writeOutHtmlTable(table, fileName):
 
     beginningOfDoc = '<!DOCTYPE html>\n<html>\n'
     header = htmlHeader()
     now = time.strftime("%Y-%m-%d %H:%M:%S %Z")
-    title = f"\n<center><b>Status of Files in Input list and Action to take- (at {now}</b></center><hr>\n"
+    title = f"\n<center><b>Status of Files in {fileName} and Action to take - {now}</b></center><hr>\n"
     endOfDoc = '\n</html>'
     with open('FileStatusAndAction.html', 'w', encoding='utf-8') as fh:
         fh.write(beginningOfDoc)
