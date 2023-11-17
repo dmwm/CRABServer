@@ -64,17 +64,17 @@ def main():
 
     # write out "clearly bad files" Lists
     # limit to at least 2 errors (avoid cases where a single retry solved)
-    truncated = truncated[int(truncated['errors']) > 2]
+    topTrunc= truncated[truncated['errors'] > 2]
     with open('TruncatedFiles.list', 'w', encoding='utf-8') as fh:
-        fh.write(truncated['DID'].to_csv(header=False, index=False))
-    notRoot = notRoot[int(notRoot['errors']) > 2]
+        fh.write(topTrunc['DID'].to_csv(header=False, index=False))
+    topNotRoot = notRoot[notRoot['errors'] > 2]
     with open('NotRootFiles.list', 'w', encoding='utf-8') as fh:
-        fh.write(notRoot['DID'].to_csv(header=False, index=False))
+        fh.write(topNotRoot['DID'].to_csv(header=False, index=False))
 
     # also suspicious files list, but limit to at least 3 errors (avoid cases where
     # CRAB 3 automatic retries solved)
-    suspicious = unknown[int(unknown['errors']) > 3]
-    with open('suspicious.list', 'w', encoding='utf-8') as fh:
+    suspicious = unknown[unknown['errors'] > 3]
+    with open('SuspiciousFiles.list', 'w', encoding='utf-8') as fh:
         fh.write(suspicious['DID'].to_csv(header=False, index=False))
 
 
