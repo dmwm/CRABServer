@@ -60,7 +60,6 @@ def main():
             replicaDict = prepareEmptyDict()
             replicaDict['kind'] = 'Rep'
             replicaDict['fileId'] = fileId
-            fileDict['#disk'] +=1
             replicaDict['site'] = rse
             if debug:
                 print(rse)
