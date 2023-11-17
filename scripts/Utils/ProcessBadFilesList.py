@@ -23,7 +23,7 @@ ERROR_KINDS = [
     'truncated',
     ]
 
-DAYS = 2  # count errors over last DAYS for the final summary
+DAYS = 3  # count errors over last DAYS for the final summary
 
 def main():
     """" description is at line 1 """
@@ -63,10 +63,20 @@ def main():
     writeOutHtmlTable(df)
 
     # write out "clearly bad files" Lists
+    # limit to at least 2 errors (avoid cases where a single retry solved)
+    truncated = truncated[int(truncated['erros']) > 2]
     with open('TruncatedFiles.list', 'w', encoding='utf-8') as fh:
         fh.write(truncated['DID'].to_csv(header=False, index=False))
+    notRoot = notRoot[int(notRoot['erros']) > 2]
     with open('NotRootFiles.list', 'w', encoding='utf-8') as fh:
         fh.write(notRoot['DID'].to_csv(header=False, index=False))
+
+    # also suspicious files list, but limit to at least 3 errors (avoid cases where
+    # CRAB 3 automatic retries solved)
+    suspicious = unknown[int(unknown['erros']) > 3]
+    with open('suspicious.list', 'w', encoding='utf-8') as fh:
+        fh.write(suspicious['DID'].to_csv(header=False, index=False))
+
 
 
 def selectDataFrameByErrorKind(df, errorKind):
