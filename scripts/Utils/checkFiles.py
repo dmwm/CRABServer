@@ -43,7 +43,10 @@ def main():
         fileDict['name'] = name
         fileDict['onTape'] = False
         fileDict['#disk'] = 0
-        replicaGen = rucio.list_replicas([{'scope':scope, 'name':name}])
+        try:
+            replicaGen = rucio.list_replicas([{'scope':scope, 'name':name}])
+        except Exception:  # sometimes there's a bad DID
+            continue
         replica = next(replicaGen)  # since we passed a lit of one DID as arg, there's only on replica object
         referenceSize = replica['bytes']
         referenceAdler2 = replica['adler32']

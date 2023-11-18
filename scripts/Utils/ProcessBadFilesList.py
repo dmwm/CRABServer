@@ -126,8 +126,11 @@ def parse(file=None):
         return result
     if info['DID'] == "cms:NotAvailable":
         return result
-    result['errorKind'] = ''
-    result['DID'] = info['DID']
+    # make sure thre's nothing after .root since sometimes we get LFN's of the form
+    # cms:/store/data/.../AB8F5CB8-2B5B-1945-967F-89EDEC3346AD.root?source=glow
+    did = info['DID']
+    did = did.split('.root')[0] + '.root'
+    result['DID'] = did
     result['RSE'] = info['RSE']
     result['errorKind'] = 'unknown'
     errorLine = info['message'][1]
