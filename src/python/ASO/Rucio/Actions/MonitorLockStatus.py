@@ -117,12 +117,13 @@ class MonitorLockStatus:
         Register replicas to it own publish container.
 
         In example, we have
-        - output dataset name `/GenericTTbar/cmsbot-integration-1/USER`
         - 2 output files:
-          - `output.root` (EDM)
+          - `output.root`
+            - outputdataset: `/GenericTTbar/cmsbot-int1/USER`
           - `myfile.txt` (Misc)
-        All `output_{job_id}.root` will registering to `/GenericTTbar/cmsbot-integration-1__output.root/USER`.
-        All `myfile_{job_id}.txt` will registering to `/GenericTTbar/cmsbot-integration-1__myfile.txt/USER`.
+            - outputdataset: `/FakeDataset/fake_myfile.txt/USER`
+        All `output_{job_id}.root` will registering to `/GenericTTbar/cmsbot-int1/USER`
+        All `myfile_{job_id}.txt` will registering to `/FakeDataset/fake_myfile.txt/USER`
 
         :param fileDocs: replicas info return from `checkLockStatus` method.
         :type fileDocs: list of dict (fileDoc)
@@ -144,12 +145,18 @@ class MonitorLockStatus:
         for filename, fileDocsInGroup in groupFileDocs.items():
             container = ''
             for c in self.transfer.multiPubContainers:
-                tmp = c.split('/')[2].rsplit('__', 1)[1]
+                _, primaryDataset, processedDataset, _ = c.split('/')
+                # edm
+                if not primaryDataset == 'FakeDataset':
+                    container = c
+                    break
+                # /FakeDataset
+                tmp = processedDataset.rsplit('_', 1)[1]
                 if tmp == filename:
                     container = c
                     break
             if not container:
-                raise RucioTransferException(f'Cannot find container for file: {filename} . There is a bug in the code.')
+                raise RucioTransferException(f'Cannot find container for file: {filename}. Likely a bug in the code.')
             # Now fileDoc dict is consist for the rest of Rucio ASO code.
             # We can return value from `addReplicasToContainer()` method.
             publishContainerFileDocs += r.addReplicasToContainer(fileDocsInGroup, container)

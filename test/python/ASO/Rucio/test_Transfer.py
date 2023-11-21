@@ -273,16 +273,16 @@ def test_buildReplica2IDMap():
     assert 0 == 1
 
 
-def test_buildMultiPubContainers(transferDicts):
+def test_buildMultiPubContainerNames(transferDicts):
     t = Transfer()
     t.transferItems = transferDicts
     t.publishContainer = '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d/USER'
-    t.buildMultiPubContainers()
-    assert t.multiPubContainers == [
-        '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__cmsRun.log.tar.gz/USER',
-        '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__miniaodfake.root/USER',
-        '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__output.root/USER',
-    ]
+    t.populateMultiPubContainers()
+    assert sorted(t.multiPubContainers) == sorted([
+        '/FakeDataset/fakefile-FakePublish-befe3559057072761674520fdaee5005_cmsRun.log.tar.gz/USER',
+        '/FakeDataset/fakefile-FakePublish-befe3559057072761674520fdaee5005_miniaodfake.root/USER',
+        '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d/USER',
+    ])
 
 def test_updateContainerRuleID(containerRuleIDJSONContent, fs):
     path = '/path/to/container_ruleid.json'
@@ -296,9 +296,9 @@ def test_updateContainerRuleID(containerRuleIDJSONContent, fs):
             t.containerRuleID = 'c88abb899f744efb8f33fd197ee77ecd'
             t.publishRuleID = '141a41b6b54f45f59dc0703182f1257f'
             t.multiPubRuleIDs = {
-                '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__cmsRun.log.tar.gz/USER': '9653f39f686944128028fd25888ae2d3',
-                '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__output.root/USER': 'e609d75e4a7a4fa3a880ea0bb6681371',
-                '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__miniaodfake.root/USER': '6b159d7e5dc940daa2188658a68c4b23',
+                '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d_cmsRun.log.tar.gz/USER': '9653f39f686944128028fd25888ae2d3',
+                '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d_output.root/USER': 'e609d75e4a7a4fa3a880ea0bb6681371',
+                '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d_miniaodfake.root/USER': '6b159d7e5dc940daa2188658a68c4b23',
             }
             t.updateContainerRuleID()
             mock_writePath.assert_called_once_with(path)
@@ -316,7 +316,7 @@ def test_readContainerRuleID(containerRuleIDJSONContent, fs):
         assert t.containerRuleID == 'c88abb899f744efb8f33fd197ee77ecd'
         assert t.publishRuleID == '141a41b6b54f45f59dc0703182f1257f'
         assert t.multiPubRuleIDs == {
-            '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__cmsRun.log.tar.gz/USER': '9653f39f686944128028fd25888ae2d3',
-            '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__output.root/USER': 'e609d75e4a7a4fa3a880ea0bb6681371',
-            '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__miniaodfake.root/USER': '6b159d7e5dc940daa2188658a68c4b23',
+            '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d_cmsRun.log.tar.gz/USER': '9653f39f686944128028fd25888ae2d3',
+            '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d_output.root/USER': 'e609d75e4a7a4fa3a880ea0bb6681371',
+            '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d_miniaodfake.root/USER': '6b159d7e5dc940daa2188658a68c4b23',
         }

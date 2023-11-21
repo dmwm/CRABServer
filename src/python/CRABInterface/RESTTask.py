@@ -387,12 +387,12 @@ class RESTTask(RESTEntity):
         if 'transferrule' not in kwargs or not kwargs['transferrule']:
             raise InvalidParameter("Transfer container's rule id not found in the input parameters")
         # For backward compatiblity, either `publishrule` or `multipubrulejson`
-        # is enough, and set default value to variable that not supply by
+        # is enough, also set default value for variables not supplied by
         # client.
         if (('publishrule' not in kwargs or not kwargs['publishrule'])
            and ('multipubrulejson' not in kwargs or not kwargs['multipubrulejson'])):
-            raise InvalidParameter("`publishrule` or `multipubrulejson` are not found in the input parameters.")
-        # set default value if `publishrule` or `multipubrule` does not exists.
+            raise InvalidParameter("Neither `publishrule` nor `multipubrulejson` are found in the input parameters.")
+        # set default value if neither `publishrule` nor `multipubrule` exists
         if 'publishrule' not in kwargs or not kwargs['publishrule']:
             publishrule = '00000000000000000000000000000000'
         else:

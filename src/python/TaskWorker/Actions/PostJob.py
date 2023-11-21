@@ -614,7 +614,7 @@ class ASOServerJob(object):
         # Loop #3. compute the output dataset name for each file and add it to file_info
         for file_info in output_files:
             # use common function with PostJob to ensure uniform dataset name
-            if file_info['filetype'] in ['EDM', 'DQM']:
+            if file_info['filetype'] in ['EDM', 'DQM'] and task['tm_publication'] == 'T':
                 # group name overrides username when present:
                 username = self.job_ad['CRAB_UserHN']
                 if self.dest_dir.startswith('/store/group/') and self.dest_dir.split('/')[3]:
@@ -2749,7 +2749,7 @@ class PostJob():
         outdataset = None
         for file_info in self.output_files_info:
             # use common function with ASOServerJob to ensure uniform dataset name
-            if file_info['filetype'] in ['EDM', 'DQM']:
+            if file_info['filetype'] in ['EDM', 'DQM'] and task['tm_publication'] == 'T':
                 # group name overrides username when present:
                 username = self.job_ad['CRAB_UserHN']
                 if self.dest_dir.startswith('/store/group/') and self.dest_dir.split('/')[3]:

@@ -8,7 +8,7 @@ import hashlib
 
 import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
 from ASO.Rucio.exception import RucioTransferException
-from ASO.Rucio.utils import writePath, parseFileNameFromLFN, addSuffixToDatasetName
+from ASO.Rucio.utils import writePath, parseFileNameFromLFN, addSuffixToProcessedDataset
 
 class Transfer:
     """
@@ -66,7 +66,7 @@ class Transfer:
         self.buildLFN2transferItemMap()
         self.readRESTInfo()
         self.readInfoFromTransferItems()
-        self.buildMultiPubContainers()
+        self.buildMultiPubContainerNames()
         self.readContainerRuleID()
         self.readOKLocks()
         self.readBlockComplete()
@@ -115,6 +115,8 @@ class Transfer:
             with open(path, 'r', encoding='utf-8') as r:
                 for line in r:
                     doc = json.loads(line)
+                    if config.args.force_publishname:
+                        doc = manipulateOutputDataset(doc, config.args.force_publishname)
                     self.transferItems.append(doc)
         except FileNotFoundError as ex:
             raise RucioTransferException(f'{path} does not exist. Probably no completed jobs in the task yet.') from ex
@@ -124,6 +126,9 @@ class Transfer:
     def buildLFN2transferItemMap(self):
         """
         Create map from LFN to transferItem
+
+        Note that LFN2transferItemMap will only have transfersDict from last
+        retry of PostJob.
         """
         self.LFN2transferItemMap = {}
         for x in self.transferItems:
@@ -166,10 +171,7 @@ class Transfer:
             self.rucioScope = f'user.{self.rucioUsername}'
         self.taskname = info['taskname']
         self.destination = info['destination']
-        if config.args.force_publishname:
-            containerName = config.args.force_publishname
-        else:
-            containerName = info["outputdataset"]
+        containerName = info["outputdataset"]
         self.publishContainer = containerName
         tmp = containerName.split('/')
         taskNameHash = hashlib.md5(info['taskname'].encode()).hexdigest()[:8]
@@ -178,10 +180,14 @@ class Transfer:
         self.logger.info(f'Publish container: {self.publishContainer}, Transfer container: {self.transferContainer}')
         self.logsDataset = f'{self.transferContainer}#LOGS'
 
-    def buildMultiPubContainers(self):
+    def buildMultiPubContainerNames(self):
         """
-        Create the self.multiPubContainers attribute by reading all transfers
+        Create the `self.multiPubContainers` by reading all transfers
         dict from the same job id.
+
+        If it starts with '/FakeDatset', append filename to ProcessedName
+        section of DBS dataset name.
+        Otherwise, use it as is.
 
         Note that this method does not check the limit of the new container name
         length, but only relies on validation from REST.
@@ -191,8 +197,14 @@ class Transfer:
         for item in self.transferItems:
             if item['job_id'] != jobID:
                 break
-            filename = parseFileNameFromLFN(item['destination_lfn'])
-            containerName = addSuffixToDatasetName(self.publishContainer, f'__{filename}')
+            if item['outputdataset'].startswith('/FakeDataset'):
+                filename = parseFileNameFromLFN(item['destination_lfn'])
+                # Alter Rucio container name from `/FakeDataset/fakefile/USER`
+                # To `/FakeDataset/fakefile_<filename>/USER`
+                # E.g., `/FakeDataset/fakefile_myoutput.root/USER`
+                containerName = addSuffixToProcessedDataset(item['outputdataset'], f'_{filename}')
+            else:
+                containerName = item['outputdataset']
             multiPubContainers.append(containerName)
         self.multiPubContainers = multiPubContainers
 
@@ -214,7 +226,7 @@ class Transfer:
                 self.logger.info('Got container rule ID from bookkeeping:')
                 self.logger.info(f'  Transfer Container rule ID: {self.containerRuleID}')
                 self.logger.info(f'  Publish Container rule ID: {self.publishRuleID}')
-                self.logger.info(f'  Multiple Publish Container rule ID: {self.multiPubRuleIDs}')
+                self.logger.info(f'  Multiple Publish Container rule IDs: {self.multiPubRuleIDs}')
         except FileNotFoundError:
             self.logger.info(f'Bookkeeping rules "{path}" does not exist. Assume it is first time it run.')
 
@@ -318,3 +330,21 @@ class Transfer:
             for f in files:
                 replicasInContainer[f['name']] = ds['name']
         return replicasInContainer
+
+def manipulateOutputDataset(transfer, forcePubName):
+    """
+    This helper function is use only for run integration test.
+
+    It is protected by `if config.args.force_publishname` and never mean to run
+    in normal task submission.
+    """
+    # import here to prevent import error in prod code.
+    import copy
+    from ASO.Rucio.utils import addSuffixToProcessedDataset
+    newTransfer = copy.deepcopy(transfer)
+    newhash = hashlib.md5(forcePubName.encode()).hexdigest()[:8]
+    if transfer['outputdataset'].startswith('/FakeDataset'):
+        newTransfer['outputdataset'] = addSuffixToProcessedDataset(newTransfer['outputdataset'], f'.int{newhash}')
+    else:
+        newTransfer['outputdataset'] = forcePubName
+    return newTransfer

@@ -273,7 +273,6 @@ def test_updateRESTFileDocsBlockCompletionInfo(mock_updateToREST):
 
 @patch.object(RegisterReplicas, 'addReplicasToContainer')
 def test_registerToMutiPubContainers(mock_addReplicasToContainer):
-    mock_Transfer.publishContainer = '/GenericTTbar/integration-test-30_TRANSFER.befe3559/USER'
     outputAllOK = [
         {
             "id": "7652449e07afeaf00abe804e8507f4172e5b04f09a2c5e0d883a3193",
@@ -302,30 +301,30 @@ def test_registerToMutiPubContainers(mock_addReplicasToContainer):
         {
             "id": "7652449e07afeaf00abe804e8507f4172e5b04f09a2c5e0d883a3193",
             "name": "/store/user/rucio/tseethon/test-rucio/ruciotransfers-1697125324/GenericTTbar/ruciotransfers-1697125324/231012_154207/0000/log/cmsRun_3.log.tar.gz",
-            "dataset": "/GenericTTbar/integration-test-30_TRANSFER.befe3559/USER#a86fca3a-1e38-467d-a2ac-98a8ff4299bd",
+            "dataset": '/FakeDataset/fakefile-FakePublish-befe3559057072761674520fdaee5005_cmsRun.log.tar.gz/USER',
             "blockcomplete": 'NO',
             "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
         },
         {
             "id": "10ba0d321da1a9d7ecc17e2bf411932ec5268ae12d5be76b5928dc29",
             "name": "/store/user/rucio/tseethon/test-rucio/ruciotransfers-1697125324/GenericTTbar/ruciotransfers-1697125324/231012_154207/0000/miniaodfake_3.root",
-            "dataset": "/GenericTTbar/integration-test-30_TRANSFER.befe3559/USER#a86fca3a-1e38-467d-a2ac-98a8ff4299bd",
+            "dataset": '/FakeDataset/fakefile-FakePublish-befe3559057072761674520fdaee5005_miniaodfake.root/USER',
             "blockcomplete": 'NO',
             "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
         },
         {
             "id": "091bfc9fb03fe326b1ace7cac5b71e034ce4b44ed46be14ae88b472a",
             "name": "/store/user/rucio/tseethon/test-rucio/ruciotransfers-1697125324/GenericTTbar/ruciotransfers-1697125324/231012_154207/0000/output_3.root",
-            "dataset": "/GenericTTbar/integration-test-30_TRANSFER.befe3559/USER#a86fca3a-1e38-467d-a2ac-98a8ff4299bd",
+            "dataset": '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d',
             "blockcomplete": 'NO',
             "ruleid": "b43a554244c54dba954aa29cb2fdde0a",
         },
     ]
 
     multiPubContainers = [
-        '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__cmsRun.log.tar.gz/USER',
-        '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__miniaodfake.root/USER',
-        '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d__output.root/USER',
+        '/FakeDataset/fakefile-FakePublish-befe3559057072761674520fdaee5005_cmsRun.log.tar.gz/USER',
+        '/FakeDataset/fakefile-FakePublish-befe3559057072761674520fdaee5005_miniaodfake.root/USER',
+        '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d/USER',
     ]
 
     def side_effect(*args):
@@ -338,7 +337,6 @@ def test_registerToMutiPubContainers(mock_addReplicasToContainer):
     mock_addReplicasToContainer.side_effect = side_effect
     m = MonitorLockStatus(t, Mock(), Mock())
     ret = m.registerToMutiPubContainers(outputAllOK)
-
 
     # check args pass to addReplicasToContainer()
     allcall = []
