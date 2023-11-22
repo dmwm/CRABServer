@@ -474,4 +474,6 @@ END;
 execute DELETE_PARTITION_MAIN;
 /*execute DELETE_PARTITION_FILEMETADATA;*/
 
+-- SELECT sum(bytes) AS db_size
+-- FROM dba_segments WHERE owner LIKE 'CMSWEB_CRAB_%'
 
