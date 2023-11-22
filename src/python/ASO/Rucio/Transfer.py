@@ -8,7 +8,7 @@ import hashlib
 
 import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
 from ASO.Rucio.exception import RucioTransferException
-from ASO.Rucio.utils import writePath, parseFileNameFromLFN
+from ASO.Rucio.utils import writePath, parseFileNameFromLFN, addSuffixToProcessedDataset
 
 
 class Transfer:
@@ -341,7 +341,6 @@ def manipulateOutputDataset(transfer, forcePubName):
     """
     # import here to prevent import error in prod code.
     import copy # pylint: disable=import-outside-toplevel
-    from ASO.Rucio.utils import addSuffixToProcessedDataset # pylint: disable=import-outside-toplevel
     newTransfer = copy.deepcopy(transfer)
     newhash = hashlib.md5(forcePubName.encode()).hexdigest()[:8]
     if transfer['outputdataset'].startswith('/FakeDataset'):
