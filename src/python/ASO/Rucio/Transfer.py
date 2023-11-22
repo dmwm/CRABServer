@@ -183,7 +183,7 @@ class Transfer:
     def buildMultiPubContainerNames(self):
         """
         Create the `self.multiPubContainers` by reading all transfers
-        dict from the same job id.
+        dict from the first job id available in transfer dicts.
 
         If it starts with '/FakeDatset', append filename to ProcessedName
         section of DBS dataset name.
