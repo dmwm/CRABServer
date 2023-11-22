@@ -180,7 +180,7 @@ class RegisterReplicas:
                     # Note that at this point, it still possible for job to
                     # retry because file is not register in replica yet.
                     self.logger.exception(ex)
-                    self.logger.warning(f'Exception is raised at add_replicas(rse, rs)')
+                    self.logger.warning('Exception is raised at add_replicas(rse, rs)')
                     self.logger.debug(f'rse={rse}, rs={rs}')
                     for idx, r in chunk:
                         fileDoc = {
