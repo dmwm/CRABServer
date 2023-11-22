@@ -23,6 +23,7 @@ class Create(DBCreator):
 
         self.create = {}
         self.constraints = {}
+
         # Define create statements for each table
         self.create['b_filemetadata'] = """
             CREATE TABLE filemetadata (
