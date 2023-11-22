@@ -83,13 +83,13 @@ class StageoutCheck(TaskAction):
         if self.task['tm_output_lfn'].startswith('/store/user/rucio') or \
            self.task['tm_output_lfn'].startswith('/store/group/rucio'):
             rucioAccount = getRucioAccountFromLFN(self.task['tm_output_lfn'])
-            self.logger.info(f"Checking Rucio quota from account {rucioAccount}.")
+            self.logger.info("Checking Rucio quota from account %s.", rucioAccount)
             quotaCheck = isEnoughRucioQuota(self.rucioClient, self.task['tm_asyncdest'], rucioAccount)
             if not quotaCheck['isEnough']:
                 msg = f"Not enough Rucio quota at {self.task['tm_asyncdest']}:{self.task['tm_output_lfn']}."\
                       f" Remain quota: {quotaCheck['free']} GB."
                 raise TaskWorkerException(msg)
-            self.logger.info(f" Remain quota: {quotaCheck['free']} GB.")
+            self.logger.info(" Remain quota: %s GB.", quotaCheck['free'])
             if quotaCheck['isQuotaWarning']:
                 msg = 'Rucio Quota is very little and although CRAB will submit, stageout may fail.'
                 self.logger.warning(msg)
@@ -118,7 +118,7 @@ class StageoutCheck(TaskAction):
                     self.logger.info("Executing rm command: %s ", rmCmd)
                     self.checkPermissions(rmCmd)
             except IOError as er:
-                raise TaskWorkerException("TaskWorker disk is full: %s" % er)
+                raise TaskWorkerException("TaskWorker disk is full.") from er
             finally:
                 removeDummyFile(filename, self.logger)
             return
