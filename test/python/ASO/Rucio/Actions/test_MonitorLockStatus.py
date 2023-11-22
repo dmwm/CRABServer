@@ -336,7 +336,8 @@ def test_registerToMultiPubContainers(mock_addReplicasToContainer):
     t.multiPubContainers = multiPubContainers
     mock_addReplicasToContainer.side_effect = side_effect
     m = MonitorLockStatus(t, Mock(), Mock())
-    ret = m.registerToMultiPubContainers(outputAllOK)
+    ret = m.registerToMutiPubContainers(outputAllOK)
+
 
     # check args pass to addReplicasToContainer()
     allcall = []
@@ -350,3 +351,11 @@ def test_registerToMultiPubContainers(mock_addReplicasToContainer):
 
 def test_checkBlockCompleteStatus():
     assert 1 == 0
+
+@pytest.mark.skip(reason="Laziness.")
+def test_CleanUpTempArea_allFailed():
+    assert 0 == 1
+
+@pytest.mark.skip(reason="Laziness.")
+def test_CleanUpTempArea_mixed():
+    assert 0 == 1

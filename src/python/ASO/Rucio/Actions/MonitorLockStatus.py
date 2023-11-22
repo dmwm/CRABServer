@@ -34,6 +34,7 @@ class MonitorLockStatus:
         # skip locks that already update status to rest
         newDoneFileDocs = [doc for doc in okFileDocs if not doc['name'] in self.transfer.bookkeepingOKLocks]
         self.updateRESTFileDocsStateToDone(newDoneFileDocs)
+        # bookkeeping, also to be used in `Cleanup` action.
         self.transfer.updateOKLocks([x['name'] for x in newDoneFileDocs])
 
         # NOTE: See https://github.com/dmwm/CRABServer/issues/7940
@@ -215,7 +216,7 @@ class MonitorLockStatus:
         as outputdataset.
 
         :param fileDocs: list of fileDoc
-        :type fileDocs: list of dict
+        :type fileDocs: list
 
         :return: fileDocs
         :rtype: list of dict

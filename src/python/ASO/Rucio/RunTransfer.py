@@ -12,6 +12,7 @@ from ASO.Rucio.exception import RucioTransferException
 from ASO.Rucio.Actions.BuildDBSDataset import BuildDBSDataset
 from ASO.Rucio.Actions.RegisterReplicas import RegisterReplicas
 from ASO.Rucio.Actions.MonitorLockStatus import MonitorLockStatus
+from ASO.Rucio.Actions.Cleanup import Cleanup
 
 
 class RunTransfer:
@@ -53,6 +54,9 @@ class RunTransfer:
         RegisterReplicas(self.transfer, self.rucioClient, self.crabRESTClient).execute()
         # do 2
         MonitorLockStatus(self.transfer, self.rucioClient, self.crabRESTClient).execute()
+        # cleanup
+        # For now, only delete files in temp RSE
+        Cleanup(self.transfer).execute()
 
     def _initRucioClient(self, username, proxypath='/tmp/x509_uXXXX'):
         """

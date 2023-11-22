@@ -5,6 +5,7 @@ import logging
 import json
 import os
 import hashlib
+import shutil
 
 import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
 from ASO.Rucio.exception import RucioTransferException
@@ -25,7 +26,9 @@ class Transfer:
         self.restDBInstance = ''
         self.restProxyFile = ''
 
-        # content of transfers.txt
+        # Content of transfers.txt (list of dict)
+        # Note that we load whole file into memory but continue process from
+        # `lastTransferLine`.
         self.transferItems = []
 
         # from transfer info
@@ -41,16 +44,20 @@ class Transfer:
         # dynamically change throughout the scripts
         self.currentDataset = ''
 
-        # bookkeeping
-        self.lastTransferLine = 0
-        self.containerRuleID = ''
-        self.publishRuleID = ''
+        # map of destination_lfn to transferItems
+        self.LFN2transferItemMap = None
+
+        # Bookkeeping variable
+        # All variable here should be `None` and get assiged in `read*` method
+        # to make it fail (fast) when we forgot to add `read*` in readInfo.
+        self.lastTransferLine = None
+        self.containerRuleID = None
+        self.publishRuleID = None
         self.multiPubRuleIDs = {}
         self.bookkeepingOKLocks = None
         self.bookkeepingBlockComplete = None
-
-        # map of lfn to original info in transferItems
-        self.LFN2transferItemMap = None
+        self.LFN2PFNMap = None
+        self.cleanedFiles = None
 
     def readInfo(self):
         """
@@ -58,6 +65,8 @@ class Transfer:
         It needs to execute to following order because of dependency between
         method.
         """
+        if os.path.exists('task_process/transfers') and config.args.purge_transfers_dir:
+            shutil.rmtree('task_process/transfers', ignore_errors=False)
         # ensure task_process/transfers directory
         if not os.path.exists('task_process/transfers'):
             os.makedirs('task_process/transfers')
@@ -71,14 +80,17 @@ class Transfer:
         self.readContainerRuleID()
         self.readOKLocks()
         self.readBlockComplete()
+        self.readLFN2PFNMap()
+        self.readCleanedFiles()
 
     def readInfoFromRucio(self, rucioClient):
         """
-        Read the information from Rucio.
+        Like `readInfo` but read the information from Rucio.
 
         :param rucioClient: Rucio client
         :type rucioClient: rucio.client.client.Client
         """
+        # Currently, we do not use this method.
 
     def readLastTransferLine(self):
         """
@@ -127,10 +139,9 @@ class Transfer:
 
     def buildLFN2transferItemMap(self):
         """
-        Create map from LFN to transferItem
-
-        Note that LFN2transferItemMap will only have transfersDict from last
-        retry of PostJob.
+        Create map from destination LFN to transferItem.
+        Note that LFN2transferItemMap only point to latest `destination_lfn` in
+        case job has been retry.
         """
         self.LFN2transferItemMap = {}
         for x in self.transferItems:
@@ -230,6 +241,7 @@ class Transfer:
                 self.logger.info(f'  Publish Container rule ID: {self.publishRuleID}')
                 self.logger.info(f'  Multiple Publish Container rule IDs: {self.multiPubRuleIDs}')
         except FileNotFoundError:
+            self.containerRuleID = ''
             self.logger.info(f'Bookkeeping rules "{path}" does not exist. Assume it is first time it run.')
 
     def updateContainerRuleID(self):
@@ -332,6 +344,67 @@ class Transfer:
             for f in files:
                 replicasInContainer[f['name']] = ds['name']
         return replicasInContainer
+
+    def readLFN2PFNMap(self):
+        """
+        Read LFN2PFNMap from task_process/transfers/lfn2pfn_map.json
+        Initialize empty dict in case of path not found or
+        `--ignore-lfn2pfn-map` is `True`.
+        """
+        if config.args.ignore_lfn2pfn_map:
+            self.LFN2PFNMap = {}
+            return
+        path = config.args.lfn2pfn_map_path
+        try:
+            with open(path, 'r', encoding='utf-8') as r:
+                self.LFN2PFNMap = json.load(r)
+                self.logger.info(f'Got LFN2PFN Map from bookkeeping: {self.LFN2PFNMap}')
+        except FileNotFoundError:
+            self.LFN2PFNMap = {}
+            self.logger.info(f'Bookkeeping LFN2PFNMap file "{path}" does not exist. Assume this is first time it run.')
+
+    def updateLFN2PFNMap(self):
+        """
+        update LFN2PFNMap to task_process/transfers/lfn2pfn_map.json
+        Note that we did not check if dict in self.LFN2PFNMap are conform with
+        format we expected.
+        """
+        path = config.args.lfn2pfn_map_path
+        self.logger.info (f'Bookkeeping LFN2PFNMap to file: {path}')
+        self.logger.debug(f'LFN2PFNMap: {self.LFN2PFNMap}')
+        with writePath(path) as w:
+            json.dump(self.LFN2PFNMap, w)
+
+    def readCleanedFiles(self):
+        """
+        Read `self.cleanedFiles` from task_process/transfers/cleaned_files.json
+        Initialize empty dict in case of path not found or
+        `--ignore-cleanup-files` is `True`.
+        """
+        if config.args.ignore_cleaned_files:
+            self.cleanedFiles = []
+            return
+        path = config.args.cleaned_files_path
+        try:
+            with open(path, 'r', encoding='utf-8') as r:
+                self.cleanedFiles = json.load(r)
+                self.logger.info(f'Got `cleanedFiles` from bookkeeping: {self.cleanedFiles}')
+        except FileNotFoundError:
+            self.cleanedFiles = []
+            self.logger.info(f'`cleanedFiles` "{path}" does not exist. Assume this is first time it run.')
+
+    def updateCleanedFiles(self):
+        """
+        update LFN2PFNMap to task_process/transfers/lfn2pfn_map.json
+        Note that we did not check if dict in self.LFN2PFNMap are conform with
+        format we expected.
+        """
+        path = config.args.cleaned_files_path
+        self.logger.info (f'Bookkeeping `self.cleanedFiles` to file: {path}')
+        self.logger.debug(f'self.cleanedFiles: {self.cleanedFiles}')
+        with writePath(path) as w:
+            json.dump(self.cleanedFiles, w)
+
 
 def manipulateOutputDataset(transfer, forcePubName):
     """

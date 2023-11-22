@@ -1,9 +1,10 @@
 import pytest
 import json
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, create_autospec
 from argparse import Namespace
 
 from ASO.Rucio.Actions.RegisterReplicas import RegisterReplicas
+from ASO.Rucio.Transfer import Transfer
 import ASO.Rucio.config as config
 
 # somehow register return [[item1,item2]] while it should return [item1, item2], but unittest fail to detect this
@@ -46,6 +47,13 @@ def loadPrepareExpectedOutput():
     with open('test/assets/prepare_expectedoutput.json', encoding='utf-8') as r:
         return json.load(r)
 
+@pytest.fixture
+def transferDicts():
+    path = 'test/assets/transferDicts.json'
+    with open(path, 'r', encoding='utf-8') as r:
+        return json.load(r)
+
+
 def generateExpectedOutput(doctype):
     if doctype == 'success':
         return {
@@ -72,6 +80,8 @@ def generateExpectedOutput(doctype):
             'list_of_retry_value': [0],
             'list_of_fts_id': ['NA'],
         }
+
+
 
 
 def test_getSourcePFN(mock_Transfer, mock_rucioClient):
@@ -254,3 +264,51 @@ def test_prepareFailFileDoc(mock_Transfer):
     ]
     r = RegisterReplicas(mock_Transfer, Mock(), Mock())
     assert failFileDoc == r.prepareFailFileDoc(outputFail)
+
+def test_bookkeepingPFN():
+    LFN2transferItemMap = { '/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root': {
+        "id": "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca",
+        "username": "cmscrab",
+        "taskname": "230324_151740:tseethon_crab_rucio_transfer_whitelist_cern_test12_20230324_161736",
+        "start_time": 1679671544,
+        "destination": "T2_CH_CERN",
+        "destination_lfn": "/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root",
+        "source": "T2_CH_CERN",
+        "source_lfn": "/store/temp/user/tseethon.d6830fc3715ee01030105e83b81ff3068df7c8e0/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root",
+        "filesize": 628054,
+        "publish": 0,
+        "transfer_state": "NEW",
+        "publication_state": "NOT_REQUIRED",
+        "job_id": "9",
+        "job_retry_count": 0,
+        "type": "output",
+        "publishname": "autotest-1679671056-00000000000000000000000000000000",
+        "checksums": {
+            "adler32": "812b8235",
+            "cksum": "1236675270"
+        },
+        "outputdataset": "/GenericTTbar/tseethon-autotest-1679671056-94ba0e06145abd65ccb1d21786dc7e1d/USER"
+    }}
+
+    # expectedOuput should be
+    getSourcePFNReturnValue = 'davs://eoscms.cern.ch:443/eos/cms/store/temp/user/tseethon.d6830fc3715ee01030105e83b81ff3068df7c8e0/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root'
+    expectedOutput = {
+        "T2_CH_CERN_Temp": {
+            "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca": {
+                "scope": "user.cmscrab",
+                "pfn": getSourcePFNReturnValue,
+                "name": "/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root",
+                "bytes": 628054,
+                "adler32": "812b8235",
+            }
+        }
+    }
+    expectedLFN2PFNMap = { 'T2_CH_CERN_Temp': { '/store/temp/user/tseethon.d6830fc3715ee01030105e83b81ff3068df7c8e0/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root': getSourcePFNReturnValue } }
+
+    t = create_autospec(Transfer, instance=True)
+    t.LFN2PFNMap = {}
+    t.LFN2transferItemMap = LFN2transferItemMap
+    r = RegisterReplicas(t, Mock(), Mock())
+    r.bookkeepingPFN(expectedOutput)
+    t.updateLFN2PFNMap.assert_called_once()
+    assert t.LFN2PFNMap == expectedLFN2PFNMap
