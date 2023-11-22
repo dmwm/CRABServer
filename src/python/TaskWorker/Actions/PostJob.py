@@ -981,6 +981,9 @@ class ASOServerJob(object):
                 newDoc['destination'] = doc['destination']
             if not 'outputdataset' in newDoc:
                 newDoc['outputdataset'] = doc['outputdataset']
+            # Rucio ASO requires the "type" field to handle the log transfers.
+            if not 'type' in newDoc:
+                newDoc['type'] = doc['type']
             with open('task_process/transfers.txt', 'a+') as transfers_file:
                 transfer_dump = json.dumps(newDoc)
                 transfers_file.write(transfer_dump+"\n")
