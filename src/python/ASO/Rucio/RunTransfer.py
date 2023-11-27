@@ -48,14 +48,14 @@ class RunTransfer:
             self.transfer.restDBInstance,
             self.transfer.restProxyFile,
         )
-        # build dataset
+        # Build Rucio container and its own Rucio dataset.
         BuildDBSDataset(self.transfer, self.rucioClient, self.crabRESTClient).execute()
-        # do 1
+        # Add files from Temp_RSE to Rucio container
         RegisterReplicas(self.transfer, self.rucioClient, self.crabRESTClient).execute()
-        # do 2
+        # Check transfer statuses from Rucio `lock` objects
+        # If transfer complete, add replicas to Rucio Publish Containers.
         MonitorLockStatus(self.transfer, self.rucioClient, self.crabRESTClient).execute()
-        # cleanup
-        # For now, only delete files in temp RSE
+        # Cleanup
         Cleanup(self.transfer).execute()
 
     def _initRucioClient(self, username, proxypath='/tmp/x509_uXXXX'):

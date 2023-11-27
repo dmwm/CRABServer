@@ -1,5 +1,5 @@
 """
-Clean up.
+Clean it up.
 """
 import logging
 
@@ -10,8 +10,9 @@ from ASO.Rucio.utils import callGfalRm
 class Cleanup:
     """
     Clean up temp RSE and Rucio entry.
-    Currently we need to delete file from Temp RSE by ourselves using `gfal-rm` command.
-    Rucio replicas need to wait until CMSRucio allow delete replicas from user scope.
+
+    :param transfer: Transfer Object to get infomation.
+    :type object: class:`ASO.Rucio.Transfer`
     """
     def __init__(self, transfer):
         self.logger = logging.getLogger("RucioTransfer.Actions.Cleanup")
@@ -19,12 +20,13 @@ class Cleanup:
 
     def execute(self):
         """
-        Gets inputs from `self.transfer` object where
-        - `UpdateOKLocks`: )
-        - `where its is updated by previous action
-        `MonitorLockStatus`.
+        Gets inputs from `self.transfer.bookkeepingOKLocks` where its is updated
+        by previous `MonitorLockStatus` action.
         """
-        # TODO: change name `deleteOKLock` in MonitoLockStatus to something else.
+        # Currently we need to delete file from Temp RSE by ourselves using `gfal-rm` command.
+        # Rucio replicas need to wait until CMSRucio allow delete replicas from user scope.
+
+        # TODO: change the name `bookkeepingOKLocks` in MonitorLockStatus to something else.
         toBeDeleted = []
         for name in self.transfer.bookkeepingOKLocks:
             if not name in self.transfer.cleanedFiles:
