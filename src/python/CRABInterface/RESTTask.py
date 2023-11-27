@@ -394,7 +394,7 @@ class RESTTask(RESTEntity):
             raise InvalidParameter("Neither `publishrule` nor `multipubrulejson` are found in the input parameters.")
         # set default value if neither `publishrule` nor `multipubrule` exists
         if 'publishrule' not in kwargs or not kwargs['publishrule']:
-            publishrule = '00000000000000000000000000000000'
+            publishrule = '0'*32
         else:
             publishrule = kwargs['publishrule']
         if 'multipubrulejson' not in kwargs or not kwargs['multipubrulejson']:

@@ -116,6 +116,7 @@ class Transfer:
             with open(path, 'r', encoding='utf-8') as r:
                 for line in r:
                     doc = json.loads(line)
+                    # Manipulate transfers dicts when running integration test
                     if config.args.force_publishname:
                         doc = manipulateOutputDataset(doc, config.args.force_publishname)
                     self.transferItems.append(doc)
@@ -334,13 +335,16 @@ class Transfer:
 
 def manipulateOutputDataset(transfer, forcePubName):
     """
-    This helper function is use only for run integration test.
+    Replace 'outpudataset' key of transfer dicts to the new name.
+    If /FakeDataset, use `forcePubName` to compute hash and append to the name.
+    Else `forcePubName` is used.
 
-    It is protected by `if config.args.force_publishname` and never mean to run
-    in normal task submission.
+    This helper function is used only to run integration tests, never to run
+    in a normal task submission.
     """
     # import here to prevent import error in prod code.
     import copy # pylint: disable=import-outside-toplevel
+    from ASO.Rucio.utils import addSuffixToProcessedDataset # pylint: disable=redefined-outer-name, reimported, import-outside-toplevel
     newTransfer = copy.deepcopy(transfer)
     newhash = hashlib.md5(forcePubName.encode()).hexdigest()[:8]
     if transfer['outputdataset'].startswith('/FakeDataset'):

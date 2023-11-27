@@ -272,7 +272,7 @@ def test_updateRESTFileDocsBlockCompletionInfo(mock_updateToREST):
 
 
 @patch.object(RegisterReplicas, 'addReplicasToContainer')
-def test_registerToMutiPubContainers(mock_addReplicasToContainer):
+def test_registerToMultiPubContainers(mock_addReplicasToContainer):
     outputAllOK = [
         {
             "id": "7652449e07afeaf00abe804e8507f4172e5b04f09a2c5e0d883a3193",
@@ -336,7 +336,7 @@ def test_registerToMutiPubContainers(mock_addReplicasToContainer):
     t.multiPubContainers = multiPubContainers
     mock_addReplicasToContainer.side_effect = side_effect
     m = MonitorLockStatus(t, Mock(), Mock())
-    ret = m.registerToMutiPubContainers(outputAllOK)
+    ret = m.registerToMultiPubContainers(outputAllOK)
 
     # check args pass to addReplicasToContainer()
     allcall = []

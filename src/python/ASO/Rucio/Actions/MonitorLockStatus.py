@@ -46,7 +46,7 @@ class MonitorLockStatus:
         ## to.
         #publishedFileDocs = self.registerToPublishContainer(needToPublishFileDocs)
         #publishedFileDocs = self.registerToPublishContainer(okFileDocs)
-        publishedFileDocs = self.registerToMutiPubContainers(okFileDocs)
+        publishedFileDocs = self.registerToMultiPubContainers(okFileDocs)
         self.logger.debug(f'publishedFileDocs: {publishedFileDocs}')
         # skip filedocs that already update it status to rest.
         newPublishFileDocs = [doc for doc in publishedFileDocs if not doc['dataset'] in self.transfer.bookkeepingBlockComplete]
@@ -112,7 +112,7 @@ class MonitorLockStatus:
             f['dataset'] = tmpLFN2DatasetMap[f['name']]
         return tmpFileDocs
 
-    def registerToMutiPubContainers(self, fileDocs):
+    def registerToMultiPubContainers(self, fileDocs):
         """
         Register replicas to it own publish container.
 
