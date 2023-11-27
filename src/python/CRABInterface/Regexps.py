@@ -10,6 +10,8 @@ RX_ANYTHING = re.compile(r"^.*$")
 # as of 2022-03 it is used for warning and failure messages, which were previously
 # encoded in b64 and matched with RX_TEXT_FAIL. see #7106
 RX_MANYLINES_SHORT = re.compile(r"(?s)^.{0,1100}$")
+
+RX_ANYTHING_10K = re.compile(r"^.{0,10000}$")
 # TODO: we should start replacing most of the regex here with what we have in WMCore.Lexicon
 #       (this probably requires to adapt something on Lexicon)
 pNameRE      = r"(?=.{0,400}$)[a-zA-Z0-9\-_.]+"

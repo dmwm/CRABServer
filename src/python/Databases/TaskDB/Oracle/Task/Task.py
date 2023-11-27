@@ -179,5 +179,6 @@ class Task(object):
                                  SET \
                                      tm_transfer_container = :tm_transfer_container, \
                                      tm_transfer_rule = :tm_transfer_rule, \
-                                     tm_publish_rule = :tm_publish_rule \
+                                     tm_publish_rule = :tm_publish_rule, \
+                                     tm_multipub_rule = :tm_multipub_rule \
                                  WHERE tm_taskname = :tm_taskname"""

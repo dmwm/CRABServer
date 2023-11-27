@@ -6,8 +6,9 @@ import copy
 import datetime
 
 import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
-from ASO.Rucio.utils import updateToREST
+from ASO.Rucio.utils import updateToREST, parseFileNameFromLFN
 from ASO.Rucio.Actions.RegisterReplicas import RegisterReplicas
+from ASO.Rucio.exception import RucioTransferException
 
 
 class MonitorLockStatus:
@@ -44,7 +45,8 @@ class MonitorLockStatus:
         ## nothing but return fileDoc containing the block name replica belongs
         ## to.
         #publishedFileDocs = self.registerToPublishContainer(needToPublishFileDocs)
-        publishedFileDocs = self.registerToPublishContainer(okFileDocs)
+        #publishedFileDocs = self.registerToPublishContainer(okFileDocs)
+        publishedFileDocs = self.registerToMultiPubContainers(okFileDocs)
         self.logger.debug(f'publishedFileDocs: {publishedFileDocs}')
         # skip filedocs that already update it status to rest.
         newPublishFileDocs = [doc for doc in publishedFileDocs if not doc['dataset'] in self.transfer.bookkeepingBlockComplete]
@@ -92,7 +94,7 @@ class MonitorLockStatus:
 
     def registerToPublishContainer(self, fileDocs):
         """
-        Register replicas to the publish container. Update the replicas info
+        (Deprecated) Register replicas to the publish container. Update the replicas info
         to the new dataset name.
 
         :param fileDocs: replicas info return from `checkLockStatus` method.
@@ -109,6 +111,56 @@ class MonitorLockStatus:
         for f in tmpFileDocs:
             f['dataset'] = tmpLFN2DatasetMap[f['name']]
         return tmpFileDocs
+
+    def registerToMultiPubContainers(self, fileDocs):
+        """
+        Register replicas to it own publish container.
+
+        In example, we have
+        - 2 output files:
+          - `output.root`
+            - outputdataset: `/GenericTTbar/cmsbot-int1/USER`
+          - `myfile.txt` (Misc)
+            - outputdataset: `/FakeDataset/fake_myfile.txt/USER`
+        All `output_{job_id}.root` will registering to `/GenericTTbar/cmsbot-int1/USER`
+        All `myfile_{job_id}.txt` will registering to `/FakeDataset/fake_myfile.txt/USER`
+
+        :param fileDocs: replicas info return from `checkLockStatus` method.
+        :type fileDocs: list of dict (fileDoc)
+
+        :return: replicas info with updated dataset name.
+        :rtype: list of dict
+        """
+        r = RegisterReplicas(self.transfer, self.rucioClient, None)
+        publishContainerFileDocs = []
+        groupFileDocs = {}
+        # Group by filename
+        for fileDoc in fileDocs:
+            filename = parseFileNameFromLFN(fileDoc['name'])
+            if filename in groupFileDocs:
+                groupFileDocs[filename].append(fileDoc)
+            else:
+                groupFileDocs[filename] = [fileDoc]
+        # Register to its own publish container
+        for filename, fileDocsInGroup in groupFileDocs.items():
+            container = ''
+            for c in self.transfer.multiPubContainers:
+                _, primaryDataset, processedDataset, _ = c.split('/')
+                # edm
+                if not primaryDataset == 'FakeDataset':
+                    container = c
+                    break
+                # /FakeDataset
+                tmp = processedDataset.rsplit('_', 1)[1]
+                if tmp == filename:
+                    container = c
+                    break
+            if not container:
+                raise RucioTransferException(f'Cannot find container for file: {filename}. Likely a bug in the code.')
+            # Now fileDoc dict is consist for the rest of Rucio ASO code.
+            # We can return value from `addReplicasToContainer()` method.
+            publishContainerFileDocs += r.addReplicasToContainer(fileDocsInGroup, container)
+        return publishContainerFileDocs
 
     def checkBlockCompleteStatus(self, fileDocs):
         """
@@ -194,7 +246,7 @@ class MonitorLockStatus:
             'list_of_fts_instance': ['https://fts3-cms.cern.ch:8446/']*num,
             'list_of_failure_reason': None, # omit
             'list_of_retry_value': None, # omit
-            'list_of_fts_id': [x['ruleid'] for x in fileDocs]*num,
+            'list_of_fts_id': [x['ruleid'] for x in fileDocs],
         }
         updateToREST(self.crabRESTClient, 'filetransfers', 'updateTransfers', restFileDoc)
 

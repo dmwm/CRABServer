@@ -7,7 +7,7 @@ from WMCore.REST.Error import InvalidParameter, ExecutionError, NotAcceptable
 from CRABInterface.Utilities import conn_handler, getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match, authz_operator
 from CRABInterface.Regexps import RX_MANYLINES_SHORT, RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME,\
-    RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE, RX_DATASET
+    RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE, RX_DATASET, RX_ANYTHING_10K
 from ServerUtilities import getUsernameFromTaskname
 
 # external dependecies here
@@ -43,6 +43,8 @@ class RESTTask(RESTEntity):
             validate_str("transfercontainer", param, safe, RX_DATASET, optional=True)
             validate_str("transferrule", param, safe, RX_RUCIORULE, optional=True)
             validate_str("publishrule", param, safe, RX_RUCIORULE, optional=True)
+            # Save json string directly to tm_multipub_rule CLOB column.
+            validate_str("multipubrulejson", param, safe, RX_ANYTHING_10K, optional=True)
         elif method in ['GET']:
             validate_str('subresource', param, safe, RX_SUBRES_TASK, optional=False)
             validate_str("workflow", param, safe, RX_TASKNAME, optional=True)
@@ -359,7 +361,6 @@ class RESTTask(RESTEntity):
 
         return []
 
-
     def addddmreqid(self, **kwargs):
         """ Add DDM request ID to DDM_reqid column in the database. Can be tested with:
             curl -X POST https://balcas-crab.cern.ch/crabserver/dev/task -k --key $X509_USER_PROXY --cert $X509_USER_PROXY \
@@ -385,9 +386,21 @@ class RESTTask(RESTEntity):
             raise InvalidParameter("Transfer container name not found in the input parameters")
         if 'transferrule' not in kwargs or not kwargs['transferrule']:
             raise InvalidParameter("Transfer container's rule id not found in the input parameters")
+        # For backward compatiblity, either `publishrule` or `multipubrulejson`
+        # is enough, also set default value for variables not supplied by
+        # client.
+        if (('publishrule' not in kwargs or not kwargs['publishrule'])
+           and ('multipubrulejson' not in kwargs or not kwargs['multipubrulejson'])):
+            raise InvalidParameter("Neither `publishrule` nor `multipubrulejson` are found in the input parameters.")
+        # set default value if neither `publishrule` nor `multipubrule` exists
         if 'publishrule' not in kwargs or not kwargs['publishrule']:
-            raise InvalidParameter("Transfer container's rule id not found in the input parameters")
-
+            publishrule = '0'*32
+        else:
+            publishrule = kwargs['publishrule']
+        if 'multipubrulejson' not in kwargs or not kwargs['multipubrulejson']:
+            multipubrulejson = '{}'
+        else:
+            multipubrulejson = kwargs['multipubrulejson']
         taskname = kwargs['workflow']
         ownerName = getUsernameFromTaskname(taskname)
         authz_operator(username=ownerName, group='crab3', role='operator')
@@ -395,7 +408,7 @@ class RESTTask(RESTEntity):
             self.Task.SetRucioASOInfo_sql,
             tm_transfer_container=[kwargs['transfercontainer']],
             tm_transfer_rule=[kwargs['transferrule']],
-            tm_publish_rule=[kwargs['publishrule']],
+            tm_publish_rule=[publishrule],
+            tm_multipub_rule=[multipubrulejson],
             tm_taskname=[taskname])
-
         return []

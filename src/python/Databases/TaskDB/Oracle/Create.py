@@ -102,6 +102,7 @@ class Create(DBCreator):
         tm_transfer_container VARCHAR(1000),
         tm_transfer_rule VARCHAR(255),
         tm_publish_rule VARCHAR(255),
+        tm_multipub_rule CLOB,
         CONSTRAINT taskname_pk PRIMARY KEY(tm_taskname),
         CONSTRAINT check_tm_publication CHECK (tm_publication IN ('T', 'F')),
         CONSTRAINT check_tm_publish_groupname CHECK (tm_publish_groupname IN ('T', 'F')),

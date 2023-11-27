@@ -180,7 +180,7 @@ class RegisterReplicas:
                     # Note that at this point, it still possible for job to
                     # retry because file is not register in replica yet.
                     self.logger.exception(ex)
-                    self.logger.warning(f'Exception is raised at add_replicas(rse, rs)')
+                    self.logger.warning('Exception is raised at add_replicas(rse, rs)')
                     self.logger.debug(f'rse={rse}, rs={rs}')
                     for idx, r in chunk:
                         fileDoc = {
@@ -203,7 +203,7 @@ class RegisterReplicas:
 
         :param fileDocs: a list of fileDoc info an
         :type fileDocs: list of dict
-        :return: same list as fileDocs args but with updated rule iD and dataset
+        :return: same list as fileDocs args but with updated rule ID and dataset
             name
         :rtype: list of dict
         """
@@ -243,7 +243,7 @@ class RegisterReplicas:
                     'id': c['id'],
                     'name': c['name'],
                     'dataset': currentDataset,
-                    'blockcomplete': None,
+                    'blockcomplete': 'NO',
                     'ruleid': self.transfer.containerRuleID,
                 }
                 containerFileDocs.append(success)

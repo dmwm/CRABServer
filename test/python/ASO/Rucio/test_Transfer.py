@@ -3,13 +3,13 @@
 import pytest
 import builtins
 import json
-from unittest.mock import patch, mock_open
+from unittest.mock import patch, mock_open, MagicMock
 from argparse import Namespace
 
 from ASO.Rucio.Transfer import Transfer
 from ASO.Rucio.exception import RucioTransferException
 import ASO.Rucio.config as config
-from .fixtures import mock_rucioClient
+#from .fixtures import mock_rucioClient
 
 
 @pytest.fixture
@@ -42,6 +42,19 @@ def listContentFiles():
     path = 'test/assets/rucio_list_content_datasets.json'
     with open(path, 'r', encoding='utf-8') as r:
         return json.load(r)
+
+@pytest.fixture
+def transferDicts():
+    path = 'test/assets/transferDicts.json'
+    with open(path, 'r', encoding='utf-8') as r:
+        return json.load(r)
+
+@pytest.fixture
+def containerRuleIDJSONContent():
+    path = 'test/assets/container_ruleid.json'
+    with open(path, 'r', encoding='utf-8') as r:
+        return r.read()
+
 
 #old relic
 #def test_Transfer_readInfo():
@@ -258,3 +271,52 @@ def test_getContainerInfo(mock_rucioClient, listContentDatasets, listContentFile
 @pytest.mark.skip(reason='I am really lazy')
 def test_buildReplica2IDMap():
     assert 0 == 1
+
+
+def test_buildMultiPubContainerNames(transferDicts):
+    t = Transfer()
+    t.transferItems = transferDicts
+    t.publishContainer = '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d/USER'
+    t.populateMultiPubContainers()
+    assert sorted(t.multiPubContainers) == sorted([
+        '/FakeDataset/fakefile-FakePublish-befe3559057072761674520fdaee5005_cmsRun.log.tar.gz/USER',
+        '/FakeDataset/fakefile-FakePublish-befe3559057072761674520fdaee5005_miniaodfake.root/USER',
+        '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d/USER',
+    ])
+
+def test_updateContainerRuleID(containerRuleIDJSONContent, fs):
+    path = '/path/to/container_ruleid.json'
+    config.args = Namespace(container_ruleid_path=path)
+    # we should mock writePath(), not function inside writePath()
+    fs.create_file(path)
+    with open(path, 'w', encoding='utf-8') as mock_file:
+        with patch('ASO.Rucio.Transfer.writePath') as mock_writePath:
+            mock_writePath.return_value.__enter__.return_value = mock_file
+            t = Transfer()
+            t.containerRuleID = 'c88abb899f744efb8f33fd197ee77ecd'
+            t.publishRuleID = '141a41b6b54f45f59dc0703182f1257f'
+            t.multiPubRuleIDs = {
+                '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d_cmsRun.log.tar.gz/USER': '9653f39f686944128028fd25888ae2d3',
+                '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d_output.root/USER': 'e609d75e4a7a4fa3a880ea0bb6681371',
+                '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d_miniaodfake.root/USER': '6b159d7e5dc940daa2188658a68c4b23',
+            }
+            t.updateContainerRuleID()
+            mock_writePath.assert_called_once_with(path)
+    with open(path, 'r', encoding='utf-8') as mock_file:
+        x = json.loads(mock_file.read())
+        y = json.loads(containerRuleIDJSONContent)
+        assert x == y
+
+def test_readContainerRuleID(containerRuleIDJSONContent, fs):
+    path = '/path/to/container_ruleid.json'
+    config.args = Namespace(container_ruleid_path=path, force_publishname=False)
+    with patch('ASO.Rucio.Transfer.open', new_callable=mock_open, read_data=containerRuleIDJSONContent):
+        t = Transfer()
+        t.readContainerRuleID()
+        assert t.containerRuleID == 'c88abb899f744efb8f33fd197ee77ecd'
+        assert t.publishRuleID == '141a41b6b54f45f59dc0703182f1257f'
+        assert t.multiPubRuleIDs == {
+            '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d_cmsRun.log.tar.gz/USER': '9653f39f686944128028fd25888ae2d3',
+            '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d_output.root/USER': 'e609d75e4a7a4fa3a880ea0bb6681371',
+            '/GenericTTbar/tseethon-ruciotransfers-1697125324-94ba0e06145abd65ccb1d21786dc7e1d_miniaodfake.root/USER': '6b159d7e5dc940daa2188658a68c4b23',
+        }
