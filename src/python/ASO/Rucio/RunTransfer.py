@@ -12,6 +12,7 @@ from ASO.Rucio.exception import RucioTransferException
 from ASO.Rucio.Actions.BuildDBSDataset import BuildDBSDataset
 from ASO.Rucio.Actions.RegisterReplicas import RegisterReplicas
 from ASO.Rucio.Actions.MonitorLockStatus import MonitorLockStatus
+from ASO.Rucio.Actions.Cleanup import Cleanup
 
 
 class RunTransfer:
@@ -47,12 +48,15 @@ class RunTransfer:
             self.transfer.restDBInstance,
             self.transfer.restProxyFile,
         )
-        # build dataset
+        # Build Rucio container and its own Rucio dataset.
         BuildDBSDataset(self.transfer, self.rucioClient, self.crabRESTClient).execute()
-        # do 1
+        # Add files from Temp_RSE to Rucio container
         RegisterReplicas(self.transfer, self.rucioClient, self.crabRESTClient).execute()
-        # do 2
+        # Check transfer statuses from Rucio `lock` objects
+        # If transfer complete, add replicas to Rucio Publish Containers.
         MonitorLockStatus(self.transfer, self.rucioClient, self.crabRESTClient).execute()
+        # Cleanup
+        Cleanup(self.transfer).execute()
 
     def _initRucioClient(self, username, proxypath='/tmp/x509_uXXXX'):
         """

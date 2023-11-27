@@ -4,8 +4,9 @@ The utility function of Rucio ASO.
 import shutil
 import re
 import os
-from contextlib import contextmanager
 import itertools
+import subprocess
+from contextlib import contextmanager
 
 from ServerUtilities import encodeRequest
 from ASO.Rucio.exception import RucioTransferException
@@ -114,6 +115,7 @@ def LFNToPFNFromPFN(lfn, pfn):
         fileid = '/'.join(lfn.split("/")[-2:])
     return f'{pfnPrefix}/{fileid}'
 
+
 def addSuffixToProcessedDataset(dataset, strsuffix):
     """
     Adding suffix to ProcessedDataset name.
@@ -174,3 +176,23 @@ def parseFileNameFromLFN(lfn):
         fileExt = jobid_fileext.rsplit(".", 1)[-1]
         origFileName = leftPiece + "." + fileExt
     return origFileName
+
+
+def callGfalRm(pfns, proxy, logPath):
+    """
+    Calling `gfal-rm` to delete files by passing list PFNs as arguments.
+    Ignore thhe exit code and pipe all logs to `logPath`.
+
+    :param pfs: list of pfn need to delete
+    :type pfs: list
+    :param proxy: X509 proxy path
+    :type proxy: str
+    :param logPath: logs path to append the logs
+    :type logPath: str
+    """
+    # checking gfal-rm command,
+    subprocess.check_call('command -v gfal-rm', shell=True)
+    timeout = len(pfns) * 3 * 60 # 3 minutes per file
+    pfnsArg = ' '.join(pfns)
+    command = f'set -x; X509_USER_PROXY={proxy} timeout {timeout} gfal-rm -v -t 180 {pfnsArg} >> {logPath} 2>&1 &'
+    subprocess.call(command, shell=True)
