@@ -1130,4 +1130,4 @@ def getRucioAccountFromLFN(lfn):
         if lfn.startswith('/store/group/rucio/'):
             return "{0}_group".format(account)
         return account
-    raise Exception("Expected /store/{user,group}/rucio/<account>, got {0}".format(lfn))
+    raise Exception("Expected /store/(user,group)/rucio/<account>, got {0}".format(lfn))
