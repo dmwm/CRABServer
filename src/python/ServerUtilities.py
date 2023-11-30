@@ -227,7 +227,7 @@ def truncateError(msg):
         msg = msg.replace(codeString, 'HTTP 1.')
     if len(msg) > msgLimit:
         truncMsg = msg[:msgLimit - 100]
-        truncMsg += f"\n[... message truncated to the first {msgLimit - 100} chars ...]"
+        truncMsg += "\n[... message truncated to the first {0} chars ...]".format(msgLimit-100)
         return truncMsg
     return msg
 
@@ -287,7 +287,7 @@ def insertJobIdSid(jinfo, jobid, workflow, jobretry):
 def getWebdirForDb(reqname, storageRules):
     """ Get the location of the webdir. This method is called on the schedd by AdjustSites
     """
-    path = os.path.expanduser(f"~/{reqname}")
+    path = os.path.expanduser("~/{0}".format(reqname))
     sinfo = storageRules.split(",")
     storageRegex = re.compile(sinfo[0])
     val = storageRegex.sub(sinfo[1], path)
@@ -568,9 +568,9 @@ def checkTaskLifetime(submissionTime):
     # resubmitLifeTime is 23 days expressed in seconds
     resubmitLifeTime = TASKLIFETIME - NUM_DAYS_FOR_RESUBMITDRAIN * 24 * 60 * 60
     if time.time() > (submissionTime + resubmitLifeTime):
-        msg = f"Resubmission of the task is not possble since less than {NUM_DAYS_FOR_RESUBMITDRAIN} days"
+        msg = "Resubmission of the task is not possble since less than {0} days".format(NUM_DAYS_FOR_RESUBMITDRAIN)
         msg += "are left before the task is removed from the""schedulers.\n"
-        msg += f"A task expires {TASKLIFETIME / (24 * 60 * 60)} days after its submission\n"
+        msg += "A task expires {0} days after its submission\n".format(TASKLIFETIME / (24 * 60 * 60))
         msg += "You can submit a 'recovery task' if you need to execute again the failed jobs\n"
         msg += "See https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ for more information about recovery tasks"
     return msg
@@ -1128,6 +1128,6 @@ def getRucioAccountFromLFN(lfn):
     if lfn.startswith('/store/user/rucio') or lfn.startswith('/store/group/rucio'):
         account = lfn.split('/')[4]
         if lfn.startswith('/store/group/rucio/'):
-            return f'{account}_group'
+            return "{0}_group".format(account)
         return account
-    raise Exception(f'Expected /store/{{user,group}}/rucio/<account>, got {lfn}')
+    raise Exception("Expected /store/(user,group)/rucio/<account>, got {0}".format(lfn))
