@@ -23,10 +23,17 @@ def get_egroup_users(egroup_name):
     res = set()
 
     # Need to set the location of trusted CA certs, they should be here by default.
-    ca_cert_dir = "/etc/openldap/cacerts"
-    ldap.set_option(ldap.OPT_X_TLS_CACERTDIR, ca_cert_dir)
-    l = ldap.initialize("ldaps://xldap.cern.ch:636")
 
+    # Use /etc/openldap/cacerts/CERN-bundle.pem if exists.
+    # libldap 2.4 that come with debian 11 is built with gnutls which does not support cacertdir.
+    # https://git.openldap.org/openldap/openldap/-/blob/3b03d6bea27f29b7f7f91b3d5488fbd6e69b6c29/libraries/libldap/tls_g.c#L187-190
+    ca_cert_file = "/etc/openldap/cacerts/CERN-bundle.pem"
+    ca_cert_dir = "/etc/openldap/cacerts"
+    if os.path.isfile(ca_cert_file):
+        ldap.set_option(ldap.OPT_X_TLS_CACERTFILE, ca_cert_file)
+    else:
+        ldap.set_option(ldap.OPT_X_TLS_CACERTDIR, ca_cert_dir)
+    l = ldap.initialize("ldaps://xldap.cern.ch:636")
     search_filter = "memberOf=CN=%s,OU=e-groups,OU=Workgroups,DC=cern,DC=ch" % egroup_name
     search_attribute = ["sAMAccountName"]
     basedn = "DC=cern,DC=ch"
@@ -40,7 +47,6 @@ def get_egroup_users(egroup_name):
         res.add(user)
 
     return res
-
 
 def cache_users(log_function=print):
     """ Cache the entries in the variuos local-users.txt files
@@ -119,4 +125,3 @@ def map_user_to_groups(user):
 
 if __name__ == '__main__':
    print(map_user_to_groups("bbockelm"))
-

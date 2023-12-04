@@ -1,0 +1,1 @@
+wmcore @ git+https://github.com/dmwm/WMCore@2.2.4rc6

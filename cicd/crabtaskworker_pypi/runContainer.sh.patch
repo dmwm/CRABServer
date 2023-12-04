@@ -1,0 +1,16 @@
+--- runContainer_pypi.sh        2023-12-04 22:49:56.106418559 +0100
++++ runContainer.sh     2023-11-29 19:09:23.986618668 +0100
+@@ -47,11 +47,9 @@
+   fi
+ done
+
+-IMAGE=${TW_REPO:-registry.cern.ch/cmscrab}/crabtaskworker:${TW_VERSION}
+-docker pull ${IMAGE}
+-DOCKER_VOL="-v /data/container/:/data/hostdisk/ -v /data/srv/tmp/:/data/srv/tmp/ -v /cvmfs:/cvmfs:shared -v /etc/grid-security/:/etc/grid-security/ -v /data/certs/:/data/certs/ -v /var/run/nscd/socket:/var/run/nscd/socket -v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
++DOCKER_VOL="-v /data/container/:/data/hostdisk/ -v /data/srv/tmp/:/data/srv/tmp/ -v /cvmfs/cms.cern.ch/SITECONF:/cvmfs/cms.cern.ch/SITECONF -v /etc/grid-security/:/etc/grid-security/ -v /data/certs/:/data/certs/ -v /var/run/nscd/socket:/var/run/nscd/socket -v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
+ DOCKER_OPT="-e SERVICE=${SERVICE} -w /data/srv/${DIRECTORY} "
+-docker run --name ${SERVICE} -d -ti --net host --privileged $DOCKER_OPT $DOCKER_VOL ${IMAGE} /data/srv/$DIRECTORY/run.sh
++docker run --name ${SERVICE} -d -ti --net host --privileged $DOCKER_OPT $DOCKER_VOL ${TW_REPO:-registry.cern.ch/cmscrab}/crabtaskworker:${TW_VERSION}
+
+ echo -e "Sleeping for 3 seconds.\nRunning containers:"
+ sleep 3 && docker ps

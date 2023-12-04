@@ -1,0 +1,4 @@
+test/Playbook
+.dockerignore
+cicd/crabserver_pypi/Dockerfile
+cicd/crabtaskworker_pypi/Dockerfile
