@@ -194,9 +194,15 @@ source setupCRABClient.sh
   done
   for param in "${USETHISPARMS[@]}"; do
     checkThisCommand status "$param"
-
   done
 
+  ### 6b. test  crab status --proxy=PROXY --task=TASKNAME --instance=INSTANCE
+  USETHISPARMS=()
+  INITPARMS="--proxy --task --instance"
+  feedParms "$PROXY $TASKTOTRACK $REST_Instance"
+  for param in "${USETHISPARMS[@]}"; do
+    checkThisCommand status "$param"
+  done
 
   ### 7. test crab report --proxy=PROXY --dir=PROJDIR --outputdir=OUTPUTDIR
   USETHISPARMS=()
