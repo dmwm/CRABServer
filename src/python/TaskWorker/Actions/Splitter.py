@@ -58,8 +58,8 @@ class Splitter(TaskAction):
         splitparam['applyLumiCorrection'] = True
 
         wmsubs = Subscription(fileset=data, workflow=wmwork,
-                               split_algo=splitparam['algorithm'],
-                               type=self.jobtypeMapper[kwargs['task']['tm_job_type']])
+                              split_algo=splitparam['algorithm'],
+                              type=self.jobtypeMapper[kwargs['task']['tm_job_type']])
         try:
             splitter = SplitterFactory()
             jobfactory = splitter(subscription=wmsubs)
@@ -69,7 +69,7 @@ class Splitter(TaskAction):
             msg = f"The splitting on your task generated more than {maxJobs} jobs (the maximum)."
             raise TaskWorkerException(msg) from RuntimeError
         if numJobs == 0:
-            msg  = "CRAB could not submit any job to the Grid scheduler:"
+            msg = "CRAB could not submit any job to the Grid scheduler:"
             msg += f"\nsplitting task {kwargs['task']['tm_taskname']}"
             if kwargs['task']['tm_input_dataset']:
                 msg += f"\non dataset {kwargs['task']['tm_input_dataset']}"
@@ -77,7 +77,7 @@ class Splitter(TaskAction):
             msg += "https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Splitting"
             msg += diagnoseRunMatch(splitparam['runs'], data)
             raise TaskWorkerException(msg)
-        elif numJobs > maxJobs:
+        if numJobs > maxJobs:
             raise TaskWorkerException(
                 f"The splitting on your task generated {numJobs} jobs. The maximum number of jobs in each task is {maxJobs}"
             )
@@ -88,7 +88,7 @@ class Splitter(TaskAction):
             msg = f"Minimum runtime requirement for automatic splitting is {minRuntime} minutes."
             raise TaskWorkerException(msg)
 
-        #printing duplicated lumis if any
+        # printing duplicated lumis if any
         lumiChecker = getattr(jobfactory, 'lumiChecker', None)
         if lumiChecker and lumiChecker.splitLumiFiles:
             self.logger.warning("The input dataset contains the following duplicated lumis %s", lumiChecker.splitLumiFiles.keys())
@@ -96,7 +96,8 @@ class Splitter(TaskAction):
             msg += " Will apply the necessary corrections in the splitting algorithm. You can ignore this message."
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
 
-        return Result(task = kwargs['task'], result = (factory, args[0]))
+        return Result(task=kwargs['task'], result=(factory, args[0]))
+
 
 def diagnoseRunMatch(runs=None, data=None):
     """
@@ -126,8 +127,9 @@ def diagnoseRunMatch(runs=None, data=None):
     msg += f"\nThe intersection of the two lists is: {intersection}"
     return msg
 
+
 if __name__ == '__main__':
     splitparams = [{'halt_job_on_file_boundaries': False, 'algorithm': 'LumiBased', 'lumis_per_job': 2000, 'splitOnRun': False},
                    {'halt_job_on_file_boundaries': False, 'algorithm': 'LumiBased', 'lumis_per_job': 50, 'splitOnRun': False},
                    {'algorithm': 'FileBased', 'files_per_job': 2000, 'splitOnRun': False},
-                   {'algorithm': 'FileBased', 'files_per_job': 50, 'splitOnRun': False},]
+                   {'algorithm': 'FileBased', 'files_per_job': 50, 'splitOnRun': False}]
