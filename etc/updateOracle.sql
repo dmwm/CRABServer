@@ -139,3 +139,40 @@ ALTER TABLE tasks ADD tm_publish_rule VARCHAR(255);
 
 --Add Rucio ASO's json kv for store container names and its rules.
 ALTER TABLE tasks ADD tm_multipub_rule CLOB;
+
+-- 2023 oracle cleanup
+-- prod
+drop table tasks_int ;
+drop table jobgroups ;
+drop table "CMP3$10027924" ;
+-- delete recycle bin
+
+-- preprod
+-- drop table FILEMETADATA_SAVE ;
+-- drop table  "CMP3$14630427" ;
+-- drop table  "FILEMETADATA_INT" ;
+-- drop table  "JOBGROUPS" ;
+-- drop table  "PRAJESHTEST" ;
+-- drop table  "PRAJESHTEST2" ;
+-- drop table  "PRAJESH_TEST" ;
+
+-- alter table TASKS modify
+--   partition by range (TM_START_TIME) 
+--   INTERVAL (NUMTOYMINTERVAL(1, 'MONTH'))
+--   (
+--       PARTITION P1 VALUES LESS THAN (TO_DATE('2017-04-14 00:00:00', 'SYYYY-MM-DD HH24:MI:SS', 'NLS_CALENDAR=GREGORIAN'))
+--   )
+--   ONLINE
+--   UPDATE INDEXES
+--   ;
+-- sta andando avanti da un'ora...
+
+-- alter table FILETRANSFERSDB modify
+--   partition by range (TM_CREATION_TIME) 
+--   INTERVAL (NUMTOYMINTERVAL(1, 'MONTH'))
+--   (
+--       PARTITION P1 VALUES LESS THAN (TO_DATE('2017-04-14 00:00:00', 'SYYYY-MM-DD HH24:MI:SS', 'NLS_CALENDAR=GREGORIAN'))
+--   )
+--   ONLINE
+--   UPDATE INDEXES
+--   ;
