@@ -1,0 +1,17 @@
+- hosts: schedd
+  become: yes
+  become_user: root
+  become_method: sudo
+  vars:
+    ansible_remote_tmp: /tmp
+  tasks:
+  - name: qedit
+    ansible.builtin.shell:
+      cmd: condor_qedit -con 'jobuniverse==7&&jobstatus==2' HoldKillSig \"SIGKILL\"
+    register: shelloutput
+  - ansible.builtin.debug: var=shelloutput.stdout_lines
+  - name: hold
+    ansible.builtin.shell:
+      cmd: condor_hold -con 'jobuniverse==7&&jobstatus==2' -reason ORACLEOFF -subcode 20231212
+    register: shelloutput
+  - ansible.builtin.debug: var=shelloutput.stdout_lines
