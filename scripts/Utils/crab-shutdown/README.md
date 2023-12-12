@@ -8,7 +8,11 @@ the dagmans in all the productions schedds.
 Further details on these operation are available on the CRAB 
 [docs](https://cmscrab.docs.cern.ch/technical/crab-shutdown.html)
 
-Install ansible on your laptop, then cd into this directory and hold the
+Install ansible on your laptop, make sure you can ssh into the schedds 
+from your laptop with `ssh vocms0106.cern.ch`. Adjust your ssh client config
+if you can not.
+
+Then cd into this directory and hold the
 dagmans in all the schedds with
 
 ```bash
@@ -21,6 +25,33 @@ Then use this command to release all the dagmans
 ```bash
 ansible-playbook --diff -i inventory.ini 001-release.yml
 ```
+
+### troubleshoot
+
+If you have never connected to a schedd before from your laptop, ssh will ask
+you to accept the schedd VM ssh fingerprint and ansible will hang at the
+gathering facts step.
+
+You can avoid this check and let the playbook do its job with
+
+```bash
+# every time
+export ANSIBLE_HOST_KEY_CHECKING=False
+ansible-playbook ...
+```
+
+Or, you can connect to every machine, accept the fingerprint, then run the
+ansible playbook
+
+```bash
+# once, until you clean your ~/.ssh/known_hosts
+for i in $(cat inventory.ini | grep cern.ch); do ssh $i 'cat /etc/hostname'; done
+# every time
+ansible-playbook
+```
+
+
+### Example
 
 An example of a successful release is:
 
