@@ -1,3 +1,6 @@
+"""
+Split a task request into a set of jobs
+"""
 from WMCore.DataStructs.Workflow import Workflow
 from WMCore.DataStructs.Subscription import Subscription
 from WMCore.JobSplitting.SplitterFactory import SplitterFactory
@@ -46,8 +49,8 @@ class Splitter(TaskAction):
             nJobs = kwargs['task']['tm_totalunits'] // splitparam['events_per_job']
             if nJobs > maxJobs:
                 raise TaskWorkerException(
-                    "Your task would generate %s jobs. The maximum number of jobs in each task is %s" %
-                    (nJobs, maxJobs))
+                    f"Your task would generate {nJobs} jobs. The maximum number of jobs in each task is {maxJobs}"
+                )
             if 'tm_events_per_lumi' in kwargs['task'] and kwargs['task']['tm_events_per_lumi']:
                 splitparam['events_per_lumi'] = kwargs['task']['tm_events_per_lumi']
             if 'tm_generator' in kwargs['task'] and kwargs['task']['tm_generator'] == 'lhe':
@@ -55,47 +58,78 @@ class Splitter(TaskAction):
         splitparam['applyLumiCorrection'] = True
 
         wmsubs = Subscription(fileset=data, workflow=wmwork,
-                               split_algo=splitparam['algorithm'],
-                               type=self.jobtypeMapper[kwargs['task']['tm_job_type']])
+                              split_algo=splitparam['algorithm'],
+                              type=self.jobtypeMapper[kwargs['task']['tm_job_type']])
         try:
             splitter = SplitterFactory()
             jobfactory = splitter(subscription=wmsubs)
             factory = jobfactory(**splitparam)
             numJobs = sum([len(jobgroup.getJobs()) for jobgroup in factory])
         except RuntimeError:
-            msg = "The splitting on your task generated more than {0} jobs (the maximum).".format(maxJobs)
-            raise TaskWorkerException(msg)
+            msg = f"The splitting on your task generated more than {maxJobs} jobs (the maximum)."
+            raise TaskWorkerException(msg) from RuntimeError
         if numJobs == 0:
-            msg  = "The CRAB3 server backend could not submit any job to the Grid scheduler:"
-            msg += " splitting task %s" % (kwargs['task']['tm_taskname'])
+            msg = "CRAB could not submit any job to the Grid scheduler:"
+            msg += f"\nsplitting task {kwargs['task']['tm_taskname']}"
             if kwargs['task']['tm_input_dataset']:
-                msg += " on dataset %s" % (kwargs['task']['tm_input_dataset'])
-            msg += " with %s method does not generate any job. See\n" % (kwargs['task']['tm_split_algo'])
+                msg += f"\non dataset {kwargs['task']['tm_input_dataset']}"
+            msg += f"\nwith {kwargs['task']['tm_split_algo']} method does not generate any job. See\n"
             msg += "https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Splitting"
+            msg += diagnoseRunMatch(splitparam['runs'], data)
             raise TaskWorkerException(msg)
-        elif numJobs > maxJobs:
-            raise TaskWorkerException("The splitting on your task generated %s jobs. The maximum number of jobs in each task is %s" %
-                                        (numJobs, maxJobs))
+        if numJobs > maxJobs:
+            raise TaskWorkerException(
+                f"The splitting on your task generated {numJobs} jobs. The maximum number of jobs in each task is {maxJobs}"
+            )
 
         minRuntime = getattr(self.config.TaskWorker, 'minAutomaticRuntimeMins', 180)
         if kwargs['task']['tm_split_algo'] == 'Automatic' and \
                 kwargs['task']['tm_split_args']['minutes_per_job'] < minRuntime:
-            msg = "Minimum runtime requirement for automatic splitting is {0} minutes.".format(minRuntime)
+            msg = f"Minimum runtime requirement for automatic splitting is {minRuntime} minutes."
             raise TaskWorkerException(msg)
 
-        #printing duplicated lumis if any
+        # printing duplicated lumis if any
         lumiChecker = getattr(jobfactory, 'lumiChecker', None)
         if lumiChecker and lumiChecker.splitLumiFiles:
             self.logger.warning("The input dataset contains the following duplicated lumis %s", lumiChecker.splitLumiFiles.keys())
-            msg = "The CRAB3 server backend detected lumis split across files in the input dataset."
+            msg = "CRAB detected lumis split across files in the input dataset."
             msg += " Will apply the necessary corrections in the splitting algorithm. You can ignore this message."
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
 
-        return Result(task = kwargs['task'], result = (factory, args[0]))
+        return Result(task=kwargs['task'], result=(factory, args[0]))
+
+
+def diagnoseRunMatch(runs=None, data=None):
+    """
+    check matching of run list in the user's input and in the dataset
+    runs: a list of run numbers from splitargs (i.e. crabConfing runRange and/or lumimask)
+    data: a list of WMCore.DataStructs.File objects as prepared by DataDiscovery
+    Returns a string with the message to send to the user
+    """
+
+    # use sets to make intersection and allow for multiple files to have same run #
+    runsInConfig = set(runs)
+    runsInData = set()
+    for fileObj in data.getFiles():  # a list of WMCore.DataStructs.File objects
+        for runObj in fileObj['runs']:  # a list of WMCore.DataStructs.Run objects
+            runsInData.add(runObj.run)
+    intersection = list(runsInData & runsInConfig)
+
+    # now turn into sorted lists to compute ranges
+    runsInConfig = sorted(list(runs))
+    runsInData = sorted(list(runsInData))
+    configRange = f"{runsInConfig[0]} - {runsInConfig[-1]}"
+    dataRange = f"{runsInData[0]} - {runsInData[-1]}"
+
+    msg = "\nSome hopefully helpful information to help you figure out the reason:"
+    msg += f"\nRun list from task configuration is inside the range: {configRange}"
+    msg += f"\nRun list from input dataset is inside the range: {dataRange}"
+    msg += f"\nThe intersection of the two lists is: {intersection}"
+    return msg
 
 
 if __name__ == '__main__':
     splitparams = [{'halt_job_on_file_boundaries': False, 'algorithm': 'LumiBased', 'lumis_per_job': 2000, 'splitOnRun': False},
                    {'halt_job_on_file_boundaries': False, 'algorithm': 'LumiBased', 'lumis_per_job': 50, 'splitOnRun': False},
                    {'algorithm': 'FileBased', 'files_per_job': 2000, 'splitOnRun': False},
-                   {'algorithm': 'FileBased', 'files_per_job': 50, 'splitOnRun': False},]
+                   {'algorithm': 'FileBased', 'files_per_job': 50, 'splitOnRun': False}]
