@@ -325,7 +325,7 @@ END DELETE_PARTITION;
 /*=========================================================================================================================*/
 CREATE OR REPLACE PROCEDURE DELETE_PARTITION_MAIN IS
 
-data varchar2(6000);
+data varchar2(100000);
 start_time TIMESTAMP;
 end_time   TIMESTAMP;
 FILETRANSFERSDB_pname varchar2(100);
