@@ -469,9 +469,9 @@ class RetryJob():
             proxy = os.getenv('X509_USER_PROXY')
             self.logger.info(f"X509_USER_PROXY = {proxy}")
             if corruptedFile:
-                reportLocation = 'gsiftp://eoscmsftp.cern.ch/eos/cms/store/temp/user/BadInputFiles/corrupted/new/'
+                reportLocation = 'davs://eoscms.cern.ch:443/eos/cms/store/temp/user/BadInputFiles/corrupted/new/'
             if suspiciousFile:
-                reportLocation = 'gsiftp://eoscmsftp.cern.ch/eos/cms/store/temp/user/BadInputFiles/suspicious/new/'
+                reportLocation = 'davs://eoscms.cern.ch:443/eos/cms/store/temp/user/BadInputFiles/suspicious/new/'
 
             destination = reportLocation + reportFileName
             cmd = f'gfal-copy -v -t 60 {reportFileName} {destination}'
