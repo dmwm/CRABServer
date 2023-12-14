@@ -520,10 +520,12 @@ class DagmanCreator(TaskAction):
         else:
             info['accelerator_jdl'] = ''
         info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
-        # info['jobarch_flatten'].split("_")[0]: extracts "slc7" from "slc7_amd64_gcc10"
-        required_os_list = ARCH_TO_OS.get(info['jobarch_flatten'].split("_")[0])
+        arch = info['jobarch_flatten'].split("_")[0]  # extracts "slc7" from "slc7_amd64_gcc10"
+        required_os_list = ARCH_TO_OS.get(arch)
+        if not required_os_list:
+            raise TaskWorkerException(f"Unsupported architecture {arch}")
         # ARCH_TO_OS.get("slc7") gives a list with one item only: ['rhel7']
-        info['opsys_req'] = '+REQUIRED_OS="{}"'.format(required_os_list[0] if required_os_list else "any")
+        info['opsys_req'] = f'+REQUIRED_OS="{required_os_list[0]}"'
 
         info.setdefault("additional_environment_options", '')
         info.setdefault("additional_input_file", "")
