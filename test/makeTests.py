@@ -269,12 +269,12 @@ writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
-# sendPythonFolder
-name = 'sendPythonFolder'
+# sendVenvFolder
+name = 'sendVenvFolder'
 changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
 confChangesList = [changeDict]
 testSubmitScript = """
-lookInTarFor "^python/" ${workDir}/inputs/*default.tgz
+lookInTarFor "^venv/" ${workDir}/inputs/*default.tgz
 """
 validationScript = """
 checkStatus ${taskName} SUBMITTED

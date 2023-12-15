@@ -13,6 +13,10 @@ cd ${CMSSW_release}/src
 eval `scramv1 runtime -sh`
 scram build
 
+# creates a venv folder to test sending it
+cd ..
+mkdir venv
+
 if echo $CMSSW_release | grep -q CMSSW_7
 then
   # when using CMSSW_7, need to force latest curl
