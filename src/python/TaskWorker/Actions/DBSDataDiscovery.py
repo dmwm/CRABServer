@@ -159,6 +159,7 @@ class DBSDataDiscovery(DataDiscovery):
             if inputBlocks:
                 blocks = [x for x in blocks if x in inputBlocks]
                 self.logger.debug("Matched inputBlocks: %s ", blocks)
+            secondaryBlocks = []
             if secondaryDataset:
                 secondaryBlocks = self.dbs.listFileBlocks(secondaryDataset)
         except DBSReaderError as dbsexc:
@@ -188,16 +189,17 @@ class DBSDataDiscovery(DataDiscovery):
             self.logger.info("Will not use Rucio for this dataset")
 
         totalSizeBytes = 0
+        locationsMap = {}
+        partialLocationsMap = {}
+        secondaryLocationsMap = {}
+        scope = "cms"
 
         if useRucioForLocations:
-            scope = "cms"
             # If the dataset is a USER one, use the Rucio user scope to find it
             # NOTE we need a way to enable users to indicate others user scopes as source
             if isUserDataset:
                 scope = f"user.{self.username}"
             self.logger.info("Looking up data location with Rucio in %s scope.", scope)
-            locationsMap = {}
-            partialLocationsMap = {}
             try:
                 for blockName in list(blocks):
                     partialReplicas = set()
@@ -220,7 +222,6 @@ class DBSDataDiscovery(DataDiscovery):
             except Exception as exc:  # pylint: disable=broad-except
                 msg = f"Rucio lookup failed with\n{exc}"
                 self.logger.warning(msg)
-                locationsMap = None
 
             if locationsMap:
                 locationsFoundWithRucio = True
@@ -273,7 +274,6 @@ class DBSDataDiscovery(DataDiscovery):
                     ) from ex
             else:
                 self.logger.info("Trying data location of secondary dataset blocks with Rucio")
-                secondaryLocationsMap = {}
                 try:
                     for blockName in list(secondaryBlocks):
                         replicas = set()
@@ -287,7 +287,6 @@ class DBSDataDiscovery(DataDiscovery):
                 except Exception as exc:  # pylint: disable=broad-except
                     msg = f"Rucio lookup failed with\n{exc}"
                     self.logger.warning(msg)
-                    secondaryLocationsMap = None
             if not secondaryLocationsMap:
                 msg = f"No locations found for secondaryDataset {secondaryDataset}."
                 raise TaskWorkerException(msg)
@@ -298,6 +297,7 @@ class DBSDataDiscovery(DataDiscovery):
         # make a copy of locationsMap dictionary, so that manipulating it in keeOnlyDiskRSE
         # does not touch blocksWithLocation
         blocksWithLocation = locationsMap.copy().keys()
+        secondaryBlocksWithLocation = {} #
         if secondaryDataset:
             secondaryBlocksWithLocation = secondaryLocationsMap.copy().keys()
 
