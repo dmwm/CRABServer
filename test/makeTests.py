@@ -346,10 +346,10 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 # make sure that the secondary dataset was really used in cmsRun
 validationScript = """
-checkStatus ${taskName} COMPLETED
+checkStatus ${taskName} COMPFAIL
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "opened.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt"
+lookFor "request to open.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt"
 """
 if SL6:  # skip: primary input used for CMSSW_7 has different lumisection numbers from the dataset above
     validationScript = dummyTestScript
