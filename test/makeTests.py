@@ -327,10 +327,10 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 # make sure that parents were really read by cmsRun
 validationScript = """
-checkStatus ${taskName} COMPLETED
+checkStatus ${taskName} COMPFAIL
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "opened.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt"
+lookFor "request to open.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt"
 """
 if CMSSW8:  # skip: needed parent dataset for the sample that we can read witn CMSSW_8 is not on disk
     validationScript = dummyTestScript

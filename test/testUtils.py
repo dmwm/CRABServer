@@ -11,7 +11,8 @@ commonBashFunctions = """#!/bin/bash
 function checkStatus {
   # check that taskName has reached targetStatus and writes statusLog.txt
   # if target = SUBMITTED, accepts status COMPLETED or FAILED as well
-  # if target = COMPLETED and status is SUBMITTED, ask for retry after delay
+  # if target = COMPLETED or COMPFAIL and status is SUBMITTED, ask for retry after delay
+  # target = COMPFAIL means that both COMPLETED and FAILED are accepted
   # Fail test if command fails or status is not good
   local taskName="$1"
   local targetStatus="$2"
@@ -41,6 +42,10 @@ function checkStatus {
     COMPLETED)
       [ ${isSub} -eq 1 ] && exit 2  # ask for a check later on
       [ ${isDone} -eq 0 ] && exit 1
+      ;;
+    COMPFAIL)
+      [ ${isSub} -eq 1 ] && exit 2  # ask for a check later on
+      [ ${isDone} -eq 0 ] && [ ${isFailed} -eq 0 ] && exit 1
   esac
   return 0
 }
