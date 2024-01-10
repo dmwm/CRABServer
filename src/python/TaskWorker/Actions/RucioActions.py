@@ -34,7 +34,7 @@ class RucioAction():
         myConfig.Services.Rucio_account = self.rucioAccount
         self.rucioClient = getNativeRucioClient(myConfig, self.logger)  # pylint: disable=redefined-outer-name
 
-    def makeContainerFromBlockList(self, rucio=None, blockList=None, containerDid=None):
+    def makeContainerFromBlockList(self, blockList=None, containerDid=None):
         """ create container and fill with given blocks """
         scope = containerDid['scope']
         containerName = containerDid['name']
@@ -43,7 +43,7 @@ class RucioAction():
         # prepare container
         self.logger.info("Create Rucio container %s", containerName)
         try:
-            rucio.add_container(scope, containerName)
+            self.rucioClient.add_container(scope, containerName)
         except DataIdentifierAlreadyExists:
             self.logger.debug("Container name already exists in Rucio. Keep going")
         except Exception as e:
@@ -51,7 +51,7 @@ class RucioAction():
             raise TaskWorkerException(msg) from e
         # add block dids to container
         try:
-            rucio.attach_dids(scope, containerName, dids)
+            self.rucioClient.attach_dids(scope, containerName, dids)
         except DuplicateContent:
             self.logger.debug("Some dids are already in this container. Keep going")
         except Exception as e:
@@ -255,9 +255,7 @@ class RucioAction():
             myScope = f"user.{self.rucioAccount}"  # do not mess with cms scope
             containerName = f"/TapeRecall/{self.taskName.replace(':', '.')}/USER"
             containerDid = {'scope': myScope, 'name': containerName}
-            self.makeContainerFromBlockList(
-                rucio=self.rucioClient, blockList=dataToLock,
-                containerDid=containerDid)
+            self.makeContainerFromBlockList(blockList=dataToLock, containerDid=containerDid)
             # beware blockList being not subscriptable (e.g. dict_keys type)
             dbsDatasetName = next(iter(dataToLock)).split('#')[0]
         else:
