@@ -1,5 +1,6 @@
 from __future__ import division
 import FWCore.ParameterSet.Config as cms
+import FWCore.PythonUtilities.LumiList as LumiList
 
 process = cms.Process('NoSplit')
 
