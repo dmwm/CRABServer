@@ -120,7 +120,8 @@ def main():
         remake_dir = '_'.join(task.rstrip().split('_')[-3:])
         if not os.path.isdir(remake_dir):
             remake_dict = {'task': task, 'instance': instance}
-            remake_dir = crab_cmd({'cmd': 'remake', 'args': remake_dict})
+            outputDict = crab_cmd({'cmd': 'remake', 'args': remake_dict})
+            remake_dir = outputDict['workDir']
 
         status_dict = {'dir': remake_dir}
         status_command_output = crab_cmd({'cmd': 'status', 'args': status_dict})
