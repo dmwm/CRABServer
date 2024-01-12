@@ -3,7 +3,7 @@ import time
 from WMCore.Configuration import Configuration
 import os
 import datetime
-from CRABClient.UserUtilities import getUsernameFromCRIC
+from CRABClient.UserUtilities import getUsername
 
 now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 filename_nopy =  __file__.split('/')[-1][:-3]
