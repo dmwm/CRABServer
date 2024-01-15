@@ -3,29 +3,49 @@ from __future__ import print_function
 import os
 import sys
 import time
+import datetime
 import logging
-import htcondor
 import traceback
 import subprocess
 import errno
 import signal
-
-from socket import gethostname
-from pprint import pprint
 import json
+from pprint import pprint
+
+import htcondor
+from socket import gethostname
 import requests
+from requests.auth import HTTPBasicAuth
+
 from RESTInteractions import CRABRest
 
 hostname = os.uname()[1]
-hostAllowRun = 'crab-prod-tw01.cern.ch'
-if hostname != hostAllowRun:
+hostsAllowRun = ['crab-prod-tw02.cern.ch', 'crab-preprod-tw02.cern.ch',]
+if not hostname in hostsAllowRun:
+    print(f"running on {hostname}, but script allowed to run on {hostsAllowRun}")
     sys.exit(0)
 
 fmt = "%Y-%m-%dT%H:%M:%S%z"
-workdir = '/home/crab3/'
-logdir = '/home/crab3/logs/'
-now = time.localtime()
-logfile = 'GenMonit-%s%s.log' % (now.tm_year, now.tm_mon)
+workdir = '/data/srv/TaskManager/'
+logdir = '/data/srv/TaskManager/logs/'
+logfile = f'GenMonit-{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
+
+CMSWEB = 'cmsweb.cern.ch'
+DBINSTANCE = 'prod'
+CMSWEB_CERTIFICATE = '/data/certs/servicecert.pem'
+CMSWEB_KEY = '/data/certs/servicekey.pem'
+
+def readpwd():
+    """
+    Reads password from disk
+    """
+    with open(f"/data/certs/monit.d/MONIT-CRAB.json", encoding='utf-8') as f:
+        credentials = json.load(f)
+    return credentials["url"], credentials["username"], credentials["password"]
+MONITURL, MONITUSER, MONITPWD = readpwd()
+
+#======================================================================================================================================
+
 
 def send(document):
     """
@@ -37,14 +57,25 @@ def send(document):
     :param document:
     :return:
     """
-    return requests.post('http://monit-metrics:10012/', data=json.dumps(document),
-                         headers={"Content-Type": "application/json; charset=UTF-8"})
+    return requests.post(f"{MONITURL}", 
+                        auth=HTTPBasicAuth(MONITUSER, MONITPWD),
+                         data=json.dumps(document),
+                         headers={"Content-Type": "application/json; charset=UTF-8"},
+                         verify=False
+                         )
 
 
 def send_and_check(document, should_fail=False):
+    """
+    commend the `##PROD` section when developing, not to duplicate the data inside elasticsearch
+    """
+    ## DEV
+    # print(type(document), document)
+    # PROD
     response = send(document)
+    msg = 'With document: {0}. Status code: {1}. Message: {2}'.format(document, response.status_code, response.text)
     assert ((response.status_code in [200]) != should_fail), \
-        'With document: {0}. Status code: {1}. Message: {2}'.format(document, response.status_code, response.text)
+        msg
 
 def isRunningTooLong(pid):
     """
@@ -121,11 +152,12 @@ class CRAB3CreateJson(object):
         self.resthost = resthost
         self.pool = ''
         self.schedds = []
-        self.resthost = "cmsweb.cern.ch:8443"
-        self.crabserver = CRABRest(hostname=resthost, localcert='/data/certs/servicecert.pem',
-                                   localkey='/data/certs/servicekey.pem', retry=10,
-                                   userAgent='CRABTaskWorker')
-        self.crabserver.setDbInstance(dbInstance='prod')
+        self.resthost = "{CMSWEB}:8443"
+        self.crabserver = CRABRest(hostname=resthost, 
+                                   localcert=CMSWEB_CERTIFICATE,
+                                   localkey=CMSWEB_KEY, 
+                                   retry=10, userAgent='CRABTaskWorker')
+        self.crabserver.setDbInstance(dbInstance=DBINSTANCE)
         # use child collector on port 9620 to get schedd attributes
         collName = "cmsgwms-collector-global.cern.ch:9620,cmsgwms-collector-global.fnal.gov:9620"
         self.coll = htcondor.Collector(collName)
@@ -183,19 +215,19 @@ class CRAB3CreateJson(object):
         return data
 
     def execute(self):
-        subprocesses_config = 6
-        # In this case 5 + 1 MasterWorker process
-        sub_grep_command = "ps -ef | grep MasterWorker | grep -v 'grep' | wc -l"
-        # If any subprocess is dead or not working, modify percentage of availability
-        # If subprocesses are not working - service availability 0%
-        process_count = int(subprocess.Popen(sub_grep_command, shell=True, stdout=subprocess.PIPE,
-                                             stderr=subprocess.STDOUT).stdout.read())
+        # subprocesses_config = 6
+        # # In this case 5 + 1 MasterWorker process
+        # sub_grep_command = "ps -ef | grep MasterWorker | grep -v 'grep' | wc -l"
+        # # If any subprocess is dead or not working, modify percentage of availability
+        # # If subprocesses are not working - service availability 0%
+        # process_count = int(subprocess.Popen(sub_grep_command, shell=True, stdout=subprocess.PIPE,
+        #                                      stderr=subprocess.STDOUT).stdout.read())
 
-        if subprocesses_config == process_count:
-            # This means that everything is fine
-            self.jsonDoc['status'] = "available"
-        else:
-            self.jsonDoc['status'] = "degraded"
+        # if subprocesses_config == process_count:
+        #     # This means that everything is fine
+        #     self.jsonDoc['status'] = "available"
+        # else:
+        #     self.jsonDoc['status'] = "degraded"
 
         # Get the number of tasks per status
         twStatus = self.getCountTasksByStatus()
@@ -244,12 +276,12 @@ class CRAB3CreateJson(object):
                                          all_jobs=int(oneSchedd[6]),
                                         )
                 jsonDocSchedd = dict(
-                                producer='crab',
+                                producer=MONITUSER,
                                 type='schedd',
                                 hostname=gethostname(),
                                 name=scheddName,
                                 idb_tags=["name"], # for InfluxDB
-                                idb_fields=influxDb_measures.keys(), # for InfluxDB
+                                idb_fields=list(influxDb_measures.keys()), # for InfluxDB
                                 )
                 jsonDocSchedd.update(influxDb_measures)
 
@@ -296,12 +328,13 @@ def main():
     start_time = time.time()
     resthost = 'cmsweb.cern.ch'
     logger = logging.getLogger()
-    #handler = logging.StreamHandler(sys.stdout)
-    handler = logging.FileHandler(logdir + logfile)
+    handler1 = logging.StreamHandler(sys.stdout)
+    logger.addHandler(handler1)
+    handler2 = logging.FileHandler(logdir + logfile)
     formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s",
                                   datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    handler2.setFormatter(formatter)
+    logger.addHandler(handler2)
     logger.setLevel(logging.INFO)
 
     # see comments above about InfluxDB tags and fields, they are added but will not be used by MONIT
@@ -311,10 +344,10 @@ def main():
                              total_idle_tasks=0,
                              total_running_tp=0)
     jsonDoc = dict(
-                   producer='crab',
+                   producer=MONITUSER,
                    type='taskworker',
                    hostname=gethostname(),
-                   idb_fields=influxDb_measures.keys(), # for InfluxDB
+                   idb_fields=list(influxDb_measures.keys()), # for InfluxDB
                    )
     jsonDoc.update(influxDb_measures)
 
@@ -330,7 +363,7 @@ def main():
         if os.stat(lockFile).st_size == 0:
             logger.error("Lockfile is empty.")
         else:
-            with open(lockFile, 'r') as lf:
+            with open(lockFile, 'r', encoding='utf-8') as lf:
                 oldProcess = int(lf.read())
             try:
                 if isRunning(oldProcess):
@@ -359,7 +392,7 @@ def main():
 
     # Put PID in the lockfile
     currentPid = str(os.getpid())
-    with open(lockFile, 'w') as lf:
+    with open(lockFile, 'w', encoding='utf-8') as lf:
         lf.write(currentPid)
 
     logger.info('Lock created. Start data collection')
