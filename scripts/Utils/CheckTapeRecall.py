@@ -6,31 +6,92 @@ usage:  python3 CheckTapeRecall.py
 example output:
 """
 
-import os
 import sys
 import time
 import pandas as pd
+import logging
+import datetime
+import json
+from socket import gethostname
+
+import requests
+from requests.auth import HTTPBasicAuth
 
 from RESTInteractions import CRABRest
 from ServerUtilities import encodeRequest
 
+workdir = '/data/srv/monit/'
+logdir = '/data/srv/monit/logs/'
+logfile = f'GenMonit-{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
+
+def readpwd():
+    """
+    Reads password from disk
+    """
+    with open(f"/data/certs/monit.d/MONIT-CRAB.json", encoding='utf-8') as f:
+        credentials = json.load(f)
+    return credentials["url"], credentials["username"], credentials["password"]
+MONITURL, MONITUSER, MONITPWD = readpwd()
+
+def send(document):
+    """
+    sends this document to Elastic Search via MONIT
+    the document may contain InfluxDB data, but those will be ignored unless the end point
+    in MONIT is changed. See main code body for more
+    Currently there is no need for using InfluxDB, see discussion in
+    https://its.cern.ch/jira/browse/CMSMONIT-72?focusedCommentId=2920389&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-2920389
+    :param document:
+    :return:
+    """
+    return requests.post(f"{MONITURL}", 
+                        auth=HTTPBasicAuth(MONITUSER, MONITPWD),
+                         data=json.dumps(document),
+                         headers={"Content-Type": "application/json; charset=UTF-8"},
+                         verify=False
+                         )
+
+
+def send_and_check(document, should_fail=False):
+    """
+    commend the `##PROD` section when developing, not to duplicate the data inside elasticsearch
+    """
+    ## DEV
+    # print(type(document), document)
+    # PROD
+    response = send(document)
+    msg = 'With document: {0}. Status code: {1}. Message: {2}'.format(document, response.status_code, response.text)
+    assert ((response.status_code in [200]) != should_fail), \
+        msg
+    print(msg)
 
 def main():
     """
         get all rules for this account, find pending ones,
         order, pretty format, print them and write an HTML file
     """
-    rucio, crab = ensureEnvironment()
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    handler1 = logging.StreamHandler(sys.stdout)
+    logger.addHandler(handler1)
+    handler2 = logging.FileHandler(logdir + logfile)
+    formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s",
+                                  datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)")
+    handler2.setFormatter(formatter)
+    logger.addHandler(handler2)
+    logger.setLevel(logging.INFO)
+
+    rucio, crab = ensureEnvironment(logger)
     account = 'crab_tape_recall'
 
     # get rules for this account
     ruleGen = rucio.list_replication_rules({'account': account})
     rules = list(ruleGen)
-    print(f"{len(rules)} rules exist for account: {account}")
+    logger.info(f"{len(rules)} rules exist for account: {account}")
 
     # make a DataFrame
     df = pd.DataFrame(rules)
-    print(df.groupby('state').size())  # count by state
+    logger.info(df.groupby('state').size())  # count by state
 
     # transform created_at to number of days
     today = pd.Timestamp.now()
@@ -44,12 +105,15 @@ def main():
 
     # combine all pending rules in a single dataframe
     pending = pd.concat([stuck, replicating, suspended]).reset_index(drop=True)
+    pending_compact = createRulesDataframe(pending, rucio, crab, logger)
 
     # prepare an HTML table
-    if pending.empty:
+    if pending_compact.empty:
         rulesTable = "<tr><td><center>No rules either in replicating nor stuck</center></td></tr>"
+        rulesJson = [{}]
     else:
-        rulesTable = createRulesHtmlTable(pending, rucio, crab)
+        rulesTable = createRulesHtmlTable(pending_compact)
+        rulesJson = createRulesJson(pending_compact)
 
     # write an HTML doc
     beginningOfDoc = '<!DOCTYPE html>\n<html>\n'
@@ -64,8 +128,10 @@ def main():
         fh.write(rulesTable)
         fh.write(endOfDoc)
 
+    # send document to opensearch
+    send_and_check(rulesJson)
 
-def createRulesHtmlTable(pending, rucio, crab):
+def createRulesDataframe(pending, rucio, crab, logger=None):
     """
     reformat the datafram into a compact-looking HTML table
     """
@@ -75,45 +141,79 @@ def createRulesHtmlTable(pending, rucio, crab):
     # extract CRAB user name from rule comment (ouch ! FRAGILE !)
     pending['user'] = pending.apply(lambda x: findUserNameForRule(rucio, x.id), axis=1)
 
-    # add and URL pointing to rule in Rucio UI
-    urlBase = '<a href="https://cms-rucio-webui.cern.ch/rule?rule_id=%s">%s</a>'
-    pending['idUrl'] = pending.apply(lambda x: (urlBase % (x.id, x.id)), axis=1)
+    # # add and URL pointing to rule in Rucio UI
+    # urlBase = '<a href="https://cms-rucio-webui.cern.ch/rule?rule_id=%s">%s</a>'
+    # pending['idUrl'] = pending.apply(lambda x: (urlBase % (x.id, x.id)), axis=1)
 
     # add tape locations
-    print("finding tape source for all pending rules (takes some time...)")
+    logger.info("finding tape source for all pending rules (takes some time...)")
     pending['tape'] = pending.apply(lambda x: findTapesForRule(rucio, x.id), axis=1)
 
-    print('Add (DBS) dataset name ...')
+    logger.info('Add (DBS) dataset name ...')
     pending['dataset'] = pending.apply(lambda x: findDatasetForRule(rucio, x.id), axis=1)
-    print('... and size')
+    logger.info('... and size')
     pending['size'] = pending.apply(lambda x: findDatasetSize(rucio, x.dataset), axis=1)
-    print("Done!")
+    logger.info("Done!")
 
-    print('compute a short Url for each dataset')
-    pending['datasetUrl'] = pending.apply(lambda x: createDatasetUrl(x.dataset), axis=1)
+    # logger.info('compute a short Url for each dataset')
+    # pending['datasetUrl'] = pending.apply(lambda x: createDatasetUrl(x.dataset), axis=1)
 
-    print('find tasks using these rules')
+    logger.info('find tasks using these rules')
     pending['tasks'] = pending.apply(lambda x: findTasksForRule(crab, x.id), axis=1)
-    print("Done!")
+    logger.info("Done!")
 
-    print('compute a short Url for each task')
-    pending['taskUrls'] = pending.apply(lambda x: createTaskUrl(x.tasks), axis=1)
-    print("Done!")
-
-    # select interesting columns
-    selected = pending[['id', 'state', 'user', 'locks', 'days', 'tape', 'size', 'datasetUrl', 'taskUrls']]
-    rulesToPrint = selected.rename(columns={'locks': 'locks ok/rep/st', 'size': 'size TB'})
-    print(rulesToPrint.to_string())
+    # logger.info('compute a short Url for each task')
+    # pending['taskUrls'] = pending.apply(lambda x: createTaskUrlHtml(x.tasks), axis=1)
+    # logger.info("Done!")
 
     # create an HTML table
-    selected = pending[['idUrl', 'state', 'user', 'locks', 'days', 'tape', 'size', 'datasetUrl', 'taskUrls']]
-    renamed = selected.rename(columns={'locks': 'locks ok/rep/st', 'size': 'size TB'})
-    rulesToHtml = renamed.to_html(escape=False)
+    # rulesToHtml = renamed.to_html(escape=False)
 
-    return rulesToHtml
+    # return rulesToHtml
+    return pending
 
+def createRulesHtmlTable(df):
+    # add and URL pointing to rule in Rucio UI
+    urlBase = '<a href="https://cms-rucio-webui.cern.ch/rule?rule_id=%s">%s</a>'
+    df['idUrl'] = df.apply(lambda x: (urlBase % (x.id, x.id)), axis=1)
 
-def createTaskUrl(tasks):
+    # logger.info('compute a short Url for each task')
+    df['taskUrls'] = df.apply(lambda x: createTaskUrlHtml(x.tasks), axis=1)
+
+    # logger.info('compute a short Url for each dataset')
+    df['datasetUrl'] = df.apply(lambda x: createDatasetUrlHtml(x.dataset), axis=1)
+
+    selected = df[['idUrl', 'state', 'user', 'locks', 'days', 'tape', 'size', 'datasetUrl', 'taskUrls']]
+    pending_compact = selected.rename(columns={'locks': 'locks ok/rep/st', 'size': 'size TB'})
+    _ = selected.rename(columns={'locks': 'locks ok/rep/st', 'size': 'size TB'})
+
+    return pending_compact.to_html(escape=False)
+
+def createRulesJson(df):
+    df = df[['id', 'state', 'user', 'locks', 'days', 'tape', 'size', 'dataset', 'tasks']]
+
+    # logger.info('compute a short Url for each task')
+    df['task0'] = df.apply(lambda x: x.tasks[-1], axis=1)
+    df['tasks_1toN'] = df.apply(lambda x: x.tasks[:-1] if len(x.tasks) >= 2 else [], axis=1)
+    df['tasks_num'] = df.apply(lambda x: len(x.tasks), axis=1)
+
+    df['dataset_short'] = df.apply(lambda x: createDatasetShortJson(x.dataset), axis=1)
+
+    rules_string = df.to_json(orient="split")
+    rules_dict = json.loads(rules_string)
+    rules_opensearch = []
+    for rule in rules_dict["data"]:
+        rule_opensearch = dict(
+            producer=MONITUSER,
+            type='checktaperecall',
+            hostname=gethostname(),
+        )
+        for key, value in zip(rules_dict["columns"], rule):
+            rule_opensearch[key] = value
+        rules_opensearch.append(rule_opensearch)
+    return rules_opensearch
+
+def createTaskUrlHtml(tasks):
     """
     create an URL reference string for HTML pointing to task info in CRABRest UI
     use ahortened task name (timstamp:user) as link in the table
@@ -126,8 +226,19 @@ def createTaskUrl(tasks):
         hrefList.append(href)
     return hrefList
 
+def createTaskUrlJson(tasks):
+    """
+    create an URL reference string for HTML pointing to task info in CRABRest UI
+    use ahortened task name (timstamp:user) as link in the table
+    """
+    urlBase = 'https://cmsweb.cern.ch/crabserver/ui/task/%s'
+    hrefList = []
+    for task in tasks:
+        href = urlBase % (task)
+        hrefList.append(href)
+    return hrefList
 
-def createDatasetUrl(dataset):
+def createDatasetUrlHtml(dataset):
     """
     create an URL reference string for HTML pointing to dataset info in DAS Web UI
     use shortened dataset name as link in the table
@@ -146,6 +257,22 @@ def createDatasetUrl(dataset):
     href = f'<a href="{dasUrl}">{shortDS}</a>'
     return href
 
+def createDatasetShortJson(dataset):
+    """
+    create an URL reference string for HTML pointing to dataset info in DAS Web UI
+    use shortened dataset name as link in the table
+    """
+
+    # shorten dataset name picking only first word of A and B in /A/B/Tier
+    # use either _ or - as word separators
+    primaryDS = dataset.split('/')[1]
+    processedDS = dataset.split('/')[2]
+    datatier = dataset.split('/')[3]
+    prim = primaryDS.replace('_', '-').split('-')[0]
+    proc = processedDS.replace('_', '-').split('-')[0]
+    shortDS = '/'.join(['', prim, proc, datatier])
+
+    return shortDS
 
 def findUserNameForRule(rucioClient=None, ruleId=None):
     """
@@ -239,24 +366,26 @@ def findDatasetSize(rucioClient=None, dataset=None):
     return size
 
 
-def ensureEnvironment():
+def ensureEnvironment(logger=None):
     """
     make sure we can run Rucio client and talk with CRAB
     """
     try:
         from rucio.client import Client
     except ModuleNotFoundError:
-        print("Setup Rucio first via:\n" +
+        logger.info("Setup Rucio first via:\n" +
               "export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/\n" +
               "export RUCIO_HOME=/cvmfs/cms.cern.ch/rucio/current/\n" +
-              "export RUCIO_ACCOUNT=`whoami`")
+              "export RUCIO_ACCOUNT='crab_server'")
         sys.exit()
     # make sure Rucio client is initialized, this also ensures X509 proxy
-    rucio = Client()
+    rucio = Client(
+        creds={"client_cert": "/data/certs/robotcert.pem", "client_key": "/data/certs/robotkey.pem"},
+        auth_type='x509',
+    )
 
-    proxy = os.environ['X509_USER_PROXY']
-    crab = CRABRest(hostname='cmsweb.cern.ch', localcert=proxy,
-                    localkey=proxy, userAgent='CheckTapeRecall')
+    crab = CRABRest(hostname='cmsweb.cern.ch', localcert="/data/certs/servicecert.pem",
+                    localkey="/data/certs/servicekey.pem", userAgent='CheckTapeRecall')
     crab.setDbInstance('prod')
 
     return rucio, crab
