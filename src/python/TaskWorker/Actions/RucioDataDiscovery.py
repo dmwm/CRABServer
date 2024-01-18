@@ -13,13 +13,14 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 from RucioUtils import getNativeRucioClient
 
+
 class RucioDataDiscovery(DataDiscovery):
     """Performing the data discovery through CMS Rucio service.
     """
 
     # disable pylint warning in next line since they refer to conflict with the main()
     # at the bottom of this file which is only used for testing
-    def __init__(self, config, crabserver='', procnum=-1, rucioClient=None): # pylint: disable=redefined-outer-name
+    def __init__(self, config, crabserver='', procnum=-1, rucioClient=None):  # pylint: disable=redefined-outer-name
         DataDiscovery.__init__(self, config, crabserver, procnum)
         self.rucioClient = rucioClient
 
@@ -40,7 +41,7 @@ class RucioDataDiscovery(DataDiscovery):
     def executeInternal(self, *args, **kwargs):  # pylint: disable=unused-argument
         """ real work happens here """
 
-        self.logger.info("Data discovery with Rucio") ## to be changed into debug
+        self.logger.info("Data discovery with Rucio")  # to be changed into debug
 
         self.taskName = kwargs['task']['tm_taskname']           # pylint: disable=W0201
         self.username = kwargs['task']['tm_username']           # pylint: disable=W0201
@@ -75,8 +76,8 @@ class RucioDataDiscovery(DataDiscovery):
         if not datasets:
             raise TaskWorkerException(f"Rucio DID {rucioScope}:{rucioContainer} not existing or empty")
 
-        ## Create a map for block's locations: for each block get the list of locations.
-        ## locationsMap is a dictionary, key=blockName, value=list of RSE's
+        # Create a map for block's locations: for each block get the list of locations.
+        # locationsMap is a dictionary, key=blockName, value=list of RSE's
         # TODO move to a utility function common with DBSDataDiscovery
         # something like
         # (locationsMap, dataSize) = self.locateData(list_of_rucio_datasets)
@@ -104,12 +105,12 @@ class RucioDataDiscovery(DataDiscovery):
             self.logger.warning(msg)
             locationsMap = None
 
-        self.logger.debug("Dataset size in GBytes: %s", totalSizeBytes/1e9)
+        self.logger.debug("Dataset size in GBytes: %s", totalSizeBytes / 1e9)
 
         if not locationsMap:
             self.logger.warning("No locations found with Rucio for %s", rucioDID)
             raise TaskWorkerException(
-                "CRAB server could not get data locations from Rucio.\n" +
+                "CRAB server could not get data locations from Rucio.\n" + \
                 "This is could be a temporary Rucio glitch, please try to submit a new task (resubmit will not work)" + \
                 " and contact the experts if the error persists."
                 )
@@ -158,15 +159,15 @@ class RucioDataDiscovery(DataDiscovery):
                     filedetails[lfn] = copy.deepcopy(detail)
         except Exception as ex:
             self.logger.exception(ex)
-            raise TaskWorkerException("CRAB could not contact Rucio to get file list.\n"+\
-                                "This could be a temporary glitch. Try to submit a new task (resubmit will not work)"+\
-                                f" and contact the experts if the error persists.\nError reason: {ex}") from ex
+            raise TaskWorkerException("CRAB could not contact Rucio to get file list.\n" + \
+                                      "This could be a temporary glitch. Try to submit a new task (resubmit will not work)" + \
+                                      f" and contact the experts if the error persists.\nError reason: {ex}") from ex
         if not filedetails:
-            raise TaskWorkerException("Cannot find any file inside the dataset. Check dataset scope and name\n" +\
-                                "Aborting submission. Submitting your task again will not help.")
+            raise TaskWorkerException("Cannot find any file inside the dataset. Check dataset scope and name\n" + \
+                                      "Aborting submission. Submitting your task again will not help.")
 
-        ## Format the output creating the data structures required by WMCore. Filters out invalid files,
-        ## files whose block has no location, and figures out the PSN
+        # Format the output creating the data structures required by WMCore. Filters out invalid files,
+        # files whose block has no location, and figures out the PSN
         result = self.formatOutput(task=kwargs['task'], requestname=self.taskName,
                                    datasetfiles=filedetails, locations=locationsMap,
                                    tempDir=kwargs['tempDir'])
@@ -182,12 +183,13 @@ class RucioDataDiscovery(DataDiscovery):
 
         return result
 
+
 if __name__ == '__main__':
-    ###
+    #
     # Usage: python3 RucioDataDiscovery.py rucioScope dbsDataset
     #
     # Example: python3 /data/repos/CRABServer/src/python/TaskWorker/Actions/RucioDataDiscovery.py cms /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
-    ###
+    #
     scope = sys.argv[1]
     container = sys.argv[2]
     rucioDid = f"{scope}:{container}"
