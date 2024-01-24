@@ -166,6 +166,8 @@ def getDBSInputInformation(taskname=None, crabServer=None):
     # TODO THERE are better ways to parse rest output into a dict !!
     inputDatasetIndex = results[0]['desc']['columns'].index("tm_input_dataset")
     inputDataset = results[0]['result'][inputDatasetIndex]
+    # in case input was a Rucio container, remove the scope if any
+    inputDataset = inputDataset.split(':')[-1]
     sourceURLIndex = results[0]['desc']['columns'].index("tm_dbs_url")
     sourceURL = results[0]['result'][sourceURLIndex]
     publishURLIndex = results[0]['desc']['columns'].index("tm_publish_dbs_url")
