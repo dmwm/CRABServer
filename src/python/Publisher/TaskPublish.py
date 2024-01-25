@@ -536,6 +536,8 @@ def publishInDBS3(config, taskname, verbose):
     try:
         inputDatasetIndex = results[0]['desc']['columns'].index("tm_input_dataset")
         inputDataset = results[0]['result'][inputDatasetIndex]
+        # in case input was a Rucio container, remove the scope if any
+        inputDataset = inputDataset.split(':')[-1]
         sourceURLIndex = results[0]['desc']['columns'].index("tm_dbs_url")
         sourceURL = results[0]['result'][sourceURLIndex]
         publish_dbs_urlIndex = results[0]['desc']['columns'].index("tm_publish_dbs_url")
