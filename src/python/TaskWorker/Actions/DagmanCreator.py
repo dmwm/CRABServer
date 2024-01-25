@@ -707,7 +707,7 @@ class DagmanCreator(TaskAction):
             argDict['scriptExe'] = kw['task']['tm_scriptexe'] #
             argDict['eventsPerLumi'] = kw['task']['tm_events_per_lumi'] #
             argDict['maxRuntime'] = kw['task']['max_runtime'] #-1
-            argDict['scriptArgs'] = json.dumps(kw['task']['tm_scriptargs']).replace('"', r'\"\"') #'[]'
+            argDict['scriptArgs'] = kw['task']['tm_scriptargs']
             argDict['CRAB_AdditionalOutputFiles'] = info['addoutputfiles_flatten']
             #The following two are for fixing up job.submit files
             argDict['CRAB_localOutputFiles'] = dagspec['localOutputFiles']
