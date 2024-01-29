@@ -289,78 +289,27 @@ def handleException(exitAcronym, exitCode, exitMsg):
 
 def parseArgs():
     parser = PassThroughOptionParser()
-    parser.add_option('-a',
-                      dest='archiveJob',
-                      type='string')
-    parser.add_option('-o',
-                      dest='outFiles',
-                      type='string')
-    parser.add_option('-r',
-                      dest='runDir',
-                      type='string')
-    parser.add_option('--inputFile',
-                      dest='inputFile',
-                      type='string')
-    parser.add_option('--sourceURL',
-                      dest='sourceURL',
-                      type='string')
-    parser.add_option('--jobNumber',
-                      dest='jobNumber',
-                      type='string')
-    parser.add_option('--cmsswVersion',
-                      dest='cmsswVersion',
-                      type='string')
-    parser.add_option('--scramArch',
-                      dest='scramArch',
-                      type='string')
-    parser.add_option('--runAndLumis',
-                      dest='runAndLumis',
-                      type='string',
-                      default=None)
-    parser.add_option('--lheInputFiles',
-                      dest='lheInputFiles',
-                      type='string',
-                      default='False')
-    parser.add_option('--firstEvent',
-                      dest='firstEvent',
-                      type='string',
-                      default=0)
-    parser.add_option('--firstLumi',
-                      dest='firstLumi',
-                      type='string',
-                      default=None)
-    parser.add_option('--lastEvent',
-                      dest='lastEvent',
-                      type='string',
-                      default=-1)
-    parser.add_option('--firstRun',
-                      dest='firstRun',
-                      type='string',
-                      default=None)
-    parser.add_option('--seeding',
-                      dest='seeding',
-                      type='string',
-                      default=None)
-    parser.add_option('--userFiles',
-                      dest='userFiles',
-                      type='string')
-    parser.add_option('--oneEventMode',
-                      dest='oneEventMode',
-                      default=0)
-    parser.add_option('--scriptExe',
-                      dest='scriptExe',
-                      type='string')
-    parser.add_option('--scriptArgs',
-                      dest='scriptArgs',
-                      type='string')
-    parser.add_option('--eventsPerLumi',
-                      dest='eventsPerLumi',
-                      type='string',
-                      default=None)
-    parser.add_option('--maxRuntime',
-                      dest='maxRuntime',
-                      type='string',
-                      default=None)
+    parser.add_option('--json', dest='jsonArgFile', type='string')
+    parser.add_option('-a', dest='archiveJob', type='string')
+    parser.add_option('-o', dest='outFiles', type='string')
+    parser.add_option('--inputFile', dest='inputFile', type='string')
+    parser.add_option('--sourceURL', dest='sourceURL', type='string')
+    parser.add_option('--jobNumber', dest='jobNumber', type='string')
+    parser.add_option('--cmsswVersion', dest='cmsswVersion', type='string')
+    parser.add_option('--scramArch', dest='scramArch', type='string')
+    parser.add_option('--runAndLumis', dest='runAndLumis', type='string', default=None)
+    parser.add_option('--lheInputFiles', dest='lheInputFiles', type='string', default='False')
+    parser.add_option('--firstEvent', dest='firstEvent', type='string', default=0)
+    parser.add_option('--firstLumi', dest='firstLumi', type='string', default=None)
+    parser.add_option('--lastEvent', dest='lastEvent', type='string', default=-1)
+    parser.add_option('--firstRun', dest='firstRun', type='string', default=None)
+    parser.add_option('--seeding', dest='seeding', type='string', default=None)
+    parser.add_option('--userFiles', dest='userFiles', type='string')
+    parser.add_option('--oneEventMode', dest='oneEventMode', default=0)
+    parser.add_option('--scriptExe', dest='scriptExe', type='string')
+    parser.add_option('--scriptArgs', dest='scriptArgs', type='string')
+    parser.add_option('--eventsPerLumi', dest='eventsPerLumi', type='string', default=None)
+    parser.add_option('--maxRuntime', dest='maxRuntime', type='string', default=None)
 
     (opts, _) = parser.parse_args(sys.argv[1:])
 
@@ -373,10 +322,28 @@ def parseArgs():
         if value == 'None':
             setattr(opts, name, None)
 
+    # allow for most input arguments to be passed via a JSON file
+    # in this case only -r and --JobNumber need to be present as arguments
+    if getattr(opts, 'jsonArgFile', None):
+        with open(opts.jsonArgFile, 'r', encoding='UTF-8') as fh:
+            arguments = json.load(fh)
+        for key, value in arguments.items():
+            setattr(opts, key, value)
+
+    # JSON file has the string "None" to mean no value, we like python None better
+    for name, value in vars(opts).items():
+        if value == 'None':
+            setattr(opts, name, None)
+
+    # set default values for non-string args (should move to DagmanCreator)
+    opts.firstEvent = 0 if not opts.firstEvent else opts.firstEvent
+    opts.lastEvent = -1 if not opts.lastEvent else opts.lastEvent
+    opts.oneEventMode = 0 if not opts.oneEventMode else opts.oneEventMode
+    opts.lheInputFiles = False if not opts.lheInputFiles else opts.lheInputFiles
+
     try:
         print(f"==== Parameters Dump at {UTCNow()} ===")
         print("archiveJob:    ", opts.archiveJob)
-        print("runDir:        ", opts.runDir)
         print("sourceURL:     ", opts.sourceURL)
         print("jobNumber:     ", opts.jobNumber)
         print("cmsswVersion:  ", opts.cmsswVersion)
@@ -397,7 +364,7 @@ def parseArgs():
         print("scriptArgs:    ", opts.scriptArgs)
         print("maxRuntime:    ", opts.maxRuntime)
         print("===================")
-    except Exception:  # pylint: disable=broad-except
+    except NameError:
         name, value, _ = sys.exc_info()
         print(f"ERROR: missing parameters: {name} - {value}")
         handleException("FAILED", EC_MissingArg, f"CMSRunAnalysisERROR: missing parameters: {name} - {value}")
@@ -738,10 +705,16 @@ if __name__ == "__main__":
             # make sure scriptexe is executable
             st = os.stat(options.scriptExe)
             os.chmod(options.scriptExe, st.st_mode | stat.S_IEXEC)
+            # make sure arguments are a string of space separeted k=v, suited as shell command argument
+            if isinstance(options.scriptArgs, list):
+                scriptArguments = ' '.join(options.scriptArgs)
+            if isinstance(options.scriptArgs, str):
+                scriptArguments = ' '.join(json.loads(options.scriptArgs))
             command += (os.getcwd()
                         + f"/{options.scriptExe}  {options.jobNumber}"
-                        + f" {' '.join(json.loads(options.scriptArgs))}")
+                        + f" {scriptArguments}")
         command += " > cmsRun-stdout.log.tmp 2>&1"
+        print(f"==== Will execute {command}")
         applicationExitCode = executeUserApplication(cmd=command, scramTool=scram, cleanEnv=False)
         if applicationExitCode:
             print(f"==== Execution FAILED at {UTCNow()} ====")
