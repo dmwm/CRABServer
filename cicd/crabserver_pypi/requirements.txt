@@ -1,3 +1,6 @@
+# Original dependencies from WMCore's requirements.txt
+# https://github.com/dmwm/WMCore/blob/9c6e83d1d23983c0296eee318c9e6255ff80d01b/requirements.txt
+# Lesser deps but match the version with upstream.
 Cheetah3==3.2.6.post1
 CherryPy==18.8.0
 CMSMonitoring==0.6.11

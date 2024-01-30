@@ -1,4 +1,5 @@
 #! /bin/bash
+# Container main process.
 
 # run monitoring script
 if [ -f /data/monitor.sh ]; then
