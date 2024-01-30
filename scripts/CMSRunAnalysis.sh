@@ -67,7 +67,7 @@ echo "==== Local directory contents dump FINISHING ===="
 echo "======== CMSRunAnalysis.py STARTING at $(TZ=GMT date) ========"
 echo "Now running the CMSRunAnalysis.py job in `pwd`..."
 set -x
-$pythonCommand CMSRunAnalysis.py -r "`pwd`" "$@"
+$pythonCommand CMSRunAnalysis.py "$@"
 jobrc=$?
 set +x
 echo "== The job had an exit code of $jobrc "
