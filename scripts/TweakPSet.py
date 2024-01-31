@@ -97,7 +97,7 @@ def createTweakingCommandLines(cmd, pklIn, pklOut):
     If command fails pklIn is left unchanged, otherwise it is overwritten with pklOut
     """
     cmdLines = "\n#\n"
-    cmdLines += f'cmd="{cmd}"\n"'
+    cmdLines += f'cmd="{cmd}"\n'
     cmdLines += 'echo "will execute: "$cmd\n'
     cmdLines += '$cmd\n'
     cmdLines += 'ec=$?\n'
