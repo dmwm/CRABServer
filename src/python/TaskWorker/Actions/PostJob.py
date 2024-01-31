@@ -20,6 +20,7 @@
 # pylint: disable=W0511   # do not barf on "TODO" comments
 # pylint: disable=too-many-nested-blocks, too-many-branches, too-many-locals, no-self-use
 # pylint: disable=too-many-statements, too-many-instance-attributes, too-many-public-methods
+# pylint: too-many-lines, disable=consider-using-f-string
 # yeah, we have a lot of try-except where we do not bother to spell specific exceptions
 # pylint: disable=broad-except
 
@@ -1516,6 +1517,39 @@ class PostJob():
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+    def reportReadBranches(self, branchList=None, username=None, inputDataset=None, taskName=None):
+        """ send to MONIT / ElasticSearch the list of Read Branches """
+        import requests
+        from requests.auth import HTTPBasicAuth
+
+        # get secrets
+        with open('/home/grid/crabtw/MONIT-CRAB-TEST.json', 'r', encoding='utf-8') as fp:
+            secrets = json.load(fp)
+        user = secrets['username']
+        password = secrets['password']
+        self.logger.info(f"Reporting Branches as USER: {user}")
+
+        monitUrl = f"https://monit-metrics.cern.ch:10014/{user}"
+        # prepare a data dictionary
+        docToSend = {"producer": user,
+                     "type": "branches",
+                     "branches": branchList,  # a list of strings
+                     "inputDataset": inputDataset.split(':')[-1],  # strip rucio scope if any
+                     "inputDataTier": inputDataset.split('/')[-1],
+                     "username": username,
+                     "taskname": taskName,
+                     }
+        # POST data as JSON
+        r = requests.post(url=monitUrl,
+                          auth=HTTPBasicAuth(user, password),
+                          data=json.dumps(docToSend),
+                          headers={"Content-Type": "application/json; charset=UTF-8"},
+                          verify=False
+                          )
+        self.logger.info(f"List of Brancehs sent to MONIT with status {r.status_code}. Output {r.text}")
+
+    ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
     def execute(self, *args, **kw):
         """
         The execute method of PostJob.
@@ -2655,6 +2689,20 @@ class PostJob():
         ##
         self.aso_start_time = self.job_report.get("aso_start_time", None)
         self.aso_start_timestamp = self.job_report.get("aso_start_timestamp", None)
+
+        # As last step, if ths is the first job in the task and it was successful,
+        # and it is first retry, and there is an input dataset,
+        # report to MONIT the list of read branches
+        # Make sure that this never stops normal flow, even if it fails
+        try:
+            if (int(self.job_id) == 1 and self.crab_retry == 0 and self.job_report['exitCode'] == 0)\
+                    and self.job_ad['DESIRED_CMSDataset'] is not 'Unknown':
+                self.reportReadBranches(branchList=self.job_report['steps']['cmsRun']['ReadBranches'],
+                                        username=self.job_ad['CRAB_UserHN'],
+                                        inputDataset=self.job_ad['DESIRED_CMSDataset'],
+                                        taskName=self.job_ad['CRAB_ReqName'])
+        except Exception:
+            pass
 
         return 0
 
