@@ -335,11 +335,9 @@ def parseArgs():
         if value == 'None':
             setattr(opts, name, None)
 
-    # set default values for non-string args (should move to DagmanCreator)
-    opts.firstEvent = 0 if not opts.firstEvent else opts.firstEvent
-    opts.lastEvent = -1 if not opts.lastEvent else opts.lastEvent
-    opts.oneEventMode = 0 if not opts.oneEventMode else opts.oneEventMode
-    opts.lheInputFiles = False if not opts.lheInputFiles else opts.lheInputFiles
+    # set default values for args which may be missing in the JSON file
+    if not hasattr(opts, 'oneEventMode'):
+        setattr(opts, 'oneEventMode', 0)
 
     try:
         print(f"==== Parameters Dump at {UTCNow()} ===")
