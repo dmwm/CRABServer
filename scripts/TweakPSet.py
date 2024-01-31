@@ -54,7 +54,6 @@ oneEventMode:   toggles one event mode
 eventsPerLumi:  start a new lumi section after the specified amount of events.  None disables this.
 
 """
-from __future__ import print_function
 
 import os
 import shutil
@@ -64,28 +63,30 @@ from ast import literal_eval
 from PSetTweaks.PSetTweak import PSetTweak
 from Utils.Utilities import decodeBytesToUnicode
 
+
 def readFileFromTarball(filename, tarball):
+    """ returns a string with the content of once file in a tarball """
     content = '{}'
     if os.path.isfile(filename):
         # This is only for Debugging
         print('DEBUGGING MODE!')
-        with open(filename, 'r') as f:
+        with open(filename, 'r', encoding='utf-8') as f:
             content = f.read()
         return literal_eval(content)
-    elif not os.path.exists(tarball):
-        raise RuntimeError("Error getting %s file location" % tarball)
-    tar_file = tarfile.open(tarball)
-    for member in tar_file.getmembers():  # pylint: disable=unused-variable
+    if not os.path.exists(tarball):
+        raise RuntimeError(f"Error getting {tarball} file location")
+    tarFile = tarfile.open(tarball)
+    for member in tarFile.getmembers():  # pylint: disable=unused-variable
         try:
-            f = tar_file.extractfile(filename)
+            f = tarFile.extractfile(filename)
             content = f.read()
             content = decodeBytesToUnicode(content)
             break
         except KeyError as er:
             # Don`t exit due to KeyError, print error. EventBased and FileBased does not have run and lumis
-            print('Failed to get information from tarball %s and file %s. Error : %s' % (tarball, filename, er))
+            print(f"Failed to get information from tarball {tarball} and file {filename}. Error : {er}")
             break
-    tar_file.close()
+    tarFile.close()
     return literal_eval(content)
 
 
@@ -96,14 +97,14 @@ def createTweakingCommandLines(cmd, pklIn, pklOut):
     If command fails pklIn is left unchanged, otherwise it is overwritten with pklOut
     """
     cmdLines = "\n#\n"
-    cmdLines += 'cmd="%s"\n' % cmd
+    cmdLines += f'cmd="{cmd}"\n"'
     cmdLines += 'echo "will execute: "$cmd\n'
     cmdLines += '$cmd\n'
     cmdLines += 'ec=$?\n'
     cmdLines += 'if ! [ $ec ]; then\n'
     cmdLines += '  echo "command failed with exit code $ec . Leave PSet unchanged"\n'
     cmdLines += 'else\n'
-    cmdLines += '  mv %s %s\n' % (pklOut, pklIn)
+    cmdLines += f'  mv {pklOut} {pklIn}\n'
     cmdLines += 'fi\n'
     return cmdLines
 
@@ -147,14 +148,14 @@ def createScriptLines(opts, pklIn):
         primaryFiles.append(inputFile["lfn"])
         for secondaryFile in inputFile["parents"]:
             secondaryFiles.append(secondaryFile["lfn"])
-    print("Adding %d files to 'fileNames' attr" % len(primaryFiles))
-    print("Adding %d files to 'secondaryFileNames' attr" % len(secondaryFiles))
+    print(f"Adding {len(primaryFiles)} files to 'fileNames' attr")
+    print(f"Adding { len(secondaryFiles)} files to 'secondaryFileNames' attr")
     if len(primaryFiles) > 0:
         tweak.addParameter("process.source.fileNames",
-                           "customTypeCms.untracked.vstring(%s)" % primaryFiles)
+                           f"customTypeCms.untracked.vstring({primaryFiles})")
         if len(secondaryFiles) > 0:
             tweak.addParameter("process.source.secondaryFileNames",
-                               "customTypeCms.untracked.vstring(%s)" % secondaryFiles)
+                               f"customTypeCms.untracked.vstring({secondaryFiles})")
 
     # for rearranging runsAndLumis into the structure needed by CMSSW, reuse code taken from
     # https://github.com/dmwm/WMCore/blob/bb573b442a53717057c169b05ae4fae98f31063b/src/python/PSetTweaks/WMTweak.py#L482
@@ -166,14 +167,14 @@ def createScriptLines(opts, pklIn):
                 if len(lumiPair) != 2:
                     # Do nothing
                     continue
-                lumisToProcess.append("%s:%s-%s:%s" % (run, lumiPair[0], run, lumiPair[1]))
+                lumisToProcess.append(f"{run}:{lumiPair[0]}-{run}:{lumiPair[1]}")
         tweak.addParameter("process.source.lumisToProcess",
-                           "customTypeCms.untracked.VLuminosityBlockRange(%s)" % lumisToProcess)
+                           f"customTypeCms.untracked.VLuminosityBlockRange({lumisToProcess})")
 
     # how many events to process
     if opts.firstEvent:
         tweak.addParameter("process.source.firstEvent",
-                           "customTypeCms.untracked.uint32(%s)" % opts.firstEvent)
+                           f"customTypeCms.untracked.uint32({opts.firstEvent})")
     if opts.firstEvent is None or opts.lastEvent is None:
         # what to process is defined in runAndLumis, we do not split by events here
         maxEvents = -1
@@ -182,13 +183,13 @@ def createScriptLines(opts, pklIn):
         maxEvents = int(opts.lastEvent) - int(opts.firstEvent) + 1
         opts.lastEvent = None  # for MC there has to be no lastEvent
     tweak.addParameter("process.maxEvents.input",
-                       "customTypeCms.untracked.int32(%s)" % maxEvents)
+                       f"customTypeCms.untracked.int32({maxEvents})")
 
     if opts.lastEvent:
         tweak.addParameter("process.source.lastEvent",
-                           "customTypeCms.untracked.uint32(%s)" % opts.lastEvent)
+                           f"customTypeCms.untracked.uint32({opts.lastEvent})")
 
-    if not inputFile["lfn"].startswith("MCFakeFile"):
+    if not inputFile["lfn"].startswith("MCFakeFile"):  # pylint: disable=undefined-loop-variable
         # Set skipEvents to 0 if config.JobType.pluginName = 'Analysis'
         # see https://github.com/dmwm/CRABServer/issues/7349
         tweak.addParameter("process.source.skipEvents", "customTypeCms.untracked.uint32(0)")
@@ -197,17 +198,17 @@ def createScriptLines(opts, pklIn):
     # firstLumi, firstRun and eventsPerLumi are used for MC
     if opts.firstLumi:
         tweak.addParameter("process.source.firstLuminosityBlock",
-                           "customTypeCms.untracked.uint32(%s)" % opts.firstLumi)
+                           f"customTypeCms.untracked.uint32({opts.firstLumi})")
     if opts.firstRun:
         tweak.addParameter("process.source.firstRun",
-                           "customTypeCms.untracked.uint32(%s)" % opts.firstRun)
+                           f"customTypeCms.untracked.uint32({opts.firstRun})")
     if opts.eventsPerLumi:
-        numberEventsInLuminosityBlock = "customTypeCms.untracked.uint32(%s)" % opts.eventsPerLumi
+        numberEventsInLuminosityBlock = f"customTypeCms.untracked.uint32({opts.eventsPerLumi})"
         tweak.addParameter("process.source.numberEventsInLuminosityBlock", numberEventsInLuminosityBlock)
 
     # time-limited running is used by automatic splitting probe jobs
     if opts.maxRuntime:
-        maxSecondsUntilRampdown = "customTypeCms.untracked.int32(%s)" % opts.maxRuntime
+        maxSecondsUntilRampdown = f"customTypeCms.untracked.int32({opts.maxRuntime})"
         tweak.addParameter("process.maxSecondsUntilRampdown.input", maxSecondsUntilRampdown)
 
     # event limiter for testing
@@ -228,8 +229,7 @@ def createScriptLines(opts, pklIn):
     procScript = "edm_pset_tweak.py"
     pklOut = pklIn + '-tweaked'
     # we always create untracked psets in our tweaks
-    cmd = "%s --input_pkl %s --output_pkl %s --json %s --create_untracked_psets" % (
-        procScript, pklIn, pklOut, psetTweakJson)
+    cmd = f"{procScript} --input_pkl {pklIn} --output_pkl {pklOut} --json {psetTweakJson} --create_untracked_psets"
     commandLines = createTweakingCommandLines(cmd, pklIn, pklOut)
 
     # there a few more things to do which require running different EDM/CMSSW commands
@@ -237,14 +237,14 @@ def createScriptLines(opts, pklIn):
     if opts.lheInputFiles == 'True':
         pklOut = pklIn + '-lazy'
         procScript = "cmssw_enable_lazy_download.py"
-        cmd = "%s --input_pkl %s --output_pkl %s" % (procScript, pklIn, pklOut)
+        cmd = f"{procScript} --input_pkl {pklIn} --output_pkl {pklOut}"
         moreLines = createTweakingCommandLines(cmd, pklIn, pklOut)
         commandLines += moreLines
 
     # 2. make sure random seeds are initialized
     pklOut = pklIn + '-seeds'
     procScript = "cmssw_handle_random_seeds.py"
-    cmd = "%s --input_pkl %s --output_pkl %s --seeding dummy" % (procScript, pklIn, pklOut)
+    cmd = f"{procScript} --input_pkl {pklIn} --output_pkl {pklOut} --seeding dummy"
     moreLines = createTweakingCommandLines(cmd, pklIn, pklOut)
     commandLines += moreLines
 
@@ -252,10 +252,11 @@ def createScriptLines(opts, pklIn):
     # https://github.com/dmwm/WMCore/blob/85d6d423f0a85fdedf78b65ca8b7b81af9263789/src/python/WMCore/WMRuntime/Scripts/SetupCMSSWPset.py#L448-L465
     # this only makes sense for produces which use nEvents internally, i.e. when running
     # MC production (GEN) using external scripts not directly controlled by cmsRun (forked)
-    if inputFile["lfn"].startswith("MCFakeFile"):  # see https://github.com/dmwm/CRABServer/issues/7650
+    if inputFile["lfn"].startswith("MCFakeFile"):  # pylint: disable=undefined-loop-variable
+        # see https://github.com/dmwm/CRABServer/issues/7650
         pklOut = pklIn + '-nEvents'
         procScript = 'cmssw_handle_nEvents.py'
-        cmd = "%s --input_pkl %s --output_pkl %s" % (procScript, pklIn, pklOut)
+        cmd = f"{procScript} --input_pkl {pklIn} --output_pkl {pklOut}"
         moreLines = createTweakingCommandLines(cmd, pklIn, pklOut)
         commandLines += moreLines
 
@@ -263,11 +264,12 @@ def createScriptLines(opts, pklIn):
 
 
 def prepareTweakingScript(options, scriptName):
-    # prepare a script to run in CMSSW environment which will do the needed
-    # tweaks using edm*.py commands and run it
-    # this is made to be called inside CMSRunAnalysis.py and it is passed the
-    # same list of options as used in there
-
+    """
+    prepare a script to run in CMSSW environment which will do the needed
+    tweaks using edm*.py commands and run it
+    this is made to be called inside CMSRunAnalysis.py and it is passed the
+    same list of options as used in there
+    """
     # save original PSet.pkl
     pklIn = "PSet.pkl"
     shutil.copy(pklIn, 'PSet-Original.pkl')
@@ -276,7 +278,6 @@ def prepareTweakingScript(options, scriptName):
 
     commandLines = createScriptLines(options, pklIn)
 
-    tweakScript = open(scriptName, 'w')
-    tweakScript.write('#/bin/bash\n')
-    tweakScript.write('\n%s\n' % commandLines)
-    tweakScript.close()
+    with open(scriptName, 'w', encoding='utf-8') as tweakScript:
+        tweakScript.write("#/bin/bash\n")
+        tweakScript.write(f"\n{commandLines}\n")
