@@ -175,7 +175,7 @@ def createScriptLines(opts, pklIn):
         tweak.addParameter("process.source.firstEvent",
                            "customTypeCms.untracked.uint32(%s)" % opts.firstEvent)
     if opts.firstEvent is None or opts.lastEvent is None:
-        # what to process is define in runAndLumis, we do no split by events here
+        # what to process is defined in runAndLumis, we do not split by events here
         maxEvents = -1
     else:
         # for MC CRAB passes 1st/last event, but cmsRun wants 1st ev + MaxEvents
