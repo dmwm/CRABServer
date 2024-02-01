@@ -1534,6 +1534,7 @@ class PostJob():
         docToSend = {"producer": user,
                      "type": "branches",
                      "branches": branchList,  # a list of strings
+                     "nBranches": len(branchList),
                      "inputDataset": inputDataset.split(':')[-1],  # strip rucio scope if any
                      "inputDataTier": inputDataset.split('/')[-1],
                      "username": username,
