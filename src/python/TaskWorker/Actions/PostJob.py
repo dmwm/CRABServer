@@ -1,16 +1,14 @@
 #!/usr/bin/python
-# TODO: This is a long term issue and to maintain ~3k lines of code in one file is hard.
-# ANOTHER TODO:
-# In the code it is hard to read: workflow, taskname, reqname. All are the same....
+# This is a long term issue and to maintain ~3k lines of code in one file is hard.
+# The code it is hard to read: workflow, taskname, reqname. All are the same....
+# pylint: disable=too-many-lines, too-many-arguments
+# pylint: disable=too-many-nested-blocks, too-many-branches, too-many-locals, no-self-use
+# pylint: disable=too-many-statements, too-many-instance-attributes, too-many-public-methods
 
 # this code intenionally uses some GLOBAL statements
-# pylint: disable=W0603
-# the swalloging of exception in abort_dag is intentional
-# pylint: disable=W0150
+# pylint: disable=global-statement
 # too many open statements here to worry about specifying and encoding
-# pylint: disable=W1514
-# there are many assignements which are better written with column alignement
-# pylint: disable=C0326, C0330
+# pylint: disable=unspecified-encoding
 # here we intentionally (!?) use snake-case instead of CamelCase
 # pylint: disable=invalid-name
 # this file is too long, too complex etc. etc. so no hope that we put
@@ -18,11 +16,11 @@
 # pylint: disable=missing-function-docstring, missing-class-docstring
 # and no hope that we cleanup things, until we rewrite it
 # pylint: disable=W0511   # do not barf on "TODO" comments
-# pylint: disable=too-many-nested-blocks, too-many-branches, too-many-locals, no-self-use
-# pylint: disable=too-many-statements, too-many-instance-attributes, too-many-public-methods
-# pylint: too-many-lines, disable=consider-using-f-string
-# yeah, we have a lot of try-except where we do not bother to spell specific exceptions
+# pylint: disable=consider-using-f-string
+# yeah, we have a lot of try-except where we really want to "catch everything"
 # pylint: disable=broad-except
+# there are a few very intricate dictionaries where current code works. better not modify it to be pretty
+# pylint: disable=consider-using-dict-items
 
 """
 In the PostJob we read the FrameworkJobReport (FJR) to retrieve information
@@ -100,6 +98,8 @@ import shutil
 import hashlib
 from shutil import move
 from http.client import HTTPException
+import requests
+from requests.auth import HTTPBasicAuth
 
 import htcondor
 import classad
@@ -123,7 +123,7 @@ G_ERROR_SUMMARY_FILE_NAME = "error_summary.json"
 G_FJR_PARSE_RESULTS_FILE_NAME = "task_process/fjr_parse_results.txt"
 G_FAKE_OUTDATASET = '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER'
 
-def sighandler(*args):
+def sighandler():
     if ASO_JOB:
         ASO_JOB.cancel()
 
@@ -137,7 +137,7 @@ signal.signal(signal.SIGTERM, sighandler)
 class NotFound(Exception):
     """Not Found is raised only if there is no document found in RDBMS.
        This makes PostJob to submit new transfer request to database."""
-    pass
+    pass  # pylint: disable=unnecessary-pass
 
 DEFER_NUM = -1
 
@@ -326,7 +326,7 @@ def fixUpTempStorageSite(logger=None, siteName=None):
 
 ##==============================================================================
 
-class ASOServerJob(object):
+class ASOServerJob():
     """
     Class used to inject transfer requests to ASO database.
     """
@@ -371,7 +371,7 @@ class ASOServerJob(object):
         except Exception as ex:
             msg = "Failed to connect to ASO database via CRABRest: %s" % (str(ex))
             self.logger.exception(msg)
-            raise RuntimeError(msg)
+            raise RuntimeError(msg) from ex
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -397,10 +397,10 @@ class ASOServerJob(object):
             filename = 'transfer_info/docs_in_transfer.%s.%d.json' % (self.job_id, self.crab_retry)
             with open(filename) as fd:
                 self.docs_in_transfer = json.load(fd)
-        except:
+        except Exception as ex:
             #Only printing a generic message, the full stacktrace is printed in execute()
             self.logger.error("Failed to load the docs in transfer. Aborting the postjob")
-            raise
+            raise Exception from ex
 
     ##= = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -431,12 +431,12 @@ class ASOServerJob(object):
                 all_transfers_finished = False
                 continue
             ## Good states.
-            elif transfer_status in ['done']:
+            if transfer_status in ['done']:
                 if doc_id not in done_transfers:
                     done_transfers.append(doc_id)
                 continue
             ## Bad states.
-            elif transfer_status in ['failed', 'killed', 'kill']:
+            if transfer_status in ['failed', 'killed', 'kill']:
                 if doc_id not in failed_killed_transfers:
                     failed_killed_transfers.append(doc_id)
                     msg = "Stageout job (internal ID %s) failed with status '%s'." % (doc_id, transfer_status)
@@ -520,7 +520,7 @@ class ASOServerJob(object):
         """
         with getLock('get_transfers_statuses'):
             self.docs_in_transfer = self.inject_to_aso()
-        if self.docs_in_transfer == False:
+        if not self.docs_in_transfer:
             exmsg = "Couldn't upload document to ASO database"
             raise RuntimeError(exmsg)
         if not self.docs_in_transfer:
@@ -787,7 +787,7 @@ class ASOServerJob(object):
                             msg = "Previous document: %s" % (pprint.pformat(doc))
                             self.logger.debug(msg)
 
-                except (NotFound):
+                except NotFound:
                     ## The document was not yet uploaded to ASO database (if this is the first job
                     ## retry, then either the upload from the WN failed, or cmscp did a direct
                     ## stageout and here we need to inject for publication only). In any case we
@@ -885,12 +885,11 @@ class ASOServerJob(object):
             docInfo[0]['job_id'] = docInfo[0]['id']
             self.found_doc_in_db = True  # This is needed for further if there is a need to update doc info in DB
             return docInfo[0]
-        else:
-            self.found_doc_in_db = False
-            raise NotFound('Document not found in database!')
+        self.found_doc_in_db = False
+        raise NotFound('Document not found in database!')
 
     def updateOrInsertDoc(self, doc, toTransfer):
-        """"""
+        """ need a docstring here """
         returnMsg = {}
         if not self.found_doc_in_db:
             # This means that it was not founded in DB and we will have to insert new doc
@@ -1048,10 +1047,10 @@ class ASOServerJob(object):
             try:
                 with open("aso_status.json") as fd:
                     aso_info = json.load(fd)
-            except:
+            except Exception as ex:
                 msg = "Failed to load transfer cache."
                 self.logger.exception(msg)
-                raise TransferCacheLoadError(msg)
+                raise TransferCacheLoadError(msg) from ex
             last_query = aso_info.get("query_timestamp", 0)
             last_jobid = aso_info.get("query_jobid", "unknown")
             last_succeded = aso_info.get("query_succeded", True)
@@ -1061,7 +1060,9 @@ class ASOServerJob(object):
             # Without the second condition, we run the risk of using the previous stageout
             # attempts results.
             if (time.time() - last_query < 900) and (last_query > self.aso_start_timestamp):
-                self.logger.info("Using the cache since it is up to date (last_query=%s) and it is after we submitted the transfer (aso_start_timestamp=%s)", last_query, self.aso_start_timestamp)
+                msg = f"Using the cache since it is up to date (last_query={last_query}) "\
+                f"and it is after we submitted the transfer (aso_start_timestamp={self.aso_start_timestamp})"
+                self.logger.info(msg)
                 query_view = False
                 if not last_succeded:
                     #no point in continuing if the last query failed. Just defer the PJ and retry later
@@ -1089,11 +1090,11 @@ class ASOServerJob(object):
                 # {"DocumentHASHID": [{"id": "DocumentHASHID", "start_time": timestamp, "transfer_state": NUMBER!, "last_update": timestamp}]}
                 for document in view_results_dict:
                     view_results_dict[document][0]['state'] = TRANSFERDB_STATES[view_results_dict[document][0]['transfer_state']].lower()
-            except:
+            except Exception as ex:
                 msg = "Error while querying the RDBMS (Oracle) database."
                 self.logger.exception(msg)
                 self.build_failed_cache()
-                raise TransferCacheLoadError(msg)
+                raise TransferCacheLoadError(msg) from ex
             aso_info = {
                 "query_timestamp": time.time(),
                 "query_succeded": True,
@@ -1486,9 +1487,8 @@ class PostJob():
             msg = "Copying job stdout from %s to %s." % (stdout, fname)
             self.logger.debug(msg)
             shutil.copy(stdout_tmp, fname)
-            fd_stdout = open(stdout_tmp, 'w')
-            fd_stdout.truncate(0)
-            fd_stdout.close()
+            with open(stdout_tmp, 'w') as fd_stdout:
+                fd_stdout.truncate(0)
             os.chmod(fname, 0o644)
         ## Copy the json job report file jobReport.json.<job_id> to
         ## job_fjr.<job_id>.<crab_retry>.json and create a symbolic link in the task web
@@ -1519,15 +1519,14 @@ class PostJob():
 
     def reportReadBranches(self, branchList=None, username=None, inputDataset=None, taskName=None):
         """ send to MONIT / ElasticSearch the list of Read Branches """
-        import requests
-        from requests.auth import HTTPBasicAuth
 
         # get secrets
         with open('/home/grid/crabtw/MONIT-CRAB-TEST.json', 'r', encoding='utf-8') as fp:
             secrets = json.load(fp)
         user = secrets['username']
         password = secrets['password']
-        self.logger.info(f"Reporting Branches as USER: {user}")
+        msg = f"Reporting Branches to MONIT USER: {user}"
+        self.logger.info(msg)
 
         monitUrl = f"https://monit-metrics.cern.ch:10014/{user}"
         # prepare a data dictionary
@@ -1547,11 +1546,12 @@ class PostJob():
                           headers={"Content-Type": "application/json; charset=UTF-8"},
                           verify=False
                           )
-        self.logger.info(f"List of Brancehs sent to MONIT with status {r.status_code}. Output {r.text}")
+        msg = f"List of Brancehs sent to MONIT with status {r.status_code}. Output {r.text}"
+        self.logger.info(msg)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def execute(self, *args, **kw):
+    def execute(self, *args, **kw):  # pylint: disable=unused-argument
         """
         The execute method of PostJob.
         """
@@ -1856,14 +1856,13 @@ class PostJob():
         self.logger.info("====== Starting to parse the lumi file")
         try:
             tmpdir = tempfile.mkdtemp()
-            f = tarfile.open("run_and_lumis.tar.gz")
             fn = "job_lumis_{0}.json".format(self.job_id)
-            f.extract(fn, path=tmpdir)
+            with tarfile.open("run_and_lumis.tar.gz") as f:
+                f.extract(fn, path=tmpdir)
             with open(os.path.join(tmpdir, fn)) as fd:
                 injson = json.load(fd)
                 inlumis = LumiList(compactList=injson)
         finally:
-            f.close()
             shutil.rmtree(tmpdir)
 
         outlumis = LumiList()
@@ -1925,7 +1924,7 @@ class PostJob():
                 while counter < 5:
                     cmd = 'condor_q -l %s > %s' % (self.dag_jobid, job_ad_file_name)
                     self.logger.info('Executing %s', cmd)
-                    subproc = subprocess.Popen(cmd, stderr=subprocess.PIPE, shell=True)
+                    subproc = subprocess.Popen(cmd, stderr=subprocess.PIPE, shell=True) # pylint: disable=consider-using-with
                     (stdout_data, stderr_data) = subproc.communicate()
                     rc = subproc.returncode
                     if rc == 0:
@@ -2353,8 +2352,7 @@ class PostJob():
         ## Raise stageout exception.
         if num_permanent_failures:
             raise PermanentStageoutError(msg)
-        else:
-            raise RecoverableStageoutError(msg)
+        raise RecoverableStageoutError(msg)
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -2459,7 +2457,8 @@ class PostJob():
                 outfileruns.append(str(run))
                 outfilelumis.append(','.join(map(str, lumis)))
 
-            configreq = [item for item in configreq.items()]  # make a real list of (k,v) pairs as rest_api requires
+            # make a real list of (k,v) pairs as rest_api requires (not sure pylint is right to complain !)
+            configreq = [item for item in configreq.items()]  # pylint: disable=unnecessary-comprehension
             #configreq['outfileruns'] = [run for run in outfileruns]
             #configreq['outfilelumis'] = [lumis for lumis in outfilelumis]
             for run in outfileruns:
@@ -2515,7 +2514,8 @@ class PostJob():
                          'directstageout'  : int(file_info['direct_stageout']),
                          'globalTag'       : 'None'
                         }
-            configreq = [item for item in configreq.items()]  # make a real list of (k,v) pairs as rest_api requires
+            # make a real list of (k,v) pairs as rest_api requires (not sure pylint is rigth to complain !)
+            configreq = [item for item in configreq.items()]  # pylint: disable=unnecessary-comprehension
             #configreq = configreq.items()
             if 'outfileruns' in file_info:
                 for run in file_info['outfileruns']:
@@ -2697,7 +2697,7 @@ class PostJob():
         # Make sure that this never stops normal flow, even if it fails
         try:
             if (int(self.job_id) == 1 and self.crab_retry == 0 and self.job_report['exitCode'] == 0)\
-                    and self.job_ad['DESIRED_CMSDataset'] is not 'Unknown':
+                    and self.job_ad['DESIRED_CMSDataset'] != 'Unknown':
                 self.reportReadBranches(branchList=self.job_report['steps']['cmsRun']['ReadBranches'],
                                         username=self.job_ad['CRAB_UserHN'],
                                         inputDataset=self.job_ad['DESIRED_CMSDataset'],
@@ -2991,12 +2991,12 @@ class PostJob():
             self.set_dashboard_state('FAILED', exitCode=exitCode)
             self.set_state_ClassAds('FAILED', exitCode=exitCode)
             return JOB_RETURN_CODES.FATAL_ERROR
-        else:
-            msg = "Job will be retried by DAGMan."
-            self.logger.info(msg)
-            self.set_dashboard_state('COOLOFF', exitCode=exitCode)
-            self.set_state_ClassAds('COOLOFF', exitCode=exitCode)
-            return JOB_RETURN_CODES.RECOVERABLE_ERROR
+        msg = "Job will be retried by DAGMan."
+        self.logger.info(msg)
+        self.set_dashboard_state('COOLOFF', exitCode=exitCode)
+        self.set_state_ClassAds('COOLOFF', exitCode=exitCode)
+
+        return JOB_RETURN_CODES.RECOVERABLE_ERROR
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -3041,7 +3041,7 @@ class PostJob():
                     self.logger.error(msg)
                     rval = 3
         finally:
-            return rval
+            return rval  # pylint: disable=lost-exception
 
     ## = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -3183,8 +3183,9 @@ class testServer(unittest.TestCase):
         self.full_args = ['0', 0, 2, 'restinstance', 'resturl',
                           'reqname', 1234, 'outputdata', 'sw', 'T2_US_Vanderbilt']
         self.json_name = "jobReport.json.%s" % (self.full_args[6])
-        open(self.json_name, 'w').write(json.dumps(self.generateJobJson()))
-
+        with open(self.json_name, 'w') as fh:
+            #fh.write(json.dumps(self.generateJobJson()))
+            json.dump(self.generateJobJson, fh)
 
     def getLevelOneDir(self):
         return datetime.datetime.now().strftime("%Y-%m")
