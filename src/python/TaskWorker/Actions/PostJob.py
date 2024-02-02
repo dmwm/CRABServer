@@ -172,7 +172,7 @@ def compute_outputdataset_name(primaryDS=None, username=None, publish_name=None,
     if pset_hash:
         # replace placeholder (32*'0') with correct pset hash for this file
         publish_name = "%s-%s" % (publish_name.rsplit('-', 1)[0], pset_hash)
-    #####hash = pset_hash if pset_hash else 32*'0'
+    # #hash = pset_hash if pset_hash else 32*'0'
     if module_label:
         # insert output module name before the pset hash
         left, right = publish_name.rsplit('-', 1)
@@ -524,7 +524,7 @@ class ASOServerJob():
         """
         with getLock('get_transfers_statuses'):
             self.docs_in_transfer = self.inject_to_aso()
-        if not self.docs_in_transfer:
+        if self.docs_in_transfer is False:
             exmsg = "Couldn't upload document to ASO database"
             raise RuntimeError(exmsg)
         if not self.docs_in_transfer:
