@@ -13,7 +13,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-f', '--filename', default='wmcore_requirements.txt')
 args = parser.parse_args()
 with open(args.filename, encoding='utf-8') as r:
-    wmcoreRequirementStr = r.readlines()[0]
+    wmcoreRequirementStr = ''
+    for line in r:
+        line = line.partition('#')[0]
+        line = line.strip()
+        if line.startswith('wmcore'):
+            wmcoreRequirementStr = line
+            break
 _, tmpRepo, tmpCommit = wmcoreRequirementStr.split('@')
 commit = tmpCommit.strip()
 repo = tmpRepo.split('+')[1].strip()
