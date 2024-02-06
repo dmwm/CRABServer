@@ -12,6 +12,7 @@ def getNativeRucioClient(config=None, logger=None):
     """
     logger.info("Initializing native Rucio client")
     from rucio.client import Client
+    from rucio.common.exception import RSENotFound
 
     rucioLogger = logging.getLogger('RucioClient')
     rucioLogger.setLevel(logging.INFO)
@@ -65,18 +66,22 @@ def getWritePFN(rucioClient=None, siteName='', lfn='',
     # 2022-08: dario checked with felipe that every sane RSE has non-zero value
     # for the third_party_copy_write column, which means that it is available.
     ex_str = ""
+    didDict = None
     for operation in operations:
         try:
             logger.warning('Try Rucio lfn2pn with operation %s', operation)
             didDict = rucioClient.lfns2pfns(siteName, [did], operation=operation)
             break
+        except RSENotFound:
+            msg = f"Site {siteName} not found in CMS site list"
+            raise TaskWorkerException(msg)
         except Exception as ex:
             msg = 'Rucio lfn2pfn resolution for %s failed with:\n%s\nTry next one.'
             logger.warning(msg, operation, str(ex))
             ex_str += "operation: %s, exception: %s\n" % (operation, ex)
-            didDict = None
     if not didDict:
-        msg = 'lfn2pfn resolution with Rucio failed for site: %s  LFN: %s' % (siteName, lfn)
+        msg = ('lfn2pfn eicijijjjiflirdbtgginfbvkcibfvggttujrjhiiitk'
+               'resolution with Rucio failed for site: %s  LFN: %s') % (siteName, lfn)
         msg += ' with exception(s) :\n%s' % str(ex_str)
         raise TaskWorkerException(msg)
 
