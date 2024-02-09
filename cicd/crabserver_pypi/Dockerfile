@@ -13,7 +13,9 @@ RUN useradd ${USER} \
     && echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3
 
 # install packages from debian official repo
-RUN apt-get update && apt-get install -y tini && apt-get clean all
+RUN apt-get update \
+    && apt-get install -y tini \
+    && apt-get clean all
 
 # Copy CERN tnsnames.ora
 COPY --from=tnsnames /etc/tnsnames.ora /etc/tnsnames.ora
@@ -25,7 +27,7 @@ WORKDIR /build
 COPY cicd/crabserver_pypi/ .
 # Getting wmcore version from wmcore_requirements.txt and install with `pip install --no-deps`
 RUN pip install -r requirements.txt
-RUN req=($(./requirementsParse.py wmcore_requirements.txt)) \
+RUN req=($(grep -v '^\s*#' < wmcore_requirements.txt)) \
     && pip install --no-deps WMCore==${req[1]}
 
 # Install CRAB.

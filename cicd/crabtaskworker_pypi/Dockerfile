@@ -3,7 +3,7 @@ FROM python:3.8 as wmcore-src
 SHELL ["/bin/bash", "-c"]
 # Use the "magic" requirements.txt from crabserver pypi
 COPY cicd/crabserver_pypi/ .
-RUN req=($(./requirementsParse.py)) \
+RUN req=($(grep -v '^\s*#' < wmcore_requirements.txt)) \
     && git clone ${req[0]} -b ${req[1]} /WMCore \
     && ( cd /WMCore; git status ) \
     && echo "${req[1]}" > /wmcore_version
@@ -61,14 +61,12 @@ RUN apt-get update \
 # prepare build
 RUN mkdir /build
 WORKDIR /build
-COPY cicd/crabserver_pypi/requirementsParse.py cicd/crabserver_pypi/wmcore_requirements.txt /build
 
 # install dependencies
 COPY --from=wmcore-src /wmcore_version .
 COPY cicd/crabtaskworker_pypi/requirements.txt .
-RUN WMCORE_TAG=$(cat wmcore_version) \
-    && pip install -r requirements.txt \
-    && pip install --no-deps wmcore==${WMCORE_TAG}
+RUN pip install -r requirements.txt \
+    && pip install --no-deps wmcore==$(cat wmcore_version)
 
 # install crabserver
 # will replace with pip later
@@ -110,4 +108,3 @@ RUN chown -R 1000:1000 ${WDIR}
 USER ${USER}
 
 ENTRYPOINT ["tini", "--"]
-CMD /data/run.sh
