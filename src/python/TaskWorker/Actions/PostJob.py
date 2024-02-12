@@ -17,6 +17,7 @@
 # and no hope that we cleanup things, until we rewrite it
 # pylint: disable=W0511   # do not barf on "TODO" comments
 # pylint: disable=consider-using-f-string
+# pylint: disable=logging-fstring-interpolation
 # yeah, we have a lot of try-except where we really want to "catch everything"
 # pylint: disable=broad-except
 # there are a few very intricate dictionaries where current code works. better not modify it to be pretty
@@ -2739,7 +2740,6 @@ class PostJob():
                                         taskName=self.job_ad['CRAB_ReqName'])
         except Exception:
             self.logger.error("Something went wrong in reportReadBranches.")
-            pass
 
         return 0
 
