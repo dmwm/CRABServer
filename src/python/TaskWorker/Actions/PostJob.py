@@ -75,7 +75,6 @@ about the file to the FJR. The information is:
 
 The PostJob and cmscp are the only places in CRAB3 where we should use camel_case instead of snakeCase.
 """
-from __future__ import print_function
 
 import os
 import sys
@@ -1525,14 +1524,19 @@ class PostJob():
         """ send to MONIT / ElasticSearch the list of Read Branches """
 
         # get secrets
-        with open('/home/grid/crabtw/MONIT-CRAB-TEST.json', 'r', encoding='utf-8') as fp:
-            secrets = json.load(fp)
+        secrets = None
+        try:
+            with open('/data/certs/monit.d/monit-metrics-secrets.json', 'r', encoding='utf-8') as fp:
+                secrets = json.load(fp)
+        except FileNotFoundError:
+            self.logger.error(f"Could not find MONIT secret file, will not report read branches")
+            return
         user = secrets['username']
         password = secrets['password']
+        monitUrl = secrets['url']
         msg = f"Reporting Branches to MONIT USER: {user}"
         self.logger.info(msg)
 
-        monitUrl = f"https://monit-metrics.cern.ch:10014/{user}"
         # prepare a data dictionary
         docToSend = {"producer": user,
                      "type": "branches",
@@ -1544,14 +1548,17 @@ class PostJob():
                      "taskname": taskName,
                      }
         # POST data as JSON
-        r = requests.post(url=monitUrl,
+        try:
+            r = requests.post(url=f"{monitUrl}/{user}",
                           auth=HTTPBasicAuth(user, password),
                           data=json.dumps(docToSend),
                           headers={"Content-Type": "application/json; charset=UTF-8"},
                           verify=False
                           )
-        msg = f"List of Brancehs sent to MONIT with status {r.status_code}. Output {r.text}"
-        self.logger.info(msg)
+            msg = f"List of Brancehs sent to MONIT with status {r.status_code}. Output {r.text}"
+            self.logger.info(msg)
+        except Exception as ex:
+            self.logger.error(f"Failed to send branch list to MONIT. Exception:\n{ex}")
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
