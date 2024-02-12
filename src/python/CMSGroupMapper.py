@@ -124,4 +124,4 @@ def map_user_to_groups(user):
     return g_cache.setdefault(user, set([]))
 
 if __name__ == '__main__':
-   print(map_user_to_groups("bbockelm"))
+    print(map_user_to_groups("bbockelm"))
