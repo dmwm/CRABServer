@@ -1529,7 +1529,13 @@ class PostJob():
             with open('/data/certs/monit.d/monit-metrics-secrets.json', 'r', encoding='utf-8') as fp:
                 secrets = json.load(fp)
         except FileNotFoundError:
-            self.logger.error(f"Could not find MONIT secret file, will not report read branches")
+            self.logger.error("Could not find MONIT secret file, will not report read branches")
+            return
+        except Exception as ex:  # pylint: disable=broad-except
+            self.logger.error(f"Error parsing MONIT secret file, will not report read branches.\n{ex}")
+            return
+        if not secrets:
+            self.logger.error("Error parsing MONIT secret file, will not report read branches")
             return
         user = secrets['username']
         password = secrets['password']
@@ -2732,6 +2738,7 @@ class PostJob():
                                         inputDataset=self.job_ad['DESIRED_CMSDataset'],
                                         taskName=self.job_ad['CRAB_ReqName'])
         except Exception:
+            self.logger.error("Something went wrong in reportReadBranches.")
             pass
 
         return 0
