@@ -1,6 +1,9 @@
+""" a small set of utilities to work with Rucio used in various places """
 import logging
 
 from TaskWorker.WorkerExceptions import TaskWorkerException
+from rucio.client import Client
+from rucio.common.exception import RSENotFound
 
 def getNativeRucioClient(config=None, logger=None):
     """
@@ -11,8 +14,6 @@ def getNativeRucioClient(config=None, logger=None):
     :return: a Rucio Client object
     """
     logger.info("Initializing native Rucio client")
-    from rucio.client import Client
-    from rucio.common.exception import RSENotFound
 
     rucioLogger = logging.getLogger('RucioClient')
     rucioLogger.setLevel(logging.INFO)
@@ -25,18 +26,18 @@ def getNativeRucioClient(config=None, logger=None):
     cl = logging.getLogger('charset_normalizer')
     cl.setLevel(logging.ERROR)
 
-    rucio_cert = getattr(config.Services, "Rucio_cert", config.TaskWorker.cmscert)
-    rucio_key = getattr(config.Services, "Rucio_key", config.TaskWorker.cmskey)
-    logger.debug("Using cert [%s]\n and key [%s] for rucio client.", rucio_cert, rucio_key)
+    rucioCert = getattr(config.Services, "rucioCert", config.TaskWorker.cmscert)
+    rucioKey = getattr(config.Services, "rucioKey", config.TaskWorker.cmskey)
+    logger.debug("Using cert [%s]\n and key [%s] for rucio client.", rucioCert, rucioKey)
     nativeClient = Client(
         rucio_host=config.Services.Rucio_host,
         auth_host=config.Services.Rucio_authUrl,
         ca_cert=config.Services.Rucio_caPath,
         account=config.Services.Rucio_account,
-        creds={"client_cert": rucio_cert, "client_key": rucio_key},
+        creds={"client_cert": rucioCert, "client_key": rucioKey},
         auth_type='x509',
         logger=rucioLogger
-    )
+        )
     ret = nativeClient.ping()
     logger.info("Rucio server v.%s contacted", ret['version'])
     ret = nativeClient.whoami()
@@ -44,7 +45,8 @@ def getNativeRucioClient(config=None, logger=None):
 
     return nativeClient
 
-def getWritePFN(rucioClient=None, siteName='', lfn='',
+
+def getWritePFN(rucioClient=None, siteName='', lfn='',  # pylint: disable=dangerous-default-value
                 operations=['third_party_copy_write', 'write'], logger=None):
     """
     convert a single LFN into a PFN which can be used for Writing via Rucio
@@ -65,7 +67,7 @@ def getWritePFN(rucioClient=None, siteName='', lfn='',
     # "write": provides the PFN to be used with gfal
     # 2022-08: dario checked with felipe that every sane RSE has non-zero value
     # for the third_party_copy_write column, which means that it is available.
-    ex_str = ""
+    exeptionString = ""
     didDict = None
     for operation in operations:
         try:
@@ -74,21 +76,20 @@ def getWritePFN(rucioClient=None, siteName='', lfn='',
             break
         except RSENotFound:
             msg = f"Site {siteName} not found in CMS site list"
-            raise TaskWorkerException(msg)
-        except Exception as ex:
+            raise TaskWorkerException(msg) from RSENotFound
+        except Exception as ex:  # pylint: disable=broad-except
             msg = 'Rucio lfn2pfn resolution for %s failed with:\n%s\nTry next one.'
             logger.warning(msg, operation, str(ex))
-            ex_str += "operation: %s, exception: %s\n" % (operation, ex)
+            exeptionString += f"operation: {operation}, exception: {ex}\n"
     if not didDict:
-        msg = ('lfn2pfn eicijijjjiflirdbtgginfbvkcibfvggttujrjhiiitk'
-               'resolution with Rucio failed for site: %s  LFN: %s') % (siteName, lfn)
-        msg += ' with exception(s) :\n%s' % str(ex_str)
+        msg = (f"lfn2pfn resolution with Rucio failed for site: {siteName}  LFN: {lfn}")
+        msg += f" with exception(s) :\n{exeptionString}"
         raise TaskWorkerException(msg)
 
     # lfns2pfns returns a dictionary with did as key and pfn as value:
     #  https://rucio.readthedocs.io/en/latest/api/rse.html
     # {u'cms:/store/user/rucio': u'gsiftp://eoscmsftp.cern.ch:2811/eos/cms/store/user/rucio'}
     pfn = didDict[did]
-    logger.info('Will use %s as stageout location', pfn)
+    logger.info(f"Will use {pfn} as stageout location")
 
     return pfn
