@@ -25,8 +25,10 @@ COPY --from=tnsnames /etc/tnsnames.ora /etc/tnsnames.ora
 RUN mkdir /build
 WORKDIR /build
 COPY cicd/crabserver_pypi/ .
-# Getting wmcore version from wmcore_requirements.txt and install with `pip install --no-deps`
+# Install wmcore/crab dependencies
 RUN pip install -r requirements.txt
+# Getting the version number from wmcore_requirements.txt and install it with `--no-deps`.
+# When reading from file, `grep -v '^\s*#'` to ignore all comment lines, including the ones with leading whitespace ('\s' to match whitespace).
 RUN req=($(grep -v '^\s*#' < wmcore_requirements.txt)) \
     && pip install --no-deps WMCore==${req[1]}
 
