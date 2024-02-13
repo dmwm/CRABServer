@@ -2738,8 +2738,8 @@ class PostJob():
                                         username=self.job_ad['CRAB_UserHN'],
                                         inputDataset=self.job_ad['DESIRED_CMSDataset'],
                                         taskName=self.job_ad['CRAB_ReqName'])
-        except Exception:
-            self.logger.error("Something went wrong in reportReadBranches.")
+        except Exception as ex:
+            self.logger.error("Something went wrong in reportReadBranches:\n%s", ex)
 
         return 0
 
