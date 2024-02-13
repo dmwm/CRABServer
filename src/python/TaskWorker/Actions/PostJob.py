@@ -1527,7 +1527,7 @@ class PostJob():
         # get secrets
         secrets = None
         try:
-            with open('/data/certs/monit.d/monit-metrics-secrets.json', 'r', encoding='utf-8') as fp:
+            with open('/data/certs/monit.d/MONIT-CRAB.json', 'r', encoding='utf-8') as fp:
                 secrets = json.load(fp)
         except FileNotFoundError:
             self.logger.error("Could not find MONIT secret file, will not report read branches")
@@ -1556,7 +1556,7 @@ class PostJob():
                      }
         # POST data as JSON
         try:
-            r = requests.post(url=f"{monitUrl}/{user}",
+            r = requests.post(url=f"{monitUrl}",
                           auth=HTTPBasicAuth(user, password),
                           data=json.dumps(docToSend),
                           headers={"Content-Type": "application/json; charset=UTF-8"},
