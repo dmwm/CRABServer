@@ -67,7 +67,7 @@ def getWritePFN(rucioClient=None, siteName='', lfn='',  # pylint: disable=danger
     # "write": provides the PFN to be used with gfal
     # 2022-08: dario checked with felipe that every sane RSE has non-zero value
     # for the third_party_copy_write column, which means that it is available.
-    exeptionString = ""
+    exceptionString = ""
     didDict = None
     for operation in operations:
         try:
@@ -80,10 +80,10 @@ def getWritePFN(rucioClient=None, siteName='', lfn='',  # pylint: disable=danger
         except Exception as ex:  # pylint: disable=broad-except
             msg = 'Rucio lfn2pfn resolution for %s failed with:\n%s\nTry next one.'
             logger.warning(msg, operation, str(ex))
-            exeptionString += f"operation: {operation}, exception: {ex}\n"
+            exceptionString += f"operation: {operation}, exception: {ex}\n"
     if not didDict:
-        msg = (f"lfn2pfn resolution with Rucio failed for site: {siteName}  LFN: {lfn}")
-        msg += f" with exception(s) :\n{exeptionString}"
+        msg = f"lfn2pfn resolution with Rucio failed for site: {siteName}  LFN: {lfn}"
+        msg += f" with exception(s) :\n{exceptionString}"
         raise TaskWorkerException(msg)
 
     # lfns2pfns returns a dictionary with did as key and pfn as value:
