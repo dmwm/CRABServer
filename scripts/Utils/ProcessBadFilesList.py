@@ -118,9 +118,13 @@ def parse(file=None):
     parse error report written by PostJob and returns a dictionary
     result{'DID', 'RSE', 'errorKind'}
     """
-    with open(file, 'r', encoding='utf8') as fp:
-        info = json.load(fp)
     result = {}
+    try:
+        with open(file, 'r', encoding='utf8') as fp:
+            info = json.load(fp)
+    except:
+        print(f"Failed to parse {file}")
+        return result
     if '/store/group' in info['DID'] or '/store/user' in info['DID'] and \
         not 'rucio' in info['DID']:
         return result
