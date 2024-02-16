@@ -38,7 +38,7 @@ PYTHONPATH=/data/srv/current/config/$srv:${PYTHONPATH}
 ## secrets
 PYTHONPATH=/etc/secrets:${PYTHONPATH} # (it should be $AUTHDIR, will fix later).
 ## app
-PYTHONPATH=/data/srv/current/lib/python3.8/site-packages/:$PYTHONPATH
+PYTHONPATH=/data/srv/current/lib/python/site-packages/:$PYTHONPATH
 export PYTHONPATH
 ## to get wmc-httpd path
 export PATH=/data/srv/current/bin:$PATH

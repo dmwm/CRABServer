@@ -29,11 +29,11 @@ COPY cicd/crabserver_pypi/ .
 RUN pip install -r requirements.txt
 # Getting the version number from wmcore_requirements.txt and install it with `--no-deps`.
 # When reading from file, `grep -v '^\s*#'` to ignore all comment lines, including the ones with leading whitespace ('\s' to match whitespace).
-RUN req=($(grep -v '^\s*#' < wmcore_requirements.txt)) \
-    && pip install --no-deps WMCore==${req[1]}
+RUN wmcore_version="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f2)" \
+    && pip install --no-deps WMCore==${wmcore_version}
 
 # Install CRAB.
-COPY src/python/ /data/srv/current/lib/python3.8/site-packages
+COPY src/python/ /data/srv/current/lib/python/site-packages
 COPY src/script/ /data/srv/current/data/script/
 COPY src/html/ /data/srv/current/data/html/
 COPY src/css/ /data/srv/current/data/css/

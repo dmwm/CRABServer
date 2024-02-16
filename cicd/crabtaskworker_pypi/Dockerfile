@@ -3,10 +3,11 @@ FROM python:3.8 as wmcore-src
 SHELL ["/bin/bash", "-c"]
 # Use the "magic" requirements.txt from crabserver pypi
 COPY cicd/crabserver_pypi/ .
-RUN req=($(grep -v '^\s*#' < wmcore_requirements.txt)) \
-    && git clone ${req[0]} -b ${req[1]} /WMCore \
+RUN wmcore_repo="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f1)" \
+    && wmcore_version="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f2)" \
+    && git clone ${wmcore_repo} -b "${wmcore_version}" /WMCore \
     && ( cd /WMCore; git status ) \
-    && echo "${req[1]}" > /wmcore_version
+    && echo "${wmcore_version}" > /wmcore_version
 
 # create TaskManagerRun.tar.gz and other data files
 FROM python:3.8 as build-data
@@ -70,9 +71,9 @@ RUN pip install -r requirements.txt \
 
 # install crabserver
 # will replace with pip later
-COPY src/python/ ${WDIR}/srv/current/lib/python3.8/site-packages/
+COPY src/python/ ${WDIR}/srv/current/lib/python/site-packages/
 # copy TaskManagerRun.tar.gz
-COPY --from=build-data /build/install_dir/data ${WDIR}/srv/current/lib/python3.8/site-packages/data
+COPY --from=build-data /build/install_dir/data ${WDIR}/srv/current/lib/python/site-packages/data
 
 # copy cern openldap config
 COPY --from=cern-cc7 /etc/openldap /etc/openldap
