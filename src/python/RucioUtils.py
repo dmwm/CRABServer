@@ -26,8 +26,8 @@ def getNativeRucioClient(config=None, logger=None):
     cl = logging.getLogger('charset_normalizer')
     cl.setLevel(logging.ERROR)
 
-    rucioCert = getattr(config.Services, "rucioCert", config.TaskWorker.cmscert)
-    rucioKey = getattr(config.Services, "rucioKey", config.TaskWorker.cmskey)
+    rucioCert = getattr(config.Services, "Rucio_cert", config.TaskWorker.cmscert)
+    rucioKey = getattr(config.Services, "Rucio_key", config.TaskWorker.cmskey)
     logger.debug("Using cert [%s]\n and key [%s] for rucio client.", rucioCert, rucioKey)
     nativeClient = Client(
         rucio_host=config.Services.Rucio_host,
