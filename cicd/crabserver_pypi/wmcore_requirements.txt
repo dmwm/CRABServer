@@ -1,0 +1,5 @@
+# WMCore dependency version.
+# Only for parsing repo url and version number in the building script later.
+# Format:
+# <repository clone url> <tag>
+https://github.com/dmwm/WMCore 2.2.4rc6

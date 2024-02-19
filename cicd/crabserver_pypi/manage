@@ -1,0 +1,114 @@
+#!/bin/bash
+# This scripts originate from dmwm-base/manage
+# https://github.com/dmwm/CMSKubernetes/blob/2b0454f9205cb8f97fecb91bf6661b59e4b31424/docker/pypi/dmwm-base/manage
+# However, scripts is heavily edited to suit new CRAB PyPI.
+# 2 things that we may need to keep up with original scripts:
+#   - Deployment Convention: WMCore/REST app (CRAB REST) read necessary files from.
+#   - `wmc-httpd` line.
+
+##H Usage: manage ACTION [ATTRIBUTE] [SECURITY-STRING]
+##H
+##H Available actions:
+##H   help        show this help
+##H   version     get current version of the service
+##H   status      show current service's status
+##H   restart     (re)start the service
+##H   start       (re)start the service
+##H   stop        stop the service
+
+# common settings to prettify output
+echo_e=-e
+COLOR_OK="\\033[0;32m"
+COLOR_WARN="\\033[0;31m"
+COLOR_NORMAL="\\033[0;39m"
+
+# hardcode service name
+srv=crabserver
+
+# service settings
+#LOGDIR=/data/srv/logs/$srv # we write logs to fifo instead of logdir
+AUTHDIR=/data/srv/current/auth/$srv
+STATEDIR=/data/srv/state/$srv
+CFGDIR=/data/srv/current/config/$srv
+CFGFILE=$CFGDIR/config.py
+
+# necessary env settings for all WM services
+## config
+PYTHONPATH=/data/srv/current/config/$srv:${PYTHONPATH}
+## secrets
+PYTHONPATH=/etc/secrets:${PYTHONPATH} # (it should be $AUTHDIR, will fix later).
+## app
+PYTHONPATH=/data/srv/current/lib/python/site-packages/:$PYTHONPATH
+export PYTHONPATH
+## to get wmc-httpd path
+export PATH=/data/srv/current/bin:$PATH
+## service creds
+export X509_USER_CERT=${X509_USER_CERT:-${AUTHDIR}/dmwm-service-cert.pem}
+export X509_USER_KEY=${X509_USER_KEY:-${AUTHDIR}/dmwm-service-key.pem}
+
+# by default Rucio relies on /opt/rucio/etc/config.cfg
+# if necessary we may setup RUCIO_HOME which should provide this location
+# but in k8s we mount rucio config.cfg under /opt/rucio/etc area
+
+usage()
+{
+    cat $0 | grep "^##H" | sed -e "s,##H,,g"
+}
+start_srv()
+{
+    # Wa: originally from dmwm-base
+    #wmc-httpd -r -d $STATEDIR -l "|rotatelogs $LOGDIR/$srv-%Y%m%d-`hostname -s`.log 86400" $CFGFILE
+    wmc-httpd -r -d $STATEDIR -l "$STATEDIR/crabserver-fifo" $CFGFILE
+    # Wa: debug
+    #LD_PRELOAD=$JEMALLOC_ROOT/lib/libjemalloc.so wmc-httpd -r -d $STATEDIR -l "$STATEDIR/crabserver-fifo" $CFGFILE
+    #gdb --args python3 /data/srv/current/bin/wmc-httpd -r -d $STATEDIR -l "$STATEDIR/crabserver-fifo" $CFGFILE
+}
+
+stop_srv()
+{
+    local pid=`ps auxwww | egrep "wmc-httpd" | grep -v grep | awk 'BEGIN{ORS=" "} {print $2}'`
+    echo "Stop $srv service... ${pid}"
+    if [ -n "${pid}" ]; then
+        kill -9 ${pid}
+    fi
+}
+
+status_srv()
+{
+    local pid=`ps auxwww | egrep "wmc-httpd" | grep -v grep | awk 'BEGIN{ORS=" "} {print $2}'`
+    if  [ -z "${pid}" ]; then
+        echo "$srv service is not running"
+        return
+    fi
+    if [ ! -z "${pid}" ]; then
+        echo $echo_e "$srv service is ${COLOR_OK}RUNNING${COLOR_NORMAL}, PID=${pid}"
+        ps -f -wwww -p ${pid}
+    else
+        echo $echo_e "$srv service is ${COLOR_WARN}NOT RUNNING${COLOR_NORMAL}"
+    fi
+}
+
+# Main routine, perform action requested on command line.
+case ${1:-status} in
+  start | restart )
+    stop_srv
+    start_srv
+    ;;
+
+  status )
+    status_srv
+    ;;
+
+  stop )
+    stop_srv
+    ;;
+
+  help )
+    usage
+    ;;
+
+  * )
+    echo "$0: unknown action '$1', please try '$0 help' or documentation." 1>&2
+    exit 1
+    ;;
+esac
