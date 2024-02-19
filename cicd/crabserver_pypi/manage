@@ -5,6 +5,12 @@
 # 2 things that we may need to keep up with original scripts:
 #   - Deployment Convention: WMCore/REST app (CRAB REST) read necessary files from.
 #   - `wmc-httpd` line.
+# This script needs following environment variables:
+#   - DEBUG:   if `true`, setup debug mode environment .
+#   - APP_DIR: PYTHONPATH of the app.
+
+
+set -euo pipefail
 
 ##H Usage: manage ACTION [ATTRIBUTE] [SECURITY-STRING]
 ##H
@@ -22,10 +28,10 @@ COLOR_OK="\\033[0;32m"
 COLOR_WARN="\\033[0;31m"
 COLOR_NORMAL="\\033[0;39m"
 
-# hardcode service name
+## hardcode service name
 srv=crabserver
 
-# service settings
+## service settings
 #LOGDIR=/data/srv/logs/$srv # we write logs to fifo instead of logdir
 AUTHDIR=/data/srv/current/auth/$srv
 STATEDIR=/data/srv/state/$srv
@@ -37,18 +43,26 @@ CFGFILE=$CFGDIR/config.py
 PYTHONPATH=/data/srv/current/config/$srv:${PYTHONPATH}
 ## secrets
 PYTHONPATH=/etc/secrets:${PYTHONPATH} # (it should be $AUTHDIR, will fix later).
-## app
-PYTHONPATH=/data/srv/current/lib/python/site-packages/:$PYTHONPATH
+## app, using APP_PATH
+PYTHONPATH=${APP_PATH}:${PYTHONPATH}
 export PYTHONPATH
-## to get wmc-httpd path
+
+## wmc-httpd path
+# export PATH manually to bin directory in case you have custom wmc-httpd
 export PATH=/data/srv/current/bin:$PATH
+
 ## service creds
 export X509_USER_CERT=${X509_USER_CERT:-${AUTHDIR}/dmwm-service-cert.pem}
 export X509_USER_KEY=${X509_USER_KEY:-${AUTHDIR}/dmwm-service-key.pem}
 
-# by default Rucio relies on /opt/rucio/etc/config.cfg
-# if necessary we may setup RUCIO_HOME which should provide this location
-# but in k8s we mount rucio config.cfg under /opt/rucio/etc area
+## debug mode
+if [[ "${DEBUG}" == true ]]; then
+  # this will direct WMCore/REST/Main.py to run in the foreground rather than as a demon
+  # allowing among other things to insert pdb calls in the crabserver code and debug interactively
+  export DONT_DAEMONIZE_REST=True
+  # this will start crabserver with only one thread (default is 25) to make it easier to run pdb
+  export CRABSERVER_THREAD_POOL=1
+fi
 
 usage()
 {

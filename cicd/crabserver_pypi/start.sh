@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /bin/bash
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
@@ -32,14 +32,12 @@ case $MODE in
         ;;
     fromGH)
         # private mode: run private instance from GH
-        APP_PATH=/data/repos/CRABServer/src/python:/data/repos/WMCore/src/python
-        # update runtime (create TaskManagerRun.tar.gz from source)
-        ./new_updateTMRuntime.sh
+        APP_PATH=/data/repos/WMCore/src/python:/data/repos/CRABServer/src/python
         ;;
     *) echo "Unimplemented mode: $MODE\n"; helpFunction ;;
 esac
 
-# export APP_PATH and DEBUG to ./manage
-export APP_PATH
+# passing DEBUG/APP_PATH to ./manage scripts
 export DEBUG
+export APP_PATH
 "${SCRIPT_DIR}/manage" start
