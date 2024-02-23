@@ -166,7 +166,7 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
         logger.exception(f"failed to retrieve status for {jobid}")
         return
 
-    logger.info("State of job %s: %s", (jobid, status["job_state"]))
+    logger.info("State of job %s: %s", jobid, status["job_state"])
 
     if status["job_state"] in ('FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"):
         jobsEnded.append(jobid)
