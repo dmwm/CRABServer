@@ -189,7 +189,9 @@ def parseJobLog(jel, nodes, nodeMap):
             if nodes[node]['StartTimes']:
                 nodes[node]['WallDurations'][-1] = eventtime - nodes[node]['StartTimes'][-1]
             insertCpu(event, nodes[node])
-        elif event["MyType"] == "JobDisconnectedEvent" or event["MyType"] == "JobReconnectedEvent":
+        elif event["MyType"] == "JobDisconnectedEvent" \
+             or event["MyType"] == "JobReconnectedEvent" \
+             or event["MyType"] == "FileTransferEvent" :
             # These events don't really affect the node status
             pass
         else:
