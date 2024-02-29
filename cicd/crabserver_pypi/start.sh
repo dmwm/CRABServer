@@ -37,7 +37,7 @@ case $MODE in
     *) echo "Unimplemented mode: $MODE\n"; helpFunction ;;
 esac
 
-# passing DEBUG/APP_PATH to ./manage scripts
+# passing DEBUG/APP_PATH to ./manage.sh scripts
 export DEBUG
 export APP_PATH
-"${SCRIPT_DIR}/manage" start
+"${SCRIPT_DIR}/manage.sh" start

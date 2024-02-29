@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-##H Usage: manage ACTION [ATTRIBUTE] [SECURITY-STRING]
+##H Usage: manage.sh ACTION [ATTRIBUTE] [SECURITY-STRING]
 ##H
 ##H Available actions:
 ##H   help        show this help

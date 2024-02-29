@@ -1,11 +1,11 @@
 #! /bin/bash
 
-# Same style as crabserver_pypi/manage script, but for crabtaskworker.
+# Same style as crabserver_pypi/manage.sh script, but for crabtaskworker.
 # This script needs following environment variables:
 #   - DEBUG:   if `true`, setup debug mode environment .
 #   - APP_DIR: PYTHONPATH of the app.
 
-##H Usage: manage ACTION [ATTRIBUTE] [SECURITY-STRING]
+##H Usage: manage.sh ACTION [ATTRIBUTE] [SECURITY-STRING]
 ##H
 ##H Available actions:
 ##H   help        show this help
