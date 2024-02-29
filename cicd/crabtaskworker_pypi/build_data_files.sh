@@ -1,13 +1,15 @@
 #! /bin/bash
 # Build data files of TaskWorker.
 # This script needs
-#   - RUNTIME_DIR:   Working directory to build tar files
-#   - INSTALL_DIR:   data files directory
-#   - CRABSERVERDIR: CRABServer repository path.
-#   - WMCOREDIR:     WMCore repository path.
-# Note that
-#   - in Dockerfile and updateTMRuntime.sh, it set INSTALL_DIR to somewhere and copy built files to the path of data-files later.
-#   - WMCOREDIR is used inside new_htcondor_make_runtime.sh
+#   - RUNTIME_WORKDIR:   Working directory to build tar files
+#   - DATAFILES_WORKDIR: Working directory to build data files
+#   - CRABSERVERDIR:     CRABServer repository path.
+#   - WMCOREDIR:         WMCore repository path.
+#
+# Note that in Dockerfile and updateTMRuntime.sh, it set DATAFILES_WORKDIR to somewhere and copy built files to the path of data files later.
+#
+# Exemple for running in local machine (use default RUNTIME_WORKDIR and DATAFILES_WORKDIR, and enable trace):
+# CRABSERVERDIR=./ WMCOREDIR=../WMCore TRACE=true bash cicd/crabtaskworker/build_data_files.sh
 
 set -euo pipefail
 TRACE=${TRACE:-}
@@ -17,31 +19,36 @@ fi
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-RUNTIME_DIR="${RUNTIME_DIR:-./make_runtime}"
-INSTALL_DIR="${INSTALL_DIR:-./install_dir}"
-CRABSERVERDIR="${CRABSERVER_DIR:-.}"
+RUNTIME_WORKDIR="${RUNTIME_WORKDIR:-./make_runtime}"
+DATAFILES_WORKDIR="${DATAFILES_WORKDIR:-./data_files}"
+CRABSERVERDIR="${CRABSERVERDIR:-./}"
+WMCOREDIR="${WMCOREDIR:-./WMCore}"
 
 # get absolute path
-RUNTIME_DIR="$(realpath "${RUNTIME_DIR}")"
-INSTALL_DIR="$(realpath "${INSTALL_DIR}")"
+RUNTIME_WORKDIR="$(realpath "${RUNTIME_WORKDIR}")"
+DATAFILES_WORKDIR="$(realpath "${DATAFILES_WORKDIR}")"
 CRABSERVERDIR="$(realpath "${CRABSERVERDIR}")"
+WMCOREDIR="$(realpath "${WMCOREDIR}")"
 
-# cleanup $INSTALL_DIR
-rm -rf "${INSTALL_DIR}"
-mkdir -p "${INSTALL_DIR}"
+# cleanup $DATAFILES_WORKDIR
+rm -rf "${DATAFILES_WORKDIR}"/data
+mkdir -p "${DATAFILES_WORKDIR}"
 
 # build tar files
-# assume new_htcondor_make_runtime.sh live in the same directory of
-# this script.
+# passing args
+export RUNTIME_WORKDIR
+export CRABSERVERDIR
+export WMCOREDIR
+# assume new_htcondor_make_runtime.sh live in the same directory of this script.
 bash "${SCRIPT_DIR}/new_htcondor_make_runtime.sh"
 # build script files
 pushd "${CRABSERVERDIR}"
-python3 setup.py install_system -s TaskWorker --prefix="${INSTALL_DIR}"
+python3 setup.py install_system -s TaskWorker --prefix="${DATAFILES_WORKDIR}"
 popd
 # copy tar files to the same directory as script files
-cp "${RUNTIME_DIR}/CMSRunAnalysis.tar.gz" \
-   "${RUNTIME_DIR}/TaskManagerRun.tar.gz" \
-   "${INSTALL_DIR}/data"
+cp "${RUNTIME_WORKDIR}/CMSRunAnalysis.tar.gz" \
+   "${RUNTIME_WORKDIR}/TaskManagerRun.tar.gz" \
+   "${DATAFILES_WORKDIR}/data"
 
 # remove unuse lib dir from `install_system`
-rm -rf "${INSTALL_DIR:?}/lib"
+rm -rf "${DATAFILES_WORKDIR:?}/lib"
