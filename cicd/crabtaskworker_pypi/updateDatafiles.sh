@@ -2,7 +2,7 @@
 # This script mean to run inside crabtaskworker image.
 # Hardcoded the DATAFILES_WORKDIR, RUNTIME_WORKDIR, WMCOREDIR, CRABSERVERDIR,
 # and DATA_DIR to TaskWorker's deployment convention
-# See description of variables in cicd/crabtaskworker_pypi/build_data_files.sh
+# See description of variables in cicd/crabtaskworker_pypi/buildDataFiles.sh
 
 set -euo pipefail
 #set -x
@@ -17,12 +17,12 @@ CRABSERVERDIR=/data/repos/CRABServer
 echo "Building data files from source."
 mkdir -p "${DATAFILES_WORKDIR}" "${RUNTIME_WORKDIR}"
 pushd "${CRABSERVERDIR}"
-echo "Running build_data_files.sh script from $CRABSERVERDIR"
+echo "Running buildDatafiles.sh script from $CRABSERVERDIR"
 export DATAFILES_WORKDIR
 export RUNTIME_WORKDIR
 export WMCOREDIR
 export CRABSERVERDIR
-bash cicd/crabtaskworker_pypi/build_data_files.sh
+bash cicd/crabtaskworker_pypi/buildDatafiles.sh
 popd
 
 # copy new data files to data files path

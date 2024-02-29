@@ -9,7 +9,7 @@
 # Note that in Dockerfile and updateTMRuntime.sh, it set DATAFILES_WORKDIR to somewhere and copy built files to the path of data files later.
 #
 # Exemple for running in local machine (use default RUNTIME_WORKDIR and DATAFILES_WORKDIR, and enable trace):
-# CRABSERVERDIR=./ WMCOREDIR=../WMCore TRACE=true bash cicd/crabtaskworker/build_data_files.sh
+# CRABSERVERDIR=./ WMCOREDIR=../WMCore TRACE=true bash cicd/crabtaskworker/buildDatafiles.sh
 
 set -euo pipefail
 TRACE=${TRACE:-}
@@ -40,7 +40,7 @@ export RUNTIME_WORKDIR
 export CRABSERVERDIR
 export WMCOREDIR
 # assume new_htcondor_make_runtime.sh live in the same directory of this script.
-bash "${SCRIPT_DIR}/new_htcondor_make_runtime.sh"
+bash "${SCRIPT_DIR}"/buildTWTarballs.sh
 # build script files
 pushd "${CRABSERVERDIR}"
 python3 setup.py install_system -s TaskWorker --prefix="${DATAFILES_WORKDIR}"

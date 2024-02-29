@@ -12,7 +12,7 @@
 # variables.
 #
 # Example of running in local machine (use default RUNTIME_WORKDIR and enable trace):
-# CRABSERVERDIR=./ WMCOREDIR=../WMCore TRACE=true bash cicd/crabtaskworker/new_htcondor_make_runtime.sh):
+# CRABSERVERDIR=./ WMCOREDIR=../WMCore TRACE=true bash cicd/crabtaskworker/buildTWTarballs.sh):
 #
 
 set -euo pipefail
