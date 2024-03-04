@@ -96,17 +96,25 @@ TIME_OF_LAST_QUERY=$(date +"%s")
 # submission is most likely pointless and relatively expensive, the script will run normally and perform the query later.
 DAG_INFO="init"
 
-# following two lines are needed to use pycurl on python3 without the full COMP or CMSSW env.
-export PYTHONPATH=$PYTHONPATH:/data/srv/pycurl3/7.44.1
-source /cvmfs/cms.cern.ch/slc7_amd64_gcc900/external/curl/7.59.0/etc/profile.d/init.sh
 
 export PYTHONPATH=`pwd`/task_process:`pwd`/CRAB3.zip:`pwd`/WMCore.zip:$PYTHONPATH
 
-# will use one of the other of following two as appropriate, of course this implies
-# that we use python(2 or 3) from the OS and that we have an FTS python client available
-# in CVMFS for the same python version
-export RucioPy2=/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py2/current/lib/python2.7/site-packages/
-export RucioPy3=/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/
+OS_Version=`cat /etc/os-release |grep VERSION_ID|cut -d= -f2|tr -d \"|cut -d. -f1`
+
+if [ $OS_Version -eq '7' ]
+then
+  # following two lines are needed to use pycurl on python3 without the full COMP or CMSSW env.
+  export PYTHONPATH=$PYTHONPATH:/data/srv/pycurl3/7.44.1
+  source /cvmfs/cms.cern.ch/slc7_amd64_gcc900/external/curl/7.59.0/etc/profile.d/init.sh
+  export RucioPy3=/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/
+elif [ $OS_Version -eq '9' ]
+then
+  # alma9 comes with worling curl and pycurl !
+  export RucioPy3=/cvmfs/cms.cern.ch/rucio/x86_64/rhel9/py3/current/lib/python3.9/site-packages/
+else
+  echo " WE DO NOT SUPPORT OS_Version = $OS_Version "
+  exit 1
+fi
 
 log "Starting task daemon wrapper"
 while true
