@@ -14,13 +14,21 @@ done
 export PATH="/usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
 export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
 
-export PYTHONPATH=$PYTHONPATH:/data/srv/pycurl3/7.44.1
-#os_ver=$(source /etc/os-release;echo $VERSION_ID)
-#curl_path="/cvmfs/cms.cern.ch/slc${os_ver}_amd64_gcc700/external/curl/7.59.0"
-#libcurl_path="${curl_path}/lib"
-#source ${curl_path}/etc/profile.d/init.sh
-source /cvmfs/cms.cern.ch/slc7_amd64_gcc900/external/curl/7.59.0/etc/profile.d/init.sh
+OS_Version=`cat /etc/os-release |grep VERSION_ID|cut -d= -f2|tr -d \"|cut -d. -f1`
 
+if [ "$OS_Version" = "7" ]
+then
+  # following two lines are needed to use pycurl on python3 without the full COMP or CMSSW env.
+  export PYTHONPATH=$PYTHONPATH:/data/srv/pycurl3/7.44.1
+  source /cvmfs/cms.cern.ch/slc7_amd64_gcc900/external/curl/7.59.0/etc/profile.d/init.sh
+elif [ "$OS_Version" = "9" ]
+then
+  # alma9 comes with working curl and pycurl !
+  :  # ":" means do nothing in bash, like pass in python
+else
+  echo " WE DO NOT SUPPORT OS_Version = $OS_Version "
+  exit 1
+fi
 
 srcname=$0
 env > ${srcname%.sh}.env
