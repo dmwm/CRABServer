@@ -24,7 +24,7 @@ COPY --from=tnsnames /etc/tnsnames.ora /etc/tnsnames.ora
 
 RUN mkdir /build
 WORKDIR /build
-COPY cicd/crabserver_pypi/ .
+COPY cicd/crabserver_pypi/requirements.txt cicd/crabserver_pypi/wmcore_requirements.txt .
 # Install wmcore/crab dependencies
 RUN pip install -r requirements.txt
 # Getting the version number from wmcore_requirements.txt and install it with `--no-deps`.
@@ -38,6 +38,10 @@ COPY src/script/ /data/srv/current/data/script/
 COPY src/html/ /data/srv/current/data/html/
 COPY src/css/ /data/srv/current/data/css/
 
+# add github repos
+COPY cicd/crabserver_pypi/addGH.sh .
+RUN bash addGH.sh
+
 RUN rm -rf /build
 
 WORKDIR /data
@@ -50,10 +54,10 @@ RUN ls /data/srv/current/ \
     && install -d -o ${USER} -g ${USER} /data/srv/current/config/crabserver
 
 # copy running script files
-COPY cicd/crabserver_pypi/run.sh cicd/crabserver_pypi/manage cicd/crabserver_pypi/entrypoint.sh /data/
+COPY cicd/crabserver_pypi/run.sh cicd/crabserver_pypi/manage.sh cicd/crabserver_pypi/entrypoint.sh cicd/crabserver_pypi/start.sh cicd/crabserver_pypi/stop.sh /data/
 
 # make sure all files is the same user/group as running user
-RUN chown -R 1000:1000 /data
+RUN chown -R 1000:1000 /data && chmod +x /data/*.sh
 
 USER ${USER}
 CMD /data/run.sh

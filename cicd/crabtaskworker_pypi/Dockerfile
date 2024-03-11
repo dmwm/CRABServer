@@ -9,7 +9,7 @@ RUN wmcore_repo="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f1)" \
     && ( cd /WMCore; git status ) \
     && echo "${wmcore_version}" > /wmcore_version
 
-# create TaskManagerRun.tar.gz and other data files
+# create data files ./data
 FROM python:3.8 as build-data
 SHELL ["/bin/bash", "-c"]
 RUN mkdir /build \
@@ -17,14 +17,15 @@ RUN mkdir /build \
     && apt-get install -y curl zip git \
     && apt-get clean all
 WORKDIR /build
-COPY cicd/crabtaskworker_pypi/new_htcondor_make_runtime.sh /build
-COPY . /build
+COPY cicd/crabtaskworker_pypi/buildTWTarballs.sh cicd/crabtaskworker_pypi/buildDatafiles.sh /build/
+COPY setup.py /build
+COPY src /build/src
+COPY scripts /build/scripts
 COPY --from=wmcore-src /WMCore /build/WMCore
-RUN bash new_htcondor_make_runtime.sh
-RUN mkdir /build/install_dir \
-    && python3 setup.py install_system -s TaskWorker --prefix=/build/install_dir \
-    && cp /build/CMSRunAnalysis.tar.gz /build/install_dir/data/ \
-    && cp /build/TaskManagerRun.tar.gz /build/install_dir/data/
+RUN WMCOREDIR=./WMCore \
+    CRABSERVERDIR=./ \
+    DATAFILES_WORKDIR=./data_files\
+    bash buildDatafiles.sh
 
 # gfal, wmcore only has gfal lib but not cli
 FROM registry.cern.ch/cmsweb/gfal:latest as wmcore-gfal
@@ -56,7 +57,7 @@ RUN ln -sf ${WDIR}/miniconda/bin/gfal-ls /usr/bin/gfal-ls \
 # install package from debian repository
 # deps for openldap: libsasl2-dev python3-dev libldap-dev libssl-dev
 RUN apt-get update \
-    && apt-get install -y tini libsasl2-dev python3-dev libldap-dev libssl-dev \
+    && apt-get install -y tini git zip fd-find ripgrep libsasl2-dev python3-dev libldap-dev libssl-dev \
     && apt-get clean all
 
 # prepare build
@@ -67,13 +68,14 @@ WORKDIR /build
 COPY --from=wmcore-src /wmcore_version .
 COPY cicd/crabtaskworker_pypi/requirements.txt .
 RUN pip install -r requirements.txt \
-    && pip install --no-deps wmcore==$(cat wmcore_version)
+    && pip install --no-deps wmcore==$(cat wmcore_version) \
+    && pip cache purge
 
 # install crabserver
 # will replace with pip later
 COPY src/python/ ${WDIR}/srv/current/lib/python/site-packages/
 # copy TaskManagerRun.tar.gz
-COPY --from=build-data /build/install_dir/data ${WDIR}/srv/current/lib/python/site-packages/data
+COPY --from=build-data /build/data_files/data ${WDIR}/srv/current/lib/python/site-packages/data
 
 # copy cern openldap config
 COPY --from=cern-cc7 /etc/openldap /etc/openldap
@@ -82,12 +84,16 @@ COPY --from=cern-cc7 /etc/openldap /etc/openldap
 RUN mkdir -p /opt/rucio/etc/
 COPY cicd/crabtaskworker_pypi/rucio.cfg /opt/rucio/etc/
 
+# add github repos, reuse script in crabserver_pypi
+COPY cicd/crabserver_pypi/addGH.sh .
+RUN bash addGH.sh
+
 # clean up
 WORKDIR ${WDIR}
 RUN rm -rf /build
 
 # add new user and switch to user
-RUN useradd ${USER} \
+RUN useradd -m ${USER} \
     && install -o ${USER} -d ${WDIR}
 
 # create working directory
@@ -97,8 +103,10 @@ RUN mkdir -p ${WDIR}/srv/tmp \
 
 RUN cd ${WDIR}/srv/TaskManager \
     && ln -sf ${WDIR}/hostdisk/TaskWorker/cfg cfg \
-    && ln -sf ${WDIR}/hostdisk/TaskWorker/logs logs
-COPY cicd/crabtaskworker_pypi/start.sh  cicd/crabtaskworker_pypi/run.sh ${WDIR}/srv/TaskManager/
+    && ln -sf ${WDIR}/hostdisk/TaskWorker/logs logs \
+    && rm /data/manage /data/run.sh
+
+COPY cicd/crabtaskworker_pypi/start.sh cicd/crabtaskworker_pypi/stop.sh cicd/crabtaskworker_pypi/run.sh cicd/crabtaskworker_pypi/manage.sh cicd/crabtaskworker_pypi/updateDatafiles.sh  ${WDIR}/srv/TaskManager/
 
 # for debuggin purpose
 RUN echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3
