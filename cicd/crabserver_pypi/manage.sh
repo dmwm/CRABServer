@@ -7,7 +7,7 @@
 #   - `wmc-httpd` line.
 # This script needs following environment variables:
 #   - DEBUG:   if `true`, setup debug mode environment .
-#   - APP_DIR: PYTHONPATH of the app.
+#   - PYTHONPATH: inherit from ./start.sh
 
 
 set -euo pipefail
@@ -39,16 +39,16 @@ CFGDIR=/data/srv/current/config/$srv
 CFGFILE=$CFGDIR/config.py
 
 # necessary env settings for all WM services
+## app path. Inherit PYTHONPATH from parent process.
+PYTHONPATH=${PYTHONPATH:-/data/srv/current/lib/python/site-packages}
 ## config
 PYTHONPATH=/data/srv/current/config/$srv:${PYTHONPATH}
 ## secrets
-PYTHONPATH=/etc/secrets:${PYTHONPATH} # (it should be $AUTHDIR, will fix later).
-## app, using APP_PATH
-PYTHONPATH=${APP_PATH}:${PYTHONPATH}
+PYTHONPATH=/data/srv/current/auth/$srv:${PYTHONPATH}
+# finally export PYTHONPATH
 export PYTHONPATH
-
 ## wmc-httpd path
-# export PATH manually to bin directory in case you have custom wmc-httpd
+# export PATH manually to WMCore/bin directory in case you have custom wmc-httpd
 export PATH=/data/srv/current/bin:$PATH
 
 ## service creds
@@ -56,7 +56,7 @@ export X509_USER_CERT=${X509_USER_CERT:-${AUTHDIR}/dmwm-service-cert.pem}
 export X509_USER_KEY=${X509_USER_KEY:-${AUTHDIR}/dmwm-service-key.pem}
 
 ## debug mode
-if [[ "${DEBUG}" == true ]]; then
+if [[ "${DEBUG:-}" == true ]]; then
   # this will direct WMCore/REST/Main.py to run in the foreground rather than as a demon
   # allowing among other things to insert pdb calls in the crabserver code and debug interactively
   export DONT_DAEMONIZE_REST=True
@@ -73,17 +73,16 @@ start_srv()
     # Wa: originally from dmwm-base
     #wmc-httpd -r -d $STATEDIR -l "|rotatelogs $LOGDIR/$srv-%Y%m%d-`hostname -s`.log 86400" $CFGFILE
     wmc-httpd -r -d $STATEDIR -l "$STATEDIR/crabserver-fifo" $CFGFILE
-    # Wa: debug
-    #LD_PRELOAD=$JEMALLOC_ROOT/lib/libjemalloc.so wmc-httpd -r -d $STATEDIR -l "$STATEDIR/crabserver-fifo" $CFGFILE
-    #gdb --args python3 /data/srv/current/bin/wmc-httpd -r -d $STATEDIR -l "$STATEDIR/crabserver-fifo" $CFGFILE
 }
 
 stop_srv()
 {
-    local pid=`ps auxwww | egrep "wmc-httpd" | grep -v grep | awk 'BEGIN{ORS=" "} {print $2}'`
-    echo "Stop $srv service... ${pid}"
-    if [ -n "${pid}" ]; then
+    local pid=$(ps auxwww | egrep "wmc-httpd" | grep -v grep | awk 'BEGIN{ORS=" "} {print $2}') || true
+    if [[ -n "${pid}" ]]; then
+        echo "Stop $srv service... ${pid}"
         kill -9 ${pid}
+    else
+        echo "No $srv service process running."
     fi
 }
 
