@@ -53,6 +53,9 @@ RUN ls /data/srv/current/ \
     && install -d -o ${USER} -g ${USER} /data/srv/current/auth/crabserver \
     && install -d -o ${USER} -g ${USER} /data/srv/current/config/crabserver
 
+# remove unuse /data/manage come from baseimage to prevent confusion
+RUN rm /data/manage
+
 # copy running script files
 COPY cicd/crabserver_pypi/run.sh cicd/crabserver_pypi/manage.sh cicd/crabserver_pypi/entrypoint.sh cicd/crabserver_pypi/start.sh cicd/crabserver_pypi/stop.sh /data/
 

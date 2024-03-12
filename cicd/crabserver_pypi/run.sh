@@ -1,6 +1,8 @@
 #! /bin/bash
 # Container main process.
 
+set -euo pipefail
+
 # run monitoring script
 if [ -f /data/monitor.sh ]; then
     /data/monitor.sh &
@@ -14,7 +16,7 @@ cat /data/srv/state/crabserver/crabserver-fifo &
 
 #start the service
 #export CRYPTOGRAPHY_ALLOW_OPENSSL_102=true
-/data/manage start
+/data/start.sh -c
 
 # cat fifo forever to read logs
 while true;
