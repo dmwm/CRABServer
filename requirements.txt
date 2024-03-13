@@ -3,4 +3,4 @@
 # Format:
 # Dependency==version
 
-wmcver==2.1.8
+wmcver==2.3.2rc3

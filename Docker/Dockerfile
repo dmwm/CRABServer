@@ -1,4 +1,4 @@
-FROM registry.cern.ch/cmsweb/cmsweb:20230427-stable
+FROM registry.cern.ch/cmsweb/cmsweb:20230901-stable
 MAINTAINER Daina Dirmaite daina.dirmaite@gmail.com
 
 #keep only voms-proxy basded on c++
