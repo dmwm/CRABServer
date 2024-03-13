@@ -428,7 +428,7 @@ END ENABLE_JOBS;
 /
 
 /*=========================================================================================================================*/
-DECLARE
+DECLARE OR REPLACE PROCEDURE JOB_PARTITION
 	c NUMBER;
 BEGIN
 
