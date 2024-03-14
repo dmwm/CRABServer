@@ -13,8 +13,25 @@ set -o pipefail
 set -x
 echo "Beginning dag_bootstrap.sh (stdout)"
 echo "Beginning dag_bootstrap.sh (stderr)" 1>&2
-export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/
-export PYTHONPATH=$PYTHONPATH:/data/srv/pycurl3/7.44.1
+
+source /etc/os-release
+OS_Version=`echo $VERSION_ID | cut -d. -f1`  # e.g. 7 or 9
+
+if [ "$OS_Version" = "7" ]
+then
+  export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/
+  export PYTHONPATH=$PYTHONPATH:/data/srv/pycurl3/7.44.1
+  curl_path="/cvmfs/cms.cern.ch/slc${os_ver}_amd64_gcc700/external/curl/7.59.0"
+  source ${curl_path}/etc/profile.d/init.sh
+elif [ "$OS_Version" = "9" ]
+then
+  export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/rhel9/py3/current/lib/python3.9/site-packages/
+  # alma9 comes with working curl and pycurl
+else
+  echo " WE DO NOT SUPPORT OS_Version = $OS_Version "
+  exit 1
+fi
+
 if [ "X$TASKWORKER_ENV" = "X" -a ! -e CRAB3.zip ]
 then
 
@@ -90,10 +107,6 @@ fi
 
 export PATH="usr/local/bin:/bin:/usr/bin:/usr/bin:$PATH"
 export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
-
-os_ver=$(source /etc/os-release;echo $VERSION_ID)
-curl_path="/cvmfs/cms.cern.ch/slc${os_ver}_amd64_gcc700/external/curl/7.59.0"
-source ${curl_path}/etc/profile.d/init.sh
 
 # for automatic splitting, DagmanCreator needs HOSTNAME env.var. to be set
 # see https://github.com/dmwm/CRABServer/issues/7652
