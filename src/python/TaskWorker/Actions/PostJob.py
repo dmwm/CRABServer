@@ -1940,7 +1940,8 @@ class PostJob():
                 self.logger.info('History file not found in ./finished_jobs. Create it by querying schedd')
                 counter = 0
                 while counter < 5:
-                    cmd = 'condor_q -l %s > %s' % (self.dag_jobid, job_ad_file_name)
+                    cmd = 'condor_q -l %s | grep = > %s' % \
+                          (self.dag_jobid, job_ad_file_name)  # no empty lines ! #8285
                     self.logger.info('Executing %s', cmd)
                     subproc = subprocess.Popen(cmd, stderr=subprocess.PIPE, shell=True) # pylint: disable=consider-using-with
                     (stdout_data, stderr_data) = subproc.communicate()
