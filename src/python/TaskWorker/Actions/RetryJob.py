@@ -82,7 +82,7 @@ class RetryJob():
 
         for text_ad in output.split("\n\n"):
             try:
-                ad = classad.parseOld(text_ad)
+                ad = classad.parseAds(text_ad)
             except SyntaxError:
                 continue
             if ad:
@@ -105,7 +105,7 @@ class RetryJob():
             if os.path.isfile(job_ad_file):
                 try:
                     with open(job_ad_file, encoding='utf-8') as fd:
-                        ad = classad.parseOld(fd)
+                        ad = classad.parseAds(fd)
                 except Exception:  # pylint: disable=broad-except
                     msg = "Unable to parse classads from file %s. Continuing." % (job_ad_file)
                     self.logger.warning(msg)

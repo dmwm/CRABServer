@@ -427,7 +427,7 @@ def parseJobAd(filename):
     """
     jobAd = {}
     with open(filename) as fd:
-        # classad.parseOld(fd)
+        # classad.parseAds(fd)
         for adline in fd.readlines():
             info = adline.split(' = ', 1)
             if len(info) != 2:
