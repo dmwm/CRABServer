@@ -529,36 +529,23 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagAd['Args'] = arg
         dagAd["TransferInput"] = str(info['inputFilesString'])
 
-        condorIdDict = {}
-        tokenDir = getattr(self.config.TaskWorker, 'SEC_TOKEN_DIRECTORY', None)
-        with HTCondorUtils.AuthenticatedSubprocess(info['user_proxy'], tokenDir,
-                                                   pickleOut=True, outputObj=condorIdDict,
-                                                   logger=self.logger) as (parent, rpipe):
-            if not parent:
-                resultAds = []
-                condorIdDict['ClusterId'] = schedd.submit(dagAd, 1, True, resultAds)
-                schedd.spool(resultAds)
-                # editing the LeaveJobInQueue since the remote submit overwrites it
-                # see https://github.com/dmwm/CRABServer/pull/5212#issuecomment-216519749
-                if resultAds:
-                    id_ = "%s.%s" % (resultAds[0]['ClusterId'], resultAds[0]['ProcId'])
-                    schedd.edit([id_], "LeaveJobInQueue", classad.ExprTree("true"))
+        htcondor.param['DELEGATE_FULL_JOB_GSI_CREDENTIALS'] = 'true'
+        htcondor.param['DELEGATE_JOB_GSI_CREDENTIALS_LIFETIME'] = '0'
+        resultAds = []
         try:
-            results = pickle.load(rpipe)
-        except EOFError:
-            # this means timeout. It is bad because a clusterId is not returned even if job is submitted.
-            # and surely can't parse results structure in this case.  Retry on this schedd does not look promising
-            raise TaskWorkerException("Timeout executing condor submit command.", retry=False)
+            clusterId = schedd.submit(dagAd, 1, True, resultAds)
+            schedd.spool(resultAds)
+        except  htcondor.HTCondorException as hte:
+            raise TaskWorkerException(f"Submission failed with:\n{hte}") from hte
+
+        if 'ClusterId' in resultAds[0]:
+            id_ = "%s.%s" % (resultAds[0]['ClusterId'], resultAds[0]['ProcId'])
+            schedd.edit([id_], "LeaveJobInQueue", classad.ExprTree("true"))
+        else:
+            raise TaskWorkerException("Submission failed: no ClusterId was returned")
 
         # notice that the clusterId might be set even if there was a failure.
-        # e.g. if the schedd.submit succeded, but the spool  call failed
-        if 'ClusterId' in results.outputObj:
-            self.logger.debug("Condor cluster ID returned from submit is: %s", results.outputObj['ClusterId'])
-        if results.outputMessage != "OK":
-            #self.logger.debug("Now printing the environment used for submission:\n" + "-"*70 + "\n" + results.environmentStr + "-"*70)
-            msg = "Failure when submitting task to scheduler. Error reason: '%s'" % results.outputMessage
-            # most times submission fails simply because schedd was very busy, worth waiting and trying again
-            raise TaskWorkerException(msg, retry=True)
+        # e.g. if the schedd.submit succeded, but the spool call failed
+        self.logger.debug("Condor cluster ID returned from submit is: %s", clusterId)
 
-        #if we don't raise exception above the id is here
-        return results.outputObj['ClusterId']
+        return clusterId

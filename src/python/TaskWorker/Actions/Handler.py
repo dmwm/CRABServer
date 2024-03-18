@@ -6,6 +6,8 @@ import tempfile
 import traceback
 import copy
 
+import htcondor
+
 from RESTInteractions import CRABRest
 from RucioUtils import getNativeRucioClient
 
@@ -52,6 +54,10 @@ class TaskHandler(object):
         # it is up to date, in case task site a while in DB e.g. for tape recall.
         # self._task is passed in input to all actions
         self._task['tm_start_time'] = int(time.time())
+
+        # setup proper credentials for HTCondor
+        tokenDir = getattr(config.TaskWorker, 'SEC_TOKEN_DIRECTORY', None)
+        htcondor.param['SEC_TOKEN_DIRECTORY'] = tokenDir
 
 
     def createTempDir(self):
