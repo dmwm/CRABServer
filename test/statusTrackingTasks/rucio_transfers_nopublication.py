@@ -45,4 +45,4 @@ config.Site.whitelist = ['T1_*','T2_US_*','T2_IT_*','T2_DE_*','T2_ES_*','T2_FR_*
 config.Site.storageSite = 'T2_CH_CERN'
 
 config.section_("Debug")
-config.Debug.scheddName = 'crab3@crab-sched-901.cern.ch'
+config.Debug.scheddName = 'crab3@vocms059.cern.ch'
