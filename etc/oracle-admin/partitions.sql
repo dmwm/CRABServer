@@ -25,9 +25,12 @@ Dependency/Requirements:
 
 */
 
+set echo on;
+
 /*
 
 Since oracle 23.c (which is not in production yet at CERN IT), this can be replaced by 
+Ref: https://stackoverflow.com/a/15633220
 
 CREATE OR REPLACE PROCEDURE CREATE_TABLE_PTNAME
 IS
@@ -37,11 +40,9 @@ BEGIN
 
 END CREATE_TABLE_PTNAME;
 
-Ref: https://stackoverflow.com/a/15633220
 
 */
 
-set echo on;
 
 CREATE OR REPLACE PROCEDURE CREATE_TABLE_PTNAME
 IS
