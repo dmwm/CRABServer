@@ -31,8 +31,8 @@ def bootstrap():
 
     adfile = os.environ["_CONDOR_JOB_AD"]
     print("Parsing classad")
-    with open(adfile, "r") as fd:
-        ad = classad.parseAds(fd)
+    with open(adfile, "r", encodint='utf-8') as fd:
+        ad = classad.parseOne(fd)
     print("..done")
     in_args = []
     if infile != "None":
