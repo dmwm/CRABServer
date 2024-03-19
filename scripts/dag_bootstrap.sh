@@ -21,7 +21,7 @@ if [ "$OS_Version" = "7" ]
 then
   export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/
   export PYTHONPATH=$PYTHONPATH:/data/srv/pycurl3/7.44.1
-  curl_path="/cvmfs/cms.cern.ch/slc${os_ver}_amd64_gcc700/external/curl/7.59.0"
+  curl_path="/cvmfs/cms.cern.ch/slc7_amd64_gcc700/external/curl/7.59.0"
   source ${curl_path}/etc/profile.d/init.sh
 elif [ "$OS_Version" = "9" ]
 then
