@@ -41,6 +41,8 @@ Ref: https://stackoverflow.com/a/15633220
 
 */
 
+set echo on;
+
 CREATE OR REPLACE PROCEDURE CREATE_TABLE_PTNAME
 IS
 c NUMBER;
