@@ -1,37 +1,33 @@
-from __future__ import print_function
-
-import os
+"""
+ bootstrap one TW action which requires a separate process
+"""
 import sys
-import json
-import errno
-import types
-import pickle
-import pprint
 
-import classad
+from TaskWorker.Actions import PreDAG, PreJob, PostJob
 
-import TaskWorker.Actions.PostJob as PostJob
-import TaskWorker.Actions.PreJob as PreJob
-import TaskWorker.Actions.PreDAG as PreDAG
-import HTCondorUtils
-
-import WMCore.Configuration as Configuration
 
 def bootstrap():
-    print("Entering TaskManagerBootstrap with args: %s" % sys.argv)
+    """ bootstrap one TW action which requires a separate process """
+    print(f"Entering TaskManagerBootstrap with args: {sys.argv}")
     command = sys.argv[1]
     if command == "POSTJOB":
         return PostJob.PostJob().execute(*sys.argv[2:])
-    elif command == "PREJOB":
+    if command == "PREJOB":
         return PreJob.PreJob().execute(*sys.argv[2:])
-    elif command == "PREDAG":
+    if command == "PREDAG":
         return PreDAG.PreDAG().execute(*sys.argv[2:])
+    raise Exception(f"Unknown command {sys.argv[1]} passed to TaskMangerBootstrap.py")
+
+    """
+    #looks like this is neverused. indeed it would break at the line
+    #    results = task.execute(in_args, task=ad).result
+    #since 'task' is not defined !!!
 
     infile, outfile = sys.argv[2:]
 
     adfile = os.environ["_CONDOR_JOB_AD"]
     print("Parsing classad")
-    with open(adfile, "r", encodint='utf-8') as fd:
+    with open(adfile, "r", encoding='utf-8') as fd:
         ad = classad.parseOne(fd)
     print("..done")
     in_args = []
@@ -42,7 +38,7 @@ def bootstrap():
     config = Configuration.Configuration()
     config.section_("Services")
     config.Services.DBSUrl = 'https://cmsweb.cern.ch/dbs/prod/phys03/DBSWriter/'
-    
+
     ad['tm_taskname'] = ad.eval("CRAB_Workflow")
     ad['tm_split_algo'] = ad.eval("CRAB_SplitAlgo")
     ad['tm_dbs_url'] = ad.eval("CRAB_DBSURL")
@@ -79,14 +75,14 @@ def bootstrap():
         pickle.dump(results, fd)
 
     return 0
+    """
+
 
 if __name__ == '__main__':
     try:
         retval = bootstrap()
-        print("Ended TaskManagerBootstrap with code %s" % retval)
+        print(f"Ended TaskManagerBootstrap with code {retval}")
         sys.exit(retval)
     except Exception as e:
-        # TODO: make this propagate somewhere machine readable
-        print("Got a fatal exception: %s" % e)
+        print(f"Got a fatal exception: {e}")
         raise
-        
