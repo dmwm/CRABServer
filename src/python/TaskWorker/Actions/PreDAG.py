@@ -38,7 +38,7 @@ import classad
 
 from WMCore.DataStructs.LumiList import LumiList
 
-from ServerUtilities import getLock, newX509env, MAX_IDLE_JOBS, MAX_POST_JOBS, parseJobAd
+from ServerUtilities import getLock, newX509env, MAX_IDLE_JOBS, MAX_POST_JOBS
 from RESTInteractions import CRABRest
 from RucioUtils import getNativeRucioClient
 from TaskWorker.Actions.Splitter import Splitter
@@ -67,28 +67,17 @@ class PreDAG(object):
         self.logger.propagate = False
         self.crabserver = None
 
-    def setupCRABRest(self):
+    def setupCRABRest(self, restHost, dbInstance):
         """
         Setup CRABRest object and add it to self.crabserver.
         rest_host and db_instance are come from parsing job ad
         (copy some code from PostJob.py). Get user proxy from
         X509_USER_PROXY environment variable.
         """
-        job_ad_file_name = os.environ.get("_CONDOR_JOB_AD", ".job.ad")
-        if not os.path.exists(job_ad_file_name) or not os.stat(job_ad_file_name).st_size:
-            self.logger.error("Missing job ad!")
-            sys.exit(1)
-        try:
-            job_ad = parseJobAd(job_ad_file_name)
-        except Exception as ex:
-            self.logger.exception("Error parsing job ad: %s", str(ex))
-            sys.exit(1)
-        rest_host = str(job_ad['CRAB_RestHost'])
-        db_instance = str(job_ad['CRAB_DbInstance'])
         proxy = os.environ['X509_USER_PROXY']
-        self.crabserver = CRABRest(rest_host, proxy, proxy, retry=20,
+        self.crabserver = CRABRest(restHost, proxy, proxy, retry=20,
                                    logger=self.logger, userAgent='CRABSchedd')
-        self.crabserver.setDbInstance(db_instance)
+        self.crabserver.setDbInstance(dbInstance)
 
     def readJobStatus(self):
         """Read the job status(es) from the cache_status file and save the relevant info into self.statusCacheInfo"""
@@ -182,8 +171,23 @@ class PreDAG(object):
         if len(completed) < self.completion:
             return 4
 
+        # read classAds for this task
+        taskAdFile = os.environ.get("_CONDOR_JOB_AD")
+        if not os.path.exists(taskAdFile) or not os.stat(taskAdFile).st_size:
+            self.logger.error("Missing job ad!")
+            sys.exit(1)
+        try:
+            with open(taskAdFile, 'r', encoding='utf-8') as fh:
+                task_ad = classad.parseOne(fh)
+        except Exception as ex:
+            self.logger.exception("Error parsing job ad: %s", str(ex))
+            sys.exit(1)
+
+        restHost = task_ad['CRAB_RestHost']
+        dbInstance = task_ad['CRAB_DbInstance']
+
         # init CRABRest self.crabserver
-        self.setupCRABRest()
+        self.setupCRABRest(restHost, dbInstance)
 
         self.readProcessedJobs()
         unprocessed = completed - self.processedJobs
@@ -209,7 +213,6 @@ class PreDAG(object):
 
         # need to get username from classAd to setup for Rucio access
         # and use user cert to talking with rucio
-        task_ad = classad.parseOne(open(os.environ['_CONDOR_JOB_AD']))
         username = task_ad['CRAB_UserHN']
         config.Services.Rucio_account = username
         config.Services.Rucio_cert = os.environ.get('X509_USER_PROXY')
