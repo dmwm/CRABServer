@@ -805,7 +805,7 @@ class DagmanCreator(TaskAction):
             siteinfo = {'group_sites': {}, 'group_datasites': {}}
         if os.path.exists("site.ad"):
             with open("site.ad", encoding='utf-8') as fd:
-                sitead = classad.parseAds(fd)
+                sitead = classad.parseOne(fd)
         else:
             sitead = classad.ClassAd()
 
