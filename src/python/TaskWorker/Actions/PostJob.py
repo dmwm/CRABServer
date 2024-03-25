@@ -110,7 +110,7 @@ from WMCore.Services.WMArchive.DataMap import createArchiverDoc
 from TaskWorker import __version__
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
-from ServerUtilities import isFailurePermanent, parseJobAd, mostCommon, TRANSFERDB_STATES, PUBLICATIONDB_STATES, encodeRequest, oracleOutputMapping
+from ServerUtilities import isFailurePermanent, mostCommon, TRANSFERDB_STATES, PUBLICATIONDB_STATES, encodeRequest, oracleOutputMapping
 from ServerUtilities import getLock, getHashLfn
 from RESTInteractions import CRABRest
 
@@ -2590,7 +2590,8 @@ class PostJob():
             self.logger.error("Missing job ad!")
             return 1
         try:
-            self.job_ad = parseJobAd(job_ad_file_name)
+            with open(job_ad_file_name, 'r', encoding='utf-8') as fh:
+                self.job_ad = classad.parseOne(fh)
         except Exception as ex:
             msg = "Error parsing job ad: %s" % (str(ex))
             self.logger.exception(msg)
