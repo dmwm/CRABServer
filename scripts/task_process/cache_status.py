@@ -16,6 +16,7 @@ import pickle
 import json
 import htcondor
 import classad
+import subprocess
 
 logging.basicConfig(filename='task_process/cache_status.log', level=logging.DEBUG)
 
@@ -71,10 +72,26 @@ def insertCpu(event, info):
 nodeNameRe = re.compile("DAG Node: Job(\d+(?:-\d+)?)")
 nodeName2Re = re.compile("Job(\d+(?:-\d+)?)")
 
+def parseJobLog(jel, nodes, nodeMap):
+    try:
+        parseJobLogOriginal(jel, nodes, nodeMap)
+    except htcondor.HTCondorIOError as ex:
+        logging.error("Corrupted job_log: %s", ex)
+        logging.error("try to fix")
+        with htcondor.lock(open('job_log', 'a'), htcondor.LockType.WriteLock):
+            backup_cmd = 'bash -c "if [[ ! -f job_log_backup ]]; then cp job_log job_log_backup; fi"'
+            subprocess.run(backup_cmd, shell=True, check=True)
+            awk_cmd = """awk '/^Message = .+valid default Singularity image$/ { printf("%s\t", $0); next } 1' job_log > job_log_fix"""
+            subprocess.run(awk_cmd, shell=True, check=True)
+            copy_cmd = 'cp job_log_fix job_log'
+            subprocess.run(copy_cmd, shell=True, check=True)
+        logging.error('run again later. exit...')
+        exit(1)
+
 # this now takes as input an htcondor.JobEventLog object
 # which as of HTCondor 8.9 can be saved/restored with memory of
 # where it had reached in processing the job log file
-def parseJobLog(jel, nodes, nodeMap):
+def parseJobLogOriginal(jel, nodes, nodeMap):
     """
     parses new events in condor job log file and updates nodeMap
     :param jel: a condor JobEventLog object which provides an iterator over events
