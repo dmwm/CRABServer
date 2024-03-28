@@ -24,9 +24,9 @@ from ServerUtilities import TRANSFERDB_STATES, PUBLICATIONDB_STATES
 # CERTIFICATE = '/data/certs/servicecert.pem'
 # KEY = '/data/certs/servicekey.pem'
 
-workdir = '/data/srv/monit/'
-logdir = '/data/srv/monit/logs/'
-logfile = f'GenMonit-{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
+WORKDIR = '/data/srv/monit/'
+LOGDIR = '/data/srv/monit/logs/'
+LOGFILE = f'GenMonit-{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
 
 CMSWEB = 'cmsweb.cern.ch'
 DBINSTANCE = 'prod'
@@ -37,7 +37,7 @@ def readpwd():
     """
     Reads password from disk
     """
-    with open(f"/data/certs/monit.d/MONIT-CRAB.json", encoding='utf-8') as f:
+    with open("/data/certs/monit.d/MONIT-CRAB.json", encoding='utf-8') as f:
         credentials = json.load(f)
     return credentials["url"], credentials["username"], credentials["password"]
 MONITURL, MONITUSER, MONITPWD = readpwd()
@@ -46,9 +46,9 @@ MONITURL, MONITUSER, MONITPWD = readpwd()
 def getData(subresource):
     """This function will fetch data from Oracle table"""
 
-    crabserver = CRABRest(hostname=CMSWEB, 
+    crabserver = CRABRest(hostname=CMSWEB,
                           localcert=CMSWEB_CERTIFICATE,
-                          localkey=CMSWEB_KEY, 
+                          localkey=CMSWEB_KEY,
                           retry=3, userAgent='CRABTaskWorker')
     crabserver.setDbInstance(dbInstance=DBINSTANCE)
     result = crabserver.get(api='filetransfers', data=encodeRequest({'subresource': subresource, 'grouping': 0}))
@@ -62,16 +62,16 @@ def printData(data, header, logger=None):
 
     i = 1
     logger.info("="*70)
-    logger.info("%-4s%-15s%-10s%-10s" % header)
+    logger.info("%-4s%-15s%-10s%-10s", header)
     logger.info("-"*70)
     for row in data:
-        logger.info("%-4d%-15s%-10d%-10d" % (i, row[header[1]], row[header[2]], row[header[3]]))
+        logger.info("%-4d%-15s%-10d%-10d", (i, row[header[1]], row[header[2]], row[header[3]]))
         i = i+1
 
     logger.info("="*70)
 #======================================================================================================================================
 
-def fillData(data, dict_key, aso_worker, state, inputdoc):
+def fillData(data, dictKey, asoWorker, state, inputdoc):
     "This function will fill fetched data from Oracle table in JSON dict."""
 
     if state == 'transfer_state':
@@ -80,17 +80,17 @@ def fillData(data, dict_key, aso_worker, state, inputdoc):
         STATES = PUBLICATIONDB_STATES
 
     for row in data:
-        if row['aso_worker'] == aso_worker:
-            inputdoc[dict_key][STATES[row[state]]]['count'] = row['nt']
+        if row['aso_worker'] == asoWorker:
+            inputdoc[dictKey][STATES[row[state]]]['count'] = row['nt']
 
 #======================================================================================================================================
 
 def sendDocument(document, logger=None):
     """This function upload JSON to MONIT"""
 
-    response = requests.post(f"{MONITURL}", 
+    response = requests.post(f"{MONITURL}",
                              auth=HTTPBasicAuth(MONITUSER, MONITPWD),
-                             data=json.dumps(document), 
+                             data=json.dumps(document),
                              headers={"Content-Type": "application/json; charset=UTF-8"},
                              verify=False)
     msg = 'With document: {0}. Status code: {1}. Message: {2}'.format(document, response.status_code, response.text)
@@ -103,7 +103,7 @@ def main():
     logger = logging.getLogger()
     handler1 = logging.StreamHandler(sys.stdout)
     logger.addHandler(handler1)
-    handler2 = logging.FileHandler(logdir + logfile)
+    handler2 = logging.FileHandler(LOGDIR + LOGFILE)
     formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s",
                                   datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)")
     handler2.setFormatter(formatter)
