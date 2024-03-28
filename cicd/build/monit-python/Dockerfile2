@@ -39,7 +39,7 @@ ENV RUCIO_ACCOUNT="crab_server"
 # ENV PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/el9/py3/current/lib/python3.9/site-packages/
 # ENV PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/el8/py3/current/lib/python3.6/site-packages/
 
-COPY entrypoint.sh /entrypoint.sh
+COPY ./cicd/build/monit-python/entrypoint.sh /entrypoint.sh
 ENTRYPOINT [ "/bin/bash", "/entrypoint.sh" ]
 
 CMD python3.8 /data/srv/monit/CheckTapeRecall.py
