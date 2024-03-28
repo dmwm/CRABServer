@@ -19,11 +19,15 @@ from requests.auth import HTTPBasicAuth
 
 from RESTInteractions import CRABRest
 
-hostname = os.uname()[1]
-hostsAllowRun = ['crab-prod-tw02.cern.ch', 'crab-preprod-tw02.cern.ch',]
-if not hostname in hostsAllowRun:
-    print(f"running on {hostname}, but script allowed to run on {hostsAllowRun}")
-    sys.exit(0)
+## no need to check the hostname, we control where this scripts run on
+## via puppet
+# hostname = os.uname()[1]
+# hostsAllowRun = ['crab-prod-tw02.cern.ch', 
+#                  'crab-preprod-tw02.cern.ch',
+#                  ]
+# if not hostname in hostsAllowRun:
+#     print(f"running on {hostname}, but script allowed to run on {hostsAllowRun}")
+#     sys.exit(0)
 
 FMT = "%Y-%m-%dT%H:%M:%S%z"
 WORKDIR = '/data/srv/TaskManager/'

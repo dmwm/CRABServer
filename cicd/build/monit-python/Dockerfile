@@ -25,11 +25,11 @@ WORKDIR ${WDIR}
 
 RUN git clone https://github.com/dmwm/WMCore /data/srv/monit/WMCore
 RUN mkdir -p /data/srv/monit/
-COPY CheckTapeRecall.py /data/srv/monit
-COPY ServerUtilities.py /data/srv/monit
-COPY RESTInteractions.py /data/srv/monit
-COPY aso_metrics_ora.py /data/srv/monit
-COPY ReportRecallQuota.py /data/srv/monit
+COPY ./scripts/Utils/CheckTapeRecall.py      /data/srv/monit
+COPY ./src/python/ServerUtilities.py         /data/srv/monit
+COPY ./src/python/RESTInteractions.py        /data/srv/monit
+COPY ./src/script/Monitor/aso_metrics_ora.py /data/srv/monit
+COPY ./src/script/Monitor/ReportRecallQuota.py /data/srv/monit
 
 ENV PYTHONPATH=$PYTHONPATH:/data/srv/monit/WMCore/src/python
 ENV RUCIO_HOME=/cvmfs/cms.cern.ch/rucio/current/
@@ -39,7 +39,7 @@ ENV RUCIO_ACCOUNT="crab_server"
 # ENV PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/el9/py3/current/lib/python3.9/site-packages/
 # ENV PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/el8/py3/current/lib/python3.6/site-packages/
 
-COPY entrypoint.sh /entrypoint.sh
+COPY ./cicd/build/monit-python/entrypoint.sh /entrypoint.sh
 ENTRYPOINT [ "/bin/bash", "/entrypoint.sh" ]
 
 CMD python3.8 /data/srv/monit/CheckTapeRecall.py
