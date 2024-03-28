@@ -8,27 +8,27 @@ example output:
 
 import sys
 import time
-import pandas as pd
 import logging
 import datetime
 import json
 from socket import gethostname
 
+import pandas as pd
 import requests
 from requests.auth import HTTPBasicAuth
 
 from RESTInteractions import CRABRest
 from ServerUtilities import encodeRequest
 
-workdir = '/data/srv/monit/'
-logdir = '/data/srv/monit/logs/'
-logfile = f'GenMonit-{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
+WORKDIR = '/data/srv/monit/'
+LOGDIR = '/data/srv/monit/logs/'
+LOGFILE = f'GenMonit-{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
 
 def readpwd():
     """
     Reads password from disk
     """
-    with open(f"/data/certs/monit.d/MONIT-CRAB.json", encoding='utf-8') as f:
+    with open("/data/certs/monit.d/MONIT-CRAB.json", encoding='utf-8') as f:
         credentials = json.load(f)
     return credentials["url"], credentials["username"], credentials["password"]
 MONITURL, MONITUSER, MONITPWD = readpwd()
@@ -43,7 +43,7 @@ def send(document):
     :param document:
     :return:
     """
-    return requests.post(f"{MONITURL}", 
+    return requests.post(f"{MONITURL}",
                         auth=HTTPBasicAuth(MONITUSER, MONITPWD),
                          data=json.dumps(document),
                          headers={"Content-Type": "application/json; charset=UTF-8"},
@@ -51,7 +51,7 @@ def send(document):
                          )
 
 
-def send_and_check(document, should_fail=False):
+def sendAndCheck(document):
     """
     commend the `##PROD` section when developing, not to duplicate the data inside elasticsearch
     """
@@ -60,8 +60,6 @@ def send_and_check(document, should_fail=False):
     # PROD
     response = send(document)
     msg = 'With document: {0}. Status code: {1}. Message: {2}'.format(document, response.status_code, response.text)
-    assert ((response.status_code in [200]) != should_fail), \
-        msg
     print(msg)
 
 def main():
@@ -74,7 +72,7 @@ def main():
     logger.setLevel(logging.DEBUG)
     handler1 = logging.StreamHandler(sys.stdout)
     logger.addHandler(handler1)
-    handler2 = logging.FileHandler(logdir + logfile)
+    handler2 = logging.FileHandler(LOGDIR + LOGFILE)
     formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s",
                                   datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)")
     handler2.setFormatter(formatter)
@@ -105,15 +103,15 @@ def main():
 
     # combine all pending rules in a single dataframe
     pending = pd.concat([stuck, replicating, suspended]).reset_index(drop=True)
-    pending_compact = createRulesDataframe(pending, rucio, crab, logger)
+    pendingCompact = createRulesDataframe(pending, rucio, crab, logger)
 
     # prepare an HTML table
-    if pending_compact.empty:
+    if pendingCompact.empty:
         rulesTable = "<tr><td><center>No rules either in replicating nor stuck</center></td></tr>"
         rulesJson = [{}]
     else:
-        rulesTable = createRulesHtmlTable(pending_compact)
-        rulesJson = createRulesJson(pending_compact)
+        rulesTable = createRulesHtmlTable(pendingCompact)
+        rulesJson = createRulesJson(pendingCompact)
 
     # write an HTML doc
     beginningOfDoc = '<!DOCTYPE html>\n<html>\n'
@@ -129,7 +127,7 @@ def main():
         fh.write(endOfDoc)
 
     # send document to opensearch
-    send_and_check(rulesJson)
+    sendAndCheck(rulesJson)
 
 def createRulesDataframe(pending, rucio, crab, logger=None):
     """
@@ -184,10 +182,10 @@ def createRulesHtmlTable(df):
     df['datasetUrl'] = df.apply(lambda x: createDatasetUrlHtml(x.dataset), axis=1)
 
     selected = df[['idUrl', 'state', 'user', 'locks', 'days', 'tape', 'size', 'datasetUrl', 'taskUrls']]
-    pending_compact = selected.rename(columns={'locks': 'locks ok/rep/st', 'size': 'size TB'})
+    pendingCompact = selected.rename(columns={'locks': 'locks ok/rep/st', 'size': 'size TB'})
     _ = selected.rename(columns={'locks': 'locks ok/rep/st', 'size': 'size TB'})
 
-    return pending_compact.to_html(escape=False)
+    return pendingCompact.to_html(escape=False)
 
 def createRulesJson(df):
     df = df[['id', 'state', 'user', 'locks', 'days', 'tape', 'size', 'dataset', 'tasks']]
@@ -199,19 +197,19 @@ def createRulesJson(df):
 
     df['dataset_short'] = df.apply(lambda x: createDatasetShortJson(x.dataset), axis=1)
 
-    rules_string = df.to_json(orient="split")
-    rules_dict = json.loads(rules_string)
-    rules_opensearch = []
-    for rule in rules_dict["data"]:
-        rule_opensearch = dict(
+    rulesString = df.to_json(orient="split")
+    rulesDict = json.loads(rulesString)
+    rulesOpensearch = []
+    for rule in rulesDict["data"]:
+        ruleOpensearch = dict(
             producer=MONITUSER,
             type='checktaperecall',
             hostname=gethostname(),
         )
-        for key, value in zip(rules_dict["columns"], rule):
-            rule_opensearch[key] = value
-        rules_opensearch.append(rule_opensearch)
-    return rules_opensearch
+        for key, value in zip(rulesDict["columns"], rule):
+            ruleOpensearch[key] = value
+        rulesOpensearch.append(ruleOpensearch)
+    return rulesOpensearch
 
 def createTaskUrlHtml(tasks):
     """
