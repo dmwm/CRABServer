@@ -5,5 +5,5 @@
 docker build \
   --network=host \
   -t registry.cern.ch/cmscrab/crabtaskworker:20240328-monitpython \
-  ./
+  ./ \
   -f ./cicd/build/monit-python/Dockerfile2
