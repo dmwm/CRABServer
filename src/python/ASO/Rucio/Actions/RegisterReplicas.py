@@ -6,7 +6,7 @@ import logging
 import itertools
 import copy
 from rucio.rse.rsemanager import find_matching_scheme
-from rucio.common.exception import RSENotFound, RSEProtocolNotSupported
+from rucio.common.exception import RucioException
 
 import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
 from ASO.Rucio.Actions.BuildDBSDataset import BuildDBSDataset
@@ -177,7 +177,7 @@ class RegisterReplicas:
                             'ruleid': None,
                         }
                         retSuccess.append(fileDoc)
-                except (RSENotFound, RSEProtocolNotSupported) as ex:
+                except RucioException as ex:
                     # Usually when exception occur it affect the whole chunk,
                     # no need to retry individually.
                     #
@@ -299,9 +299,6 @@ class RegisterReplicas:
             did = f'{self.transfer.rucioScope}:{sourceLFN}'
             sourcePFNMap = self.rucioClient.lfns2pfns(sourceRSE, [did], operation="third_party_copy_read", scheme=srcScheme)
             pfn = sourcePFNMap[did]
-            # hardcode fix for DESY temp,
-            if sourceRSE == 'T2_DE_DESY':
-                pfn = pfn.replace('/pnfs/desy.de/cms/tier2/temp', '/pnfs/desy.de/cms/tier2/store/temp')
             self.logger.debug(f'PFN: {pfn}')
             return pfn
         except Exception as ex:
