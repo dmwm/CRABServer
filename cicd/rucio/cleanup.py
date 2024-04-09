@@ -7,7 +7,7 @@ import os
 from rucio.client import Client
 from rucio.rse.rsemanager import find_matching_scheme
 
-DRY_RUN = os.getenv("DRY_RUN", 'False').lower() in ('True', 'true', '1', 't')
+DRY_RUN = os.getenv("DRY_RUN", 'True').lower() in ('True', 'true', '1', 't')
 
 def deleteRules(client=None, filters=None):
     """

@@ -7,4 +7,5 @@ voms-proxy-info
 source /cvmfs/cms.cern.ch/rucio/setup-py3.sh
 rucio whoami
 
+export DRY_RUN=${DRY_RUN:-false}
 python3 "${SCRIPT_DIR}"/cleanup.py
