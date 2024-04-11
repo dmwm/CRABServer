@@ -1,10 +1,6 @@
+""" this file can entirely go away once we cleanup and use modern classad bindings """
 
 import os
-import time
-import pickle
-import signal
-import logging
-import traceback
 
 import classad
 import htcondor
@@ -16,13 +12,13 @@ def quote(value):
     return ad.lookup("foo").__str__()
 try:
     quote = classad.quote
-except:
+except Exception:  # pylint: disable=broad-except
     pass
 def unquote(value):
     return classad.ExprTree(value).eval()
 try:
     unquote = classad.unquote
-except:
+except Exception:  # pylint: disable=broad-except
     pass
 
 readEvents = getattr(htcondor, 'readEvents', htcondor.read_events)
@@ -46,8 +42,12 @@ class AuthenticatedSubprocess(object):
     Moreaover, htcondor.SecmMan is being removed from HTC bindings
     Keep the code here for a while in case we overlooked some important
     functionality and want to revive with some different implementation
-    """
 
+    import time
+    import pickle
+    import signal
+    import logging
+    import traceback
     def __init__(self, proxy, tokenDir=None, pickleOut=False, outputObj=None, logger=logging):
         self.proxy = proxy
         self.pickleOut = pickleOut
@@ -115,3 +115,4 @@ class AuthenticatedSubprocess(object):
                 os.kill(self.pid, signal.SIGTERM)
                 #we should probably wait again and send SIGKILL is the kill does not work
 
+    """
