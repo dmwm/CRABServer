@@ -40,6 +40,13 @@ class OutputObj:
 
 
 class AuthenticatedSubprocess(object):
+    """
+    We do not use this anymore since of April 2024 since we moved to using
+    a single token for all interactions with HTCondor.
+    Moreaover, htcondor.SecmMan is being removed from HTC bindings
+    Keep the code here for a while in case we overlooked some important
+    functionality and want to revive with some different implementation
+    """
 
     def __init__(self, proxy, tokenDir=None, pickleOut=False, outputObj=None, logger=logging):
         self.proxy = proxy
