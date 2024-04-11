@@ -1,4 +1,5 @@
-from __future__ import print_function
+""" Hanldes all TW actions """
+
 import os
 import time
 import logging
@@ -29,7 +30,7 @@ from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetExcep
 from ServerUtilities import uploadToS3
 
 
-class TaskHandler(object):
+class TaskHandler():
     """Handling the set of operations to be performed."""
 
 
@@ -42,18 +43,18 @@ class TaskHandler(object):
         self.crabserver = crabserver
         self.config = config
         self.workFunction = workFunction
-        self._work = []
-        self._task = task
+        self.work = []
+        self.task = task
         self.taskname = task['tm_taskname']
         self.tempDir = None
         if createTempDir:
             self.tempDir = self.createTempDir()
-            self._task['scratch'] = self.tempDir
+            self.task['scratch'] = self.tempDir
 
         # tm_start_time will be used to set task end time. Make sure
         # it is up to date, in case task site a while in DB e.g. for tape recall.
-        # self._task is passed in input to all actions
-        self._task['tm_start_time'] = int(time.time())
+        # self.task is passed in input to all actions
+        self.task['tm_start_time'] = int(time.time())
 
         # setup proper credentials for HTCondor
         tokenDir = getattr(config.TaskWorker, 'SEC_TOKEN_DIRECTORY', None)
@@ -61,6 +62,7 @@ class TaskHandler(object):
 
 
     def createTempDir(self):
+        """ need a doc string """
         if hasattr(self.config, 'TaskWorker') and hasattr(self.config.TaskWorker, 'scratchDir'):
             tempDir = tempfile.mkdtemp(prefix='_' + self.taskname, dir=self.config.TaskWorker.scratchDir)
         else:
@@ -73,15 +75,15 @@ class TaskHandler(object):
         """Appending a new action to be performed on the task
 
         :arg callable work: a new callable to be called :)"""
-        if work not in self._work:
-            self._work.append(work)
+        if work not in self.work:
+            self.work.append(work)
 
 
     def getWorks(self):
         """Retrieving the queued actions
 
         :return: generator of actions to be performed."""
-        for w in self._work:
+        for w in self.work:
             yield w
 
 
@@ -89,27 +91,26 @@ class TaskHandler(object):
         """ Execute an action and deal with the error handling and upload of the tasklogfile to the crabcache
         """
         try:
-            output = work.execute(nextinput, task=self._task, tempDir=self.tempDir)
+            output = work.execute(nextinput, task=self.task, tempDir=self.tempDir)
         except TapeDatasetException as tde:
             raise TapeDatasetException(str(tde)) from tde
         except TaskWorkerException as twe:
             self.logger.debug(str(traceback.format_exc()))  # print the stacktrace only in debug mode
             raise WorkerHandlerException(str(twe), retry=twe.retry) from twe  # TaskWorker error, do not add traceback
         except Exception as exc:
-            msg = "Problem handling %s because of %s failure, traceback follows\n" % (self.taskname, str(exc))
+            msg = f"Problem handling {self.taskname} because of {exc} failure, traceback follows\n"
             msg += str(traceback.format_exc())
             self.logger.error(msg)
             raise WorkerHandlerException(msg) from exc  # Errors not foreseen. Print everything!
         finally:
-            #TODO: we need to do that also in Worker.py otherwise some messages might only be in the TW file but not in the crabcache.
-            logpath = self.config.TaskWorker.logsDir+'/tasks/%s/%s.log' % (self._task['tm_username'], self.taskname)
-            if os.path.isfile(logpath) and 'user_proxy' in self._task: #the user proxy might not be there if myproxy retrieval failed
+            logpath = self.config.TaskWorker.logsDir+f"/tasks/{self.task['tm_username']}/{self.taskname}.log"
+            if os.path.isfile(logpath) and 'user_proxy' in self.task: #the user proxy might not be there if myproxy retrieval failed
                 try:
                     uploadToS3(crabserver=self.crabserver, objecttype='twlog', filepath=logpath,
                                taskname=self.taskname, logger=self.logger)
-                except Exception as e:
-                    msg = 'Failed to upload logfile to S3 for task %s. ' % self.taskname
-                    msg += 'Details:\n%s' % str(e)
+                except Exception as e:  # pylint: disable=broad-except
+                    msg = f"Failed to upload logfile to S3 for task {self.taskname}. "
+                    msg += f"Details:\n{e}"
                     self.logger.error(msg)
         return output
 
@@ -124,13 +125,13 @@ class TaskHandler(object):
             t0 = time.time()
             retryCount = 0
             #execute the current action dealing with retriesz
-            MAX_RETRIES = 5
-            while retryCount < MAX_RETRIES:
+            maxRetries = 5
+            while retryCount < maxRetries:
                 try:
                     output = self.executeAction(nextinput, action)
                 except WorkerHandlerException as whe:
                     retryCount += 1
-                    if whe.retry == False or retryCount >= MAX_RETRIES:
+                    if whe.retry is False or retryCount >= maxRetries:
                         raise
                     time.sleep(60 * retryCount)
                 else:
