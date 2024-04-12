@@ -1,23 +1,21 @@
+""" need a doc string here """
 import re
-import socket
 import sys
+from http.client import HTTPException
+import htcondor
+
+import HTCondorLocator
+import HTCondorUtils
+from ServerUtilities import FEEDBACKMAIL
+from TaskWorker.DataObjects import Result
+from TaskWorker.Actions.TaskAction import TaskAction
+from TaskWorker.WorkerExceptions import TaskWorkerException
+
 if sys.version_info >= (3, 0):
     from urllib.parse import urlencode  # pylint: disable=no-name-in-module
 if sys.version_info < (3, 0):
     from urllib import urlencode
 
-from http.client import HTTPException
-
-import htcondor
-
-from ServerUtilities import FEEDBACKMAIL, insertJobIdSid
-
-import TaskWorker.DataObjects.Result as Result
-from TaskWorker.Actions.TaskAction import TaskAction
-from TaskWorker.WorkerExceptions import TaskWorkerException
-
-import HTCondorLocator
-import HTCondorUtils
 
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
 
@@ -29,6 +27,7 @@ class DagmanKiller(TaskAction):
     """
 
     def executeInternal(self, *args, **kwargs):  # pylint: disable=unused-argument
+        """ this does the killing """
         #Marco: I guess these value errors only happens for development instances
         if 'task' not in kwargs:
             raise ValueError("No task specified.")
@@ -56,17 +55,12 @@ class DagmanKiller(TaskAction):
         except Exception as exp:
             msg = "The CRAB server backend was not able to contact the Grid scheduler."
             msg += " Please try again later."
-            msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
-            msg += " Message from the scheduler: %s" % (str(exp))
+            msg += f" If the error persists send an e-mail to {FEEDBACKMAIL}."
+            msg += f" Message from the scheduler: {exp}"
             self.logger.exception("%s: %s", self.workflow, msg)
-            raise TaskWorkerException(msg)
+            raise TaskWorkerException(msg) from exp
 
-        try:
-            hostname = socket.getfqdn()
-        except Exception:
-            hostname = ''
-
-        const = 'CRAB_ReqName =?= %s && TaskType=?="Job"' % HTCondorUtils.quote(self.workflow)
+        const = f'CRAB_ReqName =?= {HTCondorUtils.quote(self.workflow)} && TaskType=?="Job"'
 
         # Note that we can not send kills for jobs not in queue at this time; we'll need the
         # DAG FINAL node to be fixed and the node status to include retry number.
@@ -74,9 +68,11 @@ class DagmanKiller(TaskAction):
 
     def killAll(self, jobConst):
 
+        """ submit the proper commands to condor """
+
         # We need to keep ROOT, PROCESSING, and TAIL DAGs in hold until periodic remove kicks in.
         # This is needed in case user wants to resubmit.
-        rootConst = 'stringListMember(TaskType, "ROOT PROCESSING TAIL", " ") && CRAB_ReqName =?= %s' % HTCondorUtils.quote(self.workflow)
+        rootConst = f'stringListMember(TaskType, "ROOT PROCESSING TAIL", " ") && CRAB_ReqName =?= {HTCondorUtils.quote(self.workflow)}'
 
         # Holding DAG job does not mean that it will remove all jobs
         # and this must be done separately
@@ -89,24 +85,17 @@ class DagmanKiller(TaskAction):
         # will continue undisturbed. If the condor_dagman job is left on hold, it will remain
         # in the HTCondor queue after all of the currently running node jobs are finished.
         # --------------------------------------
-        # TODO: Remove jobConst query when htcondor ticket is solved
-        # https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=5175
 
-        tokenDir = getattr(self.config.TaskWorker, 'SEC_TOKEN_DIRECTORY', None)
-        with HTCondorUtils.AuthenticatedSubprocess(self.proxy, tokenDir) as (parent, rpipe):
-            if not parent:
-                with self.schedd.transaction() as dummytsc:
-                    self.schedd.act(htcondor.JobAction.Hold, rootConst)
-                    self.schedd.act(htcondor.JobAction.Remove, jobConst)
-        results = rpipe.read()
-        if results != "OK":
+        try:
+            self.schedd.act(htcondor.JobAction.Hold, rootConst)
+            self.schedd.act(htcondor.JobAction.Remove, jobConst)
+        except  htcondor.HTCondorException as hte:
             msg = "The CRAB server backend was not able to kill the task,"
             msg += " because the Grid scheduler answered with an error."
             msg += " This is probably a temporary glitch. Please try again later."
-            msg += " If the error persists send an e-mail to %s." % (FEEDBACKMAIL)
-            msg += " Error reason: %s" % (results)
-            raise TaskWorkerException(msg)
-
+            msg += f" If the error persists send an e-mail to {FEEDBACKMAIL}."
+            msg += f" Error reason: {hte}"
+            raise TaskWorkerException(msg) from hte
 
     def execute(self, *args, **kwargs):
         """
@@ -132,8 +121,8 @@ class DagmanKiller(TaskAction):
         except HTTPException as hte:
             self.logger.error(hte.headers)
             msg = "The CRAB server successfully killed the task,"
-            msg += " but was unable to update the task status to %s in the database." % (configreq['status'])
+            msg += f" but was unable to update the task status to {configreq['status']} in the database."
             msg += " This should be a harmless (temporary) error."
-            raise TaskWorkerException(msg)
+            raise TaskWorkerException(msg) from hte
 
         return Result.Result(task=kwargs['task'], result='OK')
