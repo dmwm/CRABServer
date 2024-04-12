@@ -7,6 +7,8 @@ from ASO.Rucio.Actions.RegisterReplicas import RegisterReplicas
 from ASO.Rucio.Transfer import Transfer
 import ASO.Rucio.config as config
 
+from rucio.common.exception import RSEFileNameNotSupported, RSEProtocolNotSupported
+
 # somehow register return [[item1,item2]] while it should return [item1, item2], but unittest fail to detect this
 
 # prepare_replicas
@@ -312,3 +314,34 @@ def test_bookkeepingPFN():
     r.bookkeepingPFN(expectedOutput)
     t.updateLFN2PFNMap.assert_called_once()
     assert t.LFN2PFNMap == expectedLFN2PFNMap
+
+
+def test_addFilesToRucio_fail(mock_rucioClient):
+    prepared = {
+        "T2_CH_CERN_Temp": {
+            "98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca": {
+                "scope": "user.cmscrab",
+                "pfn": 'davs://eoscms.cern.ch:443/eos/cms/store/temp/user/tseethon.d6830fc3715ee01030105e83b81ff3068df7c8e0/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root',
+                "name": "/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root",
+                "bytes": 628054,
+                "adler32": "812b8235",
+            }
+        }
+    }
+    expectFailOutput = {
+        'id': '98f353b91ec84f0217da80bde84d6b520c0c6640f60ad9aabb7b20ca',
+        'name': '/store/user/rucio/tseethon/test-workflow/GenericTTbar/autotest-1679671056/230324_151740/0000/output_9.root',
+        'dataset': None,
+        'blockcomplete': None,
+        'ruleid': None,
+        'failReason': f'RUCIO_Transfers.py raised an exception: RSEFileNameNotSupported'
+    }
+    config.args = Namespace(replicas_chunk_size=5)
+    mock_rucioClient.add_replicas.side_effect = RSEFileNameNotSupported
+    r = RegisterReplicas(Mock(), mock_rucioClient, Mock())
+    _, fail = r.addFilesToRucio(prepared)
+    assert expectFailOutput == fail[0]
+    expectFailOutput['failReason'] = f'RUCIO_Transfers.py raised an exception: RSEProtocolNotSupported'
+    mock_rucioClient.add_replicas.side_effect = RSEProtocolNotSupported
+    _, fail = r.addFilesToRucio(prepared)
+    assert expectFailOutput == fail[0]
