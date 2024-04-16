@@ -7,7 +7,7 @@ This Dockerfile is for build `registry.cern.ch/cmscrab/buildtools` container.
 Simply run `docker build` to build this container.
 
 ```bash
-docker build -t registry.cern.ch/cmscrab/buildtools:latast -f Dockerfile .
+docker build -t registry.cern.ch/cmscrab/buildtools:latest -f Dockerfile .
 ```
 
 Then test it by running usual `docker run` command.
