@@ -6,7 +6,6 @@ import random
 
 import classad
 import htcondor
-import HTCondorUtils
 
 CollectorCache = {}
 
@@ -183,7 +182,7 @@ class HTCondorLocator(object):
         """
         htcondor.param['COLLECTOR_HOST'] = self.getCollector().encode('ascii', 'ignore')
         coll = htcondor.Collector()
-        schedds = coll.query(htcondor.AdTypes.Schedd, 'Name=?=%s' % HTCondorUtils.quote(schedd.encode('ascii', 'ignore')),
+        schedds = coll.query(htcondor.AdTypes.Schedd, 'Name=?=%s' % classad.quote(schedd.encode('ascii', 'ignore')),
                              ["AddressV1", "CondorPlatform", "CondorVersion", "Machine", "MyAddress", "Name", "MyType",
                               "ScheddIpAddr", "RemoteCondorSetup"])
         if not schedds:
