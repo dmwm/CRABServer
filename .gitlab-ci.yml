@@ -1,0 +1,166 @@
+---
+default:
+  tags:
+    - tseethon
+
+variables:
+  IMAGE_TAG: "${CI_COMMIT_REF_SLUG}"
+
+.default_rules:
+  rules:
+    - if: $CI_COMMIT_TAG =~ /pypi-.*/
+
+stages:
+  - prepare_env
+  - build_docker
+  - deploy
+  - run_testsuite
+  - check_testsuite
+
+get_env:
+  rules:
+    - !reference [.default_rules, rules]
+  stage: prepare_env
+  image:
+    name: registry.cern.ch/cmscrab/buildtools
+    entrypoint: [""]
+  script:
+    - printenv  # debug check ci env
+    - cicd/gitlab/parseEnv.sh $CI_COMMIT_TAG  # create .env
+  artifacts:
+    paths:
+      - .env
+    expire_in: 1 week
+
+build_rest_image:
+  rules:
+    - if: $SKIP_BUILD
+      when: never
+    - !reference [.default_rules, rules]
+  stage: build_docker
+  image:
+    name: gcr.io/kaniko-project/executor:v1.14.0-debug
+    entrypoint: [""]
+  script:
+    - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" > /kaniko/.docker/config.json
+    - cat /kaniko/.docker/config.json
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/cicd/crabserver_pypi/Dockerfile"
+      --destination "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}"
+
+build_tw_image:
+  rules:
+    - if: $SKIP_BUILD
+      when: never
+    - !reference [.default_rules, rules]
+  stage: build_docker
+  image:
+    name: gcr.io/kaniko-project/executor:v1.14.0-debug
+    entrypoint: [""]
+  script:
+    - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" > /kaniko/.docker/config.json
+    - cat /kaniko/.docker/config.json
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile"
+      --destination "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}"
+
+deploy_server:
+  rules:
+    - if: $SKIP_DEPLOY
+      when: never
+    - !reference [.default_rules, rules]
+  stage: deploy
+  image:
+    name: registry.cern.ch/cmscrab/buildtools
+    entrypoint: [""]
+  script:
+    # load KUBECONTEXT
+    - source .env
+    - echo $KUBECONFIG_FILE
+    - yq -i -y ".\"current-context\" = \"$KUBECONTEXT\"" $KUBECONFIG_FILE
+    - export KUBECONFIG=$KUBECONFIG_FILE
+    - kubectl set image deployment/crabserver "crabserver=registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}"
+    - kubectl rollout status deployment crabserver --watch --timeout=5m
+
+deploy_tw:
+  rules:
+    - if: $SKIP_DEPLOY
+      when: never
+    - !reference [.default_rules, rules]
+  stage: deploy
+  image:
+    name: registry.cern.ch/cmscrab/buildtools
+    entrypoint: [""]
+  script:
+    - source .env
+    - export Environment # from .env
+    - export Service=TaskWorker
+    - export Image="${IMAGE_TAG}"
+    - export SSH_KEY=$(cicd/gitlab/credFile.sh $CRAB_TW_SSH_KEY)
+    - bash -x cicd/gitlab/deployTW.sh
+
+task_submission_status_tracking:
+  rules:
+    - if: $MANUAL_CI_PIPELINE_ID
+      when: never
+    - if: $SUBMIT_STATUS_TRACKING
+    - !reference [.default_rules, rules]
+  stage: run_testsuite
+  tags:
+    - tseethon-apptainer
+  variables:
+    GIT_STRATEGY: clone
+  script:
+    - source .env
+    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY)
+    - export CRABClient_version=prod
+    - export CRABServer_tag=HEAD
+    - export REST_Instance # from .env
+    - export CMSSW_release=CMSSW_13_0_2
+    - export Task_Submission_Status_Tracking=true
+    - bash -x cicd/gitlab/executeTests.sh
+  cache:
+    - key: $CI_PIPELINE_ID
+      paths:
+        - workdir/submitted_tasks_TS
+      policy: push
+    - key: submitted_tasks_TS_latest
+      paths:
+        - workdir/submitted_tasks_TS
+      policy: push
+
+check_test_result:
+  rules:
+    - if: $SUBMIT_STATUS_TRACKING
+    - if: $MANUAL_CI_PIPELINE_ID
+    - !reference [.default_rules, rules]
+  stage: check_testsuite
+  tags:
+    - tseethon-apptainer
+  variables:
+    GIT_STRATEGY: clone
+  script:
+    - source .env
+    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY)
+    - export REST_Instance
+    - export CMSSW_release=CMSSW_13_0_2
+    - export SCRAM_ARCH=el8_amd64_gcc11
+    - export Check_Publication_Status=Yes
+    - export CRABClient_version=prod
+    - echo ${MANUAL_CI_PIPELINE_ID}
+    # manual task name
+    - |
+        if [[ -n "${MANUAL_TASKNAME:-}" ]]; then
+            echo "${MANUAL_TASKNAME}" > workdir/submitted_tasks_TS
+        fi
+    - cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
+  cache:
+    - key: $MANUAL_CI_PIPELINE_ID
+      fallback_keys:
+        - $CI_PIPELINE_ID
+        - submitted_tasks_TS_latest
+      paths:
+        - workdir/submitted_tasks_TS
+      policy: pull
