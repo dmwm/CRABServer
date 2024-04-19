@@ -148,6 +148,7 @@ should_transfer_files = YES
 use_x509userproxy = true
 %(opsys_req)s
 Requirements = stringListMember(TARGET.Arch, REQUIRED_ARCH)
+# Ref: https://htcondor.readthedocs.io/en/latest/classad-attributes/job-classad-attributes.html#HoldReasonCode
 periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
 # Remove if
 # a) job is in the 'held' status for more than 7 minutes

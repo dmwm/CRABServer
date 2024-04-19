@@ -14,7 +14,6 @@ from http.client import HTTPException
 import classad
 import htcondor
 
-import HTCondorUtils
 import CMSGroupMapper
 import HTCondorLocator
 
@@ -323,7 +322,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             schedd, dummyAddress = loc.getScheddObjNew(task['tm_schedd'])
             self.logger.debug("Got schedd obj for %s ", task['tm_schedd'])
 
-            rootConst = f'TaskType =?= "ROOT" && CRAB_ReqName =?= {HTCondorUtils.quote(workflow)}' \
+            rootConst = f'TaskType =?= "ROOT" && CRAB_ReqName =?= {classad.quote(workflow)}' \
                         '&& (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)'
 
             self.logger.debug("Duplicate check is querying the schedd: %s", rootConst)

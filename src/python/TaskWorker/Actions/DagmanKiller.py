@@ -3,9 +3,9 @@ import re
 import sys
 from http.client import HTTPException
 import htcondor
+import classad
 
 import HTCondorLocator
-import HTCondorUtils
 from ServerUtilities import FEEDBACKMAIL
 from TaskWorker.DataObjects import Result
 from TaskWorker.Actions.TaskAction import TaskAction
@@ -60,7 +60,7 @@ class DagmanKiller(TaskAction):
             self.logger.exception("%s: %s", self.workflow, msg)
             raise TaskWorkerException(msg) from exp
 
-        const = f'CRAB_ReqName =?= {HTCondorUtils.quote(self.workflow)} && TaskType=?="Job"'
+        const = f'CRAB_ReqName =?= {classad.quote(self.workflow)} && TaskType=?="Job"'
 
         # Note that we can not send kills for jobs not in queue at this time; we'll need the
         # DAG FINAL node to be fixed and the node status to include retry number.
@@ -72,7 +72,7 @@ class DagmanKiller(TaskAction):
 
         # We need to keep ROOT, PROCESSING, and TAIL DAGs in hold until periodic remove kicks in.
         # This is needed in case user wants to resubmit.
-        rootConst = f'stringListMember(TaskType, "ROOT PROCESSING TAIL", " ") && CRAB_ReqName =?= {HTCondorUtils.quote(self.workflow)}'
+        rootConst = f'stringListMember(TaskType, "ROOT PROCESSING TAIL", " ") && CRAB_ReqName =?= {classad.quote(self.workflow)}'
 
         # Holding DAG job does not mean that it will remove all jobs
         # and this must be done separately
