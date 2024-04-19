@@ -2,21 +2,31 @@
 
 set -euo pipefail
 
+#0. ensure variable is set
+echo "(DEBUG) Service: ${Service}"
+echo "(DEBUG) Image: ${Image}"
+echo "(DEBUG) Environment: ${Environment}"
+
 WORK_DIR=$PWD
 
-ssh -i $SSH_KEY -o StrictHostKeyChecking=no crab3@${Environment}.cern.ch "docker exec ${Service} bash -c './stop.sh'; \
-docker stop ${Service}; \
-docker rm ${Service}; \
-~/runContainer_pypi.sh -r registry.cern.ch/cmscrab -v ${Image} -s ${Service}"
-
-
-#2. check if ${Service} is running
 if [ "X${Service}" == "XTaskWorker" ] ; then
 	processName=MasterWorker
+    directory=TaskManager
 else
 	processName=RunPublisher
+    directory=Publisher
 fi
 
+
+#1. Deploying
+ssh -i $SSH_KEY -o StrictHostKeyChecking=no crab3@${Environment}.cern.ch """
+docker exec ${Service} bash -c './stop.sh'; \
+docker stop ${Service}; \
+docker rm ${Service}; \
+~/runContainer.sh -r registry.cern.ch/cmscrab -v ${Image} -s ${Service} -c /data/srv/${directory}/run.sh
+"""
+
+#2. check if ${Service} is running
 ssh -i $SSH_KEY -o StrictHostKeyChecking=no crab3@${Environment}.cern.ch \
 "docker exec ${Service} bash -c 'ps exfww | grep $processName | grep -v grep | head -1' || true" > isServiceRunning.log
 cat isServiceRunning.log
