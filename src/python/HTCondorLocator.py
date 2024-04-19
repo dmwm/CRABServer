@@ -1,5 +1,4 @@
-from __future__ import division
-from __future__ import absolute_import
+""" used by TaskWorker to decide which scheduler to submit to """
 import time
 import bisect
 import random
@@ -7,24 +6,24 @@ import random
 import classad
 import htcondor
 
-CollectorCache = {}
 
 # From http://stackoverflow.com/questions/3679694/a-weighted-version-of-random-choice
-def weighted_choice(choices):
+def weightedChoice(choices):
+    """ picks using provided list of weights """
     values, weights = list(zip(*choices))
     total = 0
-    cum_weights = []
+    cumWeights = []
     for w in weights:
         total += w
-        cum_weights.append(total)
+        cumWeights.append(total)
     assert total > 0, "all choices have zero weight"
     x = random.random() * total
-    i = bisect.bisect(cum_weights, x)
+    i = bisect.bisect(cumWeights, x)
     return values[i]
 
 def filterScheddsByClassAds(schedds, classAds, logger=None):
     """ Check a list of schedds for missing classAds
-        Used when choosing a schedd to see if each schedd has the needed classads defined.
+        Used when choosing a schedd to check that each schedd has the needed classads defined.
         Return a list of valid schedds to choose from
     """
 
@@ -36,7 +35,7 @@ def filterScheddsByClassAds(schedds, classAds, logger=None):
         for classAd in classAds:
             if classAd not in schedd:
                 if logger:
-                    logger.debug("Ignoring %s schedd since it is missing the %s ClassAd." % (schedd['Name'], classAd))
+                    logger.debug("Ignoring %s schedd since it is missing the %s ClassAd.", schedd['Name'], classAd)
                 scheddValid = False
         if scheddValid:
             validSchedds.append(schedd)
@@ -58,7 +57,7 @@ def capacityMetricsChoicesHybrid(schedds, logger=None):
         totalJobs += schedd['MaxJobsRunning']
         totalUploads += schedd['TransferQueueMaxUploading']
 
-    logger.debug("Total Mem: %d, Total Jobs: %d, Total Uploads: %d" % (totalMemory, totalJobs, totalUploads))
+    logger.debug(f"Total Mem: {totalMemory}, Total Jobs: {totalJobs}, Total Uploads: {totalUploads}")
     weights = {}
     for schedd in schedds:
         memPerc = schedd['TotalFreeMemoryMB'] / totalMemory
@@ -66,10 +65,10 @@ def capacityMetricsChoicesHybrid(schedds, logger=None):
         uplPerc = (schedd['TransferQueueMaxUploading'] - schedd['TransferQueueNumUploading']) / totalUploads
         weight = min(memPerc, uplPerc, jobPerc)
         weights[schedd['Name']] = weight
-        logger.debug("%s: Mem %d, MemPrct %0.2f, Run %d, RunPrct %0.2f, Trf %d, TrfPrct %0.2f, weight: %f" %
-                     (schedd['Name'], schedd['TotalFreeMemoryMB'], memPerc,
+        logger.debug("%s: Mem %d, MemPrct %0.2f, Run %d, RunPrct %0.2f, Trf %d, TrfPrct %0.2f, weight: %f",
+                     schedd['Name'], schedd['TotalFreeMemoryMB'], memPerc,
                       schedd['JobsRunning'], jobPerc,
-                      schedd['TransferQueueNumUploading'], uplPerc, weight))
+                      schedd['TransferQueueNumUploading'], uplPerc, weight)
     choices = [(schedd['Name'], weights[schedd['Name']]) for schedd in schedds]
     return choices
 
@@ -84,16 +83,19 @@ def memoryBasedChoices(schedds, logger=None):
         else:
             weight = 24*1024
         weights[schedd['Name']] = weight
+        if logger:
+            logger.debug(f"Scheduler: {schedd}: mwmory wight: {weight}")
     choices = [(schedd['Name'], weights[schedd['Name']]) for schedd in schedds]
     return choices
 
 
-class HTCondorLocator(object):
-
+class HTCondorLocator():
+    """ this is the class used by Task Worker """
     def __init__(self, config, logger=None):
         self.config = config
         self.logger = logger
         self.scheddAd = ""
+        self.collectorCache = {}
 
     def adjustWeights(self, choices):
         """ The method iterates over the htcondorSchedds dict from the REST and ajust schedds
@@ -108,9 +110,8 @@ class HTCondorLocator(object):
             newweight = weight * self.config['htcondorSchedds'].get(schedd, {}).get("weightfactor", 1)
             choices[i] = (schedd, newweight)
             i += 1
-        return
 
-    def getSchedd(self, chooserFunction=memoryBasedChoices):
+    def getSchedd(self, chooserFunction=capacityMetricsChoicesHybrid):
         """
         Determine a schedd to use for this task.
         param chooserFunction: name of a function which takes a list of schedds (a n-tuple of classAds each) and
@@ -119,7 +120,6 @@ class HTCondorLocator(object):
         """
         collector = self.getCollector()
         schedd = None
-
         try:
             collParam = 'COLLECTOR_HOST'
             htcondor.param[collParam] = collector.encode('ascii', 'ignore')
@@ -130,7 +130,7 @@ class HTCondorLocator(object):
                                  ['Name', 'DetectedMemory', 'TotalFreeMemoryMB', 'TransferQueueNumUploading',
                                   'TransferQueueMaxUploading','TotalRunningJobs', 'JobsRunning', 'MaxJobsRunning', 'IsOK'])
             if not schedds:
-                raise Exception("No CRAB schedds returned by collecor query. '%s' parameter is '%s'. Try later" %(collParam, htcondor.param['COLLECTOR_HOST']))
+                raise Exception(f"No CRAB schedds returned by collecor query. {collParam} parameter is {htcondor.param['COLLECTOR_HOST']}. Try later")
 
             # Get only those schedds that are listed in our external REST configuration
             if self.config and "htcondorSchedds" in self.config:
@@ -142,13 +142,13 @@ class HTCondorLocator(object):
                 weightfactor = self.config['htcondorSchedds'].get(schedd['Name'], {}).get("weightfactor", 1)
                 if not weightfactor:
                     zeroSchedds.append(schedd['Name'])
-            self.logger.debug("Skip these schedds because have a zero weightfactor (maybe in drain) in the REST configuration: %s" % zeroSchedds)
+            self.logger.debug(f"Skip these schedds because have a zero weightfactor (maybe in drain) in the REST configuration: {zeroSchedds}")
             schedds = [ schedd for schedd in schedds if schedd['Name'] not in zeroSchedds]
 
             # Keep only those schedds for which the status is OK
             notOkSchedNames = [schedd['Name'] for schedd in schedds if not classad.ExprTree.eval(schedd['IsOk'])]
             if notOkSchedNames:
-                self.logger.debug("Skip these schedds because isOK is False: %s" % notOkSchedNames)
+                self.logger.debug("Skip these schedds because isOK is False: %s", notOkSchedNames)
                 schedds = [schedd for schedd in schedds if schedd['Name'] not in notOkSchedNames]
 
             # Keep only schedds which can start more jobs in SchedulerUniverse
@@ -157,21 +157,22 @@ class HTCondorLocator(object):
                                              ['Name'])
             saturatedSchedNames = [sched['Name'] for sched in saturatedScheds]
             if saturatedSchedNames:
-                self.logger.debug("Skip these schedds because are at the MaxTask limit: %s" % saturatedSchedNames)
+                self.logger.debug("Skip these schedds because are at the MaxTask limit: %s", saturatedSchedNames)
                 schedds = [schedd for schedd in schedds if schedd['Name'] not in saturatedSchedNames]
 
             if schedds:
-                self.logger.debug("Will pick best schedd among %s" % [sched['Name'] for sched in schedds])
+                self.logger.debug("Will pick best schedd among %s", [sched['Name'] for sched in schedds])
             else:
                 raise Exception("All possible CRAB schedd's are saturated. Try later")
 
             choices = chooserFunction(schedds, self.logger)
             if not choices:
-                raise Exception("List of possible schedds from %s is empty" % chooserFunction)
+                raise Exception(f"List of possible schedds from {chooserFunction} is empty")
             self.adjustWeights(choices)
-            schedd = weighted_choice(choices)
+            schedd = weightedChoice(choices)
         except Exception as ex:
-            raise Exception("Could not find any schedd to submit to. Exception was raised: %s\n" % str(ex))
+            msg = f"Could not find any schedd to submit to. Exception was raised: {ex}\n"
+            raise Exception(msg) from ex
 
         return schedd
 
@@ -182,7 +183,7 @@ class HTCondorLocator(object):
         """
         htcondor.param['COLLECTOR_HOST'] = self.getCollector().encode('ascii', 'ignore')
         coll = htcondor.Collector()
-        schedds = coll.query(htcondor.AdTypes.Schedd, 'Name=?=%s' % classad.quote(schedd.encode('ascii', 'ignore')),
+        schedds = coll.query(htcondor.AdTypes.Schedd, f"Name=?={classad.quote(schedd)}",
                              ["AddressV1", "CondorPlatform", "CondorVersion", "Machine", "MyAddress", "Name", "MyType",
                               "ScheddIpAddr", "RemoteCondorSetup"])
         if not schedds:
@@ -198,27 +199,23 @@ class HTCondorLocator(object):
         """
         Saves Collector output in a memory cache
         """
-        global CollectorCache
-        if cacheName in CollectorCache.keys():
-            CollectorCache[cacheName]['ScheddAds'] = output
+        if cacheName in self.collectorCache:
+            self.collectorCache[cacheName]['ScheddAds'] = output
         else:
-            CollectorCache[cacheName] = {}
-            CollectorCache[cacheName]['ScheddAds'] = output
-        CollectorCache[cacheName]['updated'] = int(time.time())
+            self.collectorCache[cacheName] = {}
+            self.collectorCache[cacheName]['ScheddAds'] = output
+        self.collectorCache[cacheName]['updated'] = int(time.time())
 
     def getCachedCollectorOutput(self, cacheName):
         """
         Return cached Collector output if they exist.
         """
-        global CollectorCache
         now = int(time.time())
-        if cacheName in CollectorCache.keys():
-            if (now - CollectorCache[cacheName]['updated']) < 1800:
-                return CollectorCache[cacheName]['ScheddAds']
-            else:
-                raise Exception("Unable to contact the collector and cached results are too old for using.")
-        else:
-            raise Exception("Unable to contact the collector and cached results does not exist for %s" % cacheName)
+        if cacheName in self.collectorCache:
+            if (now - self.collectorCache[cacheName]['updated']) < 1800:
+                return self.collectorCache[cacheName]['ScheddAds']
+            raise Exception("Unable to contact the collector and cached results are too old for using.")
+        raise Exception(f"Unable to contact the collector and cached results does not exist for {cacheName}")
 
     def getCollector(self, name="localhost"):
         """
