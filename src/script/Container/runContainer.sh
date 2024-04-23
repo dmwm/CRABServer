@@ -74,14 +74,22 @@ if [[ "${SERVICE}" == TaskWorker_monit_*  ]]; then
   docker container rm $SERVICE
 fi
 
+# get os version
+OS_Version=$(cat /etc/os-release |grep VERSION_ID|cut -d= -f2|tr -d \"|cut -d. -f1)
+
 DOCKER_VOL="-v /data/container/:/data/hostdisk/ -v /data/srv/tmp/:/data/srv/tmp/"
-DOCKER_VOL="${DOCKER_VOL} -v /cvmfs/cms.cern.ch:/cvmfs/cms.cern.ch"
+DOCKER_VOL="${DOCKER_VOL} -v /cvmfs:/cvmfs:shared" # https://cvmfs.readthedocs.io/en/stable/cpt-configure.html#bind-mount-from-the-host
 DOCKER_VOL="${DOCKER_VOL} -v /etc/grid-security/:/etc/grid-security/"
 DOCKER_VOL="${DOCKER_VOL} -v /data/certs/:/data/certs/"
-DOCKER_VOL="${DOCKER_VOL} -v /var/run/nscd/socket:/var/run/nscd/socket"
 DOCKER_VOL="${DOCKER_VOL} -v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
 DOCKER_VOL="${DOCKER_VOL} -v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/pki/tls/certs/ca-bundle.crt"
+if [[ "$OS_Version" = "7" ]]; then
+    DOCKER_VOL="${DOCKER_VOL} -v /var/run/nscd/socket:/var/run/nscd/socket"
+fi
+
 DOCKER_OPT="-e SERVICE=${SERVICE} -w /data/srv/${DIRECTORY} "
+
+DOCKER_IMAGE=${TW_REPO:-registry.cern.ch/cmscrab}/crabtaskworker:${TW_VERSION}
 
 if [[ "${SERVICE}" == TaskWorker_monit_*  ]]; then
   echo "TaskWorker_monit_* detected"
@@ -89,15 +97,15 @@ if [[ "${SERVICE}" == TaskWorker_monit_*  ]]; then
   # DOCKER_OPT="${DOCKER_OPT} -v /eos/project-c/cmsweb/www/CRAB/:/data/eos "
   # DOCKER_OPT="${DOCKER_OPT} -v /tmp/krb5cc_1000:/tmp/krb5cc_1000 "
 
-  # - monit script does not work with `-di` option inside crontab. 
-  # - in order to get the exit code of the command run inside docker container, 
+  # - monit script does not work with `-di` option inside crontab.
+  # - in order to get the exit code of the command run inside docker container,
   #   remove the `-d` option for monit crontabs
 else
   # start docker container in background when you run TW and Published, not monitoring scripts.
   DOCKER_OPT="${DOCKER_OPT} -d"
 fi
 
-docker run --name ${SERVICE} -t --net host --privileged $DOCKER_OPT $DOCKER_VOL ${TW_REPO:-registry.cern.ch/cmscrab}/crabtaskworker:${TW_VERSION} $COMMAND > $tmpfile
+docker run --name ${SERVICE} -t --net host --privileged $DOCKER_OPT $DOCKER_VOL $DOCKER_IMAGE $COMMAND > $tmpfile
 if [ $? -eq 0 ]; then
   # if the crontab does not fail, remove the log file
   rm $tmpfile

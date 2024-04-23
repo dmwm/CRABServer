@@ -1,7 +1,7 @@
 ---
 default:
   tags:
-    - tseethon
+    - crab3
 
 variables:
   IMAGE_TAG: "${CI_COMMIT_REF_SLUG}"
@@ -109,7 +109,7 @@ task_submission_status_tracking:
     - !reference [.default_rules, rules]
   stage: run_testsuite
   tags:
-    - tseethon-apptainer
+    - crab3-shell
   variables:
     GIT_STRATEGY: clone
   script:
@@ -138,7 +138,7 @@ check_test_result:
     - !reference [.default_rules, rules]
   stage: check_testsuite
   tags:
-    - tseethon-apptainer
+    - crab3-shell
   variables:
     GIT_STRATEGY: clone
   script:
