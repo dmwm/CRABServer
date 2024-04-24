@@ -155,7 +155,7 @@ confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand getoutput "--jobids=1 --proxy=$PROXY"
+crabCommand "--debug getoutput" "--jobids=1 --proxy=$PROXY"
 lookFor "Success in retrieving output_1.root " commandLog.txt
 lookFor "Success in retrieving My_output_1.txt " commandLog.txt
 """
