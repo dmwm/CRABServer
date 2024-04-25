@@ -107,13 +107,12 @@ class DBSDataDiscovery(DataDiscovery):
         common_runs = d1.keys() & d2.keys()
         if len(common_runs)	== 0: return False
 
-        for	run in common_runs:
-            print(run)
+        for run in common_runs:
             common_lumis = set(d1[run]).intersection(set(d2[run]))
             if len(common_lumis)>0 : return	True
 
         return False
-    
+
     def execute(self, *args, **kwargs):
         """
         This is a convenience wrapper around the executeInternal function
