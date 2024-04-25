@@ -98,7 +98,7 @@ deploy_tw:
     - export Environment # from .env
     - export Service=TaskWorker
     - export Image="${IMAGE_TAG}"
-    - export SSH_KEY=$(cicd/gitlab/credFile.sh $CRAB_TW_SSH_KEY)
+    - export SSH_KEY=$(cicd/gitlab/credFile.sh $CRAB_TW_SSH_KEY ssh)
     - bash -x cicd/gitlab/deployTW.sh
 
 task_submission_status_tracking:
@@ -114,7 +114,7 @@ task_submission_status_tracking:
     GIT_STRATEGY: clone
   script:
     - source .env
-    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY)
+    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
     - export CRABClient_version=prod
     - export CRABServer_tag=HEAD
     - export REST_Instance # from .env
@@ -143,7 +143,7 @@ check_test_result:
     GIT_STRATEGY: clone
   script:
     - source .env
-    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY)
+    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
     - export REST_Instance
     - export CMSSW_release=CMSSW_13_0_2
     - export SCRAM_ARCH=el8_amd64_gcc11
