@@ -105,7 +105,7 @@ class DBSDataDiscovery(DataDiscovery):
         }
         """
         common_runs = d1.keys() & d2.keys()
-        if len(common_runs)	== 0: return False
+        if len(common_runs) == 0: return False
 
         for run in common_runs:
             common_lumis = set(d1[run]).intersection(set(d2[run]))
