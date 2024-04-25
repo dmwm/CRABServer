@@ -1,16 +1,17 @@
 #!/bin/bash
 
-set -euo pipefail
+##H Usage example: ./start.sh -c | -g [-d]"
+##H     -c start current crabserver instance"
+##H     -g start crabserver instance from GitHub repo"
+##H     -d start crabserver in debug mode. Option can be combined with -c or -g"
 
+set -euo pipefail
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 helpFunction() {
-    echo -e "Usage example: ./start.sh -c | -g [-d]"
-    echo -e "\t-c start current crabserver instance"
-    echo -e "\t-g start crabserver instance from GitHub repo"
-    echo -e "\t-d start crabserver in debug mode. Option can be combined with -c or -g"
-    exit 1
+    grep "^##H" "${0}" | sed -r "s/##H(| )//g"
 }
+
 
 DEBUG=''
 MODE=''
@@ -20,7 +21,7 @@ while getopts ":dDcCgGhH" o; do
         g|G) MODE="fromGH" ;;
         c|C) MODE="current" ;;
         d|D) DEBUG=true ;;
-        * ) echo "Unimplemented option: -$OPTARG"; helpFunction ;;
+        * ) echo "Unimplemented option: -$OPTARG"; helpFunction; exit 1 ;;
     esac
 done
 shift $((OPTIND-1))
@@ -47,10 +48,10 @@ case $MODE in
         touch ${markmodify_path}
         ./updateDatafiles.sh
         ;;
-    *) echo "Unimplemented mode: $MODE\n"; helpFunction ;;
+    *) echo "Unimplemented mode: $MODE"; exit 1 ;;
 esac
 
-# export APP_PATH and DEBUG to ./manage.sh
+# Export PYTHONPATH and DEBUG to ./manage.sh
 export PYTHONPATH
 export DEBUG
 "${SCRIPT_DIR}/manage.sh" start

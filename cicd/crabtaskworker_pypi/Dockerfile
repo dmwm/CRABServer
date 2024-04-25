@@ -101,12 +101,21 @@ RUN mkdir -p ${WDIR}/srv/tmp \
     && mkdir -p ${WDIR}/srv/Publisher \
     && mkdir -p ${WDIR}/srv/TaskManager
 
-RUN cd ${WDIR}/srv/TaskManager \
-    && ln -sf ${WDIR}/hostdisk/TaskWorker/cfg cfg \
-    && ln -sf ${WDIR}/hostdisk/TaskWorker/logs logs \
-    && rm /data/manage /data/run.sh
+# TaskWorker
+COPY cicd/crabtaskworker_pypi/TaskWorker/start.sh \
+     cicd/crabtaskworker_pypi/TaskWorker/stop.sh \
+     cicd/crabtaskworker_pypi/TaskWorker/manage.sh \
+     cicd/crabtaskworker_pypi/updateDatafiles.sh \
+     ${WDIR}/srv/TaskManager/
 
-COPY cicd/crabtaskworker_pypi/start.sh cicd/crabtaskworker_pypi/stop.sh cicd/crabtaskworker_pypi/run.sh cicd/crabtaskworker_pypi/manage.sh cicd/crabtaskworker_pypi/updateDatafiles.sh  ${WDIR}/srv/TaskManager/
+# publisher
+COPY cicd/crabtaskworker_pypi/Publisher/start.sh \
+     cicd/crabtaskworker_pypi/Publisher/stop.sh \
+     cicd/crabtaskworker_pypi/Publisher/manage.sh \
+     ${WDIR}/srv/Publisher/
+
+# entrypoint
+COPY cicd/crabtaskworker_pypi/run.sh /data
 
 # for debuggin purpose
 RUN echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3
@@ -117,3 +126,4 @@ RUN chown -R 1000:1000 ${WDIR}
 USER ${USER}
 
 ENTRYPOINT ["tini", "--"]
+CMD ["/data/run.sh"]
