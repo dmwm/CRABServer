@@ -508,6 +508,9 @@ if __name__ == '__main__':
     #
     # Example:  /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
     ###
+    import json
+    from ServerUtilities import newX509env
+
     dbsInstance = sys.argv[1]
     dbsDataset = sys.argv[2]
     dbsSecondaryDataset = sys.argv[3] if len(sys.argv) == 4 else None  # pylint: disable=invalid-name
@@ -528,6 +531,8 @@ if __name__ == '__main__':
         config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
     else:
         config.TaskWorker.cmskey = '/data/certs/servicekey.pem'
+    config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=config.TaskWorker.cmscert,
+                                                X509_USER_KEY=config.TaskWorker.cmskey)
 
     config.TaskWorker.instance = 'prod'
     config.TaskWorker.tiersToRecall = ['AOD', 'AODSIM', 'MINIAOD', 'MINIAODSIM', 'NANOAOD', 'NANOAODSIM']
@@ -537,18 +542,36 @@ if __name__ == '__main__':
     config.Services.Rucio_account = 'crab_server'
     config.Services.Rucio_authUrl = 'https://cms-rucio-auth.cern.ch'
     config.Services.Rucio_caPath = '/etc/grid-security/certificates/'
+    config.Services.Rucio_cert = '/data/certs/robotcert.pem'
+    config.Services.Rucio_key = '/data/certs/robotkey.pem'
+
     rucioClient = getNativeRucioClient(config=config, logger=logging.getLogger())
 
     fileset = DBSDataDiscovery(config=config, rucioClient=rucioClient)
     userConfig = {'partialdataset':False,
                   'inputblocks':[]
                   }
-    fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, 'user_proxy': 'None',
+    discoveryOutput = (
+        fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, 'user_proxy': 'None',
                           'tm_input_dataset': dbsDataset, 'tm_secondary_input_dataset': dbsSecondaryDataset,
                           'tm_taskname': 'pippo1', 'tm_username':config.Services.Rucio_account,
                           'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
                           'tm_user_config': userConfig,
-                          'tm_dbs_url': DBSUrl}, tempDir='')
+                          'tm_dbs_url': DBSUrl}, tempDir=''))
+    # discoveryOutput.result is a WMCore fileset structure
+    fileObjects = discoveryOutput.result.getFiles()
+    fileDictionaries = [file.json() for file in fileObjects]
+    # each file dictionary has the keys
+    # 'last_event', 'first_event', 'lfn', 'locations', 'id', 'checksums', 'events', 'merged', 'size', 'runs', 'parents'
+    # runs and parents are sorted, but locations are not
+    # To facilitate comparisons, make sure that that everything is sorted
+    for aFileDict in fileDictionaries:
+        aFileDict['locations'].sort()
+    
+    with open('DBSDataDiscoveryOutput.json', 'w', encoding='utf-8') as fh:
+        json.dump(fileDictionaries, fh)
+    print("\nDataDiscovery output saved as DBSDataDiscoveryOutput.json\n")
+
 
 #===============================================================================
 #    Some interesting datasets for testing
