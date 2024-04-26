@@ -95,6 +95,24 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\nhttps://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ"
                 raise TaskWorkerException(msg)
 
+    @staticmethod
+    def lumi_overlap(d1,d2):
+        """
+        This finds if there are common run and lumis in two lists in the form of
+        {
+        '1': [1,2,3,4,6,7,8,9,10],
+        '2': [1,4,5,20]
+        }
+        """
+        common_runs = d1.keys() & d2.keys()
+        if len(common_runs) == 0: return False
+
+        for run in common_runs:
+            common_lumis = set(d1[run]).intersection(set(d2[run]))
+            if len(common_lumis)>0 : return	True
+
+        return False
+
     def execute(self, *args, **kwargs):
         """
         This is a convenience wrapper around the executeInternal function
@@ -353,17 +371,15 @@ class DBSDataDiscovery(DataDiscovery):
                         del filedetails[key]
             if secondaryDataset:
                 moredetails = self.dbs.listDatasetFileDetails(secondaryDataset, getParents=False, getLumis=needLumiInfo, validFileOnly=0)
-
-                for secfilename, secinfos in moredetails.items():
-                    secinfos['lumiobj'] = LumiList(runsAndLumis=secinfos['Lumis'])
-
                 self.logger.info("Beginning to match files from secondary dataset")
+
                 for dummyFilename, infos in filedetails.items():
+                    primary_lumis = infos['Lumis']
                     infos['Parents'] = []
-                    lumis = LumiList(runsAndLumis=infos['Lumis'])
                     for secfilename, secinfos in moredetails.items():
-                        if lumis & secinfos['lumiobj']:
+                        if self.lumi_overlap(primary_lumis,secinfos['Lumis']):
                             infos['Parents'].append(secfilename)
+                
                 self.logger.info("Done matching files from secondary dataset")
                 kwargs['task']['tm_use_parent'] = 1
         except Exception as ex:
