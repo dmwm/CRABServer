@@ -155,14 +155,9 @@ confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-crabCommand "--debug getoutput" "--jobids=1 --proxy=$PROXY"
+crabCommand getoutput "--jobids=1 --proxy=$PROXY"
 lookFor "Success in retrieving output_1.root " commandLog.txt
 lookFor "Success in retrieving My_output_1.txt " commandLog.txt
-crabLog=`cat commandLog.txt|grep "Log file is"|awk '{print $4}'`
-echo printing $crabLog
-echo =======================================
-cat $crabLog
-echo =======================================
 """
 if SL6:  # skip: singularity, no gfal_copy, crab getoutput can't work
     validationScript = dummyTestScript
