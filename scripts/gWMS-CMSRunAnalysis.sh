@@ -195,7 +195,7 @@ then
     export CRAB_Retry=`grep '^CRAB_Retry =' $_CONDOR_JOB_AD | tail -1 | tr -d '"' | awk '{print $NF;}'`
     export CRAB_Reqname=`grep '^CRAB_Reqname =' $_CONDOR_JOB_AD | tail -1 | tr -d '"' | awk '{print $NF;}'`
     # let Frontier know where access will come from
-    export FRONTIER_ID="CRAB $CRAB_Reqname"
+    export FRONTIER_ID="CRAB-${CRAB_Reqname}"
     JOB_CMSSite=`grep '^JOB_CMSSite =' $_CONDOR_JOB_AD | tr -d '"' | tail -1 | awk '{print $NF;}'`
     if [ "X$CRAB_Id" = "X" ];
     then
