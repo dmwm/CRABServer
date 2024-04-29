@@ -413,7 +413,7 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
         # N.B. a migration request is supposed never to fail. Only failure to contact server should
         # result in HTTP or curl error/exceptions. Otherwise server will always return a list of dicionaries.
         # But there are cases where server replies with HTTP code other than 200 (e.g. 400 if migration
-        # request is invalid), in those caes client raises exception which should be handled with proper care
+        # request is invalid), in those cases client raises exception which should be handled with proper care
     except dbsClientException as dbsEx:
         logger.error("HTTP call to server %s failed: %s", migrateApi.url, dbsEx)
         return False
@@ -424,18 +424,38 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
         code = httpErr.code
         body = json.loads(httpErr.body)
         reason = body[0]['error']['reason']
+        message = body[0]['error']['messsage']
         if code >= 500:
             # something bad happened inside server
             logger.error("HTTP error %d with msg %s", code, reason)
             return False
         if code == 400:
-            # beware "not allowed for migration" error which is persistent
             msg = "Migration request refused by server."
             logger.error(msg)
-            # if we simply report flase, Publisher will try and fail again, forever
-            # some reasons for this are known
-            if 'has status PRODUCTION' in reason:
-                msg = 'Input dataset has status PRODUCTION'
+            msg = f"Migration refusal reason: {reason}"
+            logger.error(msg)
+            # if we simply report false, Publisher will try and possibly fail again, forever
+            # we use this to deal with already existing migrations in this case reason has the format
+            # "migration request <blockName> is already exist in DB with id=4435739 "
+            if 'is already exist in DB' in reason:
+                migId = int(reason.split('=')[1])
+                status = migrateApi.statusMigration(migration_rqst_id=migId)
+                if status[0].get("migration_status") == 9:
+                    msg = f"Existing migration id={migId} is terminally failed (status=9)"
+                    msg += "Delete it and try again at next iteration"
+                    logger.info(msg)
+                    migrateApi.removeMigration({'migration_rqst_id': id})
+                    return False
+                msg = f"Existing migration id={migId} is still in progress."
+                msg += '\nAssume that it will work and go on with status checking'
+                logger.info(msg)
+                return True
+            # Otherwise we assume that it is a no-go and so getout via an exception
+            # beware "not allowed for migration" error in message which is persistent
+            if 'not allowed for migration' in message:
+                msg = message
+                if 'has status PRODUCTION' in reason:
+                    msg = 'Input dataset has status PRODUCTION'
             raise CannotMigrateException(msg) from httpErr
 
         if code > 400:
@@ -444,6 +464,8 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
             # are properly handled
             logger.error("HTTP error %d", code)
             logger.error("A new migration request could not be submitted. Reason: %s", reason)
+            msg += 'Reason unclear. Assume that it will work and go on with status checking'
+            logger.error(msg)
             return True
         logger.error("Unexpected HTTP error %d", code)
         return False
