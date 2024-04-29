@@ -72,7 +72,7 @@ def prepareDummySummary(taskname):
     return nothingToDo
 
 
-def saveSummaryJson(summary, logdir):
+def saveSummaryJson(summary=None, logdir=None):
     """
     Save a publication summary as JSON. Make a new file every time this script runs
     :param summary: a summary disctionary. Must at least have key 'taskname'
