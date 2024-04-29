@@ -1,5 +1,12 @@
 /*
 Some procedures that dario found on production DB, which may be useful in the future
+
+Comments:
+=========
+
+Every "CREATE OR REPLACE" statement should be followed by a slash "/" on a newline
+ref: https://stackoverflow.com/a/10207695
+
 */
 
 CREATE OR REPLACE PROCEDURE CMS_ANALYSIS_REQMGR.BUILD_LOCAL_INDEX(CURRTAB VARCHAR2) AS

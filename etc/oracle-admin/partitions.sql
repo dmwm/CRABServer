@@ -9,14 +9,34 @@ Database:
 =========
     These code is applied to the following databases:
 
-	- production:    cms_analysis_reqmgr@cmsr
-    - preproduction: cmsweb_analysis_preprod@int2r
+	- [x] prod:     cms_analysis_reqmgr@cmsr
+    - [x] preprod:  cmsweb_analysis_preprod@int2r
+	- [x] dev:      cmsweb_analysis_dev@int2r
+	- [x] devtwo:   cmsweb_crab_9r_dev@int2r
+	- [ ] devthree: cmsweb_crab_9r_preprod@int2r (missing permissions)
 
 Dependency/Requirements:
 ========================
-	1. We must ensure that we have proper permission to create 
-	scheduler jobs and send email alerts. If we do not have it
-	then ask from Oracle support.
+	1. In order to install the functions and procedures from this file with
+	   SQL> @etc/oracle-admin/partitions.sql
+	   the schema/account needs to have proper permissions.
+	   If you get compilations errors/warning such as
+       "Warning: Function created with compilation errors." or
+       "Warning: Procedure created with compilation errors."
+	   or if you get an insufficient privilege error such as
+       "ERROR at line 1:
+        ORA-27486: insufficient privileges
+        ORA-06512: at "SYS.DBMS_ISCHED", line 175
+        ORA-06512: at "SYS.DBMS_SCHEDULER", line 286
+        ORA-06512: at line 20"
+        then you need to ask Oracle support to grant the lacking permissions to 
+		the schema/account that your are using
+
+Comments:
+=========
+
+Every "CREATE OR REPLACE" statement should be followed by a slash "/" on a newline
+ref: https://stackoverflow.com/a/10207695
 
 */
 
@@ -90,12 +110,15 @@ IS
 	username varchar2(100);
 	dbname   varchar2(100);
 	emails   varchar(200) := 'cms-service-crab-operators@cern.ch';
-	  /*emails   varchar(200) := 'alccs.prajesh.sharma@gmail.com,prajesh.sharma@cern.ch,Stefano.Belforte@cern.ch,daina.dirmaite@cern.ch';*/
---	emails   varchar(200) := 'dario.mapelli@cern.ch';
 
 BEGIN
 	select sys_context('USERENV','SESSION_USER')  into username from dual;
 	select sys_context('USERENV','INSTANCE_NAME') into dbname   from dual;
+
+    -- the value of the "recipients" argument must be an existing email address
+	--     it can be a user or an egroup
+	-- the value of the "sender" argument can be whatever you like. it only needs to
+	--     respect the pattern *@cern.ch
 
         UTL_MAIL.send(
                 sender     => 'crab-email-placeholder@cern.ch',

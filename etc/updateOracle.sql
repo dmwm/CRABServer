@@ -139,22 +139,3 @@ ALTER TABLE tasks ADD tm_publish_rule VARCHAR(255);
 
 --Add Rucio ASO's json kv for store container names and its rules.
 ALTER TABLE tasks ADD tm_multipub_rule CLOB;
-
--- 2024-03 oracle cleanup
--- prod
--- DROP TABLE CMS_ANALYSIS_REQMGR.TASKS_INT CASCADE CONSTRAINTS;
--- DROP TABLE CMS_ANALYSIS_REQMGR.JOBGROUPS CASCADE CONSTRAINTS;
--- DROP TABLE CMS_ANALYSIS_REQMGR.CMP3$10027924 CASCADE CONSTRAINTS;
--- delete recycle bin
-
--- preprod
--- drop table FILEMETADATA_SAVE ;
--- drop table  "CMP3$14630427" ;
--- drop table  "FILEMETADATA_INT" ;
--- drop table  "JOBGROUPS" ;
--- drop table  "PRAJESHTEST" ;
--- drop table  "PRAJESHTEST2" ;
--- drop table  "PRAJESH_TEST" ;
--- # partition TASKS, took hours, see admin docs for instructions
--- # partition FILETRANSFERSDB, took minutes, see database admin docs for instructions
-
