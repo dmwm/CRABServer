@@ -17,7 +17,6 @@ import shutil
 import pandas as pd
 
 
-
 ERROR_KINDS = [
     'not a ROOT file',
     'truncated',
@@ -48,6 +47,10 @@ def main():
         for file in doneFiles:
             shutil.move(file, doneFilesDir)
 
+    if not totals:
+        print("No Bad File Report found. Exit")
+        return
+
     # now that we have the totals for this run of the script, update the
     # daily tally
     summaryDir = f"{topDir}/summaries/"
@@ -60,26 +63,32 @@ def main():
     misc = rest
 
     df = pd.concat([truncated, notRoot, unknown, misc]).reset_index(drop=True)
-    writeOutHtmlTable(df)
+    if not df.empty:
+        writeOutHtmlTable(df)
 
     # write out "clearly bad files" Lists
     # limit to at least 2 errors (avoid cases where a single retry solved)
-    topTrunc= truncated[truncated['errors'] > 2]
-    with open('TruncatedFiles.list', 'w', encoding='utf-8') as fh:
-        fh.write(topTrunc['DID'].to_csv(header=False, index=False))
-    topNotRoot = notRoot[notRoot['errors'] > 2]
-    with open('NotRootFiles.list', 'w', encoding='utf-8') as fh:
-        fh.write(topNotRoot['DID'].to_csv(header=False, index=False))
+    if not truncated.empty:
+        topTrunc= truncated[truncated['errors'] > 2]
+        with open('TruncatedFiles.list', 'w', encoding='utf-8') as fh:
+            fh.write(topTrunc['DID'].to_csv(header=False, index=False))
+    if not notRoot.empty:
+        topNotRoot = notRoot[notRoot['errors'] > 2]
+        with open('NotRootFiles.list', 'w', encoding='utf-8') as fh:
+            fh.write(topNotRoot['DID'].to_csv(header=False, index=False))
 
     # also suspicious files list, but limit to at least 3 errors (avoid cases where
     # CRAB 3 automatic retries solved)
-    suspicious = unknown[unknown['errors'] > 3]
-    with open('SuspiciousFiles.list', 'w', encoding='utf-8') as fh:
-        fh.write(suspicious['DID'].to_csv(header=False, index=False))
+    if not unknown.empty:
+        suspicious = unknown[unknown['errors'] > 3]
+        with open('SuspiciousFiles.list', 'w', encoding='utf-8') as fh:
+            fh.write(suspicious['DID'].to_csv(header=False, index=False))
 
 
 
 def selectDataFrameByErrorKind(df, errorKind):
+    if not errorKind in df:
+        return pd.DataFrame(), df
     selected = df[df['kind'] == {errorKind}].sort_values(by=['errors'], ascending=False)
     rest = df[df['kind'] != {errorKind}].sort_values(by=['errors'], ascending=False)
     return selected, rest
@@ -294,4 +303,3 @@ def htmlHeader():
 
 if __name__ == '__main__':
     main()
-
