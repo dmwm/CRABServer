@@ -23,9 +23,7 @@ class Create(DBCreator):
 
         self.create = {}
         self.constraints = {}
-        self.create['i_transfers'] = "CREATE INDEX TM_TASKNAME_IDX ON FILETRANSFERSDB (TM_TASKNAME)"
-        self.create['i_workers'] = "CREATE INDEX TM_WORKER_STATE ON FILETRANSFERSDB (TM_ASO_WORKER, TM_TRANSFER_STATE) COMPRESS 2"
-        self.create['i_publishers'] = "CREATE INDEX TM_WORKER_STATE ON FILETRANSFERSDB (TM_ASO_WORKER, TM_PUBLICATION_STATE) COMPRESS 2"
+
         #  //
         # // Define create statements for each table
         # //
@@ -35,6 +33,12 @@ class Create(DBCreator):
         # tm_workflow - taskName (len 255 chars)
         # tm_group - group which is used inside cert
         # tm_role - role which is used inside cert
+
+        self.create['i_transfers']  = "CREATE INDEX TM_TASKNAME_IDX            ON FILETRANSFERSDB (TM_TASKNAME)"
+        self.create['i_workers']    = "CREATE INDEX TM_WORKER_STATE            ON FILETRANSFERSDB (TM_ASO_WORKER, TM_TRANSFER_STATE) COMPRESS 2"
+        self.create['i_publishers'] = "CREATE INDEX TM_WORKER_PUB_STATE        ON FILETRANSFERSDB (TM_ASO_WORKER, TM_PUBLICATION_STATE) COMPRESS 2"
+        self.create['i_pubtrans']   = "CREATE INDEX FILETRANSFERSDB_NEW2       ON FILETRANSFERSDB (TM_PUBLISH, TM_PUBLICATION_STATE, TM_TRANSFER_STATE) COMPRESS 3"
+        self.create['i_creation']   = "CREATE INDEX TM_CREATION_TIME_LOCAL_IDX ON FILETRANSFERSDB (TM_CREATION_TIME) COMPRESS 1"
 
         self.create['b_transfers'] = """
         CREATE TABLE filetransfersdb(
@@ -69,6 +73,11 @@ class Create(DBCreator):
         tm_creation_time TIMESTAMP NOT NULL,
         CONSTRAINT id_pk PRIMARY KEY(tm_id),
         CONSTRAINT fk_tm_taskname_ftdb FOREIGN KEY (tm_taskname) REFERENCES tasks (tm_taskname)
+        )
+        PARTITION by RANGE (tm_creation_time)
+        INTERVAL (NUMTOYMINTERVAL(1, 'MONTH'))
+        (
+            PARTITION P1 VALUES LESS THAN (TO_DATE('2017-04-14 00:00:00', 'SYYYY-MM-DD HH24:MI:SS', 'NLS_CALENDAR=GREGORIAN'))
         )
     """
 
