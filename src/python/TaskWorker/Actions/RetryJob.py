@@ -404,8 +404,6 @@ class RetryJob():
         via a json file taskname.corrupted.job.<crabid>.<retry>.json
         returns True/Falso accordingly to corrupted yes/no
         """
-        if not os.path.exists('/etc/use_corruption_check'):
-            return False
 
         corruptedFile = False
         suspiciousFile = False
@@ -474,7 +472,7 @@ class RetryJob():
                 reportLocation = 'davs://eoscms.cern.ch:443/eos/cms/store/temp/user/BadInputFiles/suspicious/new/'
 
             destination = reportLocation + reportFileName
-            cmd = f'gfal-copy -v -t 60 {reportFileName} {destination}'
+            cmd = f'gfal-copy -vp -t 60 {reportFileName} {destination}'
             out, err, ec = executeCommand(cmd)
             if ec:
                 self.logger.error(f'gfal-copy failed with out: {out} err: {err}')
