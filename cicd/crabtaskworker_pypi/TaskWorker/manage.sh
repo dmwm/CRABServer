@@ -26,16 +26,14 @@ export PYTHONPATH="${PYTHONPATH}"
 export SERVICE="${SERVICE}"
 
 ## some variable use in start_srv
-CONFIG="${SCRIPT_DIR}"/cfg/TaskWorkerConfig.py
+CONFIG="${SCRIPT_DIR}"/current/TaskWorkerConfig.py
 
 # CRABTASKWORKER_ROOT is a mandatory variable for getting data directory in `DagmanCreator.getLocation()`
 # Hardcoded the path and use new_updateTMRuntime.sh to build it from source and copy to this path.
 export CRABTASKWORKER_ROOT=/data/srv/current/lib/python/site-packages/
 
 helpFunction() {
-    echo;
     grep "^##H" "${0}" | sed -r "s/##H(| )//g"
-    exit 0
 }
 
 start_srv() {
@@ -102,6 +100,7 @@ case ${1:-help} in
 
   help )
     helpFunction
+    exit 0
     ;;
 
   * )

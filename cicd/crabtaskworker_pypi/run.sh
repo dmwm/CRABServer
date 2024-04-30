@@ -7,6 +7,9 @@
 
 set -euo pipefail
 
+# re-export to check require env
+export SERVICE=${SERVICE}
+
 # ensure container has needed mounts
 check_link() {
     # function checks if symbolic links required to start service exists and if they are not broken
@@ -25,22 +28,21 @@ check_link() {
 # directories/files that should be created before starting the container
 if [[ $SERVICE == TaskWorker ]]; then
     declare -A links=(
-        ["logs"]="/data/hostdisk/${SERVICE}/logs"
-        ["cfg"]="/data/hostdisk/${SERVICE}/cfg"
+        ["current/TaskWorkerConfig.py"]="/data/hostdisk/${SERVICE}/cfg/TaskWorkerConfig.py"
     )
     WORKDIR=/data/srv/TaskManager
 elif [[ "${SERVICE}" == Publisher* ]]; then
     declare -A links=(
-        ["logs"]="/data/hostdisk/${SERVICE}/logs"
-        ["cfg"]="/data/hostdisk/${SERVICE}/cfg"
-        ["/data/srv/Publisher_files"]="/data/hostdisk/${SERVICE}/PublisherFiles"
+        ["current/PublisherConfig.py"]="/data/hostdisk/${SERVICE}/cfg/PublisherConfig.py"
     )
     WORKDIR=/data/srv/Publisher
+else
+    echo "Service unknown: ${SERVICE}"; exit 1;
 fi
 
 for name in "${!links[@]}";
 do
-  check_link "${name}" || ln -s "${links[$name]}" "$name"
+  check_link "${name}" || ln -s "$(realpath "${links[$name]}")" "$name"
 done
 
 pushd "${WORKDIR}"

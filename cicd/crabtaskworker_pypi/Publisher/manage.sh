@@ -26,12 +26,10 @@ export PYTHONPATH="${PYTHONPATH}"
 export SERVICE="${SERVICE}"
 
 ## some variable use in start_srv
-CONFIG="${SCRIPT_DIR}"/cfg/PublisherConfig.py
+CONFIG="${SCRIPT_DIR}"/current/PublisherConfig.py
 
 helpFunction() {
-    echo;
     grep "^##H" "${0}" | sed -r "s/##H(| )//g"
-    exit 0
 }
 
 start_srv() {
@@ -101,6 +99,7 @@ case ${1:-help} in
   # Separate start/restart because stop_srv does not work when next cycle is
   # less than now and its block the container to start.
   start )
+
     start_srv
     ;;
   restart )
@@ -114,6 +113,7 @@ case ${1:-help} in
 
   help )
     helpFunction
+    exit 1
     ;;
 
   * )
