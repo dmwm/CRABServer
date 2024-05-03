@@ -87,8 +87,6 @@ def main():
 
 
 def selectDataFrameByErrorKind(df, errorKind):
-    if not errorKind in df:
-        return pd.DataFrame(), df
     selected = df[df['kind'] == {errorKind}].sort_values(by=['errors'], ascending=False)
     rest = df[df['kind'] != {errorKind}].sort_values(by=['errors'], ascending=False)
     return selected, rest
