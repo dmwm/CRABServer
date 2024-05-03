@@ -168,6 +168,7 @@ def findParentBlocks(listOfFileDicts=None, DBSApis=None, logger=None, verbose=No
                     file['parents'].remove(parentFile)
     return (localParentBlocks, globalParentBlocks)
 
+
 def prepareDbsPublishingConfigs(blockDict=None, aFile=None, inputDataset=None, outputDataset=None,
                                 DBSApis=None, logger=None):
     """
@@ -241,6 +242,7 @@ def prepareDbsPublishingConfigs(blockDict=None, aFile=None, inputDataset=None, o
     DBSConfigs['acquisition_era_config'] = acquisition_era_config
 
     return DBSConfigs
+
 
 def createBulkBlock(output_config, processing_era_config, primds_config,
                     dataset_config, acquisition_era_config, block_config, files):

@@ -16,7 +16,7 @@ from TaskWorker.WorkerExceptions import CannotMigrateException
 from TaskWorker.WorkerUtilities import getCrabserver
 
 from PublisherUtils import setupLogging, prepareDummySummary, saveSummaryJson, \
-    mark_good, mark_failed, getDBSInputInformation
+    markGood, markFailed, getDBSInputInformation
 
 from PublisherDbsUtils import format_file_3, setupDbsAPIs, findParentBlocks, \
     prepareDbsPublishingConfigs, createBulkBlock, migrateByBlockDBS3
@@ -169,8 +169,6 @@ def publishInDBS3(config, taskname, verbose, console):  # pylint: disable=too-ma
                 failureReason = 'failedToInsertInDBS'
             finally:
                 elapsed = int(time.time() - t1)
-                # msg = 'PUBSTAT: Nfiles=%4d, lumis=%7d, blockSize=%6s, time=%3ds, status=%s, task=%s' % \
-                #       (len(dbsFiles), nLumis, blockSize, elapsed, didPublish, taskname)
                 msg = f"PUBSTAT: Nfiles={len(dbsFiles):{4}}, lumis={nLumis:{7}}"
                 msg += f", blockSize={blockSize:{6}}, time={elapsed:{3}}"
                 msg += f", status={didPublish}, task={taskname}"
@@ -271,7 +269,7 @@ def publishInDBS3(config, taskname, verbose, console):  # pylint: disable=too-ma
         # docId is the hash of the source LFN i.e. the file in the tmp area at the running site
         files = [f['source_lfn'] for f in block['files'] for block in blocksToPublish]
         if not dryRun:
-            mark_good(files=files, crabServer=crabServer, asoworker=config.General.asoworker, logger=logger)
+            markGood(files=files, crabServer=crabServer, asoworker=config.General.asoworker, logger=logger)
         summaryFileName = saveSummaryJson(nothingToDo, log['logdir'])
         return summaryFileName
 
@@ -310,7 +308,7 @@ def publishInDBS3(config, taskname, verbose, console):  # pylint: disable=too-ma
             publishedBlocks += 1
             publishedFiles += len(blockDict['files'])
             if not dryRun:
-                mark_good(files=lfnsInBlock, crabServer=crabServer, asoworker=config.General.asoworker, logger=logger)
+                markGood(files=lfnsInBlock, crabServer=crabServer, asoworker=config.General.asoworker, logger=logger)
             listOfPublishedLFNs.extend(lfnsInBlock)
         elif result['status'] == 'FAIL':
             failedBlocks += 1
@@ -318,7 +316,7 @@ def publishInDBS3(config, taskname, verbose, console):  # pylint: disable=too-ma
             failedBlocks += 1
             failedFiles += len(blockDict['files'])
             if not dryRun:
-                mark_failed(files=lfnsInBlock, crabServer=crabServer, asoworker=config.General.asoworker, logger=logger)
+                markFailed(files=lfnsInBlock, crabServer=crabServer, asoworker=config.General.asoworker, logger=logger)
             listOfFailedLFNs.extend(lfnsInBlock)
             if result['reason'] == 'failedToInsertInDBS':
                 logger.error("Failed to insert block in DBS. Block Dump saved")

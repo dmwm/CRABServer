@@ -528,7 +528,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
 
     def markAsFailed(self, lfns=None, reason=None):
         """
-        could this be replaced by PublisherUtils/mark_failed ?
+        could this be replaced by PublisherUtils/markFailed ?
         """
         nMarked = 0
         for lfn in lfns:

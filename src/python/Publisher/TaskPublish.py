@@ -3,8 +3,6 @@
 this is a standalone script. It is spawned by PushisherMaster or could
 be executed from CLI (in the Publisher environment) to retry or debug failures
 """
-from __future__ import division
-from __future__ import print_function
 import os
 import uuid
 import time
@@ -19,10 +17,11 @@ from TaskWorker.WorkerExceptions import CannotMigrateException
 from TaskWorker.WorkerUtilities import getCrabserver
 
 from PublisherUtils import setupLogging, prepareDummySummary, saveSummaryJson, \
-    mark_good, mark_failed, getDBSInputInformation
+    markGood, markFailed, getDBSInputInformation
 
 from PublisherDbsUtils import format_file_3, setupDbsAPIs, findParentBlocks, \
     createBulkBlock, migrateByBlockDBS3, prepareDbsPublishingConfigs
+
 
 def publishInDBS3(config, taskname, verbose, console):
     """
@@ -39,10 +38,8 @@ def publishInDBS3(config, taskname, verbose, console):
     logdir = log['logdir']
     migrationLogDir = log['migrationLogDir']
     taskFilesDir = log['taskFilesDir']
-
     dryRun = config.TaskPublisher.dryRun
     logger.info("Start new iteration on taskname:  %s\nGet files to publish", taskname)
-
 
     # DBS client relies on X509 env. vars
     os.environ['X509_USER_CERT'] = config.TaskPublisher.cert
@@ -52,7 +49,7 @@ def publishInDBS3(config, taskname, verbose, console):
     nothingToDo = prepareDummySummary(taskname)
 
     toPublish = []
-    # TODO move from new to done when processed
+    # TO DO move from new to done when processed
     fname = taskFilesDir + taskname + ".json"
     with open(fname, 'r', encoding='utf8') as f:
         toPublish = json.load(f)
@@ -80,7 +77,6 @@ def publishInDBS3(config, taskname, verbose, console):
         summaryFileName = saveSummaryJson(nothingToDo, log['logdir'])
         return summaryFileName
     logger.info("inputDataset: %s", inputDataset)
-
 
     # prepare DBS API's
     try:
@@ -111,13 +107,13 @@ def publishInDBS3(config, taskname, verbose, console):
         existingDBSFiles = destReadApi.listFiles(dataset=dataset, detail=True)
         existingFiles = [f['logical_file_name'] for f in existingDBSFiles]
         existingFilesValid = [f['logical_file_name'] for f in existingDBSFiles if f['is_file_valid']]
-        msg = "Dataset %s already contains %d files" % (dataset, len(existingFiles))
-        msg += " (%d valid, %d invalid)." % (len(existingFilesValid), len(existingFiles) - len(existingFilesValid))
+        msg = f"Dataset {dataset} already contains {len(existingFiles)} files"
+        msg += f" ({len(existingFilesValid)} valid, {len(existingFiles) - len(existingFilesValid)} invalid)."
         logger.info(msg)
         final['existingFiles'] = len(existingFiles)
     except Exception as ex:
-        msg = "Error when listing files in DBS: %s" % (str(ex))
-        msg += "\n%s" % (str(traceback.format_exc()))
+        msg = f"Error when listing files in DBS: {ex}"
+        msg += f"\n{traceback.format_exc()}"
         logger.error(msg)
         nothingToDo['result'] = 'FAIL'
         nothingToDo['reason'] = 'Error listing existing files in DBS'
@@ -128,7 +124,6 @@ def publishInDBS3(config, taskname, verbose, console):
     workToDo = False
 
     for fileTo in toPublish:
-        #print(existingFilesValid)
         if fileTo['lfn'] not in existingFiles:
             workToDo = True
             break
@@ -140,7 +135,7 @@ def publishInDBS3(config, taskname, verbose, console):
         # docId is the has of the source LFN i.e. the file in the tmp area at the running site
         files = [f['SourceLFN'] for f in toPublish]
         if not dryRun:
-            mark_good(files=files, crabServer=crabServer, asoworker=config.General.asoworker, logger=logger)
+            markGood(files=files, crabServer=crabServer, asoworker=config.General.asoworker, logger=logger)
         summaryFileName = saveSummaryJson(nothingToDo, logdir)
         return summaryFileName
 
@@ -165,20 +160,18 @@ def publishInDBS3(config, taskname, verbose, console):
             # Add this file to the list of files to be published.
             dbsFiles.append(format_file_3(file_))
             dbsFiles_f.append(file_)
-        #print file
         published.append(file_['SourceLFN'])
-        #published.append(file_['lfn'].replace("/store","/store/temp"))
 
     # Print a message with the number of files to publish.
-    msg = "Found %d files not already present in DBS which will be published." % (len(dbsFiles))
+    msg = f"Found {len(dbsFiles)} files not already present in DBS which will be published."
     logger.info(msg)
 
     # compute size of this publication request to guide us on picking max_files_per_block
     dbsFilesKBytes = len(json.dumps(dbsFiles)) // 1024
     if dbsFilesKBytes > 1024:
-        dbsFilesSize = '%dMB' % (dbsFilesKBytes // 1024)
+        dbsFilesSize = f"{dbsFilesKBytes // 1024}MB"
     else:
-        dbsFilesSize = '%dKB' % dbsFilesKBytes
+        dbsFilesSize = f"{dbsFilesKBytes}KB"
     nLumis = 0
     for file_ in dbsFiles:
         nLumis += len(file_['file_lumi_list'])
@@ -194,7 +187,8 @@ def publishInDBS3(config, taskname, verbose, console):
     # First migrate the parent blocks that are in the same DBS instance
     # as the input dataset.
     if localParentBlocks:
-        msg = "List of parent blocks that need to be migrated from %s:\n%s" % (sourceApi.url, localParentBlocks)
+        msg = "List of parent blocks that need to be migrated"
+        msg += f" from {sourceApi.url}:\n{localParentBlocks}"
         logger.info(msg)
         if dryRun:
             logger.info("DryRun: skipping migration request")
@@ -208,7 +202,7 @@ def publishInDBS3(config, taskname, verbose, console):
                 failureMsg = 'Cannot migrate. ' + str(ex)
                 logger.info('%s. Mark all files as failed', failureMsg)
                 if not dryRun:
-                    mark_failed([file['SourceLFN'] for file in toPublish],
+                    markFailed([file['SourceLFN'] for file in toPublish],
                                 crabServer=crabServer, asoworker=config.General.asoworker,
                                 failure_reason=failureMsg, logger=logger)
                 nothingToDo['result'] = 'FAIL'
@@ -227,7 +221,8 @@ def publishInDBS3(config, taskname, verbose, console):
                 return summaryFileName
     # Then migrate the parent blocks that are in the global DBS instance.
     if globalParentBlocks:
-        msg = "List of parent blocks that need to be migrated from %s:\n%s" % (globalApi.url, globalParentBlocks)
+        msg = "List of parent blocks that need to be migrated from"
+        msg += f" {globalApi.url}:\n{globalParentBlocks}"
         logger.info(msg)
         if dryRun:
             logger.info("DryRun: skipping migration request")
@@ -256,7 +251,7 @@ def publishInDBS3(config, taskname, verbose, console):
     publishedBlocks = 0
     failedBlocks = 0
     max_files_per_block = config.General.max_files_per_block
-    #TODO here can tune max_file_per_block based on len(dbsFiles) and dbsFilesSize
+    # TO DO here can tune max_file_per_block based on len(dbsFiles) and dbsFilesSize
     # start with a horrible hack for identified bad use cases:
     if '2018UL' in taskname or 'UL2018' in taskname:
         max_files_per_block = 10
@@ -264,11 +259,11 @@ def publishInDBS3(config, taskname, verbose, console):
     # make sure that a block never has too many lumis, see
     # https://github.com/dmwm/CRABServer/issues/6670#issuecomment-965837566
     maxLumisPerBlock = 1.e6  # 1 Million
-    nBlocks = float(len(dbsFiles))/float(max_files_per_block)
+    nBlocks = float(len(dbsFiles)) / float(max_files_per_block)
     if nLumis > maxLumisPerBlock * nBlocks:
         logger.info('Trying to publish %d lumis in %d blocks', nLumis, nBlocks)
-        reduction = (nLumis/maxLumisPerBlock)/nBlocks
-        max_files_per_block = int(max_files_per_block/reduction)
+        reduction = (nLumis / maxLumisPerBlock) / nBlocks
+        max_files_per_block = int(max_files_per_block / reduction)
         max_files_per_block = max(max_files_per_block, 1)  # sanity check
         logger.info('Reducing to %d files per block to keep nLumis/block below %s',
                     max_files_per_block, maxLumisPerBlock)
@@ -276,8 +271,8 @@ def publishInDBS3(config, taskname, verbose, console):
     dumpList = []   # keep a list of files where blocks which fail publication are dumped
     while True:
         nIter += 1
-        block_name = "%s#%s" % (dataset, str(uuid.uuid4()))
-        files_to_publish = dbsFiles[count:count+max_files_per_block]
+        block_name = f"{dataset}#{str(uuid.uuid4())}"
+        files_to_publish = dbsFiles[count:count + max_files_per_block]
         # makes sure variabled defined in try/except/finally are defined for later use
         t1 = 0
         blockSize = '0'
@@ -285,20 +280,19 @@ def publishInDBS3(config, taskname, verbose, console):
         try:
             block_config = {'block_name': block_name, 'origin_site_name': pnn, 'open_for_writing': 0}
             if verbose:
-                msg = "Inserting files %s into block %s." % ([f['logical_file_name']
-                                                              for f in files_to_publish], block_name)
+                msg = f"Inserting files {[f['logical_file_name'] for f in files_to_publish]}"
+                msg += f" into block {block_name}."
                 logger.info(msg)
 
             blockDump = createBulkBlock(DBSConfigs['output_config'], DBSConfigs['processing_era_config'],
                                         DBSConfigs['primds_config'], DBSConfigs['dataset_config'],
                                         DBSConfigs['acquisition_era_config'],
                                         block_config, files_to_publish)
-            #logger.debug("Block to insert: %s\n %s" % (blockDump, destApi.__dict__ ))
             blockSizeKBytes = len(json.dumps(blockDump)) // 1024
             if blockSizeKBytes > 1024:
-                blockSize = '%dMB' % (blockSizeKBytes // 1024)
+                blockSize = f"{blockSizeKBytes // 1024}MB"
             else:
-                blockSize = '%dKB' % blockSizeKBytes
+                blockSize = f"{blockSizeKBytes}KB"
 
             t1 = time.time()
             if dryRun:
@@ -310,16 +304,14 @@ def publishInDBS3(config, taskname, verbose, console):
             publishedBlocks += 1
         except Exception as ex:
             didPublish = 'FAIL'
-            #logger.error("Error for files: %s" % [f['SourceLFN'] for f in toPublish])
             logger.error("Error for files: %s", [f['lfn'] for f in toPublish])
             failed.extend([f['SourceLFN'] for f in toPublish])
-            #failed.extend([f['lfn'].replace("/store","/store/temp") for f in toPublish])
-            msg = "Error when publishing (%s) " % ", ".join(failed)
+            msg = f"Error when publishing ({ ', '.join(failed)})"
             msg += str(ex)
             msg += str(traceback.format_exc())
             logger.error(msg)
             taskFilesDir = config.General.taskFilesDir
-            fname = os.path.join(taskFilesDir, 'FailedBlocks', 'failed-block-at-%s.txt' % time.time())
+            fname = os.path.join(taskFilesDir, 'FailedBlocks', f"failed-block-at-{time.time()}.txt")
             with open(fname, 'w', encoding='utf8') as fd:
                 fd.write(pprint.pformat(blockDump))
             dumpList.append(fname)
@@ -327,19 +319,20 @@ def publishInDBS3(config, taskname, verbose, console):
             logger.error("FAILING BLOCK DUE TO %s SAVED AS %s", str(ex), fname)
         finally:
             elapsed = int(time.time() - t1)
-            msg = 'PUBSTAT: Nfiles=%4d, filestructSize=%6s, lumis=%7d, iter=%2d, blockSize=%6s, time=%3ds, status=%s, task=%s' % \
-                  (len(dbsFiles), dbsFilesSize, nLumis, nIter, blockSize, elapsed, didPublish, taskname)
+            msg = f"PUBSTAT: Nfiles={len(dbsFiles):{4}}, filestructSize={dbsFilesSize:{6}}"
+            msg += f", lumis={nLumis:{7}}, iter={nIter:{2}}"
+            msg += f", blockSize={blockSize:{6}}, time={elapsed:{3}}"
+            msg += f", status={didPublish}, task={taskname}"
             logger.info(msg)
             logsDir = config.General.logsDir
             fname = os.path.join(logsDir, 'STATS.txt')
             with open(fname, 'a+', encoding='utf8') as fd:
-                fd.write(str(msg+'\n'))
+                fd.write(str(msg + '\n'))
 
         count += max_files_per_block
-        files_to_publish_next = dbsFiles_f[count:count+max_files_per_block]
+        files_to_publish_next = dbsFiles_f[count:count + max_files_per_block]
         if len(files_to_publish_next) < max_files_per_block:
             publish_in_next_iteration.extend([f["SourceLFN"] for f in files_to_publish_next])
-            #publish_in_next_iteration.extend([f["lfn"].replace("/store","/store/temp") for f in files_to_publish_next])
             break
     published = [x for x in published if x not in failed + publish_in_next_iteration]
     # Fill number of files/blocks published for this dataset.
@@ -347,26 +340,26 @@ def publishInDBS3(config, taskname, verbose, console):
     final['blocks'] = block_count
     # Print a publication status summary for this dataset.
     msg = "End of publication status:"
-    msg += " failed %s" % len(failed)
+    msg += f" failed {len(failed)}"
     if verbose:
-        msg += ": %s" % failed
-    msg += ", published %s" % len(published)
+        msg += f": {failed}"
+    msg += f", published {len(published)}"
     if verbose:
-        msg += ": %s" % published
-    msg += ", publish_in_next_iteration %s" % len(publish_in_next_iteration)
+        msg += f": {published}"
+    msg += f", publish_in_next_iteration {len(publish_in_next_iteration)}"
     if verbose:
-        msg += ": %s" % publish_in_next_iteration
-    msg += ", results %s" % (final)
+        msg += f": {publish_in_next_iteration}"
+    msg += f", results {final}"
     logger.info(msg)
 
     try:
         if published:
             if not dryRun:
-                mark_good(files=published, crabServer=crabServer, asoworker=config.General.asoworker, logger=logger)
+                markGood(files=published, crabServer=crabServer, asoworker=config.General.asoworker, logger=logger)
         if failed:
             logger.debug("Failed files: %s ", failed)
             if not dryRun:
-                mark_failed(failed, crabServer=crabServer, asoworker=config.General.asoworker, logger=logger)
+                markFailed(failed, crabServer=crabServer, asoworker=config.General.asoworker, logger=logger)
     except Exception as ex:
         logger.exception("Status update failed: %s", ex)
 
@@ -421,10 +414,11 @@ def main():
         config.TaskPublisher.dryRun = True
 
     if verbose:
-        print("Will run%s with:\nconfigFile: %s\ntaskname  : %s\n" % (modeMsg, configFile, taskname))
+        print(f"Will run{modeMsg} with:\nconfigFile: {configFile}\ntaskname  : {taskname}\n")
 
     result = publishInDBS3(config, taskname, verbose, console)
-    print("Completed with result in %s" % result)
+    print(f"Completed with result in {result}")
+
 
 if __name__ == '__main__':
     main()
