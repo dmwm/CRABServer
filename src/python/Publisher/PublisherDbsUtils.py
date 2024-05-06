@@ -101,6 +101,149 @@ def setupDbsAPIs(sourceURL=None, publishURL=None, DBSHost=None, logger=None):
     return DBSApis
 
 
+def findParentBlocks(listOfFileDicts=None, DBSApis=None, logger=None, verbose=None):
+    """ find parent blocks for a list of files"""
+
+    # Set of all the parent files from all the files requested to be published.
+    parentFiles = set()
+    # Set of parent files for which the migration to the destination DBS instance
+    # should be skipped (because they were not found in DBS).
+    parentsToSkip = set()
+    # Set of parent files to migrate from the source DBS instance
+    # to the destination DBS instance.
+    localParentBlocks = set()
+    # Set of parent files to migrate from the global DBS instance
+    # to the destination DBS instance.
+    globalParentBlocks = set()
+
+    for file in listOfFileDicts:  # pylint: disable=too-many-nested-blocks
+        if verbose:
+            logger.info(file)
+        # Get the parent files and for each parent file do the following:
+        # 1) Add it to the list of parent files.
+        # 2) Find the block to which it belongs and insert that block name in
+        #    (one of) the set of blocks to be migrated to the destination DBS.
+        for parentFile in list(file['parents']):
+            if parentFile not in parentFiles:
+                parentFiles.add(parentFile)
+                # Is this parent file already in the destination DBS instance?
+                # (If yes, then we don't have to migrate this block.)
+                # some parent files are illegal DBS names (GH issue #6771), skip them
+                try:
+                    blocksDict = DBSApis['destRead'].listBlocks(logical_file_name=parentFile)
+                except Exception:
+                    file['parents'].remove(parentFile)
+                    continue
+                if not blocksDict:
+                    # No, this parent file is not in the destination DBS instance.
+                    # Maybe it is in the same DBS instance as the input dataset?
+                    blocksDict = DBSApis['source'].listBlocks(logical_file_name=parentFile)
+                    if blocksDict:
+                        # Yes, this parent file is in the same DBS instance as the input dataset.
+                        # Add the corresponding block to the set of blocks from the source DBS
+                        # instance that have to be migrated to the destination DBS.
+                        localParentBlocks.add(blocksDict[0]['block_name'])
+                    else:
+                        # No, this parent file is not in the same DBS instance as input dataset.
+                        # Maybe it is in global DBS instance?
+                        blocksDict = DBSApis['global'].listBlocks(logical_file_name=parentFile)
+                        if blocksDict:
+                            # Yes, this parent file is in global DBS instance.
+                            # Add the corresponding block to the set of blocks from global DBS
+                            # instance that have to be migrated to the destination DBS.
+                            globalParentBlocks.add(blocksDict[0]['block_name'])
+                # If this parent file is not in the destination DBS instance, is not
+                # the source DBS instance, and is not in global DBS instance, then it
+                # means it is not known to DBS and therefore we can not migrate it.
+                # Put it in the set of parent files for which migration should be skipped.
+                if not blocksDict:
+                    parentsToSkip.add(parentFile)
+            # If this parent file should not be migrated because it is not known to DBS,
+            # we remove it from the list of parents in the file-to-publish info dictionary
+            # (so that when publishing, this "parent" file will not appear as a parent).
+            if parentFile in parentsToSkip:
+                msg = f"Skipping parent file {parentFile}, as it doesn't seem to be known to DBS."
+                logger.info(msg)
+                if parentFile in file['parents']:
+                    file['parents'].remove(parentFile)
+    return (localParentBlocks, globalParentBlocks)
+
+
+def prepareDbsPublishingConfigs(blockDict=None, aFile=None, inputDataset=None, outputDataset=None,
+                                DBSApis=None, logger=None):
+    """
+    Fills the DBSConfigs dictionary with the various configs needed to publish one block
+    Needs a few parameters from the a sample block to be published
+    DBSConfigs = {'primds_config', 'dataset_config', 'output_config',
+              'processing_era_config', 'acquisition_era_config'}
+    """
+    # to unify with TaskPublish (no Rucio) need as arguments, in place of blockDict
+    # a sample file dictionary (aFile)
+
+    if blockDict:
+        aFile = blockDict['files'][0]
+    psetHash = aFile['publishname'].split("-")[-1]
+    releaseVersion = aFile['swversion']
+
+    noInput = len(inputDataset.split("/")) <= 3
+    if not noInput:
+        existing_datasets = DBSApis['source'].listDatasets(dataset=inputDataset, detail=True, dataset_access_type='*')
+        primary_ds_type = existing_datasets[0]['primary_ds_type']
+        acquisitionEra = existing_datasets[0]['acquisition_era_name']
+        existing_output = DBSApis['destRead'].listOutputConfigs(dataset=inputDataset)
+        if not existing_output:
+            msg = f"Unable to list output config for input dataset {inputDataset}"
+            logger.error(msg)
+            globalTag = 'crab3_tag'
+        else:
+            globalTag = existing_output[0]['global_tag']
+    else:
+        msg = "This publication appears to be for private MC."
+        logger.info(msg)
+        primary_ds_type = 'mc'
+        acquisitionEra = 'CRAB'
+        globalTag = 'crab3_tag'
+
+    appName = 'cmsRun'
+    if not globalTag or globalTag == 'null' or globalTag == 'None':
+        globalTag = 'crab3_tag'
+    if not acquisitionEra or acquisitionEra == 'null' or acquisitionEra == 'None':
+        acquisitionEra = 'CRAB'
+
+    _, primName, procName, tier = outputDataset.split('/')
+    primds_config = {'primary_ds_name': primName, 'primary_ds_type': primary_ds_type}
+
+    acquisition_era_config = {'acquisition_era_name': acquisitionEra, 'start_date': 0}
+
+    processing_era_config = {'processing_version': 1, 'description': 'CRAB3_processing_era'}
+
+    output_config = {'release_version': releaseVersion,
+                     'pset_hash': psetHash,
+                     'app_name': appName,
+                     'output_module_label': 'o',
+                     'global_tag': globalTag,
+                     }
+
+    dataset_config = {'dataset': outputDataset,
+                      'processed_ds_name': procName,
+                      'data_tier_name': tier,
+                      'dataset_access_type': 'VALID',
+                      'physics_group_name': 'CRAB3',
+                      'last_modification_date': int(time.time()),
+                      }
+
+    logger.info("Output dataset config: %s", str(dataset_config))
+
+    DBSConfigs = {}
+    DBSConfigs['primds_config'] = primds_config
+    DBSConfigs['dataset_config'] = dataset_config
+    DBSConfigs['output_config'] = output_config
+    DBSConfigs['processing_era_config'] = processing_era_config
+    DBSConfigs['acquisition_era_config'] = acquisition_era_config
+
+    return DBSConfigs
+
+
 def createBulkBlock(output_config, processing_era_config, primds_config,
                     dataset_config, acquisition_era_config, block_config, files):
     """
@@ -272,7 +415,7 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
         # N.B. a migration request is supposed never to fail. Only failure to contact server should
         # result in HTTP or curl error/exceptions. Otherwise server will always return a list of dicionaries.
         # But there are cases where server replies with HTTP code other than 200 (e.g. 400 if migration
-        # request is invalid), in those caes client raises exception which should be handled with proper care
+        # request is invalid), in those cases client raises exception which should be handled with proper care
     except dbsClientException as dbsEx:
         logger.error("HTTP call to server %s failed: %s", migrateApi.url, dbsEx)
         return False
@@ -283,18 +426,38 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
         code = httpErr.code
         body = json.loads(httpErr.body)
         reason = body[0]['error']['reason']
+        message = body[0]['error']['messsage']
         if code >= 500:
             # something bad happened inside server
             logger.error("HTTP error %d with msg %s", code, reason)
             return False
         if code == 400:
-            # beware "not allowed for migration" error which is persistent
             msg = "Migration request refused by server."
             logger.error(msg)
-            # if we simply report flase, Publisher will try and fail again, forever
-            # some reasons for this are known
-            if 'has status PRODUCTION' in reason:
-                msg = 'Input dataset has status PRODUCTION'
+            msg = f"Migration refusal reason: {reason}"
+            logger.error(msg)
+            # if we simply report false, Publisher will try and possibly fail again, forever
+            # we use this to deal with already existing migrations in this case reason has the format
+            # "migration request <blockName> is already exist in DB with id=4435739 "
+            if 'is already exist in DB' in reason:
+                migId = int(reason.split('=')[1])
+                status = migrateApi.statusMigration(migration_rqst_id=migId)
+                if status[0].get("migration_status") == 9:
+                    msg = f"Existing migration id={migId} is terminally failed (status=9)"
+                    msg += "Delete it and try again at next iteration"
+                    logger.info(msg)
+                    migrateApi.removeMigration({'migration_rqst_id': id})
+                    return False
+                msg = f"Existing migration id={migId} is still in progress."
+                msg += '\nAssume that it will work and go on with status checking'
+                logger.info(msg)
+                return True
+            # Otherwise we assume that it is a no-go and so getout via an exception
+            # beware "not allowed for migration" error in message which is persistent
+            if 'not allowed for migration' in message:
+                msg = message
+                if 'has status PRODUCTION' in reason:
+                    msg = 'Input dataset has status PRODUCTION'
             raise CannotMigrateException(msg) from httpErr
 
         if code > 400:
@@ -303,6 +466,8 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
             # are properly handled
             logger.error("HTTP error %d", code)
             logger.error("A new migration request could not be submitted. Reason: %s", reason)
+            msg += 'Reason unclear. Assume that it will work and go on with status checking'
+            logger.error(msg)
             return True
         logger.error("Unexpected HTTP error %d", code)
         return False

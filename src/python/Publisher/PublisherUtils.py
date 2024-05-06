@@ -28,9 +28,10 @@ def createLogdir(dirname):
 
 
 def setupLogging(config, taskname, verbose, console):
-    # prepare log and work directories for TaskPublish
-    # an initialize a logger
-    # returs a dictionary log={logger, logdir, migrationlLogDir, taskFilesDir}
+    """
+    prepare log and work directories for TaskPublish and initializes a logger
+    returs a dictionary log={logger, logdir, migrationlLogDir, taskFilesDir}
+    """
     log = {}
     taskFilesDir = config.General.taskFilesDir
     username = taskname.split(':')[1].split('_')[0]
@@ -58,7 +59,7 @@ def setupLogging(config, taskname, verbose, console):
 
 
 def prepareDummySummary(taskname):
-    # prepare a dummy summary JSON file in case there's nothing to do
+    """ prepare a dummy summary JSON file in case there's nothing to do """
     nothingToDo = {}
     nothingToDo['taskname'] = taskname
     nothingToDo['result'] = 'OK'
@@ -72,7 +73,7 @@ def prepareDummySummary(taskname):
     return nothingToDo
 
 
-def saveSummaryJson(summary, logdir):
+def saveSummaryJson(summary=None, logdir=None):
     """
     Save a publication summary as JSON. Make a new file every time this script runs
     :param summary: a summary disctionary. Must at least have key 'taskname'
@@ -90,7 +91,7 @@ def saveSummaryJson(summary, logdir):
     return summaryFileName
 
 
-def mark_good(files=None, crabServer=None, asoworker=None, logger=None):
+def markGood(files=None, crabServer=None, asoworker=None, logger=None):
     """
     Mark the list of files as published
     files must be a list of SOURCE_LFN's i.e. /store/temp/user/...
@@ -101,8 +102,8 @@ def mark_good(files=None, crabServer=None, asoworker=None, logger=None):
 
     nMarked = 0
     for lfn in files:
-        source_lfn = lfn
-        docId = getHashLfn(source_lfn)
+        sourceLfn = lfn
+        docId = getHashLfn(sourceLfn)
         data = {}
         data['asoworker'] = asoworker
         data['subresource'] = 'updatePublication'
@@ -113,18 +114,19 @@ def mark_good(files=None, crabServer=None, asoworker=None, logger=None):
 
         try:
             result = crabServer.post(api='filetransfers', data=encodeRequest(data))
-            logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
-        except Exception as ex:
-            logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
+            logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, sourceLfn, result)
+        except Exception as ex:  # pylint: disable=broad-except
+            logger.error("Error updating status for DocumentId: %s lfn: %s", docId, sourceLfn)
             logger.error("Error reason: %s", ex)
             logger.error("Error reason: %s", ex)
 
         nMarked += 1
         if nMarked % 10 == 0:
             logger.info('marked %d files', nMarked)
+        logger.info('total of %s files, marked as Good', nMarked)
 
 
-def mark_failed(files=None, crabServer=None, failure_reason="", asoworker=None, logger=None):
+def markFailed(files=None, crabServer=None, failureReason="", asoworker=None, logger=None):
     """
     Something failed for these files.
     files must be a list of SOURCE_LFN's i.e. /store/temp/user/...
@@ -134,36 +136,40 @@ def mark_failed(files=None, crabServer=None, failure_reason="", asoworker=None, 
 
     nMarked = 0
     for lfn in files:
-        source_lfn = lfn
-        docId = getHashLfn(source_lfn)
+        sourceLfn = lfn
+        docId = getHashLfn(sourceLfn)
         data = {}
         data['asoworker'] = asoworker
         data['subresource'] = 'updatePublication'
         data['list_of_ids'] = [docId]
         data['list_of_publication_state'] = ['FAILED']
         data['list_of_retry_value'] = [1]
-        data['list_of_failure_reason'] = [failure_reason]
+        data['list_of_failure_reason'] = [failureReason]
 
         logger.debug("data: %s ", data)
         try:
             result = crabServer.post(api='filetransfers', data=encodeRequest(data))
-            logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
-        except Exception as ex:
-            logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
+            logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, sourceLfn, result)
+        except Exception as ex:  # pylint: disable=broad-except
+            logger.error("Error updating status for DocumentId: %s lfn: %s", docId, sourceLfn)
             logger.error("Error reason: %s", ex)
 
         nMarked += 1
         if nMarked % 10 == 0:
             logger.info('marked %d files', nMarked)
+        logger.info('total of %s files, marked as Failed', nMarked)
 
 
 def getDBSInputInformation(taskname=None, crabServer=None):
-    # LOOK UP Input dataset info in CRAB DB task table
-    # for this task to know which DBS istance it was in
+    """
+    LOOK UP Input dataset info in CRAB DB task table
+    for this task to know which DBS istance it was in
+    """
+
     data = {'subresource': 'search',
             'workflow': taskname}
     results = crabServer.get(api='task', data=encodeRequest(data))
-    # TODO THERE are better ways to parse rest output into a dict !!
+    # NOTICE: There are better ways to parse rest output into a dict !!
     inputDatasetIndex = results[0]['desc']['columns'].index("tm_input_dataset")
     inputDataset = results[0]['result'][inputDatasetIndex]
     # in case input was a Rucio container, remove the scope if any

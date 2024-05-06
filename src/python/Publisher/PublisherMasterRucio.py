@@ -487,13 +487,12 @@ class Master():  # pylint: disable=too-many-instance-attributes
                         if fileInTDB['destination_lfn'] == fmd['lfn']:
                             metadataFound = True
                             toPublish.append(fmd['lfn'])
-                            for key in ['inevents', 'filetype', 'publishname', 'lfn', 'jobid',
+                            for key in ['inevents', 'filetype', 'publishname', 'lfn', 'jobid', 'swversion',
                                         'runlumi', 'adler32', 'cksum', 'filesize', 'parents', 'state', 'created']:
                                 fileDict[key] = fmd[key]
                             # following three vars. only need to be saved once, they are the same for all FMD
                             # but let's stay simple even if a bit redundant
                             acquisitionEra = fmd['acquisitionera']
-                            releaseVersion = fmd['swversion']
                             globalTag = fmd['globaltag']
                             break
                     if not metadataFound:
@@ -502,7 +501,6 @@ class Master():  # pylint: disable=too-many-instance-attributes
                     filesInfo.append(fileDict)
                 blockDict['files'] = filesInfo
                 blockDict['acquisition_era_name'] = acquisitionEra
-                blockDict['release_version'] = releaseVersion
                 blockDict['global_tag'] = globalTag
                 blockDictsToPublish.append(blockDict)
 
@@ -530,7 +528,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
 
     def markAsFailed(self, lfns=None, reason=None):
         """
-        could this be replaced by PublisherUtils/mark_failed ?
+        could this be replaced by PublisherUtils/markFailed ?
         """
         nMarked = 0
         for lfn in lfns:
