@@ -195,7 +195,7 @@ def publishInDBS3(config, taskname, verbose, console):
         else:
             try:
                 statusCode, failureMsg = migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi,
-                                                            inputDataset, localParentBlocks, migrationLogDir,
+                                                            localParentBlocks, migrationLogDir,
                                                             logger=logger, verbose=verbose)
             except CannotMigrateException as ex:
                 # there is nothing we can do in this case
@@ -229,8 +229,8 @@ def publishInDBS3(config, taskname, verbose, console):
         else:
             try:
                 statusCode, failureMsg = migrateByBlockDBS3(taskname, migrateApi, destReadApi, globalApi,
-                                                            inputDataset, globalParentBlocks, migrationLogDir,
-                                                            verbose)
+                                                            globalParentBlocks, migrationLogDir,
+                                                            logger=logger, verbose=verbose)
             except Exception as ex:
                 logger.exception('Exception raised inside migrateByBlockDBS3\n%s', ex)
                 statusCode = 1
