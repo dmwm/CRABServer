@@ -99,7 +99,15 @@ case ${1:-help} in
   # Separate start/restart because stop_srv does not work when next cycle is
   # less than now and its block the container to start.
   start )
-
+    # check if Publisher process still running.
+    rc=0;
+    # shellcheck disable=SC2207
+    pids=($(pgrep -f RunPublisher 2> /dev/null)) || rc=$?
+    if [[ $rc -eq 0 ]]; then
+       >&2 echo "Error: Publisher process still running (pid: ${pids[@]})"
+       exit 1
+    fi
+    # start
     start_srv
     ;;
   restart )
