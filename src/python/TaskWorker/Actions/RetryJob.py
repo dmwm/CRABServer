@@ -316,7 +316,7 @@ class RetryJob():
         self.logger.info(msg)
 
         # Wrapper script sometimes returns the posix return code (8 bits).
-        if exitCode in [8020, 8021, 8028] or exitCode in [84, 85, 92]:
+        if exitCode in [8020, 8021, 8022, 8028] or exitCode in [84, 85, 86, 92]:
             try:  # the following is still a bit experimental, make sure it never crashes the PJ
                 corruptedInputFile = self.check_corrupted_file(exitCode)
             except Exception as e:  # pylint: disable=broad-except
