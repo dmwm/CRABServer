@@ -67,13 +67,13 @@ def main():
         writeOutHtmlTable(df)
 
     # write out "clearly bad files" Lists
-    # limit to at least 2 errors (avoid cases where a single retry solved)
+    # limit to at least 3 errors (avoid cases where automatic retry solved)
     if not truncated.empty:
-        topTrunc= truncated[truncated['errors'] > 2]
+        topTrunc= truncated[truncated['errors'] > 3]
         with open('TruncatedFiles.list', 'w', encoding='utf-8') as fh:
             fh.write(topTrunc['DID'].to_csv(header=False, index=False))
     if not notRoot.empty:
-        topNotRoot = notRoot[notRoot['errors'] > 2]
+        topNotRoot = notRoot[notRoot['errors'] > 3]
         with open('NotRootFiles.list', 'w', encoding='utf-8') as fh:
             fh.write(topNotRoot['DID'].to_csv(header=False, index=False))
 
