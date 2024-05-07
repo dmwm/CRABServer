@@ -11,19 +11,12 @@
 ##H   start       (re)start the service
 ##H   stop        stop the service
 ##H
-##H This script needs following environment variables to be set:
-##H   - DEBUG:   if `true`, setup debug mode environment.
+##H This script needs following environment variables for start action:
+##H   - DEBUG:      if `true`, setup debug mode environment.
 ##H   - PYTHONPATH: inherit from ./start.sh
-##H   - SERVICE:    inherit from container environment
-##H                 (e.g., `-e SERVICE=TaskWorker` when do `docker run`)
 
 set -euo pipefail
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-
-# Check require env.
-export DEBUG="${DEBUG}"
-export PYTHONPATH="${PYTHONPATH}"
-export SERVICE="${SERVICE}"
 
 ## some variable use in start_srv
 CONFIG="${SCRIPT_DIR}"/current/TaskWorkerConfig.py
@@ -37,8 +30,13 @@ helpFunction() {
 }
 
 start_srv() {
+    # Check require env
+    # shellcheck disable=SC2269
+    DEBUG="${DEBUG}"
+    export PYTHONPATH="${PYTHONPATH}"
+
     # hardcode APP_DIR, but if debug mode, APP_DIR can be override
-    if [[ "$DEBUG" == true ]]; then
+    if [[ "$DEBUG" = 'true' ]]; then
         APP_DIR="${APP_DIR:-/data/repos/CRABServer/src/python}"
         python3 -m pdb "${APP_DIR}"/TaskWorker/SequentialWorker.py "${CONFIG}" --logDebug
     else
