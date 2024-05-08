@@ -2,14 +2,17 @@
 
 # runContainer.sh: script to pull specified CRAB TW image from defined repo and run it
 
-helpFunction(){
-  echo -e "\nUsage example: ./runContainer.sh -v v3.201118 -s TaskWorker"
-  echo -e "\t-v TW/Publisher version"
-  echo -e "\t-s which service should be started: Publisher, Publisher_schedd, Publisher_asoless, Publisher_rucio or TaskWorker"
-  echo -e "\t-r docker hub repo, if not provided, default points to 'cmssw'"
-  echo -e "\t-c command that overrides CMD specified in the dockerfile"
-  exit 1
-  }
+##H  Usage example: ./runContainer.sh -v v3.201118 -s TaskWorker"
+##H      -v TW/Publisher version"
+##H      -s which service should be started: Publisher, Publisher_schedd, Publisher_asoless, Publisher_rucio or TaskWorker"
+##H      -r docker hub repo, if not provided, default points to 'cmssw'"
+##H      -c command that overrides CMD specified in the dockerfile"
+
+set -euo pipefail
+
+helpFunction() {
+    grep "^##H" "${0}" | sed -r "s/##H(| )//g"
+}
 
 while getopts ":v:s:r:h:c:u:" opt
 do
@@ -20,14 +23,18 @@ do
       r) TW_REPO="$OPTARG" ;;
       c) COMMAND="$OPTARG" ;;
       u) LOGUUID="$OPTARG" ;;
-      :) echo "$0: -$OPTARG needs a value"; helpFunction ;;
-      * ) echo "Unimplemented option: -$OPTARG"; helpFunction ;;
+      :) echo "$0: -$OPTARG needs a value"; helpFunction; exit 1;;
+      * ) echo "Unimplemented option: -$OPTARG"; helpFunction; exit 1 ;;
     esac
 done
 
 if [ -z "${TW_VERSION}" ] || [ -z "${SERVICE}" ]; then
-  echo "Make sure to set both -v and -s variables." && helpFunction
+  echo "Make sure to set both -v and -s variables."; helpFunction; exit 1
 fi
+# define vars but set initial value to empty strgin to prevent unbound error
+TW_REPO=${TW_REPO:-}
+COMMAND=${COMMAND:-}
+LOGUUID=${LOGUUID:-}
 
 #list of directories that should exist on the host machine before container start
 dir=("/data/container/${SERVICE}/cfg" "/data/container/${SERVICE}/logs")
@@ -47,8 +54,11 @@ case $SERVICE in
     echo "$SERVICE is not a valid service to start. Specify whether you want to start one of the 'Publisher' variants or 'TaskWorker'." && helpFunction
 esac
 
+volumeMounts=()
 for d in "${dir[@]}"; do
-  if ! [ -e "$d" ]; then
+  if [ -e "$d" ]; then
+      volumeMounts+=("-v ${d}:/data/srv/${DIRECTORY}/$(basename "${d}")")
+  else
     echo "Make sure to create needed directories before starting container. Missing directory: $d" && exit 1
   fi
 done
@@ -77,7 +87,7 @@ fi
 # get os version
 OS_Version=$(cat /etc/os-release |grep VERSION_ID|cut -d= -f2|tr -d \"|cut -d. -f1)
 
-DOCKER_VOL="-v /data/container/:/data/hostdisk/ -v /data/srv/tmp/:/data/srv/tmp/"
+DOCKER_VOL="-v /data/container/:/data/hostdisk/ ${volumeMounts[@]} -v /data/srv/tmp/:/data/srv/tmp/"
 DOCKER_VOL="${DOCKER_VOL} -v /cvmfs:/cvmfs:shared" # https://cvmfs.readthedocs.io/en/stable/cpt-configure.html#bind-mount-from-the-host
 DOCKER_VOL="${DOCKER_VOL} -v /etc/grid-security/:/etc/grid-security/"
 DOCKER_VOL="${DOCKER_VOL} -v /data/certs/:/data/certs/"

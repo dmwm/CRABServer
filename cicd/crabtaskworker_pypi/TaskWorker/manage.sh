@@ -1,13 +1,8 @@
 #! /bin/bash
 
-# Same style as crabserver_pypi/manage.sh script, but for crabtaskworker.
-# This script needs following environment variables:
-#   - DEBUG:   if `true`, setup debug mode environment.
-#   - PYTHONPATH: inherit from ./start.sh
+# Start the TaskWorker service.
 
-set -euo pipefail
-
-##H Usage: manage.sh ACTION [ATTRIBUTE] [SECURITY-STRING]
+##H Usage: manage.sh ACTION
 ##H
 ##H Available actions:
 ##H   help        show this help
@@ -15,32 +10,38 @@ set -euo pipefail
 ##H   restart     (re)start the service
 ##H   start       (re)start the service
 ##H   stop        stop the service
+##H
+##H This script needs following environment variables for start action:
+##H   - DEBUG:      if `true`, setup debug mode environment.
+##H   - PYTHONPATH: inherit from ./start.sh
 
+set -euo pipefail
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 ## some variable use in start_srv
-TASKWORKER_HOME=/data/srv/TaskManager
-CONFIG=$TASKWORKER_HOME/cfg/TaskWorkerConfig.py
+CONFIG="${SCRIPT_DIR}"/current/TaskWorkerConfig.py
 
 # CRABTASKWORKER_ROOT is a mandatory variable for getting data directory in `DagmanCreator.getLocation()`
 # Hardcoded the path and use new_updateTMRuntime.sh to build it from source and copy to this path.
 export CRABTASKWORKER_ROOT=/data/srv/current/lib/python/site-packages/
 
-# app path. Inherit PYTHONPATH from ./start.sh
-PYTHONPATH=${PYTHONPATH:-/data/srv/current/lib/python/site-packages}
-export PYTHONPATH
-
-usage()
-{
-    cat $0 | grep "^##H" | sed -e "s,##H,,g"
+helpFunction() {
+    grep "^##H" "${0}" | sed -r "s/##H(| )//g"
 }
 
 start_srv() {
-    if [[ "$DEBUG" == true ]]; then
-        APP_DIR=${APP_DIR:-/data/repos/CRABServer/src/python}
-        python3 -m pdb ${APP_DIR}/TaskWorker/SequentialWorker.py ${CONFIG} --logDebug
+    # Check require env
+    # shellcheck disable=SC2269
+    DEBUG="${DEBUG}"
+    export PYTHONPATH="${PYTHONPATH}"
+
+    # hardcode APP_DIR, but if debug mode, APP_DIR can be override
+    if [[ "$DEBUG" = 'true' ]]; then
+        APP_DIR="${APP_DIR:-/data/repos/CRABServer/src/python}"
+        python3 -m pdb "${APP_DIR}"/TaskWorker/SequentialWorker.py "${CONFIG}" --logDebug
     else
         APP_DIR=/data/srv/current/lib/python/site-packages
-        nohup python3 ${APP_DIR}/TaskWorker/MasterWorker.py --config ${CONFIG} --logDebug &
+        python3 "${APP_DIR}"/TaskWorker/MasterWorker.py --config "${CONFIG}" --logDebug &
     fi
 }
 
@@ -96,7 +97,8 @@ case ${1:-help} in
     ;;
 
   help )
-    usage
+    helpFunction
+    exit 0
     ;;
 
   * )
