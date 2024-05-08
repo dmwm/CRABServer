@@ -111,16 +111,20 @@ class RucioAction():
             if 'T1_RU_JINR_Tape' in tapeLocations and len(tapeLocations) > 1:
                 tapeLocations.remove('T1_RU_JINR_Tape')  # JINR tape data are often duplicated
             if len(tapeLocations) == 1:
+                # do not recall across the Atlantic
                 if 'US' in list(tapeLocations)[0]:
-                    allRses += "&(country=US|country=BR)"
+                    allRses += "&(country=US)"  # Brasil is on that side too, but not reliable enough
                 else:
                     # Rucio wants the set complement operator \
                     allRses += r"\country=US\country=BR"  # pylint: disable=anomalous-backslash-in-string
+                    # avoid fragile sites, see #7400
+                    allRses += r"\country=RU\country=UA"  # pylint: disable=anomalous-backslash-in-string
         rses = self.rucioClient.list_rses(allRses)
         rseNames = [r['rse'] for r in rses]
         largeRSEs = []  # a list of largish (i.e. solid) RSEs
         for rse in rseNames:
-            if rse[2:6] == '_RU_':  # avoid fragile sites, see #7400
+            # avoid large but not-very-reliable-yet sites
+            if rse in ['T2_IN_TIFR', 'T2_PL_Swierk']:
                 continue
             usageDetails = list(self.rucioClient.get_rse_usage(rse, filters={'source': 'static'}))
             if not usageDetails:  # some RSE's are put in the system with an empty list here, e.g. T2_FR_GRIF
