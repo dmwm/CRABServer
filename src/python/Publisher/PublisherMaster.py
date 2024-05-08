@@ -708,7 +708,7 @@ class Master(object):
                 logger.info("Now execute: %s", cmd)
                 stdout, stderr, exitcode = executeCommand(cmd)
                 if exitcode != 0:
-                    errorMsg = 'Failed to execute command: %s.\n StdErr: %s.' % (cmd, stderr)
+                    errorMsg = f"Failed to execute command: {cmd}.\n StdErr:\n {stderr}\n"
                     raise Exception(errorMsg)
                 else:
                     logger.info('TaskPublishScript done : %s', stdout)
