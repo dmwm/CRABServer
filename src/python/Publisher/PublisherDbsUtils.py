@@ -426,7 +426,7 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
         code = httpErr.code
         body = json.loads(httpErr.body)
         reason = body[0]['error']['reason']
-        message = body[0]['error']['messsage']
+        message = body[0]['error']['message']
         if code >= 500:
             # something bad happened inside server
             logger.error("HTTP error %d with msg %s", code, reason)
@@ -446,7 +446,7 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
                     msg = f"Existing migration id={migId} is terminally failed (status=9)"
                     msg += "Delete it and try again at next iteration"
                     logger.info(msg)
-                    migrateApi.removeMigration({'migration_rqst_id': id})
+                    migrateApi.removeMigration({'migration_rqst_id': migId})
                     return False
                 msg = f"Existing migration id={migId} is still in progress."
                 msg += '\nAssume that it will work and go on with status checking'
