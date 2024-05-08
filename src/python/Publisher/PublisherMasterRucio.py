@@ -312,7 +312,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
         logger.info("Now execute: %s", cmd)
         stdout, stderr, exitcode = executeCommand(cmd)
         if exitcode != 0:
-            errorMsg = f"Failed to execute command: {cmd}.\n StdErr: {stderr}."
+            errorMsg = f"Failed to execute command: {cmd}.\n StdErr:\n {stderr}."
             raise Exception(errorMsg)
         logger.info('TaskPublishScript done : %s', stdout)
 

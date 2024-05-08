@@ -204,7 +204,7 @@ def publishInDBS3(config, taskname, verbose, console):
                 if not dryRun:
                     markFailed([file['SourceLFN'] for file in toPublish],
                                 crabServer=crabServer, asoworker=config.General.asoworker,
-                                failure_reason=failureMsg, logger=logger)
+                                failureReason=failureMsg, logger=logger)
                 nothingToDo['result'] = 'FAIL'
                 nothingToDo['reason'] = failureMsg
                 nothingToDo['failedFiles'] = len(dbsFiles)
