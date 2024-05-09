@@ -249,6 +249,7 @@ def markFailed(files=None, crabServer=None, failureReason="", asoworker=None, lo
             logger.info('marked %d files', nMarked)
         logger.info('total of %s files, marked as Failed', nMarked)
 
+
 def getInfoFromFMD(crabServer=None, taskname=None, lfns=None, logger=None):
     """
     Download and read the files describing what needs to be published

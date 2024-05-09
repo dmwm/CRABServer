@@ -27,8 +27,8 @@ from ServerUtilities import getHashLfn
 from ServerUtilities import getProxiedWebDir
 from TaskWorker.WorkerUtilities import getCrabserver
 
-from PublisherUtils import createLogdir, setRootLogger, setSlaveLogger, logVersionAndConfig, \
-                           getInfoFromFMD
+from PublisherUtils import createLogdir, setRootLogger, setSlaveLogger, logVersionAndConfig
+from PublisherUtils import getInfoFromFMD
 
 
 class Master():  # pylint: disable=too-many-instance-attributes
@@ -126,13 +126,12 @@ class Master():  # pylint: disable=too-many-instance-attributes
             self.logger.info("%s acquired publications retrieved for asoworker %s", len(files), asoworker)
             filesToPublish.extend(files)
 
-
         # TO DO: join query for publisher (same of submitter)
         unique_tasks = [list(i) for i in set(tuple([x['username'],
                                                     x['user_group'],
                                                     x['user_role'],
                                                     x['taskname']]
-                                                  ) for x in filesToPublish if x['transfer_state'] == 3)]
+                                                   ) for x in filesToPublish if x['transfer_state'] == 3)]
 
         info = []
         for task in unique_tasks:
@@ -149,7 +148,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
             user killing the task. See:
             https://htcondor.readthedocs.io/en/latest/users-manual/dagman-workflows.html#capturing-the-status-of-nodes-in-a-file
             """
-            status = {0:'PENDING', 1: 'SUBMITTED', 2: 'SUBMITTED', 3: 'SUBMITTED',
+            status = {0: 'PENDING', 1: 'SUBMITTED', 2: 'SUBMITTED', 3: 'SUBMITTED',
                       4: 'SUBMITTED', 5: 'COMPLETED', 6: 'FAILED'}[statusToTr]
             return status
 
@@ -193,7 +192,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
                 return check_queued(translateStatus(subDagInfos[0]['DagStatus']))
             return check_queued(translateStatus(dagInfo['DagStatus']))
 
-        crabDBInfo, _, _ = self.crabServer.get(api='task', data={'subresource':'search', 'workflow':workflow})
+        crabDBInfo, _, _ = self.crabServer.get(api='task', data={'subresource': 'search', 'workflow': workflow})
         dbStatus = getColumn(crabDBInfo, 'tm_task_status')
         if dbStatus == 'KILLED':
             return 'KILLED'
@@ -203,10 +202,10 @@ class Master():  # pylint: disable=too-many-instance-attributes
         url = proxiedWebDir + "/status_cache.pkl"
         # this host is dummy since we will pass full url to downloadFile but WMCore.Requests needs it
         host = 'https://cmsweb.cern.ch'
-        cdict = {'cert':self.config.serviceCert, 'key':self.config.serviceKey}
+        cdict = {'cert': self.config.serviceCert, 'key': self.config.serviceKey}
         req = Requests(url=host, idict=cdict)
         _, ret = req.downloadFile(local_status_cache_pkl, url)
-        if not ret.status == 200:
+        if ret.status != 200:
             raise Exception(f"download attempt returned HTTP code {ret.status}")
         with open(local_status_cache_pkl, 'rb') as fp:
             statusCache = pickle.load(fp)
@@ -246,7 +245,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
         for task in tasks:
             taskName = task[0][3]
             acquiredFiles = len(task[1])
-            flag = '  OK' if acquiredFiles < 1000 else 'WARN' # mark suspicious tasks
+            flag = '  OK' if acquiredFiles < 1000 else 'WARN'  # mark suspicious tasks
             self.logger.info('acquired_files: %s %5d : %s', flag, acquiredFiles, taskName)
 
         processes = []
@@ -274,7 +273,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
                     while len(processes) == maxSlaves:
                         # wait until one process has completed
                         time.sleep(10)
-                        for proc in processes:
+                        for proc in processes.copy():
                             if not proc.is_alive():
                                 self.logger.info('Terminated: %s pid=%s', proc, proc.pid)
                                 processes.remove(proc)
@@ -284,14 +283,14 @@ class Master():  # pylint: disable=too-many-instance-attributes
         self.logger.info('No more tasks to care for. Wait for remaining %d processes to terminate', len(processes))
         while processes:
             time.sleep(10)
-            for proc in processes:
+            for proc in processes.copy():
                 if not proc.is_alive():
                     self.logger.info('Terminated: %s pid=%s', proc, proc.pid)
                     processes.remove(proc)
 
         self.logger.info("Algorithm iteration completed")
         self.logger.info("Wait %d sec for next cycle", self.pollInterval())
-        newStartTime = time.strftime("%H:%M:%S", time.localtime(time.time()+self.pollInterval()))
+        newStartTime = time.strftime("%H:%M:%S", time.localtime(time.time() + self.pollInterval()))
         # BEWARE: any change to message in next line needs to be synchronized with
         # a change in Publisher/stop.sh otherwise that script will break
         self.logger.info("Next cycle will start at %s", newStartTime)
@@ -336,24 +335,23 @@ class Master():  # pylint: disable=too-many-instance-attributes
                 msg = "Considering task status as terminal. Will force publication."
                 logger.info(msg)
             # Otherwise...
-            else:    ## TO DO put this else in a function like def checkForPublication()
+            else:    # TO DO put this else in a function like def checkForPublication()
                 msg = "Task status is not considered terminal. Will check last publication time."
                 logger.info(msg)
                 # Get when was the last time a publication was done for this workflow (this
                 # should be more or less independent of the output dataset in case there are
                 # more than one).
                 last_publication_time = None
-                data = encodeRequest({'workflow':workflow, 'subresource':'search'})
+                data = encodeRequest({'workflow': workflow, 'subresource': 'search'})
                 try:
                     result = self.crabServer.get(api='task', data=data)
-                    #logger.debug("task: %s ", str(result[0]))
                     last_publication_time = getColumn(result[0], 'tm_last_publication')
                 except Exception as ex:  # pylint: disable=broad-except
                     logger.error("Error during task info retrieving:\n%s", ex)
                 if last_publication_time:
-                    date = last_publication_time # datetime in Oracle format
-                    timetuple = datetime.strptime(date, "%Y-%m-%d %H:%M:%S.%f").timetuple()  # convert to time tuple
-                    last_publication_time = time.mktime(timetuple)      # convert to seconds since Epoch (float)
+                    date = last_publication_time  # datetime in Oracle format
+                    timetuple = datetime.strptime(date, "%Y-%m-%d %H:%M:%S.%f").timetuple()
+                    last_publication_time = time.mktime(timetuple)  # convert to seconds since Epoch (float)
 
                 msg = f"Last publication time: {last_publication_time}."
                 logger.debug(msg)
@@ -372,10 +370,10 @@ class Master():  # pylint: disable=too-many-instance-attributes
                     # go ahead and publish.
                     now = int(time.time()) - time.timezone
                     time_since_last_publication = now - last
-                    hours = int(time_since_last_publication/60/60)
-                    minutes = int((time_since_last_publication - hours*60*60)/60)
-                    timeout_hours = int(self.block_publication_timeout/60/60)
-                    timeout_minutes = int((self.block_publication_timeout - timeout_hours*60*60)/60)
+                    hours = int(time_since_last_publication / 60 / 60)
+                    minutes = int((time_since_last_publication - hours * 60 * 60) / 60)
+                    timeout_hours = int(self.block_publication_timeout / 60 / 60)
+                    timeout_minutes = int((self.block_publication_timeout - timeout_hours * 60 * 60) / 60)
                     msg = f"Last publication was {hours}h:{minutes}m ago"
                     if time_since_last_publication > self.block_publication_timeout:
                         self.force_publication = True
@@ -400,7 +398,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
                                       x['input_dataset'],
                                       x['dbs_url'],
                                       x['last_update']
-                                     ]}
+                                      ]}
                            for x in task[1] if x['transfer_state'] == 3 and x['publication_state'] not in [2, 3, 5]]
 
                 lfn_ready = []
@@ -493,13 +491,11 @@ class Master():  # pylint: disable=too-many-instance-attributes
                         data['list_of_failure_reason'] = 'File type not EDM or metadata not found'
                         try:
                             result = self.crabServer.post(api='filetransfers', data=encodeRequest(data))
-                            #logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
                         except Exception as ex:  # pylint: disable=broad-except
                             logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
                             logger.error("Error reason: %s", ex)
 
                         nMarked += 1
-                        #if nMarked % 10 == 0:
                     logger.info('marked %d files as Failed', nMarked)
 
                 # find the location in the current environment of the script we want to run
@@ -564,7 +560,7 @@ if __name__ == '__main__':
     parser.add_argument('--config', help='Publisher config file', default='PublisherConfig.py')
 
     args = parser.parse_args()
-    #need to pass the configuration file path to the slaves
+    # need to pass the configuration file path to the slaves
     configurationFile = os.path.abspath(args.config)
 
     master = Master(confFile=configurationFile)

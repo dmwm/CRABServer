@@ -22,8 +22,8 @@ from WMCore.Configuration import loadConfigurationFile
 from ServerUtilities import encodeRequest, oracleOutputMapping, executeCommand
 from TaskWorker.WorkerUtilities import getCrabserver
 
-from PublisherUtils import createLogdir, setRootLogger, setSlaveLogger, logVersionAndConfig, \
-                           getInfoFromFMD, markFailed
+from PublisherUtils import createLogdir, setRootLogger, setSlaveLogger, logVersionAndConfig
+from PublisherUtils import getInfoFromFMD, markFailed
 
 
 class Master():  # pylint: disable=too-many-instance-attributes
@@ -133,7 +133,6 @@ class Master():  # pylint: disable=too-many-instance-attributes
             taskList.append(taskDict)
         return taskList
 
-
     def runTaskPublish(self, workflow, logger):
         """
         forks a process which will run TaskPublishRucio.py
@@ -234,20 +233,20 @@ class Master():  # pylint: disable=too-many-instance-attributes
                     while len(processes) == maxSlaves:
                         # wait until one process has completed
                         time.sleep(10)
-                        for proc in processes:
+                        for proc in processes.copy():
                             if not proc.is_alive():
                                 self.logger.info('Terminated: %s pid=%s', proc, proc.pid)
-                                processes.remove(proc)  # pylint: disable=modified-iterating-list
+                                processes.remove(proc)
 
         except Exception:  # pylint: disable=broad-except
             self.logger.exception("Error during process mapping")
         self.logger.info('No more tasks to care for. Wait for remaining %d processes to terminate', len(processes))
         while processes:
             time.sleep(10)
-            for proc in processes:
+            for proc in processes.copy():
                 if not proc.is_alive():
                     self.logger.info('Terminated: %s pid=%s', proc, proc.pid)
-                    processes.remove(proc)  # pylint: disable=modified-iterating-list
+                    processes.remove(proc)
 
         self.logger.info("Algorithm iteration completed")
         self.logger.info("Wait %d sec for next cycle", self.pollInterval())
@@ -308,8 +307,6 @@ class Master():  # pylint: disable=too-many-instance-attributes
                 filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
                 filepath.touch()  # notify other slaves
                 logger.debug('++++++++ BLACKLIST TASK %s ++', workflow)
-
-            #print(filesInfoFromFMD[0])
 
             blockDictsToPublish = []  # initialise the structure which will be dumped as JSON
             toPublish = []
@@ -372,7 +369,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
         handy wrapper for PublisherUtils/markFailed
         """
         nMarked = markFailed(files=lfns, crabserver=self.crabserver, failureReason=reason,
-                   asoworker=self.config.asoworker, logger=self.logger)
+                             asoworker=self.config.asoworker, logger=self.logger)
         return nMarked
 
     def pollInterval(self):
