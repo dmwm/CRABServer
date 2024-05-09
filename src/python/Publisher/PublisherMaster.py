@@ -1,4 +1,4 @@
-# pylint: disable=C0103, W0703, R0912, R0914, R0915
+# pylint: disable=invalid-name  # have a lot of snake_case varaibles here from "old times"
 
 """
 Here's the algorithm
@@ -9,15 +9,8 @@ Here's the algorithm
 4. spawn a process per task that publish their files
 """
 
-from __future__ import division
-from __future__ import print_function
 import argparse
-import logging
-from logging import FileHandler
-from logging.handlers import TimedRotatingFileHandler
 import os
-import traceback
-import sys
 import json
 import pickle
 import tempfile
@@ -25,57 +18,20 @@ from datetime import datetime
 import time
 from pathlib import Path
 from multiprocessing import Process
-from MultiProcessingLog import MultiProcessingLog
 
 from WMCore.Configuration import loadConfigurationFile
 from WMCore.Services.Requests import Requests
 
-from RESTInteractions import CRABRest
 from ServerUtilities import getColumn, encodeRequest, oracleOutputMapping, executeCommand
-from ServerUtilities import SERVICE_INSTANCES
+from ServerUtilities import getHashLfn
 from ServerUtilities import getProxiedWebDir
-from TaskWorker import __version__
-from TaskWorker.WorkerExceptions import ConfigException
+from TaskWorker.WorkerUtilities import getCrabserver
+
+from PublisherUtils import createLogdir, setRootLogger, setSlaveLogger, logVersionAndConfig, \
+                           getInfoFromFMD
 
 
-def chunks(l, n):
-    """
-    Yield successive n-sized chunks from l.
-    :param l: list to splitt in chunks
-    :param n: chunk size
-    :return: yield the next list chunk
-    """
-    for i in range(0, len(l), n):
-        yield l[i:i + n]
-
-def setMasterLogger(logsDir, name='master'):
-    """ Set the logger for the master process. The file used for it is logs/processes/proc.name.txt and it
-        can be retrieved with logging.getLogger(name) in other parts of the code
-    """
-    logger = logging.getLogger(name)
-    fileName = os.path.join(logsDir, 'processes', "proc.c3id_%s.pid_%s.txt" % (name, os.getpid()))
-    handler = TimedRotatingFileHandler(fileName, 'midnight', backupCount=30)
-    formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+name+":%(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    return logger
-
-def setSlaveLogger(logsDir, name):
-    """ Set the logger for a single slave process. The file used for it is logs/processes/proc.name.txt and it
-        can be retrieved with logging.getLogger(name) in other parts of the code
-    """
-    logger = logging.getLogger(name)
-    fileName = os.path.join(logsDir, 'processes', "proc.c3id_%s.txt" % name)
-    #handler = TimedRotatingFileHandler(fileName, 'midnight', backupCount=30)
-    # slaves are short lived, use one log file for each
-    handler = FileHandler(fileName)
-    formatter = logging.Formatter("%(asctime)s:%(levelname)s:"+"slave"+":%(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    return logger
-
-
-class Master(object):
+class Master():  # pylint: disable=too-many-instance-attributes
     """I am the main daemon kicking off all Publisher work via slave Publishers"""
 
     def __init__(self, confFile=None, quiet=False, debug=True, testMode=False):
@@ -87,75 +43,6 @@ class Master(object):
         :arg bool debug: it tells if needs a verbose logger
         :arg bool testMode: it tells if to run in test (no subprocesses) mode.
         """
-
-        def createLogdir(dirname):
-            """ Create the directory dirname ignoring erors in case it exists. Exit if
-                the directory cannot be created.
-            """
-            try:
-                os.makedirs(dirname)
-            except OSError as ose:
-                if ose.errno != 17: #ignore the "Directory already exists error"
-                    print(str(ose))
-                    print("The Publisher Worker needs to access the '%s' directory" % dirname)
-                    sys.exit(1)
-
-        def setRootLogger(logsDir, quiet=False, debug=True, console=False):
-            """Sets the root logger with the desired verbosity level
-               The root logger logs to logs/log.txt and every single
-               logging instruction is propagated to it (not really nice
-               to read)
-
-            :arg bool quiet: it tells if a quiet logger is needed
-            :arg bool debug: it tells if needs a verbose logger
-            :arg bool console: it tells if to direct all printoput to console rather then files, useful for debug
-            :return logger: a logger with the appropriate logger level."""
-
-            createLogdir(logsDir)
-            createLogdir(os.path.join(logsDir, 'processes'))
-            createLogdir(os.path.join(logsDir, 'tasks'))
-
-            if console:
-                # if we are testing log to the console is easier
-                logging.getLogger().addHandler(logging.StreamHandler())
-            else:
-                logHandler = MultiProcessingLog(os.path.join(logsDir, 'log.txt'), when='midnight')
-                logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
-                logHandler.setFormatter(logFormatter)
-                logging.getLogger().addHandler(logHandler)
-            loglevel = logging.INFO
-            if quiet:
-                loglevel = logging.WARNING
-            if debug:
-                loglevel = logging.DEBUG
-            logging.getLogger().setLevel(loglevel)
-            logger = setMasterLogger(logsDir)
-            logger.debug("PID %s.", os.getpid())
-            logger.debug("Logging level initialized to %s.", loglevel)
-            return logger
-
-        def logVersionAndConfig(config=None, logger=None):
-            """
-            log version number and major config. parameters
-            args: config : a configuration object loaded from file
-            args: logger : the logger instance to use
-            """
-            pubstartDict = {}
-            pubstartDict['version'] = __version__
-            pubstartDict['asoworker'] = config.General.asoworker
-            pubstartDict['instance'] = config.General.instance
-            if config.General.instance == 'other':
-                pubstartDict['restHost'] = config.General.restHost
-                pubstartDict['dbInstance'] = config.General.dbInstance
-            pubstartDict['max_slaves'] = config.General.max_slaves
-            pubstartDict['DBShost'] = config.TaskPublisher.DBShost
-            pubstartDict['dryRun'] = config.TaskPublisher.dryRun
-            # one line for automatic parsing
-            logger.info('PUBSTART: %s', json.dumps(pubstartDict))
-            # multiple lines for humans to read
-            for k, v in pubstartDict.items():
-                logger.info('%s: %s', k, v)
-            return
 
         self.configurationFile = confFile         # remember this, will have to pass it to TaskPublish
         config = loadConfigurationFile(confFile)
@@ -179,45 +66,12 @@ class Master(object):
         createLogdir(self.blackListedTaskDir)
 
         self.logger = setRootLogger(self.config.logsDir, quiet=quiet, debug=debug, console=self.TestMode)
-
         logVersionAndConfig(config, self.logger)
 
-        from WMCore.Credential.Proxy import Proxy
-        proxy = Proxy({'logger':self.logger})
-        from ServerUtilities import tempSetLogLevel
-        with tempSetLogLevel(self.logger, logging.ERROR):
-            self.myDN = proxy.getSubjectFromCert(certFile=self.config.serviceCert)
+        # CRAB REST API
+        self.crabServer = getCrabserver(restConfig=config.REST, agentName='CRABPublisher', logger=self.logger)
 
-        try:
-            instance = self.config.instance
-        except:
-            msg = "No instance provided: need to specify config.General.instance in the configuration"
-            raise ConfigException(msg)
-
-        if instance in SERVICE_INSTANCES:
-            self.logger.info('Will connect to CRAB service: %s', instance)
-            restHost = SERVICE_INSTANCES[instance]['restHost']
-            dbInstance = SERVICE_INSTANCES[instance]['dbInstance']
-        else:
-            msg = "Invalid instance value '%s'" % instance
-            raise ConfigException(msg)
-        if instance == 'other':
-            self.logger.info('Will use restHost and dbInstance from config file')
-            try:
-                restHost = self.config.restHost
-                dbInstance = self.config.dbInstance
-            except:
-                msg = "Need to specify config.General.restHost and dbInstance in the configuration"
-                raise ConfigException(msg)
-
-        self.logger.info('Will connect to CRAB Data Base %s instance via URL: https://%s', dbInstance, restHost)
-
-        # CRAB REST API's
         self.max_files_per_block = self.config.max_files_per_block
-        self.crabServer = CRABRest(hostname=restHost, localcert=self.config.serviceCert,
-                                   localkey=self.config.serviceKey, retry=3,
-                                   userAgent='CRABPublisher')
-        self.crabServer.setDbInstance(dbInstance=dbInstance)
         self.startTime = time.time()
 
         # tasks which are too loarge for us to deal with are
@@ -252,12 +106,12 @@ class Master(object):
             data = encodeRequest(fileDoc)
             try:
                 result = crabServer.post(api='filetransfers', data=data)  # pylint: disable=unused-variable
-            except Exception as ex:
+            except Exception as ex:  # pylint: disable=broad-except
                 self.logger.error("Failed to acquire publications from crabserver: %s", ex)
                 return []
 
             self.logger.debug("Retrieving max.100000 acquired publications from oracleDB")
-            fileDoc = dict()
+            fileDoc = {}
             fileDoc['asoworker'] = asoworker
             fileDoc['subresource'] = 'acquiredPublication'
             fileDoc['grouping'] = 0
@@ -265,7 +119,7 @@ class Master(object):
             data = encodeRequest(fileDoc)
             try:
                 results = crabServer.get(api='filetransfers', data=data)
-            except Exception as ex:
+            except Exception as ex:  # pylint: disable=broad-except
                 self.logger.error("Failed to acquire publications from crabserver: %s", ex)
                 return []
             files = oracleOutputMapping(results)
@@ -273,7 +127,7 @@ class Master(object):
             filesToPublish.extend(files)
 
 
-        # TODO: join query for publisher (same of submitter)
+        # TO DO: join query for publisher (same of submitter)
         unique_tasks = [list(i) for i in set(tuple([x['username'],
                                                     x['user_group'],
                                                     x['user_role'],
@@ -285,60 +139,8 @@ class Master(object):
             info.append([x for x in filesToPublish if x['taskname'] == task[3]])
         return list(zip(unique_tasks, info))
 
-    def getPublDescFiles(self, workflow, lfn_ready, logger):
-        """
-        Download and read the files describing what needs to be published
-        do on a small number of LFNs at a time (numFilesAtOneTime) to avoid
-        hitting the URL length limit in CMSWEB/Apache
-        """
-        out = []
-        metadataList = []
-        dataDict = {}
-        dataDict['taskname'] = workflow
-        i = 0
-        numFilesAtOneTime = 10
-        logger.debug('FMDATA: will retrieve data for %d files', len(lfn_ready))
-        while i < len(lfn_ready):
-            dataDict['lfnList'] = lfn_ready[i:i+numFilesAtOneTime]
-            data = encodeRequest(dataDict)
-            i += numFilesAtOneTime
-            try:
-                t1 = time.time()
-                res = self.crabServer.get(api='filemetadata', data=data)
-                # res is a 3-plu: (result, exit code, status)
-                res = res[0]
-                t2 = time.time()
-                elapsed = int(t2-t1)
-                fmdata = int(len(str(res))/1e6) # convert dict. to string to get actual length in HTTP call
-                logger.debug('FMDATA: retrieved data for %d files', len(res['result']))
-                logger.debug('FMDATA: retrieved: %d MB in %d sec for %s', fmdata, elapsed, workflow)
-                if elapsed > 60 and fmdata > 100:  # more than 1 minute and more than 100MB
-                    self.taskBlackList.append(workflow)  # notify this slave
-                    filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
-                    filepath.touch()  # notify other slaves
-                    logger.debug('++++++++ BLACKLIST2 TASK %s ++', workflow)
-            except Exception as ex:
-                t2 = time.time()
-                elapsed = int(t2-t1)
-                logger.error("Error during metadata2 retrieving from crabserver:\n%s", ex)
-                if elapsed > 290:
-                    logger.debug('FMDATA gave error after > 290 secs. Most likely it timed out')
-                    self.taskBlackList.append(workflow)  # notify this slave
-                    filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
-                    filepath.touch()  # notify other slaves
-                    logger.debug('++++++++ BLACKLIST TASK %s ++', workflow)
-                return []
-            metadataList = [json.loads(md) for md in res['result']]  # CRAB REST returns a list of JSON objects
-            for md in metadataList:
-                out.append(md)
-
-        logger.info('Got filemetadata for %d LFNs', len(out))
-        # sort the list by jobId, makes it easier to compare https://stackoverflow.com/a/73050
-        # sort by jobid as strings w/o converting to int becasue of https://github.com/dmwm/CRABServer/issues/7246
-        sortedOut = sorted(out, key=lambda md: md['jobid'])
-        return sortedOut
-
     def getTaskStatusFromSched(self, workflow, logger):
+        """ find task status (need to know if it is terminal) """
 
         def translateStatus(statusToTr):
             """Translate from DAGMan internal integer status to a string.
@@ -405,7 +207,7 @@ class Master(object):
         req = Requests(url=host, idict=cdict)
         _, ret = req.downloadFile(local_status_cache_pkl, url)
         if not ret.status == 200:
-            raise Exception('download attempt returned HTTP code %d' % ret.status)
+            raise Exception(f"download attempt returned HTTP code {ret.status}")
         with open(local_status_cache_pkl, 'rb') as fp:
             statusCache = pickle.load(fp)
         os.close(local_status_cache_fd)
@@ -417,7 +219,7 @@ class Master(object):
         status = dagStatus
         return status
 
-    def algorithm(self):
+    def algorithm(self):  # pylint: disable=too-many-branches
         """
         1. Get a list of files to publish from the REST and organize by taskname
         2. For each taks get a suitably sized input for publish
@@ -448,7 +250,7 @@ class Master(object):
             self.logger.info('acquired_files: %s %5d : %s', flag, acquiredFiles, taskName)
 
         processes = []
-        try:
+        try:  # pylint: disable=too-many-nested-blocks
             for task in tasks:
                 taskname = str(task[0][3])
                 # this IF is for testing on preprod or dev DB's, which are full of old unpublished tasks
@@ -462,12 +264,12 @@ class Master(object):
                 if self.TestMode:
                     self.startSlave(task)   # sequentially do one task after another
                     continue
-                else:                       # deal with each task in a separate process
-                    p = Process(target=self.startSlave, args=(task,))
-                    p.start()
-                    self.logger.info('Starting process %s  pid=%s', p, p.pid)
-                    self.logger.info('PID %s will work on task %s', p.pid, taskname)
-                    processes.append(p)
+                # else deal with each task in a separate process
+                p = Process(target=self.startSlave, args=(task,))
+                p.start()
+                self.logger.info('Starting process %s  pid=%s', p, p.pid)
+                self.logger.info('PID %s will work on task %s', p.pid, taskname)
+                processes.append(p)
                 if len(processes) == maxSlaves:
                     while len(processes) == maxSlaves:
                         # wait until one process has completed
@@ -477,10 +279,10 @@ class Master(object):
                                 self.logger.info('Terminated: %s pid=%s', proc, proc.pid)
                                 processes.remove(proc)
 
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             self.logger.exception("Error during process mapping")
         self.logger.info('No more tasks to care for. Wait for remaining %d processes to terminate', len(processes))
-        while (processes):
+        while processes:
             time.sleep(10)
             for proc in processes:
                 if not proc.is_alive():
@@ -494,7 +296,7 @@ class Master(object):
         # a change in Publisher/stop.sh otherwise that script will break
         self.logger.info("Next cycle will start at %s", newStartTime)
 
-    def startSlave(self, task):
+    def startSlave(self, task):  # pylint: disable=too-many-branches, too-many-locals, too-many-statements
         """
         start a slave process to deal with publication for a single task
         :param task: one tupla describing  a task as returned by  active_tasks()
@@ -512,17 +314,17 @@ class Master(object):
 
         if len(task[1]) > self.max_files_per_block:
             self.force_publication = True
-            msg = "All datasets have more than %s ready files." % (self.max_files_per_block)
+            msg = f"All datasets have more than {self.max_files_per_block} ready files."
             msg += " No need to retrieve task status nor last publication time."
             logger.info(msg)
         else:
-            msg = "At least one dataset has less than %s ready files. Retrieve task status" % (self.max_files_per_block)
+            msg = f"At least one dataset has less than {self.max_files_per_block} ready files. Retrieve task status"
             logger.info(msg)
             try:
                 workflow_status = self.getTaskStatusFromSched(workflow, logger)
-            except Exception as ex:
-                logger.warn('Error retrieving status cache from sched for %s:\n%s', workflow, str(ex))
-                logger.warn('Assuming COMPLETED in order to force pending publications if any')
+            except Exception as ex:  # pylint: disable=broad-except
+                logger.warning('Error retrieving status cache from sched for %s:\n%s', workflow, str(ex))
+                logger.warning('Assuming COMPLETED in order to force pending publications if any')
                 workflow_status = 'COMPLETED'
             logger.info('Task status from DAG info: %s', workflow_status)
             # If the workflow status is terminal, go ahead and publish all the ready files
@@ -534,7 +336,7 @@ class Master(object):
                 msg = "Considering task status as terminal. Will force publication."
                 logger.info(msg)
             # Otherwise...
-            else:    ## TODO put this else in a function like def checkForPublication()
+            else:    ## TO DO put this else in a function like def checkForPublication()
                 msg = "Task status is not considered terminal. Will check last publication time."
                 logger.info(msg)
                 # Get when was the last time a publication was done for this workflow (this
@@ -546,14 +348,14 @@ class Master(object):
                     result = self.crabServer.get(api='task', data=data)
                     #logger.debug("task: %s ", str(result[0]))
                     last_publication_time = getColumn(result[0], 'tm_last_publication')
-                except Exception as ex:
+                except Exception as ex:  # pylint: disable=broad-except
                     logger.error("Error during task info retrieving:\n%s", ex)
                 if last_publication_time:
                     date = last_publication_time # datetime in Oracle format
                     timetuple = datetime.strptime(date, "%Y-%m-%d %H:%M:%S.%f").timetuple()  # convert to time tuple
                     last_publication_time = time.mktime(timetuple)      # convert to seconds since Epoch (float)
 
-                msg = "Last publication time: %s." % str(last_publication_time)
+                msg = f"Last publication time: {last_publication_time}."
                 logger.debug(msg)
                 # If this is the first time a publication would be done for this workflow, go
                 # ahead and publish.
@@ -564,7 +366,7 @@ class Master(object):
                 # Otherwise...
                 else:
                     last = last_publication_time
-                    msg = "Last published block time: %s" % last
+                    msg = f"Last published block time: {last}"
                     logger.debug(msg)
                     # If the last publication was long time ago (> our block publication timeout),
                     # go ahead and publish.
@@ -574,13 +376,13 @@ class Master(object):
                     minutes = int((time_since_last_publication - hours*60*60)/60)
                     timeout_hours = int(self.block_publication_timeout/60/60)
                     timeout_minutes = int((self.block_publication_timeout - timeout_hours*60*60)/60)
-                    msg = "Last publication was %sh:%sm ago" % (hours, minutes)
+                    msg = f"Last publication was {hours}h:{minutes}m ago"
                     if time_since_last_publication > self.block_publication_timeout:
                         self.force_publication = True
-                        msg += " (more than the timeout of %sh:%sm)." % (timeout_hours, timeout_minutes)
+                        msg += f" (more than the timeout of {timeout_hours}h:{timeout_minutes}m)."
                         msg += " Will force publication."
                     else:
-                        msg += " (less than the timeout of %sh:%sm)." % (timeout_hours, timeout_minutes)
+                        msg += F" (less than the timeout of {timeout_hours}h:{timeout_minutes}m)."
                         msg += " Not enough to force publication."
                     logger.info(msg)
 
@@ -627,7 +429,14 @@ class Master(object):
                                  workflow)
                 else:
                     # retrieve information from FileMetadata
-                    publDescFiles_list = self.getPublDescFiles(workflow, lfn_ready, logger)
+                    (publDescFiles_list, blackList) = getInfoFromFMD(
+                        crabServer=self.crabServer, taskname=workflow, lfns=lfn_ready, logger=logger)
+                    if blackList:
+                        self.taskBlackList.append(workflow)  # notify this slave
+                        filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
+                        filepath.touch()  # notify other slaves
+                        logger.debug('++++++++ BLACKLIST TASK %s ++', workflow)
+
                 # now combine the info from FMD with the info from transfersdb (in active_)
                 # to create the JSON files (one per task) to be put in Publisher_Files and
                 # used by TaskPublish.py as input
@@ -639,9 +448,9 @@ class Master(object):
                 # 'swversion', 'inevents', 'globaltag', 'publishname', 'location',
                 # 'tmplocation', 'runlumi',
                 #  'adler32', 'cksum', 'md5', 'lfn'(*), 'filesize',
-                #  'parents', 'state', 'created', 'tmplfn', 'User'(*), 'Group'(*),
-                # 'Role'(*), 'UserDN'(*), 'Destination'(*), 'SourceLFN(*)'
-                # Clearly `taskname`, 'acquisitionera', 'swversion', 'globaltag', 'UserDN' are common,
+                #  'parents', 'state', 'created', 'tmplfn', 'User'(*)
+                #  'Destination'(*), 'SourceLFN(*)'
+                # Clearly `taskname`, 'acquisitionera', 'swversion', 'globaltag' are common,
                 # others could be different from one file to another (even if we do not support multiple
                 # outputdataset at this moment
 
@@ -655,9 +464,6 @@ class Master(object):
                         # logger.info(doc)
                         if doc["lfn"] == file_["value"][2]:
                             doc["User"] = username
-                            doc["Group"] = file_["key"][1]
-                            doc["Role"] = file_["key"][2]
-                            doc["UserDN"] = self.myDN
                             doc["Destination"] = file_["value"][0]
                             doc["SourceLFN"] = file_["value"][1]
                             toPublish.append(doc)
@@ -667,19 +473,18 @@ class Master(object):
                     # at same files over and over
                     if not metadataFound:
                         toFail.append(file_["value"][1])
-                with open(self.taskFilesDir + workflow + '.json', 'w') as outfile:
+                with open(self.taskFilesDir + workflow + '.json', 'w', encoding='utf-8') as outfile:
                     json.dump(toPublish, outfile)
                 logger.debug('Unitarity check: active_:%d toPublish:%d toFail:%d', len(active_), len(toPublish), len(toFail))
                 if len(toPublish) + len(toFail) != len(active_):
                     logger.error("SOMETHING WRONG IN toPublish vs toFail !!")
                 if toFail:
                     logger.info('Did not find useful metadata for %d files. Mark as failed', len(toFail))
-                    from ServerUtilities import getHashLfn
                     nMarked = 0
                     for lfn in toFail:
                         source_lfn = lfn
                         docId = getHashLfn(source_lfn)
-                        data = dict()
+                        data = {}
                         data['asoworker'] = self.config.asoworker
                         data['subresource'] = 'updatePublication'
                         data['list_of_ids'] = docId
@@ -689,7 +494,7 @@ class Master(object):
                         try:
                             result = self.crabServer.post(api='filetransfers', data=encodeRequest(data))
                             #logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
-                        except Exception as ex:
+                        except Exception as ex:  # pylint: disable=broad-except
                             logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
                             logger.error("Error reason: %s", ex)
 
@@ -698,11 +503,11 @@ class Master(object):
                     logger.info('marked %d files as Failed', nMarked)
 
                 # find the location in the current environment of the script we want to run
-                import Publisher.TaskPublish as tp
+                import Publisher.TaskPublish as tp  # pylint: disable=import-outside-toplevel
                 taskPublishScript = tp.__file__
-                cmd = "python3 %s " % taskPublishScript
-                cmd += " --configFile=%s" % self.configurationFile
-                cmd += " --taskname=%s" % workflow
+                cmd = f"python3 {taskPublishScript} "
+                cmd += f" --configFile={self.configurationFile}"
+                cmd += f" --taskname={workflow}"
                 if self.TPconfig.dryRun:
                     cmd += " --dry"
                 logger.info("Now execute: %s", cmd)
@@ -710,11 +515,10 @@ class Master(object):
                 if exitcode != 0:
                     errorMsg = f"Failed to execute command: {cmd}.\n StdErr:\n {stderr}\n"
                     raise Exception(errorMsg)
-                else:
-                    logger.info('TaskPublishScript done : %s', stdout)
+                logger.info('TaskPublishScript done : %s', stdout)
 
                 jsonSummary = stdout.split()[-1]
-                with open(jsonSummary, 'r') as fd:
+                with open(jsonSummary, 'r', encoding='utf-8') as fd:
                     summary = json.load(fd)
                 result = summary['result']
                 reason = summary['reason']
@@ -724,10 +528,10 @@ class Master(object):
                     if reason == 'NOTHING TO DO':
                         logger.info('Taskname %s is OK. Nothing to do', taskname)
                     else:
-                        msg = 'Taskname %s is OK. Published %d files in %d blocks.' % \
-                              (taskname, summary['publishedFiles'], summary['publishedBlocks'])
+                        msg = f"Taskname {taskname} is OK. Published {summary['publishedFiles']} "
+                        msg += f"in {summary['publishedBlocks']} blocks."
                         if summary['nextIterFiles']:
-                            msg += ' %d files left for next iteration.' % summary['nextIterFiles']
+                            msg += f" {summary['nextIterFiles']} files left for next iteration."
                         logger.info(msg)
                 if result == 'FAIL':
                     logger.error('Taskname %s : TaskPublish failed with: %s', taskname, reason)
@@ -736,7 +540,7 @@ class Master(object):
                                      taskname, summary['failedBlocks'], summary['failedFiles'])
                         logger.error('Taskname %s : Failed block(s) details have been saved in %s',
                                      taskname, summary['failedBlockDumps'])
-        except Exception as ex:
+        except Exception as ex:  # pylint: disable=broad-except
             logger.exception("Exception when calling TaskPublish!\n%s", str(ex))
 
         return 0
