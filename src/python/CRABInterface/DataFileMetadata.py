@@ -65,7 +65,7 @@ class DataFileMetadata(object):
                     'filesize': row.filesize,
                     'parents': literal_eval(row.parents.read()),
                     'state': row.state,
-                    'created': str(row.parents),
+                    'created': str(row.created),  # row.created is of type datetime, need a string for json.dumps
                     'tmplfn': row.tmplfn
             }
             yield json.dumps(filedict)
