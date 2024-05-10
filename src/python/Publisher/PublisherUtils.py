@@ -213,7 +213,7 @@ def markGood(files=None, crabServer=None, asoworker=None, logger=None):
         nMarked += 1
         if nMarked % 10 == 0:
             logger.info('marked %d files', nMarked)
-        logger.info('total of %s files, marked as Good', nMarked)
+    logger.info('total of %s files, marked as Good', nMarked)
 
 
 def markFailed(files=None, crabServer=None, failureReason="", asoworker=None, logger=None):
