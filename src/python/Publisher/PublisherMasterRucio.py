@@ -1,4 +1,4 @@
-# pylint: disable=C0103, W0703, R0912, R0914, R0915
+# pylint: disable=invalid-name  # have a lot of snake_case varaibles here from "old times"
 
 """
 Here's the algorithm
@@ -9,66 +9,21 @@ Here's the algorithm
 4. spawn a process per task that publish their files
 """
 
-from __future__ import division
-from __future__ import print_function
 import argparse
-import logging
-from logging import FileHandler
-from logging.handlers import TimedRotatingFileHandler
 import os
-import sys
 import json
 import time
 
 from pathlib import Path
 from multiprocessing import Process
-from MultiProcessingLog import MultiProcessingLog
 
 from WMCore.Configuration import loadConfigurationFile
 
 from ServerUtilities import encodeRequest, oracleOutputMapping, executeCommand
-from ServerUtilities import getHashLfn
-from TaskWorker import __version__
 from TaskWorker.WorkerUtilities import getCrabserver
 
-
-def chunks(aList, n):
-    """
-    Yield successive n-sized chunks from aList.
-    :param aList: list to split in chunks
-    :param n: chunk size
-    :return: yield the next list chunk
-    """
-    for i in range(0, len(aList), n):
-        yield aList[i:i + n]
-
-
-def setMasterLogger(logsDir, name='master'):
-    """ Set the logger for the master process. The file used for it is logs/processes/proc.name.txt and it
-        can be retrieved with logging.getLogger(name) in other parts of the code
-    """
-    logger = logging.getLogger(name)
-    fileName = os.path.join(logsDir, 'processes', f"proc.c3id_{name}.pid_{os.getpid()}.txt")
-    handler = TimedRotatingFileHandler(fileName, 'midnight', backupCount=30)
-    formatter = logging.Formatter("%(asctime)s:%(levelname)s:" + name + ":%(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    return logger
-
-
-def setSlaveLogger(logsDir, name):
-    """ Set the logger for a single slave process. The file used for it is logs/processes/proc.name.txt and it
-        can be retrieved with logging.getLogger(name) in other parts of the code
-    """
-    logger = logging.getLogger(name)
-    fileName = os.path.join(logsDir, 'processes', f"proc.c3id_{name}.txt")
-    # handler = TimedRotatingFileHandler(fileName, 'midnight', backupCount=30)
-    # slaves are short lived, use one log file for each
-    handler = FileHandler(fileName)
-    formatter = logging.Formatter("%(asctime)s:%(levelname)s:" + "slave" + ":%(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    return logger
+from PublisherUtils import createLogdir, setRootLogger, setSlaveLogger, logVersionAndConfig
+from PublisherUtils import getInfoFromFMD, markFailed
 
 
 class Master():  # pylint: disable=too-many-instance-attributes
@@ -83,74 +38,6 @@ class Master():  # pylint: disable=too-many-instance-attributes
         :arg bool debug: it tells if needs a verbose logger
         :arg bool testMode: it tells if to run in test (no subprocesses) mode.
         """
-
-        def createLogdir(dirname):
-            """ Create the directory dirname ignoring erors in case it exists. Exit if
-                the directory cannot be created.
-            """
-            try:
-                os.makedirs(dirname)
-            except OSError as ose:
-                if ose.errno != 17:  # ignore the "Directory already exists error"
-                    print(str(ose))
-                    print(f"The Publisher Worker needs to access the '{dirname}' directory")
-                    sys.exit(1)
-
-        def setRootLogger(logsDir, quiet=False, debug=True, console=False):
-            """Sets the root logger with the desired verbosity level
-               The root logger logs to logs/log.txt and every single
-               logging instruction is propagated to it (not really nice
-               to read)
-
-            :arg bool quiet: it tells if a quiet logger is needed
-            :arg bool debug: it tells if needs a verbose logger
-            :arg bool console: it tells if to direct all printoput to console rather then files, useful for debug
-            :return logger: a logger with the appropriate logger level."""
-
-            createLogdir(logsDir)
-            createLogdir(os.path.join(logsDir, 'processes'))
-            createLogdir(os.path.join(logsDir, 'tasks'))
-
-            if console:
-                # if we are testing log to the console is easier
-                logging.getLogger().addHandler(logging.StreamHandler())
-            else:
-                logHandler = MultiProcessingLog(os.path.join(logsDir, 'log.txt'), when='midnight')
-                logFormatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
-                logHandler.setFormatter(logFormatter)
-                logging.getLogger().addHandler(logHandler)
-            loglevel = logging.INFO
-            if quiet:
-                loglevel = logging.WARNING
-            if debug:
-                loglevel = logging.DEBUG
-            logging.getLogger().setLevel(loglevel)
-            logger = setMasterLogger(logsDir)
-            logger.debug("PID %s.", os.getpid())
-            logger.debug("Logging level initialized to %s.", loglevel)
-            return logger
-
-        def logVersionAndConfig(config=None, logger=None):
-            """
-            log version number and major config. parameters
-            args: config : a configuration object loaded from file
-            args: logger : the logger instance to use
-            """
-            pubstartDict = {}
-            pubstartDict['version'] = __version__
-            pubstartDict['asoworker'] = config.General.asoworker
-            pubstartDict['instance'] = config.General.instance
-            if config.General.instance == 'other':
-                pubstartDict['restHost'] = config.General.restHost
-                pubstartDict['dbInstance'] = config.General.dbInstance
-            pubstartDict['max_slaves'] = config.General.max_slaves
-            pubstartDict['DBShost'] = config.TaskPublisher.DBShost
-            pubstartDict['dryRun'] = config.TaskPublisher.dryRun
-            # one line for automatic parsing
-            logger.info('PUBSTART: %s', json.dumps(pubstartDict))
-            # multiple lines for humans to read
-            for k, v in pubstartDict.items():
-                logger.info('%s: %s', k, v)
 
         self.configurationFile = confFile         # remember this, will have to pass it to TaskPublish
         config = loadConfigurationFile(confFile)
@@ -171,8 +58,8 @@ class Master():  # pylint: disable=too-many-instance-attributes
         createLogdir(os.path.join(self.taskFilesDir, 'FailedBlocks'))
         # need a persistent place on disk to communicate among slaves
         self.blackListedTaskDir = os.path.join(self.taskFilesDir, 'BlackListedTasks')
-
         createLogdir(self.blackListedTaskDir)
+
         self.logger = setRootLogger(self.config.logsDir, quiet=quiet, debug=debug, console=self.TestMode)
         logVersionAndConfig(config, self.logger)
 
@@ -210,7 +97,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
             try:
                 # select files with transfer DONE and publication NEW and set publication to ACQUIRED
                 result = crabServer.post(api='filetransfers', data=data)  # pylint: disable=unused-variable
-            except Exception as ex:
+            except Exception as ex:  # pylint: disable=broad-except
                 self.logger.error("Failed to acquire publications from crabserver: %s", ex)
                 return []
 
@@ -223,7 +110,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
             data = encodeRequest(fileDoc)
             try:
                 results = crabServer.get(api='filetransfers', data=data)
-            except Exception as ex:
+            except Exception as ex:  # pylint: disable=broad-except
                 self.logger.error("Failed to acquire publications from crabserver: %s", ex)
                 return []
             files = oracleOutputMapping(results)
@@ -245,57 +132,6 @@ class Master():  # pylint: disable=too-many-instance-attributes
             taskDict['fileDicts'] = fileList
             taskList.append(taskDict)
         return taskList
-
-    def getInfoFromFMD(self, workflow, lfns, logger):
-        """
-        Download and read the files describing what needs to be published
-        do on a small number of LFNs at a time (numFilesAtOneTime) to avoid
-        hitting the URL length limit in CMSWEB/Apache
-        input: lfns : a list of LFNs
-        returns: a list of dictionaries, one per file, sorted by CRAB JobID
-        """
-        out = []
-        dataDict = {}
-        dataDict['taskname'] = workflow
-        i = 0
-        numFilesAtOneTime = 10
-        logger.debug('FMDATA: will retrieve data for %d files', len(lfns))
-        while i < len(lfns):
-            dataDict['lfnList'] = lfns[i: i + numFilesAtOneTime]
-            data = encodeRequest(dataDict)
-            i += numFilesAtOneTime
-            try:
-                t1 = time.time()
-                res = self.crabServer.get(api='filemetadata', data=data)
-                # res is a 3-plu: (result, exit code, status)
-                res = res[0]
-                t2 = time.time()
-                elapsed = int(t2 - t1)
-                fmdata = int(len(str(res)) / 1e6)  # convert dict. to string to get actual length in HTTP call
-                logger.debug('FMDATA: retrieved data for %d files', len(res['result']))
-                logger.debug('FMDATA: retrieved: %d MB in %d sec for %s', fmdata, elapsed, workflow)
-                if elapsed > 60 and fmdata > 100:  # more than 1 minute and more than 100MB
-                    self.taskBlackList.append(workflow)  # notify this slave
-                    filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
-                    filepath.touch()  # notify other slaves
-                    logger.debug('++++++++ BLACKLIST2 TASK %s ++', workflow)
-            except Exception as ex:
-                t2 = time.time()
-                elapsed = int(t2 - t1)
-                logger.error("Error during metadata2 retrieving from crabserver:\n%s", ex)
-                if elapsed > 290:
-                    logger.debug('FMDATA gave error after > 290 secs. Most likely it timed out')
-                    self.taskBlackList.append(workflow)  # notify this slave
-                    filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
-                    filepath.touch()  # notify other slaves
-                    logger.debug('++++++++ BLACKLIST TASK %s ++', workflow)
-                return []
-            metadataList = [json.loads(md) for md in res['result']]  # CRAB REST returns a list of JSON objects
-            for md in metadataList:
-                out.append(md)
-
-        logger.info('Got filemetadata for %d LFNs', len(out))
-        return out
 
     def runTaskPublish(self, workflow, logger):
         """
@@ -342,7 +178,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
                 logger.error('Taskname %s : Failed block(s) details have been saved in %s',
                              taskname, summary['failedBlockDumps'])
 
-    def algorithm(self):
+    def algorithm(self):  # pylint: disable=too-many-branches
         """
         1. Get a list of files to publish from the REST and organize by taskname
         2. For each taks get a suitably sized input for publish
@@ -397,20 +233,20 @@ class Master():  # pylint: disable=too-many-instance-attributes
                     while len(processes) == maxSlaves:
                         # wait until one process has completed
                         time.sleep(10)
-                        for proc in processes:
+                        for proc in processes.copy():
                             if not proc.is_alive():
                                 self.logger.info('Terminated: %s pid=%s', proc, proc.pid)
-                                processes.remove(proc)  # pylint: disable=modified-iterating-list
+                                processes.remove(proc)
 
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             self.logger.exception("Error during process mapping")
         self.logger.info('No more tasks to care for. Wait for remaining %d processes to terminate', len(processes))
         while processes:
             time.sleep(10)
-            for proc in processes:
+            for proc in processes.copy():
                 if not proc.is_alive():
                     self.logger.info('Terminated: %s pid=%s', proc, proc.pid)
-                    processes.remove(proc)  # pylint: disable=modified-iterating-list
+                    processes.remove(proc)
 
         self.logger.info("Algorithm iteration completed")
         self.logger.info("Wait %d sec for next cycle", self.pollInterval())
@@ -419,7 +255,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
         # a change in Publisher/stop.sh otherwise that script will break
         self.logger.info("Next cycle will start at %s", newStartTime)
 
-    def startSlave(self, task):
+    def startSlave(self, task):  # pylint: disable=too-many-branches
         """
         start a slave process to deal with publication for a single task
         :param task: one tuple describing  a task as returned by  active_tasks()
@@ -464,11 +300,13 @@ class Master():  # pylint: disable=too-many-instance-attributes
                 self.markAsFailed(lfns=lfnsToPublish, reason='Blacklisted Task')
                 return 0
             # get filemetadata info for all files which needs to be published
-            infoFMD = self.getInfoFromFMD(workflow, lfnsToPublish, logger)
-            # sort the list by lfn, makes it easier to compare https://stackoverflow.com/a/73050
-            filesInfoFromFMD = sorted(infoFMD, key=lambda md: md['lfn'])
-
-            print(filesInfoFromFMD[0])
+            (filesInfoFromFMD, blackList) = getInfoFromFMD(
+                crabServer=self.crabServer, taskname=workflow, lfns=lfnsToPublish, logger=logger)
+            if blackList:
+                self.taskBlackList.append(workflow)  # notify this slave
+                filepath = Path(os.path.join(self.blackListedTaskDir, workflow))
+                filepath.touch()  # notify other slaves
+                logger.debug('++++++++ BLACKLIST TASK %s ++', workflow)
 
             blockDictsToPublish = []  # initialise the structure which will be dumped as JSON
             toPublish = []
@@ -521,34 +359,17 @@ class Master():  # pylint: disable=too-many-instance-attributes
             # call taskPublishRucio
             self.runTaskPublish(workflow, logger)
 
-        except Exception as ex:
+        except Exception as ex:  # pylint: disable=broad-except
             logger.exception("Exception when calling TaskPublish!\n%s", str(ex))
 
         return 0
 
     def markAsFailed(self, lfns=None, reason=None):
         """
-        could this be replaced by PublisherUtils/markFailed ?
+        handy wrapper for PublisherUtils/markFailed
         """
-        nMarked = 0
-        for lfn in lfns:
-            source_lfn = lfn
-            docId = getHashLfn(source_lfn)
-            data = {}
-            data['asoworker'] = self.config.asoworker
-            data['subresource'] = 'updatePublication'
-            data['list_of_ids'] = docId
-            data['list_of_publication_state'] = 'FAILED'
-            data['list_of_retry_value'] = 1
-            data['list_of_failure_reason'] = reason
-            try:
-                self.crabServer.post(api='filetransfers', data=encodeRequest(data))
-                # if nMarked % 10 == 0:
-                # logger.debug("updated DocumentId: %s lfn: %s Result %s", docId, source_lfn, result)
-            except Exception as ex:
-                self.logger.error("Error updating status for DocumentId: %s lfn: %s", docId, source_lfn)
-                self.logger.error("Error reason: %s", ex)
-            nMarked += 1
+        nMarked = markFailed(files=lfns, crabserver=self.crabserver, failureReason=reason,
+                             asoworker=self.config.asoworker, logger=self.logger)
         return nMarked
 
     def pollInterval(self):
