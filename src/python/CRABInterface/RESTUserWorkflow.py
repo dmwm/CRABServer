@@ -361,7 +361,7 @@ class RESTUserWorkflow(RESTEntity):
             ## Once we don't care anymore about backward compatibility with client < 3.3.1511,
             ## we can uncomment the 1st line below and delete the next 4 lines.
             #validate_str("inputdata", param, safe, RX_DATASET, optional=True)
-            if safe.kwargs['jobtype'] == 'Analysis' and 'inputdata' in param.kwargs:
+            if safe.kwargs['jobtype'] == 'Analysis' and param.kwargs.get('inputdata', None):  # beware!  #8372
                 inputDataFromRucio = ':' in param.kwargs['inputdata']  # scope:name format
                 if inputDataFromRucio:
                     validate_str("inputdata", param, safe, RX_RUCIODID, optional=True)
