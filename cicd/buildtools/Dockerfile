@@ -1,3 +1,5 @@
+FROM gcr.io/go-containerregistry/crane:latest as crane
+
 FROM gitlab-registry.cern.ch/linuxsupport/alma9-base
 SHELL ["/bin/bash", "-c"]
 
@@ -8,3 +10,4 @@ RUN curl -LO https://dl.k8s.io/v1.28.3/kubernetes-client-linux-amd64.tar.gz \
     && /usr/bin/kubectl completion bash > /usr/share/bash-completion/completions/kubectl \
     && rm -r kubernetes-client-linux-amd64.tar.gz kubernetes
 RUN python3 -m ensurepip && python3 -m pip install yq
+COPY --from=crane /ko-app/crane /usr/bin/crane

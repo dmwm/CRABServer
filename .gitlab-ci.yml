@@ -4,22 +4,27 @@ default:
     - crab3
 
 variables:
-  IMAGE_TAG: "${CI_COMMIT_REF_SLUG}"
+  IMAGE_TAG: "${CI_COMMIT_REF_SLUG}"  # to distinct it from commit tag and final image tag
 
 .default_rules:
-  rules:
-    - if: $CI_COMMIT_TAG =~ /pypi-.*/
+  default:
+    - if: $CI_COMMIT_TAG =~ /pypi-.*/         # pypi-devthree-1714418922
+    - if: $CI_COMMIT_TAG =~ /v3\.[0-9]{6}.*/  # v3.240423, v3.240423.hotfix1
+  release:
+    - if: $CI_COMMIT_TAG =~ /v3\.[0-9]{6}.*/  # same as above
 
 stages:
   - prepare_env
+  - prepare_release
   - build_docker
   - deploy
   - run_testsuite
   - check_testsuite
+  - tagging_release
 
 get_env:
   rules:
-    - !reference [.default_rules, rules]
+    - !reference [.default_rules, default]
   stage: prepare_env
   image:
     name: registry.cern.ch/cmscrab/buildtools
@@ -32,9 +37,30 @@ get_env:
       - .env
     expire_in: 1 week
 
+# use pre_release stage
+set_version_name:
+  rules:
+    - !reference [.default_rules, release]
+  stage: prepare_release
+  image:
+    name: registry.cern.ch/cmscrab/buildtools
+    entrypoint: [""]
+  script:
+    - source .env
+    - |
+        echo -e "\n__version__ = \"${RELEASE_NAME}\" #Automatically added during build process" >> src/python/TaskWorker/__init__.py;
+    - |
+        echo -e "\n__version__ = \"${RELEASE_NAME}\" #Automatically added during build process" >> src/python/CRABInterface/__init__.py;
+  cache:
+    - key: $CI_PIPELINE_ID
+      paths:
+        - src/python/TaskWorker/__init__.py
+        - src/python/CRABInterface/__init__.py
+      policy: push
+
 build_rest_image:
   rules:
-    - !reference [.default_rules, rules]
+    - !reference [.default_rules, default]
   stage: build_docker
   image:
     name: gcr.io/kaniko-project/executor:v1.14.0-debug
@@ -46,10 +72,15 @@ build_rest_image:
       --context "${CI_PROJECT_DIR}"
       --dockerfile "${CI_PROJECT_DIR}/cicd/crabserver_pypi/Dockerfile"
       --destination "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}"
+  cache:
+    - key: $CI_PIPELINE_ID
+      paths:
+        - src/python/CRABInterface/__init__.py
+      policy: pull
 
 build_tw_image:
   rules:
-    - !reference [.default_rules, rules]
+    - !reference [.default_rules, default]
   stage: build_docker
   image:
     name: gcr.io/kaniko-project/executor:v1.14.0-debug
@@ -61,12 +92,17 @@ build_tw_image:
       --context "${CI_PROJECT_DIR}"
       --dockerfile "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile"
       --destination "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}"
+  cache:
+    - key: $CI_PIPELINE_ID
+      paths:
+        - src/python/TaskWorker/__init__.py
+      policy: pull
 
 deploy_server:
   rules:
     - if: $SKIP_DEPLOY
       when: never
-    - !reference [.default_rules, rules]
+    - !reference [.default_rules, default]
   stage: deploy
   image:
     name: registry.cern.ch/cmscrab/buildtools
@@ -84,7 +120,7 @@ deploy_server:
   rules:
     - if: $SKIP_DEPLOY
       when: never
-    - !reference [.default_rules, rules]
+    - !reference [.default_rules, default]
   stage: deploy
   image:
     name: registry.cern.ch/cmscrab/buildtools
@@ -114,12 +150,12 @@ deploy_publisher_rucio:
 
 task_submission_status_tracking:
   rules:
-    - if: $SKIP_DEPLOY
-      when: never
     - if: $MANUAL_CI_PIPELINE_ID
       when: never
     - if: $SUBMIT_STATUS_TRACKING
-    - !reference [.default_rules, rules]
+    - if: $SKIP_DEPLOY
+      when: never
+    - !reference [.default_rules, default]
   stage: run_testsuite
   tags:
     - crab3-shell
@@ -144,11 +180,11 @@ task_submission_status_tracking:
 
 check_test_result:
   rules:
-    - if: $SKIP_DEPLOY
-      when: never
     - if: $SUBMIT_STATUS_TRACKING
     - if: $MANUAL_CI_PIPELINE_ID
-    - !reference [.default_rules, rules]
+    - if: $SKIP_DEPLOY
+      when: never
+    - !reference [.default_rules, default]
   stage: check_testsuite
   tags:
     - crab3-shell
@@ -175,3 +211,20 @@ check_test_result:
       paths:
         - workdir/submitted_tasks_TS
       policy: pull
+
+# if test is pass, retag with `*-stable`
+release_stable:
+  rules:
+    - !reference [.default_rules, release]
+  stage: tagging_release
+  image:
+    name: registry.cern.ch/cmscrab/buildtools
+    entrypoint: [""]
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - source .env
+    - export RELEASE_TAG=${RELEASE_NAME}-stable
+    - crane auth login -u ${CMSCRAB_REGISTRY_USER} -p ${CMSCRAB_REGISTRY_PASSWORD} ${CMSCRAB_REGISTRY_URL}
+    - crane cp registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG} registry.cern.ch/cmscrab/crabserver:${RELEASE_TAG}
+    - crane cp registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG} registry.cern.ch/cmscrab/crabtaskworker:${RELEASE_TAG}
