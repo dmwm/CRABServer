@@ -84,10 +84,8 @@ deploy_server:
     - kubectl set image deployment/crabserver "crabserver=registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}"
     - kubectl rollout status deployment crabserver --watch --timeout=5m
 
-deploy_tw:
+.deploy_tw_template:
   rules:
-    - if: $SKIP_DEPLOY
-      when: never
     - !reference [.default_rules, rules]
   stage: deploy
   image:
@@ -96,10 +94,25 @@ deploy_tw:
   script:
     - source .env
     - export Environment # from .env
-    - export Service=TaskWorker
+    - export Service="${SERVICE}"
     - export Image="${IMAGE_TAG}"
     - export SSH_KEY=$(cicd/gitlab/credFile.sh $CRAB_TW_SSH_KEY ssh)
     - bash -x cicd/gitlab/deployTW.sh
+
+deploy_taskworker:
+  extends: .deploy_tw_template
+  variables:
+    SERVICE: TaskWorker
+
+deploy_publisher_schedd:
+  extends: .deploy_tw_template
+  variables:
+    SERVICE: Publisher_schedd
+
+deploy_publisher_rucio:
+  extends: .deploy_tw_template
+  variables:
+    SERVICE: Publisher_rucio
 
 task_submission_status_tracking:
   rules:
