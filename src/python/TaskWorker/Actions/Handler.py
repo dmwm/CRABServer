@@ -175,12 +175,18 @@ def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
     handler.addWork(MyProxyLogon(config=config, crabserver=crabserver, procnum=procnum, myproxylen=60 * 60 * 24))
     handler.addWork(StageoutCheck(config=config, crabserver=crabserver, procnum=procnum, rucioClient=privilegedRucioClient))
     if task['tm_job_type'] == 'Analysis':
-        if task.get('tm_user_files'):
+        if task.get('tm_input_dataset'):
+            if ':' in task.get('tm_input_dataset'):  # Rucio DID is scope:name
+                handler.addWork(RucioDataDiscovery(config=config, crabserver=crabserver,
+                                                   procnum=procnum, rucioClient=rucioClient))
+            else:
+                handler.addWork(DBSDataDiscovery(config=config, crabserver=crabserver,
+                                                 procnum=procnum, rucioClient=rucioClient))
+
+        elif task.get('tm_user_files'):
             handler.addWork(UserDataDiscovery(config=config, crabserver=crabserver, procnum=procnum))
-        elif ':' in task.get('tm_input_dataset'):  # Rucio DID is scope:name
-            handler.addWork(RucioDataDiscovery(config=config, crabserver=crabserver, procnum=procnum, rucioClient=rucioClient))
         else:
-            handler.addWork(DBSDataDiscovery(config=config, crabserver=crabserver, procnum=procnum, rucioClient=rucioClient))
+            raise WorkerHandlerException("Neither inputDataset nor userInputFiles specified", retry=0)
     elif task['tm_job_type'] == 'PrivateMC':
         handler.addWork(MakeFakeFileSet(config=config, crabserver=crabserver, procnum=procnum))
     handler.addWork(Splitter(config=config, crabserver=crabserver, procnum=procnum))
