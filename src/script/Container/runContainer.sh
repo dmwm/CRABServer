@@ -118,7 +118,7 @@ fi
 docker run --name ${SERVICE} -t --net host --privileged $DOCKER_OPT $DOCKER_VOL $DOCKER_IMAGE $COMMAND > $tmpfile
 if [ $? -eq 0 ]; then
   # if the crontab does not fail, remove the log file
-  rm $tmpfile
+  rm -f $tmpfile
 fi
 
 echo -e "Sleeping for 3 seconds.\nRunning containers:"
