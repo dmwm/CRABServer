@@ -220,7 +220,7 @@ def logCMSSW():
             for aLine in fh:
                 printCMSSWLine(f"{prefix + aLine}", maxLineLen)
 
-    print("======== CMSSW OUTPUT FINSHING ========")
+    print("======== CMSSW OUTPUT FINISHING ========")
     logCMSSWSaved = True
     # inform CMSRunAnalysis.sh by "touching a file"
     with open('logCMSSWSaved.txt', 'a', encoding='utf-8'):

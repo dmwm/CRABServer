@@ -35,7 +35,7 @@ def main():
     state = status[0].get("migration_status")
 
     if not state == 9:
-        stateName = {0:'created', 1:'in progress', 2:'done', 3:'failed but beign retried', 9:'terminally failed'}
+        stateName = {0:'created', 1:'in progress', 2:'done', 3:'failed but being retried', 9:'terminally failed'}
         print("%id is in state %d (%s), not 9" % (migrationId, state, stateName[state]))
         print("This migrationId is not terminally failed. Will not remove it")
         return

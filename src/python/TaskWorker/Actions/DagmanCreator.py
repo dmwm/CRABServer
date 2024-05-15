@@ -243,7 +243,7 @@ def validateLFNs(path, outputFiles):
         Lexicon.lfn(testLfn)  # will raise if testLfn is not a valid lfn
         # since Lexicon does not have lenght check, do it manually here.
         if len(testLfn) > 500:
-            msg = "\nYour task speficies an output LFN %d-char long " % len(testLfn)
+            msg = "\nYour task specifies an output LFN %d-char long " % len(testLfn)
             msg += "\n which exceeds maximum length of 500"
             msg += "\n and therefore can not be handled in our DataBase"
             raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
@@ -271,7 +271,7 @@ def validateUserLFNs(path, outputFiles):
         Lexicon.userLfn(testLfn)  # will raise if testLfn is not a valid lfn
         # since Lexicon does not have lenght check, do it manually here.
         if len(testLfn) > 500:
-            msg = "\nYour task speficies an output LFN %d-char long " % len(testLfn)
+            msg = "\nYour task specifies an output LFN %d-char long " % len(testLfn)
             msg += "\n which exceeds maximum length of 500"
             msg += "\n and therefore can not be handled in our DataBase"
             raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
@@ -375,7 +375,7 @@ class DagmanCreator(TaskAction):
         if m:
             _, _, arch, _ = m.groups()
             if arch not in SCRAM_TO_ARCH:
-                msg = f"Job configured for non-supoprted ScramArch '{arch}'"
+                msg = f"Job configured for non-supported ScramArch '{arch}'"
                 raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
             info['required_arch'] = SCRAM_TO_ARCH.get(arch)
             # if arch == "amd64":
@@ -587,7 +587,7 @@ class DagmanCreator(TaskAction):
                 validateUserLFNs(dest, outfiles)
                 validateUserLFNs(temp_dest, outfiles)
         except AssertionError as ex:
-            msg = "\nYour task speficies an output LFN which fails validation in"
+            msg = "\nYour task specifies an output LFN which fails validation in"
             msg += "\n WMCore/Lexicon and therefore can not be handled in our DataBase"
             msg += "\nError detail: %s" % (str(ex))
             raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)

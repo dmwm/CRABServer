@@ -84,7 +84,7 @@ def memoryBasedChoices(schedds, logger=None):
             weight = 24*1024
         weights[schedd['Name']] = weight
         if logger:
-            logger.debug(f"Scheduler: {schedd}: mwmory wight: {weight}")
+            logger.debug(f"Scheduler: {schedd}: memory weight: {weight}")
     choices = [(schedd['Name'], weights[schedd['Name']]) for schedd in schedds]
     return choices
 
@@ -130,7 +130,7 @@ class HTCondorLocator():
                                  ['Name', 'DetectedMemory', 'TotalFreeMemoryMB', 'TransferQueueNumUploading',
                                   'TransferQueueMaxUploading','TotalRunningJobs', 'JobsRunning', 'MaxJobsRunning', 'IsOK'])
             if not schedds:
-                raise Exception(f"No CRAB schedds returned by collecor query. {collParam} parameter is {htcondor.param['COLLECTOR_HOST']}. Try later")
+                raise Exception(f"No CRAB schedds returned by collector query. {collParam} parameter is {htcondor.param['COLLECTOR_HOST']}. Try later")
 
             # Get only those schedds that are listed in our external REST configuration
             if self.config and "htcondorSchedds" in self.config:

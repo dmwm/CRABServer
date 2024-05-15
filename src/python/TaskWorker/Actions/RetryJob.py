@@ -402,7 +402,7 @@ class RetryJob():
         """
         check if job stdout contains a message indicating a corrupted file and reports this
         via a json file taskname.corrupted.job.<crabid>.<retry>.json
-        returns True/Falso accordingly to corrupted yes/no
+        returns True/False accordingly to corrupted yes/no
         """
 
         corruptedFile = False
@@ -444,7 +444,7 @@ class RetryJob():
                         corruptedFile = False
                         suspiciousFile = True
                         errorLines.append('NOT CLEARLY CORRUPTED, OTHER ROOT ERROR ?')
-                        errorLines.append('DID Identification may not be corrrect')
+                        errorLines.append('DID Identification may not be correct')
                         self.logger.info("RootFatalError does not contain file info")
                     break
         if corruptedFile or suspiciousFile:

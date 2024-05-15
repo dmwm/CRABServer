@@ -51,7 +51,7 @@ def main():
          return
     blackListedSites = get_crab_blacklist()
     nBlocks = len(blocks)
-    print("Checking blocks availabiliyt on disk ...")
+    print("Checking blocks availability on disk ...")
     locationsMap = create_locations_map(blocks, rucio)
     (nbFORnr, nbFORrse) = createBlockMaps(locationsMap=locationsMap, blackList=[])
     print_blocks_per_replica_map(nbFORnr)

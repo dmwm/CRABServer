@@ -120,7 +120,7 @@ class RESTCache(RESTEntity):
                 objectPath = ownerName + '/sandboxes/' + tarballname
             else:
                 if not taskname:
-                    raise MissingParameter("takskname is missing")
+                    raise MissingParameter("taskname is missing")
                 ownerName = getUsernameFromTaskname(taskname)
                 # task related files go in bucket/username/taskname/
                 objectPath = ownerName + '/' + taskname + '/' + objecttype

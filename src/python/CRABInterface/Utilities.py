@@ -47,7 +47,7 @@ def globalinit(credpath):
 def execute_command(command, logger, timeout):
     """
     _execute_command_
-    Funtion to manage commands.
+    Function to manage commands.
     """
 
     stdout, stderr, rc = None, None, 99999
@@ -96,7 +96,7 @@ cfgFallback = {}
 
 def getCentralConfig(extconfigurl, mode):
     """Utility to retrieve the central configuration to be used for dynamic variables
-    arg str extconfigurl: the url pointing to the exteranl configuration parameter
+    arg str extconfigurl: the url pointing to the external configuration parameter
     arg str mode: also known as the variant of the rest (prod, preprod, dev, private)
     return: the dictionary containing the external configuration for the selected mode."""
 

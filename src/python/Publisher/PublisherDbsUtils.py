@@ -378,7 +378,7 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, blocks,  # 
         msg = "Some blocks failed to be migrated."
         logger.info(msg)
         return 2, f"Migration of {datasetToMigrate} failed."
-    msg = "Migration completed. Wait 5sec before verifying that migrated datesed is OK in destination DBS"
+    msg = "Migration completed. Wait 5sec before verifying that migrated dataset is OK in destination DBS"
     logger.info(msg)
     time.sleep(5.0)
     migratedDataset = None
@@ -405,7 +405,7 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
     logger = logging.getLogger(taskname)
     #    logging.basicConfig(filename=taskname+'.log', level=logging.INFO, format=config.General.logMsgFormat)
 
-    msg = f"Submiting migration request for block {block} ..."
+    msg = f"Submitting migration request for block {block} ..."
     logger.info(msg)
     sourceURL = sourceApi.url
     data = {'migration_url': sourceURL, 'migration_input': block}

@@ -327,9 +327,9 @@ def publishInDBS3(config, taskname, verbose, console):  # pylint: disable=too-ma
     # Print a publication status summary for this dataset.
     msg = "End of publication status:"
     msg += f" failed blocks: {failedBlocks}"
-    msg += f" succes blocks: {publishedBlocks}"
+    msg += f" success blocks: {publishedBlocks}"
     msg += f" failed files: {failedFiles}"
-    msg += f" succes files: {publishedFiles}"
+    msg += f" success files: {publishedFiles}"
     logger.info(msg)
 
     # save summary for PublisherMasterRucio
