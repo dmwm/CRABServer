@@ -342,7 +342,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("publishname2", param, safe, RX_ANYTHING, optional=True)
 
             if safe.kwargs['jobtype'] == 'PrivateMC':
-                if param.kwargs['inputdata'] or 'inputblocks' in param.kwargs:
+                if param.kwargs.get('inputdata', None) or 'inputblocks' in param.kwargs:
                     msg = "Invalid 'inputdata' parameter."
                     msg += " Job type PrivateMC does not take any input dataset."
                     msg += " If you really intend to run over an input dataset, then you must use job type Analysis."
