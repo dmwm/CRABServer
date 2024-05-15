@@ -22,7 +22,7 @@ logging.getLogger().setLevel(logging.DEBUG)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', help='Publisher config file', default='PublisherConfig.py')
-parser.add_argument('--service', help='Pubblisher_schedd or Publisher_rucio', default='Publisher_schedd')
+parser.add_argument('--service', help='Publisher_schedd or Publisher_rucio', default='Publisher_schedd')
 parser.add_argument('--testMode', help='run in sequential mode (no subprocesses)', action='store_true')
 parser.add_argument('--debug', help='start with pdb', action='store_true')
 args = parser.parse_args()

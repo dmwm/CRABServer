@@ -1070,7 +1070,7 @@ class ASOServerJob():
                 query_view = False
                 if not last_succeded:
                     #no point in continuing if the last query failed. Just defer the PJ and retry later
-                    msg = ("Not using info about transfer statuses from the trasnfer cache. "
+                    msg = ("Not using info about transfer statuses from the transfer cache. "
                            "Deferring the postjob."
                            "PJ num %s failed to load the information from the DB and cache has not expired yet." % last_jobid)
                     raise TransferCacheLoadError(msg)
@@ -1432,7 +1432,7 @@ class PostJob():
         if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
             handler = logging.StreamHandler(sys.stdout)
         else:
-            print("Wrinting post-job output to %s." % (self.postjob_log_file_name))
+            print("Writing post-job output to %s." % (self.postjob_log_file_name))
             mode = 'w' if first_pj_execution() else 'a'
             handler = logging.FileHandler(filename=self.postjob_log_file_name, mode=mode)
         handler.setFormatter(self.logging_formatter)
@@ -1562,7 +1562,7 @@ class PostJob():
                           headers={"Content-Type": "application/json; charset=UTF-8"},
                           verify=False
                           )
-            msg = f"List of Brancehs sent to MONIT with status {r.status_code}. Output {r.text}"
+            msg = f"List of Branches sent to MONIT with status {r.status_code}. Output {r.text}"
             self.logger.info(msg)
         except Exception as ex:
             self.logger.error(f"Failed to send branch list to MONIT. Exception:\n{ex}")
@@ -1958,7 +1958,7 @@ class PostJob():
                     time.sleep(sleep_time)
                     counter += 1
                 if rc != 0:
-                    self.logger.error("%d tries, still cant't talk to schedd. Reschedule the PostJob", counter)
+                    self.logger.error("%d tries, still can't talk to schedd. Reschedule the PostJob", counter)
                     return 4
                 self.logger.info('History file %s created', job_ad_file_name)
 
@@ -2339,7 +2339,7 @@ class PostJob():
             msg += "\nPost-job timed out waiting for ASO transfers to complete."
             msg += "\nAttempts were made to cancel the ongoing transfers,"
             msg += " but cancellation failed for some transfers."
-            msg += "\nConsidering cancellation failures as a permament stageout error."
+            msg += "\nConsidering cancellation failures as a permanent stageout error."
             self.stageout_exit_codes.append(60317)
             raise PermanentStageoutError(msg)
 

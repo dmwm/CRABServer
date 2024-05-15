@@ -335,7 +335,7 @@ def createDummyFile(filename, logger):
         with open(abspath, 'w') as fd:
             fd.write('This is a dummy file created by the crab checkwrite command on %s' % str(datetime.datetime.now().strftime('%d/%m/%Y at %H:%M:%S')))
     except IOError:
-        logger.info('Error: Failed to create file %s localy.' % filename)
+        logger.info('Error: Failed to create file %s locally.' % filename)
         raise
 
 
@@ -410,7 +410,7 @@ def isFailurePermanent(reason, gridJob=False):
         permanent failure and submit task or not.
     """
 
-    checkQuota = " Please check that you have write access to destination site and that your quota is not exceeded, use crab checkwrite for more informations."
+    checkQuota = " Please check that you have write access to destination site and that your quota is not exceeded, use crab checkwrite for more information."
     refuseToSubmit = " Can't submit task because write check at destination site fails."
     if gridJob:
         refuseToSubmit = ""
@@ -574,7 +574,7 @@ def checkTaskLifetime(submissionTime):
     # resubmitLifeTime is 23 days expressed in seconds
     resubmitLifeTime = TASKLIFETIME - NUM_DAYS_FOR_RESUBMITDRAIN * 24 * 60 * 60
     if time.time() > (submissionTime + resubmitLifeTime):
-        msg = "Resubmission of the task is not possble since less than {0} days".format(NUM_DAYS_FOR_RESUBMITDRAIN)
+        msg = "Resubmission of the task is not possible since less than {0} days".format(NUM_DAYS_FOR_RESUBMITDRAIN)
         msg += "are left before the task is removed from the""schedulers.\n"
         msg += "A task expires {0} days after its submission\n".format(TASKLIFETIME / (24 * 60 * 60))
         msg += "You can submit a 'recovery task' if you need to execute again the failed jobs\n"
@@ -821,7 +821,7 @@ def uploadToS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
         uploadToS3ViaPSU(filepath=filepath, preSignedUrlFields=preSignedUrl, logger=logger)
     except Exception as e:
         raise Exception('Upload to S3 failed\n%s' % str(e))
-    logger.debug('%s %s successully uploaded to S3', objecttype, filepath)
+    logger.debug('%s %s successfully uploaded to S3', objecttype, filepath)
 
 
 def getDownloadUrlFromS3(crabserver=None, objecttype=None, taskname=None,
