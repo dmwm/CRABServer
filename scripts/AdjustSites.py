@@ -419,6 +419,7 @@ def main():
     crabserver = CRABRest(host, cert, cert, retry=3, userAgent='CRABSchedd')
     crabserver.setDbInstance(dbInstance)
 
+    time.sleep(60)  # give TW time to update taskDB #8411
     checkTaskInfo(crabserver, ad)
 
     # is this the first time this script runs for this task ? (it runs at each resubmit as well !)
