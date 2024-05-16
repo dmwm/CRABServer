@@ -87,7 +87,7 @@ NUM_DAYS_FOR_RESUBMITDRAIN = 7
 # Maximum number of days a task can stay in TAPERECALL status
 MAX_DAYS_FOR_TAPERECALL = 15
 # Threshold (in TB) to split a dataset among multiple sites when recalling from tape
-MAX_TB_TO_RECALL_AT_A_SINGLE_SITE = 10000  # effectively no limit. See https://github.com/dmwm/CRABServer/issues/7610
+MAX_TB_TO_RECALL_AT_A_SINGLE_SITE = 1000  # effectively no limit. See https://github.com/dmwm/CRABServer/issues/7610
 
 # These are all possible statuses of a task in the TaskDB.
 TASKDBSTATUSES_TMP = ['NEW', 'HOLDING', 'QUEUED', 'TAPERECALL', 'KILLRECALL']
