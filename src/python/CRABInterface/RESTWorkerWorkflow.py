@@ -157,7 +157,7 @@ def fixupTask(task):
     user_config_default = {
         'partialdataset': False,
         'requireaccelerator': False,
-        'accceleratorparams': None,
+        'acceleratorparams': None,
         'inputblocks': None,
     }
     if result['tm_user_config']:
