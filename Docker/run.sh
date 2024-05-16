@@ -40,19 +40,20 @@ check_link(){
 # directories/files that should be created before starting the container :
 # [[...]] is a trick to do partial string match from https://unix.stackexchange.com/a/465906
 if [[ $SERVICE == TaskWorker ]]; then
-  # -/data/hostdisk/${SERVICE}/cfg/TaskWorkerConfig.py
-  # -/data/hostdisk/${SERVICE}/logs
-  declare -A links=( ["current/TaskWorkerConfig.py"]="/data/hostdisk/${SERVICE}/cfg/TaskWorkerConfig.py" ["logs"]="/data/hostdisk/${SERVICE}/logs" ["nohup.out"]="/data/hostdisk/${SERVICE}/nohup.out")
+  declare -A links=(
+      ["current/TaskWorkerConfig.py"]="./hostdisk/cfg/TaskWorkerConfig.py"
+      ["nohup.out"]="./hostdisk/nohup.out"
+  )
 elif [[ $SERVICE == Publisher* ]]; then
-  # -/data/hostdisk/${SERVICE}/cfg/PublisherConfig.py
-  # -/data/hostdisk/${SERVICE}/logs
-  # -/data/hostdisk/${SERVICE}/PublisherFiles
-  declare -A links=( ["PublisherConfig.py"]="/data/hostdisk/${SERVICE}/cfg/PublisherConfig.py" ["logs"]="/data/hostdisk/${SERVICE}/logs" ["/data/srv/Publisher_files"]="/data/hostdisk/${SERVICE}/PublisherFiles" ["nohup.out"]="/data/hostdisk/${SERVICE}/nohup.out")
+  declare -A links=(
+      ["PublisherConfig.py"]="./hostdisk/cfg/PublisherConfig.py"
+      ["nohup.out"]="./hostdisk/nohup.out"
+  )
 fi
 
 for name in "${!links[@]}";
 do
-  check_link "${name}" || ln -s "${links[$name]}" "$name"
+  check_link "${name}" || ln -s "$(realpath "${links[$name]}")" "$name"
 done
 
 # run current instance
