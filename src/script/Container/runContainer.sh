@@ -54,11 +54,8 @@ case $SERVICE in
     echo "$SERVICE is not a valid service to start. Specify whether you want to start one of the 'Publisher' variants or 'TaskWorker'." && helpFunction
 esac
 
-volumeMounts=()
 for d in "${dir[@]}"; do
-  if [ -e "$d" ]; then
-      volumeMounts+=("-v ${d}:/data/srv/${DIRECTORY}/$(basename "${d}")")
-  else
+  if ! [ -e "$d" ]; then
     echo "Make sure to create needed directories before starting container. Missing directory: $d" && exit 1
   fi
 done
@@ -87,15 +84,12 @@ fi
 # get os version
 OS_Version=$(cat /etc/os-release |grep VERSION_ID|cut -d= -f2|tr -d \"|cut -d. -f1)
 
-DOCKER_VOL="-v /data/container/:/data/hostdisk/ ${volumeMounts[@]} -v /data/srv/tmp/:/data/srv/tmp/"
+DOCKER_VOL="-v /data/container/${SERVICE}:/data/srv/${DIRECTORY}/hostdisk"
+DOCKER_VOL="${DOCKER_VOL} -v /data/certs/:/data/certs/"
 DOCKER_VOL="${DOCKER_VOL} -v /cvmfs:/cvmfs:shared" # https://cvmfs.readthedocs.io/en/stable/cpt-configure.html#bind-mount-from-the-host
 DOCKER_VOL="${DOCKER_VOL} -v /etc/grid-security/:/etc/grid-security/"
-DOCKER_VOL="${DOCKER_VOL} -v /data/certs/:/data/certs/"
 DOCKER_VOL="${DOCKER_VOL} -v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
 DOCKER_VOL="${DOCKER_VOL} -v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/pki/tls/certs/ca-bundle.crt"
-if [[ "$OS_Version" = "7" ]]; then
-    DOCKER_VOL="${DOCKER_VOL} -v /var/run/nscd/socket:/var/run/nscd/socket"
-fi
 
 DOCKER_OPT="-e SERVICE=${SERVICE} -w /data/srv/${DIRECTORY} "
 

@@ -27,15 +27,16 @@ check_link() {
 
 # directories/files that should be created before starting the container
 if [[ $SERVICE == TaskWorker ]]; then
-    declare -A links=(
-        ["current/TaskWorkerConfig.py"]="/data/hostdisk/${SERVICE}/cfg/TaskWorkerConfig.py"
-    )
     WORKDIR=/data/srv/TaskManager
-elif [[ "${SERVICE}" == Publisher* ]]; then
     declare -A links=(
-        ["current/PublisherConfig.py"]="/data/hostdisk/${SERVICE}/cfg/PublisherConfig.py"
+        ["current/TaskWorkerConfig.py"]="${WORKDIR}/hostdisk/cfg/TaskWorkerConfig.py"
     )
+
+elif [[ "${SERVICE}" == Publisher* ]]; then
     WORKDIR=/data/srv/Publisher
+    declare -A links=(
+        ["current/PublisherConfig.py"]="${WORKDIR}/hostdisk/cfg/PublisherConfig.py"
+    )
 else
     echo "Service unknown: ${SERVICE}"; exit 1;
 fi
