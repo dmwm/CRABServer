@@ -7,10 +7,10 @@ import os
 import logging
 import sys
 
-from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.DBS.DBSReader import DBSReader
 from WMCore.Services.DBS.DBSErrors import DBSReaderError
 from WMCore.Configuration import ConfigurationEx
+from WMCore import Lexicon
 
 from RucioUtils import getNativeRucioClient
 
@@ -18,7 +18,6 @@ from ServerUtilities import MAX_LUMIS_IN_BLOCK, parseDBSInstance, isDatasetUserD
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 from TaskWorker.Actions.RucioActions import RucioAction
-
 
 
 class DBSDataDiscovery(DataDiscovery):
@@ -96,7 +95,7 @@ class DBSDataDiscovery(DataDiscovery):
                 raise TaskWorkerException(msg)
 
     @staticmethod
-    def lumi_overlap(d1,d2):
+    def lumiOverlap(d1, d2):
         """
         This finds if there are common run and lumis in two lists in the form of
         {
@@ -104,14 +103,38 @@ class DBSDataDiscovery(DataDiscovery):
         '2': [1,4,5,20]
         }
         """
-        common_runs = d1.keys() & d2.keys()
-        if len(common_runs) == 0: return False
+        commonRuns = d1.keys() & d2.keys()
+        if len(commonRuns) == 0:
+            return False
 
-        for run in common_runs:
-            common_lumis = set(d1[run]).intersection(set(d2[run]))
-            if len(common_lumis)>0 : return	True
-
+        for run in commonRuns:
+            commonLumis = set(d1[run]).intersection(set(d2[run]))
+            if len(commonLumis) > 0 :
+                return True
         return False
+
+    def validateInputUserFiles(self, dataset=None, files=None):
+        """ make sure that files in input list match input dataset """
+        try:
+            for file in files:
+                Lexicon.lfn(file)  # will raise if file is not a valid lfn
+        except AssertionError as ex:
+            raise TaskWorkerException(f"input file is not a valid LFN: {file}") from ex
+        filesInDataset = self.dbs.listDatasetFiles(datasetPath=dataset)
+        for file in files:
+            if not file in filesInDataset:
+                raise TaskWorkerException(f"input file use does not belong to input dataset: {file}")
+    @staticmethod
+    def validateInputBlocks(dataset=None, blocks=None):
+        """ make sure that blocks in input list match input dataset """
+        try:
+            for block in blocks:
+                Lexicon.block(block)  # will raise if file is not a valid lfn
+        except AssertionError as ex:
+            raise TaskWorkerException(f"input block is not a valid block name: {block}") from ex
+        for block in blocks:
+            if not block.split('#')[0] == dataset:
+                raise TaskWorkerException(f"input block does not belong to input dataset: {block}")
 
     def execute(self, *args, **kwargs):
         """
@@ -155,10 +178,17 @@ class DBSDataDiscovery(DataDiscovery):
 
         inputDataset = kwargs['task']['tm_input_dataset']
         inputBlocks = kwargs['task']['tm_user_config']['inputblocks']
+        inputUserFiles = kwargs['task']['tm_user_files']
         if inputBlocks:
             msg = f'Only blocks in "Data.inputBlocks" will be processed ({len(inputBlocks)} blocks).'
             self.uploadWarning(msg, self.userproxy, self.taskName)
             self.logger.info(msg)
+            self.validateInputBlocks(dataset=inputDataset, blocks=inputBlocks)
+        if inputUserFiles:
+            msg = f'Only files in "Data.userInputFiles" will be processed ({len(inputUserFiles)} files).'
+            self.uploadWarning(msg, self.userproxy, self.taskName)
+            self.logger.info(msg)
+            self.validateInputUserFiles(dataset=inputDataset, files=inputUserFiles)
         secondaryDataset = kwargs['task'].get('tm_secondary_input_dataset', None)
         runRange = kwargs['task']['tm_split_args']['runs']
         usePartialDataset = kwargs['task']['tm_user_config']['partialdataset']
@@ -369,17 +399,22 @@ class DBSDataDiscovery(DataDiscovery):
                 for key, infos in filedetails.copy().items():
                     if not infos['BlockName'] in inputBlocks:
                         del filedetails[key]
+            if inputUserFiles:
+                for lfn in filedetails.copy().keys():
+                    if not lfn in inputUserFiles:
+                        del filedetails[lfn]
+
             if secondaryDataset:
                 moredetails = self.dbs.listDatasetFileDetails(secondaryDataset, getParents=False, getLumis=needLumiInfo, validFileOnly=0)
                 self.logger.info("Beginning to match files from secondary dataset")
 
                 for dummyFilename, infos in filedetails.items():
-                    primary_lumis = infos['Lumis']
+                    primaryLumis = infos['Lumis']
                     infos['Parents'] = []
                     for secfilename, secinfos in moredetails.items():
-                        if self.lumi_overlap(primary_lumis,secinfos['Lumis']):
+                        if self.lumiOverlap(primaryLumis,secinfos['Lumis']):
                             infos['Parents'].append(secfilename)
-                
+
                 self.logger.info("Done matching files from secondary dataset")
                 kwargs['task']['tm_use_parent'] = 1
         except Exception as ex:
@@ -583,7 +618,7 @@ if __name__ == '__main__':
     # To facilitate comparisons, make sure that that everything is sorted
     for aFileDict in fileDictionaries:
         aFileDict['locations'].sort()
-    
+
     with open('DBSDataDiscoveryOutput.json', 'w', encoding='utf-8') as fh:
         json.dump(fileDictionaries, fh)
     print("\nDataDiscovery output saved as DBSDataDiscoveryOutput.json\n")
