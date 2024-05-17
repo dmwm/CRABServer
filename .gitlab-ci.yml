@@ -34,8 +34,6 @@ get_env:
 
 build_rest_image:
   rules:
-    - if: $SKIP_BUILD
-      when: never
     - !reference [.default_rules, rules]
   stage: build_docker
   image:
@@ -51,8 +49,6 @@ build_rest_image:
 
 build_tw_image:
   rules:
-    - if: $SKIP_BUILD
-      when: never
     - !reference [.default_rules, rules]
   stage: build_docker
   image:
@@ -86,6 +82,8 @@ deploy_server:
 
 .deploy_tw_template:
   rules:
+    - if: $SKIP_DEPLOY
+      when: never
     - !reference [.default_rules, rules]
   stage: deploy
   image:
@@ -116,6 +114,8 @@ deploy_publisher_rucio:
 
 task_submission_status_tracking:
   rules:
+    - if: $SKIP_DEPLOY
+      when: never
     - if: $MANUAL_CI_PIPELINE_ID
       when: never
     - if: $SUBMIT_STATUS_TRACKING
@@ -146,6 +146,8 @@ task_submission_status_tracking:
 
 check_test_result:
   rules:
+    - if: $SKIP_DEPLOY
+      when: never
     - if: $SUBMIT_STATUS_TRACKING
     - if: $MANUAL_CI_PIPELINE_ID
     - !reference [.default_rules, rules]
