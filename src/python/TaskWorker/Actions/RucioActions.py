@@ -59,7 +59,7 @@ class RucioAction():
             raise TaskWorkerException(msg) from e
         self.logger.info("Rucio container %s:%s created with %d blocks", scope, containerName, len(blockList))
 
-    def createOrReuseRucioRule(self, did=None, grouping=None,
+    def createOrReuseRucioRule(self, did=None, grouping=None, activity=None,
                                rseExpression='', comment='', lifetime=0):
         """ if Rucio reports duplicate rule exception, reuse existing one """
         # Some RSE_EXPR for testing
@@ -67,14 +67,19 @@ class RucioAction():
         # rseExpression = 'T3_IT_Trieste' # for testing
         weight = 'ddm_quota'  # only makes sense for rules which trigger replicas
         # weight = None # for testing
-        askApproval = False
+        if activity == "Analysis TapeRecall":
+            askApproval = True
+            account = self.username
+        else:
+            askApproval = False
+            account = self.rucioAccount
         # askApproval = True # for testing
         copies = 1
         try:
             ruleIds = self.rucioClient.add_replication_rule(  # N.B. returns a list
                 dids=[did], copies=copies, rse_expression=rseExpression,
                 grouping=grouping, weight=weight, lifetime=lifetime,
-                account=self.rucioAccount, activity='Analysis Input',
+                account=account, activity=activity,
                 comment=comment,
                 ask_approval=askApproval, asynchronous=True)
             ruleId = ruleIds[0]
@@ -190,7 +195,7 @@ class RucioAction():
 
         # prepare container to be recalled
         if isinstance(dataToRecall, str):
-            # recalling a full DBS dataset, simple the container already exists
+            # recalling a full DBS dataset. Simple: the container already exists
             myScope = 'cms'
             dbsDatasetName = dataToRecall
             containerDid = {'scope': myScope, 'name': dbsDatasetName}
@@ -220,6 +225,7 @@ class RucioAction():
         lifetime = (MAX_DAYS_FOR_TAPERECALL + 7) * 24 * 60 * 60  # in seconds
         ruleId = self.createOrReuseRucioRule(did=containerDid, grouping=grouping,
                                              rseExpression=rseExpression,
+                                             activity="Analysis TapeRecall",
                                              comment=comment, lifetime=lifetime)
         msg = f"Created Rucio rule ID: {ruleId}"
         self.logger.info(msg)
@@ -271,6 +277,7 @@ class RucioAction():
 
         # create rule
         ruleId = self.createOrReuseRucioRule(did=containerDid, rseExpression='rse_type=DISK',
+                                             activity="Analysis Input",
                                              comment=comment, lifetime=TASKLIFETIME)
         msg = f"Created Rucio rule ID: {ruleId}"
         self.logger.info(msg)
