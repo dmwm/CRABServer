@@ -123,8 +123,6 @@ task_submission_status_tracking:
   stage: run_testsuite
   tags:
     - crab3-shell
-  variables:
-    GIT_STRATEGY: clone
   script:
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
@@ -154,8 +152,6 @@ check_test_result:
   stage: check_testsuite
   tags:
     - crab3-shell
-  variables:
-    GIT_STRATEGY: clone
   script:
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
