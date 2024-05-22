@@ -97,6 +97,9 @@ def addCRABInfoToClassAd(ad, info):
     if 'extra_jdl' in info and info['extra_jdl']:
         for jdl in info['extra_jdl'].split('\n'):
             adName, adVal = jdl.lstrip('+').split('=', 1)
+            # remove spaces which  would bread schedd.submit #8420
+            adName = adName.strip()
+            adVal = adVal.strip()
             ad[adName] = adVal
     if 'accelerator_jdl' in info and info['accelerator_jdl']:
         for jdl in info['accelerator_jdl'].split('\n'):
