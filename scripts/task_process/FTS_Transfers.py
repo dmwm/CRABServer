@@ -252,6 +252,7 @@ def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
             dest_pfn,
             file oracle id,
             source site,
+            dest RSE,
             username,
             taskname,
             file size,
@@ -266,10 +267,12 @@ def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
 
     transfers = []
     for lfn in files:
+        src_rse = lfn[3] + '_Temp'
+        dst_rse = lfn[4]
         transfers.append(fts3.new_transfer(lfn[0],
                                            lfn[1],
-                                           filesize=lfn[6],
-                                           metadata={'oracleId': lfn[2]}
+                                           filesize=lfn[7],
+                                           metadata={'oracleId': lfn[2], 'src_rse': src_rse, 'dst_rse': dst_rse}
                                            )
                          )
     logger.info(f"Submitting {len(files)} transfers to FTS server")
@@ -281,8 +284,8 @@ def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
                        overwrite=True,
                        verify_checksum=True,
                        metadata={"issuer": "ASO",
-                                 "userDN": files[0][4],
-                                 "taskname": files[0][5]},
+                                 "userDN": files[0][5],
+                                 "taskname": files[0][6]},
                        copy_pin_lifetime=-1,
                        bring_online=None,
                        source_spacetoken=None,
@@ -433,7 +436,7 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
             src_pfn = src_pfn_prefix + '/' + fileid
             dst_pfn = dst_pfn_prefix + '/' + fileid
 
-            xfer = [src_pfn, dst_pfn, jobid, source, username, taskname, size, checksums['adler32'].rjust(8, '0')]
+            xfer = [src_pfn, dst_pfn, jobid, source, dst_rse, username, taskname, size, checksums['adler32'].rjust(8, '0')]
             tx_from_source.append(xfer)
 
         xfersPerFTSJob = 50 if ftsReuse else 200
@@ -465,6 +468,29 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient, c
 
     transfers = []
     logging.info("starting from line: %s", lastLine)
+
+    # read one doc from each line in input file
+    # doc is a dictionary :
+    #{
+    # "username": "belforte",
+    # "taskname": "240515_151607:belforte_crab_20240515_171602",
+    # "start_time": 1715795671,
+    # "destination": "T2_CH_CERN",
+    # "destination_lfn": "/store/user/belforte/[...].root",
+    # "source": "T2_UK_SGrid_RALPP",
+    # "source_lfn": "/store/temp/user/belforte.4bba3c2d14d54a938291c268ff4eba8b575b197f/[...].root",
+    # "filesize": 166575,
+    # "publish": 0,
+    # "transfer_state": "NEW",
+    # "publication_state": "NOT_REQUIRED",
+    # "job_id": "2",
+    # "job_retry_count": 0,
+    # "type": "output",
+    # "publishname": "autotest-1715786162-00000000000000000000000000000000",
+    # "checksums": {
+    #   "adler32": "1c0775fa",
+    #   "cksum": "1309875024"
+    # }
 
     with open(inputFile, encoding='utf-8') as _list:
         for _data in _list.readlines()[lastLine:]:
