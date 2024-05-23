@@ -91,6 +91,7 @@ DOCKER_VOL="-v /data/container/:/data/hostdisk/ ${volumeMounts[@]} -v /data/srv/
 DOCKER_VOL="${DOCKER_VOL} -v /data/container/${SERVICE}:/data/srv/${DIRECTORY}/hostdisk"
 DOCKER_VOL="${DOCKER_VOL} -v /cvmfs:/cvmfs:shared" # https://cvmfs.readthedocs.io/en/stable/cpt-configure.html#bind-mount-from-the-host
 DOCKER_VOL="${DOCKER_VOL} -v /etc/grid-security/:/etc/grid-security/"
+DOCKER_VOL="${DOCKER_VOL} -v /etc/vomses/:/etc/vomses/"
 DOCKER_VOL="${DOCKER_VOL} -v /data/certs/:/data/certs/"
 DOCKER_VOL="${DOCKER_VOL} -v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
 DOCKER_VOL="${DOCKER_VOL} -v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/pki/tls/certs/ca-bundle.crt"
