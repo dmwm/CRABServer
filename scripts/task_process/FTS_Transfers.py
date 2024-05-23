@@ -466,6 +466,29 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient, c
     transfers = []
     logging.info("starting from line: %s", lastLine)
 
+    # read one doc from each line in input file
+    # doc is a dictionary :
+    #{
+    # "username": "belforte",
+    # "taskname": "240515_151607:belforte_crab_20240515_171602",
+    # "start_time": 1715795671,
+    # "destination": "T2_CH_CERN",
+    # "destination_lfn": "/store/user/belforte/[...].root",
+    # "source": "T2_UK_SGrid_RALPP",
+    # "source_lfn": "/store/temp/user/belforte.4bba3c2d14d54a938291c268ff4eba8b575b197f/[...].root",
+    # "filesize": 166575,
+    # "publish": 0,
+    # "transfer_state": "NEW",
+    # "publication_state": "NOT_REQUIRED",
+    # "job_id": "2",
+    # "job_retry_count": 0,
+    # "type": "output",
+    # "publishname": "autotest-1715786162-00000000000000000000000000000000",
+    # "checksums": {
+    #   "adler32": "1c0775fa",
+    #   "cksum": "1309875024"
+    # }
+
     with open(inputFile, encoding='utf-8') as _list:
         for _data in _list.readlines()[lastLine:]:
             try:
