@@ -9,7 +9,6 @@ variables:
 .default_rules:
   default:
     - if: $CI_COMMIT_TAG =~ /pypi-.*/         # pypi-devthree-1714418922
-    - if: $CI_COMMIT_TAG =~ /v3\.[0-9]{6}.*/  # v3.240423, v3.240423.hotfix1
   release:
     - if: $CI_COMMIT_TAG =~ /v3\.[0-9]{6}.*/  # same as above
 
@@ -25,6 +24,7 @@ stages:
 get_env:
   rules:
     - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
   stage: prepare_env
   image:
     name: registry.cern.ch/cmscrab/buildtools
@@ -61,6 +61,7 @@ set_version_name:
 build_rest_image:
   rules:
     - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
   stage: build_docker
   image:
     name: gcr.io/kaniko-project/executor:v1.14.0-debug
@@ -81,6 +82,7 @@ build_rest_image:
 build_tw_image:
   rules:
     - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
   stage: build_docker
   image:
     name: gcr.io/kaniko-project/executor:v1.14.0-debug
@@ -103,6 +105,7 @@ deploy_server:
     - if: $SKIP_DEPLOY
       when: never
     - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
   stage: deploy
   image:
     name: registry.cern.ch/cmscrab/buildtools
@@ -121,6 +124,7 @@ deploy_server:
     - if: $SKIP_DEPLOY
       when: never
     - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
   stage: deploy
   image:
     name: registry.cern.ch/cmscrab/buildtools
@@ -156,6 +160,7 @@ task_submission_status_tracking:
     - if: $SKIP_DEPLOY
       when: never
     - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
   stage: run_testsuite
   tags:
     - crab3-shell
@@ -185,6 +190,7 @@ check_test_result:
     - if: $SKIP_DEPLOY
       when: never
     - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
   stage: check_testsuite
   tags:
     - crab3-shell
