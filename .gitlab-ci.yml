@@ -229,8 +229,7 @@ release_stable:
   variables:
     GIT_STRATEGY: none
   script:
-    - source .env
-    - export RELEASE_TAG=${RELEASE_NAME}-stable
+    - export RELEASE_IMAGE_TAG=${RELEASE_NAME:-${CI_COMMIT_TAG}-stable}
     - crane auth login -u ${CMSCRAB_REGISTRY_USER} -p ${CMSCRAB_REGISTRY_PASSWORD} ${CMSCRAB_REGISTRY_URL}
-    - crane cp registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG} registry.cern.ch/cmscrab/crabserver:${RELEASE_TAG}
-    - crane cp registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG} registry.cern.ch/cmscrab/crabtaskworker:${RELEASE_TAG}
+    - crane cp registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG} registry.cern.ch/cmscrab/crabserver:${RELEASE_IMAGE_TAG}
+    - crane cp registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG} registry.cern.ch/cmscrab/crabtaskworker:${RELEASE_IMAGE_TAG}
