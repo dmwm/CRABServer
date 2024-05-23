@@ -252,6 +252,7 @@ def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
             dest_pfn,
             file oracle id,
             source site,
+            dest RSE,
             username,
             taskname,
             file size,
@@ -266,10 +267,12 @@ def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
 
     transfers = []
     for lfn in files:
+        src_rse = lfn[3] + '_Temp'
+        dst_rse = lfn[4]
         transfers.append(fts3.new_transfer(lfn[0],
                                            lfn[1],
-                                           filesize=lfn[6],
-                                           metadata={'oracleId': lfn[2]}
+                                           filesize=lfn[7],
+                                           metadata={'oracleId': lfn[2], 'src_rse': src_rse, 'dst_rse': dst_rse}
                                            )
                          )
     logger.info(f"Submitting {len(files)} transfers to FTS server")
@@ -281,8 +284,8 @@ def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
                        overwrite=True,
                        verify_checksum=True,
                        metadata={"issuer": "ASO",
-                                 "userDN": files[0][4],
-                                 "taskname": files[0][5]},
+                                 "userDN": files[0][5],
+                                 "taskname": files[0][6]},
                        copy_pin_lifetime=-1,
                        bring_online=None,
                        source_spacetoken=None,
@@ -433,7 +436,7 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
             src_pfn = src_pfn_prefix + '/' + fileid
             dst_pfn = dst_pfn_prefix + '/' + fileid
 
-            xfer = [src_pfn, dst_pfn, jobid, source, username, taskname, size, checksums['adler32'].rjust(8, '0')]
+            xfer = [src_pfn, dst_pfn, jobid, source, dst_rse, username, taskname, size, checksums['adler32'].rjust(8, '0')]
             tx_from_source.append(xfer)
 
         xfersPerFTSJob = 50 if ftsReuse else 200
