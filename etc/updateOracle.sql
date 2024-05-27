@@ -139,3 +139,8 @@ ALTER TABLE tasks ADD tm_publish_rule VARCHAR(255);
 
 --Add Rucio ASO's json kv for store container names and its rules.
 ALTER TABLE tasks ADD tm_multipub_rule CLOB;
+
+--Drop unused columns related to "panda", see issue #8418
+-- alter table tasks set unused ( PANDA_RESUBMITTED_JOBS, PANDA_JOBSET_ID );
+-- ALTER TABLE tasks DROP UNUSED COLUMNS;
+
