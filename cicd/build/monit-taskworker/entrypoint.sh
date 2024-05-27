@@ -1,6 +1,6 @@
 #!/bin/sh
 
-source /data/srv/TaskManager/env.sh
+source /data/srv/TaskManager/env.sh -c
 
 # ensure container has needed mounts
 check_link(){

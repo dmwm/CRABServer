@@ -64,15 +64,14 @@ for d in "${dir[@]}"; do
 done
 
 uuid=$(uuidgen)
-if [ -n "${LOGUUID}+1" ]; then
+if [ ! -z "${LOGUUID}" ]; then
     # if LOGUUID is set, then use it
     uuid=${LOGUUID}
 fi
 tmpfile=/tmp/monit-${uuid}.txt
 
 if [[ "${SERVICE}" == TaskWorker_monit_*  ]]; then
-  countrunning=$(docker ps | grep ${SERVICE} | wc -l)
-  if [[ ! $countrunning -eq "0" ]]; then
+  if docker ps | grep ${SERVICE} | wc -l ; then
     msg="There already is a running container for $SERVICE. It is likely stuck. Stopping, removing and then starting again."
     echo $msg
     # writing now that the previous execution of the script is hanging.
@@ -81,7 +80,9 @@ if [[ "${SERVICE}" == TaskWorker_monit_*  ]]; then
     echo $msg > $tmpfile
     docker container stop $SERVICE
   fi
-  docker container rm $SERVICE
+  if docker ps -a | grep ${SERVICE} | wc -l ; then
+    docker container rm $SERVICE
+  fi
 fi
 
 # get os version
