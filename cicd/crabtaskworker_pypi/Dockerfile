@@ -119,6 +119,7 @@ COPY cicd/crabtaskworker_pypi/TaskWorker/start.sh \
 
 ## publisher
 COPY cicd/crabtaskworker_pypi/Publisher/start.sh \
+     cicd/crabtaskworker_pypi/Publisher/env.sh \
      cicd/crabtaskworker_pypi/Publisher/stop.sh \
      cicd/crabtaskworker_pypi/Publisher/manage.sh \
      ${WDIR}/srv/Publisher/

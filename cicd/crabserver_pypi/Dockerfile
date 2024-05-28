@@ -57,7 +57,13 @@ RUN ls /data/srv/current/ \
 RUN rm /data/manage
 
 # copy running script files
-COPY cicd/crabserver_pypi/run.sh cicd/crabserver_pypi/manage.sh cicd/crabserver_pypi/entrypoint.sh cicd/crabserver_pypi/start.sh cicd/crabserver_pypi/stop.sh /data/
+COPY cicd/crabserver_pypi/run.sh \
+     cicd/crabserver_pypi/manage.sh \
+     cicd/crabserver_pypi/entrypoint.sh \
+     cicd/crabserver_pypi/env.sh \
+     cicd/crabserver_pypi/start.sh \
+     cicd/crabserver_pypi/stop.sh \
+     /data/
 
 # make sure all files is the same user/group as running user
 RUN chown -R 1000:1000 /data && chmod +x /data/*.sh
