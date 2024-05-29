@@ -1,7 +1,46 @@
 #!/usr/bin/python
 # pylint: disable=line-too-long, broad-except, invalid-name
 """
+for lack of a better place, I record here the current situation with
+FTS python easy binding documentation, which is needed to understand
+the code used in this file.
+Reference: https://cern.service-now.com/service-portal?id=ticket&table=incident&n=INC3888594
 
+Message from Mihai Patrascoiu:
+Hello Stefano,
+ 
+The ".md" file is there. The HTML file is there as well ( https://fts3-docs.web.cern.ch/fts3-docs/fts-rest/docs/easy/submit.html ).
+But there's no direct link to them in the navigation menu on the left.
+ 
+We have our main documentation repository ( https://gitlab.cern.ch/fts/documentation ), but some parts, such as the easy-bindings, come from the old FTS-REST project ( https://gitlab.cern.ch/fts/fts-rest/-/tree/develop/docs ). It's not ideal, but it worked and we left it untouched. (this should explain why the easy-bindings are not in the "documentation" repo)
+ 
+Unfortunately, the documentation CI relies on old technologies. The building still happens on CC7 image + Gitbook (deprecated). At some point in time, it stopped successfully rendering the documentation files that came from the old FTS-REST project. We just left it like that.
+ 
+When we can redo the whole documentation, the foreign parts scattered in the old FTS-REST project will be moved to the main "documentation" repository.
+ 
+You can always find a direct link to our documentation from the main FTS page:
+https://fts.web.cern.ch/fts/ > Docs (in the top navigation bar)
+ 
+Below is the listing of the easy-bindings directory.
+You can access those files via the web page if you know the exact location.
+```
+$ tree < https://fts3-docs.web.cern.ch/fts3-docs/fts-rest/docs/easy/ >
+├── examples
+│   ├── cancel.py
+│   ├── listing.py
+│   ├── snapshot.py
+│   ├── status.py
+│   ├── submit.py
+│   └── whoami.py
+├── index.html
+├── submit.html
+└── submit.md
+```
+ 
+I hope this answers your questions. For the foreseeable future, the current situation will have to do.
+ 
+Cheers,
+Mihai
 """
 import json
 import logging
