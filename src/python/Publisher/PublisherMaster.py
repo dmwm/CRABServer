@@ -525,7 +525,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
                         logger.info('Taskname %s is OK. Nothing to do', taskname)
                     else:
                         msg = f"Taskname {taskname} is OK. Published {summary['publishedFiles']} "
-                        msg += f"in {summary['publishedBlocks']} blocks."
+                        msg += f"files in {summary['publishedBlocks']} blocks."
                         if summary['nextIterFiles']:
                             msg += f" {summary['nextIterFiles']} files left for next iteration."
                         logger.info(msg)
