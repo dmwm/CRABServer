@@ -242,7 +242,7 @@ class PreJob:
         Copy the content of the generic file Job.submit into a job-specific file
         Job.<job_id>.submit and add attributes that are job-specific (e.g. CRAB_Retry).
         Add also parameters that can be overwritten at each manual job resubmission
-        (e.g. MaxWallTimeMins, RequestMemory, RequestCpus, JobPrio, DESIRED_SITES).
+        (e.g. MaxWallTimeMins, RequestMemory, RequestCores, JobPrio, DESIRED_SITES).
         """
         ## Start the Job.<job_id>.submit content with the CRAB_Retry.
         new_submit_text = '+CRAB_Retry = %d\n' % (crab_retry)
@@ -287,10 +287,10 @@ class PreJob:
                 maxjobruntime = int(str(self.task_ad.lookup('MaxWallTimeMinsTail')))
             elif 'MaxWallTimeMinsRun' in self.task_ad:
                 maxjobruntime = int(str(self.task_ad.lookup('MaxWallTimeMinsRun')))
-            if 'RequestMemory' in self.task_ad:
-                maxmemory = int(str(self.task_ad.lookup('RequestMemory')))
-            if 'RequestCpus' in self.task_ad:
-                numcores = int(str(self.task_ad.lookup('RequestCpus')))
+            if 'CRAB_RequestedMemory' in self.task_ad:
+                maxmemory = int(str(self.task_ad.lookup('CRAB_RequestedMemory')))
+            if 'CRAB_RequestedCores' in self.task_ad:
+                numcores = int(str(self.task_ad.lookup('CRAB_RequestedCores')))
             if 'JobPrio' in self.task_ad:
                 priority = int(str(self.task_ad['JobPrio']))
             if str(self.job_id) == '0': #jobids can be like 1-1 for subjobs
