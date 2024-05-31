@@ -503,7 +503,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         subdagJDL = htcondor.Submit()  # submit object does not have a copy method
         for k,v in jobJDL.items():     # so we have to create a new object and
             subdagJDL[k] = v           # fill it one element at a time
-        subdagJDL['X509UserProxy'] = os.path.basename(dagJDL['X509UserProxy'])  # proxy in scheduler will be in cwd
+        subdagJDL['X509UserProxy'] = os.path.basename(jobJDL['X509UserProxy'])  # proxy in scheduler will be in cwd
         with open('subdag.jdl', 'w', encoding='utf-8') as fd:
             print(subdagJDL, file=fd)
 
