@@ -292,11 +292,11 @@ class CRAB3CreateJson:
                     continue
                 schedd = htcondor.Schedd(scheddAdd)
                 try:
-                    idleDags = list(schedd.xquery(pickSchedulerIdle))
+                    idleDags = list(schedd.query(pickSchedulerIdle))
                 except Exception:
                     idleDags = []
                 try:
-                    runningTPs = list(schedd.xquery(pickLocalRunning))
+                    runningTPs = list(schedd.query(pickLocalRunning))
                 except Exception:
                     runningTPs = []
                 numDagIdle = len(idleDags)
