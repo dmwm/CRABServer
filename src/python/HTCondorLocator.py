@@ -121,8 +121,7 @@ class HTCondorLocator():
         collector = self.getCollector()
         schedd = None
         try:
-            collParam = 'COLLECTOR_HOST'
-            htcondor.param[collParam] = collector.encode('ascii', 'ignore')
+            htcondor.param['COLLECTOR_HOST'] = collector
             coll = htcondor.Collector()
             # select from collector crabschedds and pull some add values
             # this call returns a list of schedd objects.
@@ -130,7 +129,7 @@ class HTCondorLocator():
                                  ['Name', 'DetectedMemory', 'TotalFreeMemoryMB', 'TransferQueueNumUploading',
                                   'TransferQueueMaxUploading','TotalRunningJobs', 'JobsRunning', 'MaxJobsRunning', 'IsOK'])
             if not schedds:
-                raise Exception(f"No CRAB schedds returned by collector query. {collParam} parameter is {htcondor.param['COLLECTOR_HOST']}. Try later")
+                raise Exception(f"No CRAB schedds returned by collector query. COLLECTOR_HOST parameter is {htcondor.param['COLLECTOR_HOST']}. Try later")
 
             # Get only those schedds that are listed in our external REST configuration
             if self.config and "htcondorSchedds" in self.config:
@@ -181,7 +180,7 @@ class HTCondorLocator():
         Return a tuple (schedd, address) containing an object representing the
         remote schedd and its corresponding address.
         """
-        htcondor.param['COLLECTOR_HOST'] = self.getCollector().encode('ascii', 'ignore')
+        htcondor.param['COLLECTOR_HOST'] = self.getCollector()
         coll = htcondor.Collector()
         schedds = coll.query(htcondor.AdTypes.Schedd, f"Name=?={classad.quote(schedd)}",
                              ["AddressV1", "CondorPlatform", "CondorVersion", "Machine", "MyAddress", "Name", "MyType",
