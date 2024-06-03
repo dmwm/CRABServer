@@ -995,7 +995,7 @@ class ASOServerJob():
             #if not os.path.exists('task_process/rest_filetransfers.txt'):
                 restInfo = {'host':self.rest_host,
                             'dbInstance': self.db_instance,
-                            'proxyfile': self.proxy}
+                            'proxyfile': os.path.basename(self.proxy)}
                 with open('task_process/RestInfoForFileTransfers.json', 'w') as fp:
                     json.dump(restInfo, fp)
         else:
@@ -1014,7 +1014,7 @@ class ASOServerJob():
             #if not os.path.exists('task_process/rest_filetransfers.txt'):
                 restInfo = {'host':self.rest_host,
                             'dbInstance': self.db_instance,
-                            'proxyfile': self.proxy}
+                            'proxyfile': os.path.basename(self.proxy)}
                 with open('task_process/RestInfoForFileTransfers.json','w') as fp:
                     json.dump(restInfo, fp)
         return returnMsg
