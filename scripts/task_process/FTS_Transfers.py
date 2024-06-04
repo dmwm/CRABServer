@@ -326,9 +326,6 @@ def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
                                  "userDN": files[0][5],
                                  "taskname": files[0][6]},
                        copy_pin_lifetime=-1,
-                       bring_online=None,
-                       source_spacetoken=None,
-                       spacetoken=None,
                        # max time for job in the FTS queue in hours. From FTS experts in
                        # https://cern.service-now.com/service-portal?id=ticket&table=incident&n=INC2776329
                        # The max_time_in_queue applies per job, not per retry.
