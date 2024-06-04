@@ -3,7 +3,7 @@ import shutil
 import os
 import traceback
 
-import htcondor
+import htcondor2 as htcondor
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 
 class GetAcceleratorSite(BaseRecurringAction):

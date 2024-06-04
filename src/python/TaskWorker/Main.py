@@ -1,4 +1,7 @@
-from optparse import OptionParser
+"""
+Top driver for TaskWorker service
+"""
+from optparse import OptionParser  # pylint: disable=deprecated-module
 import signal
 import os
 import logging
@@ -59,16 +62,23 @@ def main():
                       default=False,
                       help="Enter pdb mode. Set up TW to run sequential mode and invoke pdb.")
 
-    (options, args) = parser.parse_args()
+    (options, args) = parser.parse_args()  # pylint: disable=unused-variable
 
 
     if not options.config:
         raise ConfigException("Configuration not found")
 
     configuration = loadConfigurationFile(os.path.abspath(options.config))
-    status_, msg_ = validateConfig(configuration)
-    if not status_:
-        raise ConfigException(msg_)
+    status, msg = validateConfig(configuration)
+    if not status:
+        raise ConfigException(msg)
+
+    # must set useHtcV2 in the environment before importing TaskWorker
+    # so that in all files we can use it to decide if to import htcondor or htcondor2
+    if getattr(configuration.TaskWorker, 'useHtcV2', None):
+        print("Configuration says to use HTC Bindings V2")
+    else:
+        print("Configuration says to use HTC Bindings V1")
 
     if options.pdb:
         # override root loglevel to debug

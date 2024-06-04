@@ -427,12 +427,10 @@ def isFailurePermanent(reason, gridJob=False):
 def parseJobAd(filename):
     """ Parse the jobad file provided as argument and return a dict representing it
         SB: why do we have this ? the classAd object returned by classad.parse has
-            the semantic of a dictionary ! Maybe simply in order to use it inside cmscp.py
-            and in job wrapper we are not sure to have HTCondor available ?
+            the semantic of a dictionary ! Currently it is only used in cmscp.py
+            and in job wrapper we are not sure to have HTCondor available.
             Note that we also have a parseAd() method inside CMSRunAnalysis.py which should
             do finely also in cmscp.py
-            As a start I will remove reference to classAd in here (was commented anyhow) and
-            avoid using is when we can import classad
     """
     jobAd = {}
     with open(filename, 'r', encoding='utf-8') as fd:
