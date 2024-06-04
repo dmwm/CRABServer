@@ -34,8 +34,6 @@ import functools
 import subprocess
 from ast import literal_eval
 
-import classad
-
 from WMCore.DataStructs.LumiList import LumiList
 
 from ServerUtilities import getLock, newX509env, MAX_IDLE_JOBS, MAX_POST_JOBS
@@ -46,6 +44,11 @@ from TaskWorker.Actions.DagmanCreator import DagmanCreator
 from TaskWorker.Actions.Recurring.BanDestinationSites import CRAB3BanDestinationSites
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from TaskWorker.Worker import failTask
+
+if 'useHtcV2' in os.environ:
+    import classad2 as classad
+else:
+    import classad
 
 
 class PreDAG():

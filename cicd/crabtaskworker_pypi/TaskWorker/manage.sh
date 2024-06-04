@@ -31,6 +31,7 @@ APP_PATH="${APP_PATH:-/data/srv/current/lib/python/site-packages/}"
 # Hardcoded the path and use new_updateTMRuntime.sh to build it from source and copy to this path.
 export CRABTASKWORKER_ROOT="${APP_PATH}"
 
+
 helpFunction() {
     grep "^##H" "${0}" | sed -r "s/##H(| )//g"
 }
@@ -43,6 +44,7 @@ _getMasterWorkerPid() {
 start_srv() {
     # Check require env
     export PYTHONPATH
+
     echo "Starting TaskWorker..."
     if [[ $DEBUG ]]; then
         crab-taskworker --config "${CONFIG}" --logDebug --pdb

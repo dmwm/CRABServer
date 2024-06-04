@@ -121,6 +121,7 @@ COPY cicd/crabtaskworker_pypi/TaskWorker/start.sh \
      cicd/crabtaskworker_pypi/TaskWorker/env.sh \
      cicd/crabtaskworker_pypi/TaskWorker/stop.sh \
      cicd/crabtaskworker_pypi/TaskWorker/manage.sh \
+     cicd/crabtaskworker_pypi/TaskWorker/useHTCbindingsV1orV2.py \
      cicd/crabtaskworker_pypi/updateDatafiles.sh \
      ${WDIR}/srv/TaskManager/
 

@@ -1,4 +1,7 @@
-from optparse import OptionParser
+"""
+Top driver for TaskWorker service
+"""
+from optparse import OptionParser  # pylint: disable=deprecated-module
 import signal
 import os
 import logging
@@ -6,7 +9,7 @@ import sys
 
 from WMCore.Configuration import loadConfigurationFile
 from TaskWorker.WorkerExceptions import ConfigException
-from TaskWorker.MasterWorker import MasterWorker
+#from TaskWorker.MasterWorker import MasterWorker
 import HTCondorLocator
 
 def validateConfig(config):
@@ -59,16 +62,26 @@ def main():
                       default=False,
                       help="Enter pdb mode. Set up TW to run sequential mode and invoke pdb.")
 
-    (options, args) = parser.parse_args()
+    (options, args) = parser.parse_args()  # pylint: disable=unused-variable
 
 
     if not options.config:
         raise ConfigException("Configuration not found")
 
     configuration = loadConfigurationFile(os.path.abspath(options.config))
-    status_, msg_ = validateConfig(configuration)
-    if not status_:
-        raise ConfigException(msg_)
+    status, msg = validateConfig(configuration)
+    if not status:
+        raise ConfigException(msg)
+
+    # must set userHtcV2 in the environment before importing TaskWorker
+    # so that in all files we can use it to decide if to import htcondor or htcondor2
+    if getattr(configuration.TaskWorker, 'useHtcV2', None):
+        os.environ['useHtcV2'] = 'True'
+        print("Using HTTC Bindings V2")
+    else:
+        os.environ.pop('useHtcV2', None)
+        print("Using HTTC Bindings V1")
+    from TaskWorker.MasterWorker import MasterWorker  # pylint: disable=import-outside-toplevel
 
     if options.pdb:
         # override root loglevel to debug
