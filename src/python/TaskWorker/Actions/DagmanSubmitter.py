@@ -32,6 +32,8 @@ if sys.version_info < (3, 0):
 
 ## These are the CRAB attributes that we want to add to the job class ad when
 ## using the submitDirect() method.
+# SB: do we really need all of this ? Most of them are in Job.submit created by
+# DagmanCreator and are not needed to submit/run the DagMan.
 SUBMIT_INFO = [ \
     ('+CRAB_ReqName', 'requestname'),
     ('+CRAB_Workflow', 'workflow'),
@@ -93,7 +95,7 @@ def addCRABInfoToJobJDL(jdl, info):
     """
     for adName, dictName in SUBMIT_INFO:
         if dictName in info and (info[dictName] is not None):
-            jdl[adName] = info[dictName]
+            jdl[adName] = classad.quote(info[dictName])
 
 
 class ScheddStats(dict):
@@ -471,7 +473,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
         jobJDL["+CRAB_Attempt"] = 0
-        jobJDL["+CMS_SubmissionTool"] = "CRAB"
+        jobJDL["+CMS_SubmissionTool"] = classad.quote("CRAB")
         # We switched from local to scheduler universe.  Why?  It seems there's no way in the
         # local universe to change the hold signal at runtime.  That's fairly important for our
         # resubmit implementation.
@@ -485,10 +487,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
         environmentString += " " + " ".join(info['additional_environment_options'].split(';'))
         # Environment command in JDL requires proper quotes https://htcondor.readthedocs.io/en/latest/man-pages/condor_submit.html#environment
         jobJDL["Environment"] = classad.quote(environmentString)
-        jobJDL["+RemoteCondorSetup"] = info['remote_condor_setup']
-        jobJDL["+CRAB_TaskSubmitTime"] = info['start_time']
-        jobJDL['+CRAB_TaskLifetimeDays'] = TASKLIFETIME // 24 // 60 // 60
-        jobJDL['+CRAB_TaskEndTime'] = int(info['start_time']) + TASKLIFETIME
+        jobJDL["+RemoteCondorSetup"] = classad.quote(info['remote_condor_setup'])
+        jobJDL["+CRAB_TaskSubmitTime"] = classad.quote(info['start_time'])
+        jobJDL['+CRAB_TaskLifetimeDays'] = classad.quote(TASKLIFETIME // 24 // 60 // 60)
+        jobJDL['+CRAB_TaskEndTime'] = classad.quote(int(info['start_time']) + TASKLIFETIME)
         #For task management info see https://github.com/dmwm/CRABServer/issues/4681#issuecomment-302336451
         jobJDL["LeaveJobInQueue"] = "True"
         jobJDL["PeriodicHold"] = "time() > CRAB_TaskEndTime"
@@ -507,7 +509,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         with open('subdag.jdl', 'w', encoding='utf-8') as fd:
             print(subdagJDL, file=fd)
 
-        jobJDL["+TaskType"] = "ROOT"
+        jobJDL["+TaskType"] = classad.quote("ROOT")
         jobJDL["output"] = os.path.join(info['scratch'], "request.out")
         jobJDL["error"] = os.path.join(info['scratch'], "request.err")
         jobJDL["Cmd"] = cmd
