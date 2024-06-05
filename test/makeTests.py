@@ -599,7 +599,7 @@ writeValidationScript(testName=name, validationScript=validationScript)
 # collector
 name = 'collector'
 confChangesList = []
-changeDict = {'param': name, 'value': '"cmsgwms-collector-itb.fnal.gov:9620,cmsgwms-collector-itb.cern.ch:9620"', 'section': 'Debug'}
+changeDict = {'param': name, 'value': '"cmsgwms-collector-itb.cern.ch,cmsgwms-collector-itb.fnal.gov"', 'section': 'Debug'}
 confChangesList.append(changeDict)
 changeDict = {'param': 'scheddName', 'value': '"crab3@vocms068.cern.ch"', 'section': 'Debug'}
 confChangesList.append(changeDict)
