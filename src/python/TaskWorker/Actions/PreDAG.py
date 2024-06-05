@@ -333,7 +333,7 @@ class PreDAG():
         """ Submit a subdag
         """
         subprocess.check_call(['condor_submit_dag', '-DoRecov', '-AutoRescue', '0', '-MaxPre', '20', '-MaxIdle', str(maxidle),
-                               '-MaxPost', str(maxpost), '-insert_sub_file', 'subdag.jdl',
+                               '-MaxPost', str(maxpost), '-insert_sub_file', 'subdag.ad',
                                '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), subdag),
                                '-append', '+TaskType = "{0}"'.format(stage.upper()), subdag])
 
