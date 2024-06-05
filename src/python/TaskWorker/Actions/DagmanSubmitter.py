@@ -70,7 +70,6 @@ SUBMIT_INFO = [ \
     ('+CRAB_SiteBlacklist', 'siteblacklist'),
     ('+CRAB_SiteWhitelist', 'sitewhitelist'),
     ('+RequestMemory', 'tm_maxmemory'),
-    ('+RequestCpus', 'tm_numcores'),
     ('+MaxWallTimeMins', 'tm_maxjobruntime'),
     ('+MaxWallTimeMinsRun', 'tm_maxjobruntime'),
     ('+MaxWallTimeMinsProbe', 'maxproberuntime'),
@@ -479,7 +478,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         jobJDL["JobUniverse"] = 7
         jobJDL["HoldKillSig"] = "SIGUSR1"
         jobJDL["X509UserProxy"] = info['user_proxy']
-        jobJDL["Requirements"] = "TARGET.Cpus == 1"  # see https://github.com/dmwm/CRABServer/issues/8456#issuecomment-2145887432
+        jobJDL["Requirements"] = "True"
         environmentString = "PATH=/usr/bin:/bin CRAB3_VERSION=3.3.0-pre1"
         environmentString += " CONDOR_ID=$(ClusterId).$(ProcId)"
         environmentString += " " + " ".join(info['additional_environment_options'].split(';'))
