@@ -318,7 +318,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                         '&& (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)'
 
             self.logger.debug("Duplicate check is querying the schedd: %s", rootConst)
-            results = list(schedd.query(rootConst, []))
+            results = list(schedd.xquery(rootConst, []))
             self.logger.debug("Schedd queried %s", results)
         except Exception as exp:
             msg = "The CRAB server backend was not able to contact the Grid scheduler."
