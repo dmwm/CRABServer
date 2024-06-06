@@ -1,0 +1,22 @@
+---
+name: Trigger gitlab pipeline when publish new release
+
+# https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#release
+on:
+  release:
+    types: [published]
+
+jobs:
+  trigger_gitlab_ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: run curl
+        # trigger sync_release_from_github job in gitlab-ci
+        run: |
+          curl -X POST \
+          --fail \
+          --max-time 5 \
+          -F token=${{ secrets.GITLAB_PIPELINE_TRIGGER_TOKEN }} \
+          -F ref=master \
+          -F variables[GITHUB_REF_NAME]=${GITHUB_REF_NAME} \
+          https://gitlab.cern.ch/api/v4/projects/${{ secrets.GITLAB_PROJECT_ID }}/trigger/pipeline
