@@ -174,7 +174,7 @@ class Overflow:
         returns: True/False
         """
 
-        currIdleTime = jobObject["ServerTime"] - jobObject["QDate"]
+        currIdleTime = int(time.time()) - jobObject["QDate"]
         currIdleTime = int(currIdleTime/60)  # from seconds to minutes
 
         idleTooMuch = currIdleTime > 0 and (currIdleTime - self.maxIdleTime) > 0
@@ -237,7 +237,6 @@ class Overflow:
                           "DAGManJobId",
                           "JobStatus",
                           "JobUniverse",
-                          "ServerTime",
                           "QDate",
                           "CMS_ALLOW_OVERFLOW",
                           "DESIRED_SITES"]
