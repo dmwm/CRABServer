@@ -71,13 +71,12 @@ SUBMIT_INFO = [ \
     ('+CRAB_UserVO', 'tm_user_vo'),
     ('+CRAB_SiteBlacklist', 'siteblacklist'),
     ('+CRAB_SiteWhitelist', 'sitewhitelist'),
-    ('+RequestMemory', 'tm_maxmemory'),
-    ('+RequestCpus', 'tm_numcores'),
+    ('+CRAB_RequestedMemory', 'tm_maxmemory'),
+    ('+CRAB_RequestedCores', 'tm_numcores'),
     ('+MaxWallTimeMins', 'tm_maxjobruntime'),
     ('+MaxWallTimeMinsRun', 'tm_maxjobruntime'),
     ('+MaxWallTimeMinsProbe', 'maxproberuntime'),
     ('+MaxWallTimeMinsTail', 'maxtailruntime'),
-    ('JobPrio', 'tm_priority'),
     ('+CRAB_FailedNodeLimit', 'faillimit'),
     ('+CRAB_DashboardTaskType', 'taskType'),
     ('+CRAB_MaxIdle', 'maxidle'),
@@ -94,8 +93,22 @@ def addCRABInfoToJobJDL(jdl, info):
     from the info directory
     """
     for adName, dictName in SUBMIT_INFO:
-        if dictName in info and (info[dictName] is not None):
-            jdl[adName] = classad.quote(info[dictName])
+        if dictName in info and info[dictName] is not None:
+            jdl[adName] = info[dictName]
+    # extra_jdl and accelerator_jdl are not listed in SUBMIT_INFO
+    # and need ad-hoc handling, those are a string of `\n` separated k=v elements
+    if 'extra_jdl' in info and info['extra_jdl']:
+        for keyValue in info['extra_jdl'].split('\n'):
+            adName, adVal = keyValue.split(sep='=', maxsplit=1)
+            # remove any user-inserted spaces which would break schedd.submit #8420
+            adName = adName.strip()
+            adVal = adVal.strip()
+            jdl[adName] = adVal
+    if 'accelerator_jdl' in info and info['accelerator_jdl']:
+        for keyValue in info['accelerator_jdl'].split('\n'):
+            adName, adVal = keyValue.split(sep='=', maxsplit=1)
+            # these are built in our code w/o extra spaces
+            jdl[adName] = classad.ExprTree(str(adVal))
 
 
 class ScheddStats(dict):
@@ -390,6 +403,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         info['outputFilesString'] = ", ".join(outputFiles)
         arg = "RunJobs.dag"
 
+        # for uniformity with values prepared in DagmanCreator (in JSON format), add double quotes
         info['resthost'] = f"\"{self.crabserver.server['host']}\""
         info['dbinstance'] = f'"{self.crabserver.getDbInstance()}"'
 
@@ -481,16 +495,19 @@ class DagmanSubmitter(TaskAction.TaskAction):
         jobJDL["JobUniverse"] = 7
         jobJDL["HoldKillSig"] = "SIGUSR1"
         jobJDL["X509UserProxy"] = info['user_proxy']
-        jobJDL["Requirements"] = "TARGET.Cpus == 1"  # see https://github.com/dmwm/CRABServer/issues/8456#issuecomment-2145887432
+        # submission command "priority" maps to jobAd "JobPrio" !
+        jobJDL["priority"] = int(info['tm_priority'])  # info stores a string, but HTC wants a number
+        jobJDL["Requirements"] = "TARGET.Cpus >= 1"  # see https://github.com/dmwm/CRABServer/issues/8456#issuecomment-2145887432
+        jobJDL["Requirements"] = True
         environmentString = "PATH=/usr/bin:/bin CRAB3_VERSION=3.3.0-pre1"
         environmentString += " CONDOR_ID=$(ClusterId).$(ProcId)"
         environmentString += " " + " ".join(info['additional_environment_options'].split(';'))
         # Environment command in JDL requires proper quotes https://htcondor.readthedocs.io/en/latest/man-pages/condor_submit.html#environment
         jobJDL["Environment"] = classad.quote(environmentString)
         jobJDL["+RemoteCondorSetup"] = classad.quote(info['remote_condor_setup'])
-        jobJDL["+CRAB_TaskSubmitTime"] = classad.quote(info['start_time'])
-        jobJDL['+CRAB_TaskLifetimeDays'] = classad.quote(TASKLIFETIME // 24 // 60 // 60)
-        jobJDL['+CRAB_TaskEndTime'] = classad.quote(int(info['start_time']) + TASKLIFETIME)
+        jobJDL["+CRAB_TaskSubmitTime"] = info['start_time']  # this is an int (seconds from epoch)
+        jobJDL['+CRAB_TaskLifetimeDays'] = TASKLIFETIME // 24 // 60 // 60
+        jobJDL['+CRAB_TaskEndTime'] = int(info['start_time']) + TASKLIFETIME
         #For task management info see https://github.com/dmwm/CRABServer/issues/4681#issuecomment-302336451
         jobJDL["LeaveJobInQueue"] = "True"
         jobJDL["PeriodicHold"] = "time() > CRAB_TaskEndTime"
@@ -509,7 +526,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         with open('subdag.jdl', 'w', encoding='utf-8') as fd:
             print(subdagJDL, file=fd)
 
-        jobJDL["+TaskType"] = classad.quote("ROOT")
+        jobJDL["+TaskType"] = classad.quote("ROOT")  # we want the ad value to be "ROOT", not ROOT
         jobJDL["output"] = os.path.join(info['scratch'], "request.out")
         jobJDL["error"] = os.path.join(info['scratch'], "request.err")
         jobJDL["Cmd"] = cmd

@@ -504,6 +504,10 @@ class DagmanCreator(TaskAction):
         info['accounting_group_user'] = info['userhn']
         info = transform_strings(info)
         info['faillimit'] = task['tm_fail_limit']
+        # tm_extrajdl and tm_user_config['acceleratorparams'] contain list of k=v
+        # assignements to be turned into classAds, so here we turn them from a python list of strings to
+        # a single string with k=v separated by \n which can be pasted into the Job.submit JDL
+        info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
         if task['tm_user_config']['requireaccelerator']:
             # hardcoding accelerator to GPU (SI currently only have nvidia GPU)
             info['accelerator_jdl'] = '+RequiresGPU=1\nrequest_GPUs=1'
@@ -520,7 +524,6 @@ class DagmanCreator(TaskAction):
                     info['accelerator_jdl'] += f"\n+CUDARuntime={classad.quote(cudaRuntime)}"
         else:
             info['accelerator_jdl'] = ''
-        info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
         arch = info['jobarch_flatten'].split("_")[0]  # extracts "slc7" from "slc7_amd64_gcc10"
         required_os_list = ARCH_TO_OS.get(arch)
         if not required_os_list:
