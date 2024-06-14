@@ -65,7 +65,7 @@ def printData(data, header, logger=None):
     logger.info("%-4s%-15s%-10s%-10s", header)
     logger.info("-"*70)
     for row in data:
-        logger.info("%-4d%-15s%-10d%-10d", (i, row[header[1]], row[header[2]], row[header[3]]))
+        logger.info("%-4d%-15s%-10d%-10d", i, row[header[1]], row[header[2]], row[header[3]])
         i = i+1
 
     logger.info("="*70)
