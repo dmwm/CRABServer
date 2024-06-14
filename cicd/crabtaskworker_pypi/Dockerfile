@@ -71,6 +71,10 @@ RUN pip install -r requirements.txt \
     && pip install --no-deps wmcore==$(cat wmcore_version) \
     && pip cache purge
 
+# copy htcondor config
+RUN mkdir /etc/condor
+COPY cicd/crabtaskworker_pypi/condor_config /etc/condor/
+
 # install crabserver
 # will replace with pip later
 COPY src/python/ ${WDIR}/srv/current/lib/python/site-packages/
