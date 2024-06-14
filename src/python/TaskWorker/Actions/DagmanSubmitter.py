@@ -236,7 +236,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         alreadyTriedSchedds = scheddStats.taskErrors.keys() #keys in the taskerrors are schedd
 
         currentBackendurls = copy.deepcopy(self.backendurls)
-        currentBackendurls['htcondorSchedds'] = { k:v for (k,v) in restSchedulers.item() if k not in alreadyTriedSchedds}
+        currentBackendurls['htcondorSchedds'] = { k:v for (k,v) in restSchedulers.items() if k not in alreadyTriedSchedds}
         if not currentBackendurls['htcondorSchedds']:
             return None
         loc = HTCondorLocator.HTCondorLocator(currentBackendurls, self.logger)
