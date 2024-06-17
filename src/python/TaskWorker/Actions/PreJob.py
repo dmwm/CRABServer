@@ -519,8 +519,8 @@ class PreJob:
         if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
             print("Pre-job started with no output redirection.")
         else:
-            os.dup2(fd_prejob_log, 1)
-            os.dup2(fd_prejob_log, 2)
+            sys.stdout = fd_prejob_log  # https://stackoverflow.com/a/56013294
+            sys.stderr = sys.stdout
             msg = "Pre-job started with output redirected to %s" % (prejob_log_file_name)
             self.logger.info(msg)
 
@@ -529,7 +529,7 @@ class PreJob:
 
         ## If calculate_crab_retry() has set self.prejob_exit_code, we exit.
         if self.prejob_exit_code is not None:
-            os.close(fd_prejob_log)
+            fd_prejob_log.close()
             sys.exit(self.prejob_exit_code)
 
         ## Load the task ad.
@@ -563,5 +563,5 @@ class PreJob:
             return 4
         msg = "Finished pre-job execution. Sleeping %s seconds..." % (sleep_time)
         self.logger.info(msg)
-        os.close(fd_prejob_log)
-        os.execv("/bin/sleep", ["sleep", str(sleep_time)])
+        fd_prejob_log.close()
+        time.sleep(sleep_time)
