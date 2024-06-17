@@ -57,9 +57,9 @@ class PreJob:
         retry_info_file_name = "retry_info/job.%s.txt" % (self.job_id)
         if os.path.exists(retry_info_file_name):
             try:
-                with open(retry_info_file_name, 'r') as fd:
+                with open(retry_info_file_name, 'r', encoding='utf-8') as fd:
                     retry_info = json.load(fd)
-            except:
+            except Exception:
                 retmsg += "\n\tFailed to load file %s" % (retry_info_file_name)
                 retmsg += "\n\tWill use DAGMan retry number (%s)" % (self.dag_retry)
                 return self.dag_retry, retmsg
@@ -117,11 +117,11 @@ class PreJob:
         ## Save the retry_info dictionary to file.
         retmsg += "\n\tSaving retry_info = %s to %s" % (retry_info, retry_info_file_name)
         try:
-            with open(retry_info_file_name + ".tmp", 'w') as fd:
+            with open(retry_info_file_name + ".tmp", 'w', encoding='utf-8') as fd:
                 json.dump(retry_info, fd)
             os.rename(retry_info_file_name + ".tmp", retry_info_file_name)
             retmsg += "\n\tSuccessfully saved %s" % (retry_info_file_name)
-        except:
+        except Exception:
             retmsg += "\n\tFailed to save %s" % (retry_info_file_name)
 
         return crab_retry, retmsg
@@ -169,9 +169,9 @@ class PreJob:
         self.task_ad = {}
         try:
             self.logger.info("Loading classads from: %s", os.environ['_CONDOR_JOB_AD'])
-            self.task_ad = classad.parseOne(open(os.environ['_CONDOR_JOB_AD']))
+            self.task_ad = classad.parseOne(open(os.environ['_CONDOR_JOB_AD'], 'r', encoding='utf-8'))
             self.logger.info(str(self.task_ad))
-        except:
+        except Exception:
             msg = "Got exception while trying to parse the job ad."
             self.logger.exception(msg)
 
@@ -182,7 +182,7 @@ class PreJob:
         """
         file_name = "resubmit_info/job.%s.txt" % (self.job_id)
         if os.path.exists(file_name):
-            with open(file_name, 'r') as fd:
+            with open(file_name, 'r', encoding='utf-8') as fd:
                 self.resubmit_info = literal_eval(fd.read())
 
 
@@ -191,7 +191,7 @@ class PreJob:
         Need a doc string here.
         """
         file_name = "resubmit_info/job.%s.txt" % (self.job_id)
-        with open(file_name + ".tmp", 'w') as fd:
+        with open(file_name + ".tmp", 'w', encoding='utf-8') as fd:
             fd.write(str(self.resubmit_info))
         os.rename(file_name + ".tmp", file_name)
 
@@ -204,10 +204,10 @@ class PreJob:
         try:
             for state in JOB_RETURN_CODES._fields:
                 count = 0
-                with open("task_statistics.%s" % (state)) as fd:
+                with open("task_statistics.%s" % (state), 'r', encoding='utf-8') as fd:
                     count = len(fd.read().split(b'\n')) - 1
                 results[state] = count
-        except:
+        except Exception:
             return {}
         return results
 
@@ -220,10 +220,10 @@ class PreJob:
         try:
             for state in JOB_RETURN_CODES._fields:
                 count = 0
-                with open("task_statistics.%s.%s" % (site, state)) as fd:
+                with open("task_statistics.%s.%s" % (site, state), 'r', encoding='utf-8') as fd:
                     count = len(fd.read().split(b'\n')) - 1
                 results[state] = count
-        except:
+        except Exception:
             return {}
         return results
 
@@ -359,10 +359,10 @@ class PreJob:
                 new_submit_text += '+CMSGroups = %s\n' % classad.quote(groups)
 
         ## Finally add (copy) all the content of the generic Job.submit file.
-        with open("Job.submit", 'r') as fd:
+        with open("Job.submit", 'r', encoding='utf-8') as fd:
             new_submit_text += fd.read()
         ## Write the Job.<job_id>.submit file.
-        with open("Job.%s.submit" % (self.job_id), 'w') as fd:
+        with open("Job.%s.submit" % (self.job_id), 'w', encoding='utf-8') as fd:
             fd.write(new_submit_text)
 
 
@@ -411,13 +411,13 @@ class PreJob:
             new_submit_text += '+CRAB_SiteWhitelist = {}\n'
         ## Get the list of available sites (the sites where this job could run).
         if os.path.exists("site.ad.json"):
-            with open("site.ad.json") as fd:
+            with open("site.ad.json", 'r', encoding='utf-8') as fd:
                 site_info = json.load(fd)
             group = site_info[self.job_id]
             available = set(site_info['group_sites'][str(group)])
             datasites = set(site_info['group_datasites'][str(group)])
         else:
-            with open("site.ad") as fd:
+            with open("site.ad", 'r', encoding='utf-8') as fd:
                 site_ad = classad.parseOne(fd)
             available = set(site_ad['Job%s' % (self.job_id)])
         ## Take the intersection between the available sites and the site whitelist.
@@ -454,19 +454,19 @@ class PreJob:
             logpath = os.path.relpath('WEB_DIR')
             job_retry = "%s.%s" % (self.job_id, crab_retry)
             fname = os.path.join(logpath, "job_out.%s.txt" % job_retry)
-            with open(fname, 'w') as fd:
+            with open(fname, 'w', encoding='utf-8') as fd:
                 fd.write("Job output has not been processed by post-job.\n")
             fname = "postjob.%s.txt" % job_retry
-            with open(fname, 'w') as fd:
+            with open(fname, 'w', encoding='utf-8') as fd:
                 fd.write("Post-job is currently queued.\n")
             try:
                 os.symlink(os.path.abspath(os.path.join(".", fname)), \
                            os.path.join(logpath, fname))
-            except:
+            except Exception:
                 pass
             if crab_retry:
                 return time.time() - os.stat(os.path.join(".", "postjob.%s.%s.txt" % (self.job_id, int(crab_retry)-1))).st_mtime
-        except:
+        except Exception:
             msg = "Exception executing touch_logs()."
             self.logger.exception(msg)
 
@@ -511,10 +511,9 @@ class PreJob:
         except OSError as ose:
             if ose.errno != errno.EEXIST:
                 logpath = os.getcwd()
-        ## Create (open) the pre-job log file prejob.<job_id>.<crab_retry>.txt.
+        ## Create and open the pre-job log file prejob.<job_id>.<crab_retry>.txt.
         prejob_log_file_name = os.path.join(logpath, "prejob.%s.%s.txt" % (self.job_id, crab_retry))
-        fd_prejob_log = os.open(prejob_log_file_name, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
-        os.chmod(prejob_log_file_name, 0o644)
+        fd_prejob_log = open(prejob_log_file_name, 'w', encoding='utf-8')
 
         ## Redirect stdout and stderr to the pre-job log file.
         if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
@@ -537,7 +536,7 @@ class PreJob:
         self.get_task_ad()
 
         try:
-            with open('webdir') as fd:
+            with open('webdir', 'r', encoding='utf-8') as fd:
                 self.userWebDirPrx = fd.read()
         except IOError as e:
             self.logger.error("'I/O error(%s): %s', when looking for the 'webdir' file. Might be normal"
@@ -547,7 +546,7 @@ class PreJob:
             self.get_resubmit_info()
             self.alter_submit(crab_retry)
             self.save_resubmit_info()
-        except:
+        except Exception:
             msg = "Exception executing the pre-job."
             self.logger.exception(msg)
             raise
