@@ -450,7 +450,7 @@ class PreJob:
         with default messages.
         """
         try:
-            taskname = self.task_ad['CRAB_ReqName']
+            taskname = self.task_ad['CRAB_ReqName']  # pylint: disable=unused-variable
             logpath = os.path.relpath('WEB_DIR')
             job_retry = "%s.%s" % (self.job_id, crab_retry)
             fname = os.path.join(logpath, "job_out.%s.txt" % job_retry)
