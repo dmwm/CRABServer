@@ -31,16 +31,7 @@ class PreJob:
         self.userWebDirPrx = ""
         self.resubmit_info = {}
         self.prejob_exit_code = None
-        ## Set a logger for the pre-job.
         self.logger = logging.getLogger()
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", \
-                                      datefmt = "%a, %d %b %Y %H:%M:%S %Z(%z)")
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
-        self.logger.setLevel(logging.DEBUG)
-        self.logger.propagate = False
-
 
     def calculate_crab_retry(self):
         """
@@ -504,6 +495,7 @@ class PreJob:
         ## Calculate the CRAB retry count.
         crab_retry, calculate_crab_retry_msg = self.calculate_crab_retry()
 
+        ## Set a logger for the pre-job.
         ## Create a directory in the schedd where to store the prejob logs.
         logpath = os.path.join(os.getcwd(), "prejob_logs")
         try:
@@ -513,13 +505,20 @@ class PreJob:
                 logpath = os.getcwd()
         ## Create and open the pre-job log file prejob.<job_id>.<crab_retry>.txt.
         prejob_log_file_name = os.path.join(logpath, "prejob.%s.%s.txt" % (self.job_id, crab_retry))
-        fd_prejob_log = open(prejob_log_file_name, 'w', encoding='utf-8')
+
+        logging.basicConfig(
+            filename=prejob_log_file_name,
+            encoding='utf-8',
+            level=logging.DEBUG,
+            format='%(asctime)s:%(levelname)s:%(module)s %(message)s", \
+                                      datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)"'
+        )
 
         ## Redirect stdout and stderr to the pre-job log file.
         if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
             print("Pre-job started with no output redirection.")
         else:
-            sys.stdout = fd_prejob_log  # https://stackoverflow.com/a/56013294
+            sys.stdout = open(prejob_log_file_name, 'a', encoding='utf-8')  # https://stackoverflow.com/a/56013294
             sys.stderr = sys.stdout
             msg = "Pre-job started with output redirected to %s" % (prejob_log_file_name)
             self.logger.info(msg)
@@ -529,7 +528,6 @@ class PreJob:
 
         ## If calculate_crab_retry() has set self.prejob_exit_code, we exit.
         if self.prejob_exit_code is not None:
-            fd_prejob_log.close()
             sys.exit(self.prejob_exit_code)
 
         ## Load the task ad.
@@ -563,5 +561,4 @@ class PreJob:
             return 4
         msg = "Finished pre-job execution. Sleeping %s seconds..." % (sleep_time)
         self.logger.info(msg)
-        fd_prejob_log.close()
         time.sleep(sleep_time)
