@@ -1,34 +1,14 @@
 # https://github.com/dmwm/WMCore/blob/2.2.4rc6/requirements.txt
 # update deps version when bump wmcore version
 
-Cheetah3~=3.2.6.post1
-CherryPy~=18.8.0
-CMSCouchapp~=1.3.4
-CMSMonitoring~=0.6.10
-coverage~=5.4
-cx-Oracle~=8.3.0
 dbs3-client~=4.0.12
 future~=0.18.2
-httplib2~=0.20.4
-htcondor~=23.0.12
-Jinja2~=3.1.2
-memory-profiler~=0.60.0
-mock~=4.0.3
-mox3~=1.1.0
-mysqlclient~=2.1.1
-nose~=1.3.7
-nose2~=0.12.0
-pycodestyle~=2.8.0
+htcondor==23.9.0a2
 psutil~=5.9.1
 pycurl~=7.45.1
-pylint~=2.14.5
-pymongo~=4.2.0
 pyOpenSSL~=18.0.0
-pyzmq~=23.2.1
 retry~=0.9.2
 rucio-clients~=1.29.10
-Sphinx~=5.1.1
-SQLAlchemy~=1.4.40
 PyJWT~=2.4.0
 
 # crab deps
