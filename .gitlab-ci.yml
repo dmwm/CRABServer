@@ -145,7 +145,6 @@ deploy_server:
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: deploy
-  needs: ["build_rest_image"]
   image:
     name: registry.cern.ch/cmscrab/buildtools
     entrypoint: [""]
