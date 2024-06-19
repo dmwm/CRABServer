@@ -37,7 +37,6 @@ get_env:
       - .env
     expire_in: 1 week
 
-# use pre_release stage
 set_version_name:
   rules:
     - !reference [.default_rules, release]
@@ -46,11 +45,10 @@ set_version_name:
     name: registry.cern.ch/cmscrab/buildtools
     entrypoint: [""]
   script:
-    - source .env
     - |
-        echo -e "\n__version__ = \"${RELEASE_NAME}\" #Automatically added during build process" >> src/python/TaskWorker/__init__.py;
+        echo -e "\n__version__ = \"${RELEASE_NAME:-$CI_COMMIT_TAG}\" #Automatically added during build process" >> src/python/TaskWorker/__init__.py;
     - |
-        echo -e "\n__version__ = \"${RELEASE_NAME}\" #Automatically added during build process" >> src/python/CRABInterface/__init__.py;
+        echo -e "\n__version__ = \"${RELEASE_NAME:-$CI_COMMIT_TAG}\" #Automatically added during build process" >> src/python/CRABInterface/__init__.py;
   cache:
     - key: $CI_PIPELINE_ID
       paths:
@@ -125,7 +123,7 @@ build_monit_image:
 
 deploy_server:
   rules:
-    - if: $SKIP_DEPLOY
+    - if: $SKIP_DEPLOY || $FORCE_RELEASE
       when: never
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -144,7 +142,7 @@ deploy_server:
 
 .deploy_tw_template:
   rules:
-    - if: $SKIP_DEPLOY
+    - if: $SKIP_DEPLOY || $FORCE_RELEASE
       when: never
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -180,7 +178,7 @@ task_submission_status_tracking:
     - if: $MANUAL_CI_PIPELINE_ID
       when: never
     - if: $SUBMIT_STATUS_TRACKING
-    - if: $SKIP_DEPLOY
+    - if: $SKIP_DEPLOY || $FORCE_RELEASE
       when: never
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -210,7 +208,7 @@ check_test_result:
   rules:
     - if: $SUBMIT_STATUS_TRACKING
     - if: $MANUAL_CI_PIPELINE_ID
-    - if: $SKIP_DEPLOY
+    - if: $SKIP_DEPLOY || $FORCE_RELEASE
       when: never
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -252,7 +250,7 @@ release_stable:
   variables:
     GIT_STRATEGY: none
   script:
-    - export RELEASE_IMAGE_TAG=${RELEASE_NAME:-${CI_COMMIT_TAG}-stable}
+    - export RELEASE_IMAGE_TAG=${RELEASE_NAME:-${CI_COMMIT_TAG}}-stable
     - crane auth login -u ${CMSCRAB_REGISTRY_USER} -p ${CMSCRAB_REGISTRY_PASSWORD} ${CMSCRAB_REGISTRY_URL}
     - crane cp registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG} registry.cern.ch/cmscrab/crabserver:${RELEASE_IMAGE_TAG}
     - crane cp registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG} registry.cern.ch/cmscrab/crabtaskworker:${RELEASE_IMAGE_TAG}
