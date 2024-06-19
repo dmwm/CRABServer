@@ -123,21 +123,6 @@ build_monit_image:
         - src/python/TaskWorker/__init__.py
       policy: pull
 
-# if release, then tag monit image with `v3.latest.monit`
-tag_monit_latest:
-  rules:
-    - !reference [.default_rules, release]
-  stage: build_docker
-  needs: ["build_monit_image"]
-  image:
-    name: registry.cern.ch/cmscrab/buildtools
-    entrypoint: [""]
-  variables:
-    GIT_STRATEGY: none
-  script:
-    - crane auth login -u ${CMSCRAB_REGISTRY_USER} -p ${CMSCRAB_REGISTRY_PASSWORD} ${CMSCRAB_REGISTRY_URL}
-    - crane cp registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.monit registry.cern.ch/cmscrab/crabtaskworker:v3.latest.monit
-
 deploy_server:
   rules:
     - if: $SKIP_DEPLOY
@@ -271,3 +256,17 @@ release_stable:
     - crane auth login -u ${CMSCRAB_REGISTRY_USER} -p ${CMSCRAB_REGISTRY_PASSWORD} ${CMSCRAB_REGISTRY_URL}
     - crane cp registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG} registry.cern.ch/cmscrab/crabserver:${RELEASE_IMAGE_TAG}
     - crane cp registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG} registry.cern.ch/cmscrab/crabtaskworker:${RELEASE_IMAGE_TAG}
+
+# if release, then tag monit image with `v3.latest.monit`
+tag_monit_latest:
+  rules:
+    - !reference [.default_rules, release]
+  stage: tagging_release
+  image:
+    name: registry.cern.ch/cmscrab/buildtools
+    entrypoint: [""]
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - crane auth login -u ${CMSCRAB_REGISTRY_USER} -p ${CMSCRAB_REGISTRY_PASSWORD} ${CMSCRAB_REGISTRY_URL}
+    - crane cp registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.monit registry.cern.ch/cmscrab/crabtaskworker:v3.latest.monit
