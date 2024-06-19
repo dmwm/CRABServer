@@ -83,7 +83,7 @@ def main(logger):
     logger.info("rucio client initialized: %s %s", rucioClient.ping(), rucioClient.whoami() )
 
     # prepare a JSON to be sent to MONIT
-    jsonDoc = {'producer': 'crab', 'type': 'reportrecallquota', 'hostname': gethostname()}
+    jsonDoc = {'producer': MONITUSER, 'type': 'reportrecallquota', 'hostname': gethostname()}
     # get info for the used account, each will be sent with ad-hoc tag in the JSON
     accounts = [{'name': 'crab_tape_recall', 'tag': 'tape_recall_total_TB'},
                 {'name': 'crab_input',       'tag': 'crab_input_total_TB'}]
