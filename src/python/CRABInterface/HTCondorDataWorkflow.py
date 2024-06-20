@@ -98,34 +98,25 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         yield res
 
-    @throttle.make_throttled()
-    @conn_handler(services=['centralconfig'])
+    def taskads(self, workflow):
+        """ deprecated. Remove when https://github.com/dmwm/CRABClient/pull/5318 in production """
+        return [{'JobStatus': 0}]  # makes old client to print "Waiting for ... bootstrap"
+
     def status(self, workflow, userdn):
-        """Retrieve the status of the workflow.
-
-           :arg str workflow: a valid workflow name
-           :return: a workflow status summary document"""
-        self.logger.error("========================================")
-        self.logger.error("DO WE REALLY WANT TO CALL THIS !!!!!!!!!!!!!!!!!")
-        self.logger.error("========================================")
-
-        #Empty results
-        result = {"status"           : '', #from the db
-                  "command"          : '', #from the db
-                  "taskFailureMsg"   : '', #from the db
-                  "taskWarningMsg"   : [], #from the db
-                  "submissionTime"   : 0,  #from the db
-                  "statusFailureMsg" : '', #errors of the status itself
-                  "jobList"          : [],
-                  "schedd"           : '', #from the db
-                  "splitting"        : '', #from the db
-                  "taskWorker"       : '', #from the db
-                  "webdirPath"       : '', #from the db
+        """ deprecated. Remove when https://github.com/dmwm/CRABClient/pull/5318 in production """
+        # Empty results
+        result = {"status": '',  # from the db
+                  "command": '',  # from the db
+                  "taskFailureMsg": '',  # from the db
+                  "taskWarningMsg": [],  # from the db
+                  "submissionTime": 0,  # from the db
+                  "statusFailureMsg": '',  # errors of the status itself
+                  "jobList": [],
+                  "schedd": '',  # from the db
+                  "splitting": '',  # from the db
+                  "taskWorker": '',  # from the db
+                  "webdirPath": '',  # from the db
                   "username"         : ''} #from the db
-
-        # waiting for a new implementation, possibly based on a future jobs table
-        result['status'] = "NotAvailable"
-        result['statusFailureMsg'] = "To be implemented"
         return [result]
 
     @conn_handler(services=[])
