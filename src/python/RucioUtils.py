@@ -26,14 +26,21 @@ def getNativeRucioClient(config=None, logger=None):
     cl = logging.getLogger('charset_normalizer')
     cl.setLevel(logging.ERROR)
 
-    rucioCert = getattr(config.Services, "Rucio_cert", config.TaskWorker.cmscert)
-    rucioKey = getattr(config.Services, "Rucio_key", config.TaskWorker.cmskey)
+    # allow for both old and new configuration style
+
+    if getattr(config, 'Services', None):
+        rucioConfig = config.Services
+    else:
+        rucioConfig = config
+
+    rucioCert = getattr(rucioConfig, "Rucio_cert")
+    rucioKey = getattr(rucioConfig, "Rucio_key")
     logger.debug("Using cert [%s]\n and key [%s] for rucio client.", rucioCert, rucioKey)
     nativeClient = Client(
-        rucio_host=config.Services.Rucio_host,
-        auth_host=config.Services.Rucio_authUrl,
-        ca_cert=config.Services.Rucio_caPath,
-        account=config.Services.Rucio_account,
+        rucio_host=rucioConfig.Rucio_host,
+        auth_host=rucioConfig.Rucio_authUrl,
+        ca_cert=rucioConfig.Rucio_caPath,
+        account=rucioConfig.Rucio_account,
         creds={"client_cert": rucioCert, "client_key": rucioKey},
         auth_type='x509',
         logger=rucioLogger
