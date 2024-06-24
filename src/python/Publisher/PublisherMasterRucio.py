@@ -21,6 +21,7 @@ from WMCore.Configuration import loadConfigurationFile
 
 from ServerUtilities import encodeRequest, oracleOutputMapping, executeCommand
 from TaskWorker.WorkerUtilities import getCrabserver
+from RucioUtils import getNativeRucioClient
 
 from PublisherUtils import createLogdir, setRootLogger, setSlaveLogger, logVersionAndConfig
 from PublisherUtils import getInfoFromFMD, markFailed
@@ -65,6 +66,9 @@ class Master():  # pylint: disable=too-many-instance-attributes
 
         # CRAB REST API
         self.crabServer = getCrabserver(restConfig=config.REST, agentName='CRABPublisher', logger=self.logger)
+
+        # Rucio Client
+        self.rucio = getNativeRucioClient(config=config.Rucio, logger=self.logger)
 
         self.startTime = time.time()
 
