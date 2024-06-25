@@ -265,6 +265,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
         :param task: one tuple describing  a task as returned by  active_tasks()
         :return: 0  It will always terminate normally, if publication fails it will mark it in the DB
         """
+
         workflow = task['taskname']
         # - process logger
         logger = setSlaveLogger(self.config.logsDir, workflow)
@@ -275,10 +276,30 @@ class Master():  # pylint: disable=too-many-instance-attributes
 
         # fill list of blocks completely transferred and closed in Rucio, which can be published in DBS
         blocksToPublish = set()
+        numAcquiredFilesPerBlock = {}
         self.numAcquiredFiles = len(task['fileDicts'])  # pylint: disable=attribute-defined-outside-init
         for fileDict in task['fileDicts']:
             if fileDict['block_complete'] == 'OK':
-                blocksToPublish.add(fileDict['dbs_blockname'])
+                blockName = fileDict['dbs_blockname']
+                if not blockName in numAcquiredFilesPerBlock:
+                    numAcquiredFilesPerBlock[blockName] = 0
+                numAcquiredFilesPerBlock[blockName] += 1
+            blocksToPublish.add(blockName)
+
+        # make sure that we have acquired all files in that block. ref #8491
+        for blockName in blocksToPublish.copy():
+            countOfAcquiredFilesInBlock = numAcquiredFilesPerBlock[blockName]
+            # start by "finding" rucio scope, later we will pick this from the filetransfers DB
+            rucioScope = f"user.{task['username']}"
+            # beware group scope
+            destLfnParts = task['fileDicts'][0]['destination_lfn'].split('/')
+            if destLfnParts[2] == 'group':
+                groupName =  destLfnParts[4]
+                rucioScope = f"group.{groupName}"
+            countOfFilesInRucioDataset =  len(list(self.rucio.list_content(scope=rucioScope, name=blockName)))
+            if countOfAcquiredFilesInBlock != countOfFilesInRucioDataset:
+                # wait until we have acquired all files which Rucio says are in this block
+                blocksToPublish.remove(blockName)
 
         # prepare 2 structures:
         # one dictionary for each blocksToPublish with list of files in that block
@@ -292,6 +313,8 @@ class Master():  # pylint: disable=too-many-instance-attributes
                     filesInfo.append(fileDict)
                     lfnsToPublish.append(fileDict['destination_lfn'])
             FilesInfoFromTBDInBlock[blockName] = filesInfo
+
+
 
         print(f"Prepare publish info for {len(blocksToPublish)} blocks")
 
