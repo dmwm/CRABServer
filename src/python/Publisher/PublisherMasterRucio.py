@@ -21,6 +21,7 @@ from WMCore.Configuration import loadConfigurationFile
 
 from ServerUtilities import encodeRequest, oracleOutputMapping, executeCommand
 from TaskWorker.WorkerUtilities import getCrabserver
+from RucioUtils import getNativeRucioClient
 
 from PublisherUtils import createLogdir, setRootLogger, setSlaveLogger, logVersionAndConfig
 from PublisherUtils import getInfoFromFMD, markFailed
@@ -65,6 +66,9 @@ class Master():  # pylint: disable=too-many-instance-attributes
 
         # CRAB REST API
         self.crabServer = getCrabserver(restConfig=config.REST, agentName='CRABPublisher', logger=self.logger)
+
+        # Rucio Client
+        self.rucio = getNativeRucioClient(config=config.Rucio, logger=self.logger)
 
         self.startTime = time.time()
 
@@ -255,12 +259,13 @@ class Master():  # pylint: disable=too-many-instance-attributes
         # a change in Publisher/stop.sh otherwise that script will break
         self.logger.info("Next cycle will start at %s", newStartTime)
 
-    def startSlave(self, task):  # pylint: disable=too-many-branches
+    def startSlave(self, task):  # pylint: disable=too-many-branches, too-many-locals
         """
         start a slave process to deal with publication for a single task
         :param task: one tuple describing  a task as returned by  active_tasks()
         :return: 0  It will always terminate normally, if publication fails it will mark it in the DB
         """
+
         workflow = task['taskname']
         # - process logger
         logger = setSlaveLogger(self.config.logsDir, workflow)
@@ -271,10 +276,30 @@ class Master():  # pylint: disable=too-many-instance-attributes
 
         # fill list of blocks completely transferred and closed in Rucio, which can be published in DBS
         blocksToPublish = set()
+        numAcquiredFilesPerBlock = {}
         self.numAcquiredFiles = len(task['fileDicts'])  # pylint: disable=attribute-defined-outside-init
         for fileDict in task['fileDicts']:
             if fileDict['block_complete'] == 'OK':
-                blocksToPublish.add(fileDict['dbs_blockname'])
+                blockName = fileDict['dbs_blockname']
+                if blockName not in numAcquiredFilesPerBlock:
+                    numAcquiredFilesPerBlock[blockName] = 0
+                numAcquiredFilesPerBlock[blockName] += 1
+            blocksToPublish.add(blockName)
+
+        # make sure that we have acquired all files in that block. ref #8491
+        for blockName in blocksToPublish.copy():
+            countOfAcquiredFilesInBlock = numAcquiredFilesPerBlock[blockName]
+            # start by "finding" rucio scope, later we will pick this from the filetransfers DB
+            rucioScope = f"user.{task['username']}"
+            # beware group scope
+            destLfnParts = task['fileDicts'][0]['destination_lfn'].split('/')
+            if destLfnParts[2] == 'group':
+                groupName = destLfnParts[4]
+                rucioScope = f"group.{groupName}"
+            countOfFilesInRucioDataset = len(list(self.rucio.list_content(scope=rucioScope, name=blockName)))
+            if countOfAcquiredFilesInBlock != countOfFilesInRucioDataset:
+                # wait until we have acquired all files which Rucio says are in this block
+                blocksToPublish.remove(blockName)
 
         # prepare 2 structures:
         # one dictionary for each blocksToPublish with list of files in that block
@@ -289,7 +314,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
                     lfnsToPublish.append(fileDict['destination_lfn'])
             FilesInfoFromTBDInBlock[blockName] = filesInfo
 
-        print(f"Prepare publish info for {len(blocksToPublish)} blocks")
+        logger.info(f"Prepare publish info for {len(blocksToPublish)} blocks")
 
         # so far so good
 
