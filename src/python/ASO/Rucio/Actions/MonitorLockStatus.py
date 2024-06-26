@@ -1,3 +1,4 @@
+# pylint: disable=logging-fstring-interpolation
 """
 Monitoring replicas' transfer status and adding them to publish the container.
 """
@@ -261,11 +262,12 @@ class MonitorLockStatus:
         # TODO: may need to refactor later along with rest and publisher part
         # This can be optimize to single REST API call together with updateTransfers's subresources
         num = len(fileDocs)
+        scope = self.transfer.rucioScope
         restFileDoc = {
             'asoworker': 'rucio',
             'list_of_ids': [x['id'] for x in fileDocs],
             'list_of_transfer_state': ['DONE']*num,
-            'list_of_dbs_blockname': [x['dataset'] for x in fileDocs],
+            'list_of_dbs_blockname': [f"{scope}:{x['dataset']}" for x in fileDocs],
             'list_of_block_complete': [x['blockcomplete'] for x in fileDocs],
             'list_of_fts_instance': ['https://fts3-cms.cern.ch:8446/']*num,
             'list_of_failure_reason': None, # omit
