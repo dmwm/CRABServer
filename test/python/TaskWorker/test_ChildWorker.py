@@ -13,8 +13,8 @@ from TaskWorker.WorkerExceptions import ChildUnexpectedExitException, ChildTimeo
 @pytest.fixture
 def config_ChildWorker():
     config = ConfigurationEx()
-    config.section_("TaskWorker")
-    config.TaskWorker.childWorkerTimeout = 1
+    config.section_("FeatureFlags")
+    config.FeatureFlags.childWorkerTimeout = 1
     return config
 
 @pytest.fixture
