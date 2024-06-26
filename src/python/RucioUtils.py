@@ -5,6 +5,7 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 from rucio.client import Client
 from rucio.common.exception import RSENotFound
 
+
 def getNativeRucioClient(config=None, logger=None):
     """
     instantiates a Rucio python Client for use in CRAB TaskWorker

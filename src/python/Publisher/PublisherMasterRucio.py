@@ -259,7 +259,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
         # a change in Publisher/stop.sh otherwise that script will break
         self.logger.info("Next cycle will start at %s", newStartTime)
 
-    def startSlave(self, task):  # pylint: disable=too-many-branches
+    def startSlave(self, task):  # pylint: disable=too-many-branches, too-many-locals
         """
         start a slave process to deal with publication for a single task
         :param task: one tuple describing  a task as returned by  active_tasks()
@@ -281,7 +281,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
         for fileDict in task['fileDicts']:
             if fileDict['block_complete'] == 'OK':
                 blockName = fileDict['dbs_blockname']
-                if not blockName in numAcquiredFilesPerBlock:
+                if blockName not in numAcquiredFilesPerBlock:
                     numAcquiredFilesPerBlock[blockName] = 0
                 numAcquiredFilesPerBlock[blockName] += 1
             blocksToPublish.add(blockName)
@@ -294,9 +294,9 @@ class Master():  # pylint: disable=too-many-instance-attributes
             # beware group scope
             destLfnParts = task['fileDicts'][0]['destination_lfn'].split('/')
             if destLfnParts[2] == 'group':
-                groupName =  destLfnParts[4]
+                groupName = destLfnParts[4]
                 rucioScope = f"group.{groupName}"
-            countOfFilesInRucioDataset =  len(list(self.rucio.list_content(scope=rucioScope, name=blockName)))
+            countOfFilesInRucioDataset = len(list(self.rucio.list_content(scope=rucioScope, name=blockName)))
             if countOfAcquiredFilesInBlock != countOfFilesInRucioDataset:
                 # wait until we have acquired all files which Rucio says are in this block
                 blocksToPublish.remove(blockName)
@@ -314,9 +314,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
                     lfnsToPublish.append(fileDict['destination_lfn'])
             FilesInfoFromTBDInBlock[blockName] = filesInfo
 
-
-
-        print(f"Prepare publish info for {len(blocksToPublish)} blocks")
+        logger.info(f"Prepare publish info for {len(blocksToPublish)} blocks")
 
         # so far so good
 
