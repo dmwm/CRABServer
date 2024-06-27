@@ -71,7 +71,7 @@ zip -rq "${STARTDIR}/CRAB3.zip" WMCore PSetTweaks Utils -x \*.pyc || exit 3
 popd
 
 pushd "${CRABSERVER_BUILD_PREFIX}"
-zip -rq "${STARTDIR}/CRAB3.zip" RESTInteractions.py HTCondorUtils.py HTCondorLocator.py TaskWorker CRABInterface  TransferInterface ASO -x \*.pyc || exit 3
+zip -rq "${STARTDIR}/CRAB3.zip" RESTInteractions.py HTCondorLocator.py TaskWorker CRABInterface  TransferInterface ASO -x \*.pyc || exit 3
 popd
 
 cp -r "${CRABSERVERDIR}/scripts"/{TweakPSet.py,CMSRunAnalysis.py,task_process} .
