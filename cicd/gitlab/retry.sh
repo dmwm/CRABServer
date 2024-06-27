@@ -19,7 +19,8 @@ while true; do
                 echo "Reach max retry count: $RETRY"
                 exit 1
             fi
-            echo "Sleep for ${RETRY_SLEEP_SECONDS} seconds."
+            echo -n "Sleep for ${RETRY_SLEEP_SECONDS} seconds."
+	    echo " Until " `date -d "now + ${RETRY_SLEEP_SECONDS} seconds" +"%H:%M %Z"` 
             sleep "${RETRY_SLEEP_SECONDS}"
             RETRY=$((RETRY + 1))
             continue
