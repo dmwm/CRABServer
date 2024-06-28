@@ -1,0 +1,8 @@
+#!/usr/bin/env python
+"""
+Entrypoint to TaskWorker process
+"""
+
+from TaskWorker.Main import main
+
+main()

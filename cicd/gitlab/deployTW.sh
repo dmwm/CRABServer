@@ -10,7 +10,7 @@ echo "(DEBUG) Environment: ${Environment}"
 WORK_DIR=$PWD
 
 if [ "X${Service}" == "XTaskWorker" ] ; then
-	processName=MasterWorker
+	processName=crab-taskworker
 else
 	processName=RunPublisher
 fi
