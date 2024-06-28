@@ -12,11 +12,10 @@
 # CRABSERVERDIR=./ WMCOREDIR=../WMCore TRACE=true bash cicd/crabtaskworker/buildDatafiles.sh
 
 set -euo pipefail
-TRACE=${TRACE:-}
-if [[ -n $TRACE ]]; then
-    set +x
+if [[ -n ${TRACE+x} ]]; then
+    set -x
+    export TRACE
 fi
-
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 RUNTIME_WORKDIR="${RUNTIME_WORKDIR:-./make_runtime}"
