@@ -43,3 +43,9 @@ class TapeDatasetException(TaskWorkerException):
 
 class CannotMigrateException(TaskWorkerException):
     """Used by Publisher in case DBS server refuses to migrate"""
+
+class ChildUnexpectedExitException(TaskWorkerException):
+    """Used by ChildWorker simply to rename BrokenProcessPool to be more understandable name"""
+
+class ChildTimeoutException(TaskWorkerException):
+    """Used by ChildWorker to rename built-in TimeoutException from SIGALARM's signalHandler function to be more understandable name"""
