@@ -27,5 +27,8 @@ if usePdb:
     import pdb
     pdb.set_trace()
 
+# no childWorker when running with pdb
+config.FeatureFlags.childWorker = False
+
 mc = MasterWorker(config=config, logWarning=False, logDebug=True, sequential=True, console=True)
 mc.algorithm()
