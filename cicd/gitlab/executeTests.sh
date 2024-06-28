@@ -57,5 +57,5 @@ else
             echo -e "Task submission for **${test}** successfully ended.\n\`\`\`\n`cat "$path"`\n\`\`\`\n"
         fi
     done
-    echo -e "Finished at: `(date '+%Y-%m-%d %H:%M:%S')`\n"
+    echo -e "Finished at: `(date '+%Y-%m-%d %H:%M:%S %Z')`\n"
 fi

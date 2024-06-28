@@ -46,7 +46,7 @@ fi
 echo -e """**Test:** Task Submission Status Tracking\n\
 **Result:** ${TEST_RESULT}\n\
 **Attempt:** ${RETRY} out of ${RETRY_MAX}. ${MESSAGE}\n\
-**Finished at:** `(date '+%Y-%m-%d %H:%M:%S')`\n\
+**Finished at:** `(date '+%Y-%m-%d %H:%M:%S %Z')`\n\
 """
 
 echo -e "\`\`\`\n`cat result`\n\`\`\`" || true
