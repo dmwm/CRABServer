@@ -25,8 +25,10 @@ from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
 from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
 from TaskWorker.Actions.RucioDataDiscovery import RucioDataDiscovery
 from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
-from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException, TaskWorkerException
+from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException,\
+    TaskWorkerException, SubmissionRefusedException
 
+from CRABUtils.TaskUtils import updateTaskStatus
 from ServerUtilities import uploadToS3
 
 
@@ -92,8 +94,12 @@ class TaskHandler():
         """
         try:
             output = work.execute(nextinput, task=self.task, tempDir=self.tempDir)
-        except TapeDatasetException as tde:
-            raise TapeDatasetException(str(tde)) from tde
+        except TapeDatasetException as e:
+            raise TapeDatasetException(str(e)) from e
+        except SubmissionRefusedException as e:
+            updateTaskStatus(self.crabserver, taskName=self.task['tm_taskname'],
+                             status='SUBMITREFUSED', logger=self.logger)
+            raise SubmissionRefusedException(str(e)) from e
         except TaskWorkerException as twe:
             self.logger.debug(str(traceback.format_exc()))  # print the stacktrace only in debug mode
             raise WorkerHandlerException(str(twe), retry=twe.retry) from twe  # TaskWorker error, do not add traceback
