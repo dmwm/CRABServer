@@ -5,7 +5,10 @@
 # See description of variables in cicd/crabtaskworker_pypi/buildDataFiles.sh
 
 set -euo pipefail
-#set -x
+if [[ -n ${TRACE+x} ]]; then
+    set -x
+    export TRACE
+fi
 
 # use "convention path" of repos to build datafiles inside /data/build
 DATAFILES_WORKDIR=/data/build/datafiles_dir
@@ -22,7 +25,14 @@ export DATAFILES_WORKDIR
 export RUNTIME_WORKDIR
 export WMCOREDIR
 export CRABSERVERDIR
-bash cicd/crabtaskworker_pypi/buildDatafiles.sh
+# the buildDatafiles is too verbose, pipe it to file instead if not TRACE
+if [[ -n ${TRACE+x} ]]; then
+    bash cicd/crabtaskworker_pypi/buildDatafiles.sh
+else
+    logpath=/tmp/buildDatafiles-$(date +"%Y%m%d-%H%M%S").log
+    bash cicd/crabtaskworker_pypi/buildDatafiles.sh &> "${logpath}"
+    echo "buildDatafiles.sh log path: ${logpath}"
+fi
 popd
 
 # copy new data files to data files path

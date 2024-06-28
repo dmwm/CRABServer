@@ -16,6 +16,10 @@
 ##H   - PYTHONPATH: inherit from ./start.sh
 
 set -euo pipefail
+if [[ -n ${TRACE+x} ]]; then
+    set -x
+    export TRACE
+fi
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 ## some variable use in start_srv
