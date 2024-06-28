@@ -100,6 +100,7 @@ def processWorkerLoop(inputs, results, resthost, dbInstance, procnum, logger, lo
             if hasattr(WORKER_CONFIG, 'FeatureFlags') and \
                hasattr(WORKER_CONFIG.FeatureFlags, 'childWorker') and \
                WORKER_CONFIG.FeatureFlags.childWorker:
+                logger.debug(f'Run {work.__name__} in childWorker.')
                 args = (resthost, dbInstance, WORKER_CONFIG, task, procnum, inputargs)
                 outputs = startChildWorker(WORKER_CONFIG, work, args, logger)
             else:

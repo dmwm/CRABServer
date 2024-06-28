@@ -8,13 +8,22 @@ to caller.
 The startChildWorker() can handle coredump, timeout, and generic exception.
 
 Original issue: https://github.com/dmwm/CRABServer/issues/8428
+
+Note about `logger` object. This works out-of-the-box because:
+- We spawn child process with `fork`
+- Worker process stop and do nothing, wait until `work()` finish.
+This makes child-worker and worker processes have the same log file fd, but only
+one write the logs to the file at a time. Not sure if there is any risk of
+deadlock. Need more test on production.
+
+See more: https://github.com/python/cpython/issues/84559
+Possible solution (but need a lot of code change): https://stackoverflow.com/a/32065395
 """
 
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 import multiprocessing as mp
 import signal
-import logging
 from TaskWorker.WorkerExceptions import ChildUnexpectedExitException, ChildTimeoutException
 
 
@@ -35,10 +44,11 @@ def startChildWorker(config, work, workArgs, logger):
     :rtype: any
     """
     procTimeout = config.FeatureFlags.childWorkerTimeout
-    # we cannot passing the logger object to child worker.
-    loggerName = logger.name,
+    # Force start method to 'fork' to inherit logging setting. Otherwise logs
+    # from child-worker will not go to log files in process/tasks or propagate
+    # back to MasterWorker process.
     with ProcessPoolExecutor(max_workers=1, mp_context=mp.get_context('fork')) as executor:
-        future = executor.submit(_runChildWorker, work, workArgs, procTimeout, loggerName)
+        future = executor.submit(_runChildWorker, work, workArgs, procTimeout, logger)
         try:
             outputs = future.result(timeout=procTimeout+1)
         except BrokenProcessPool as e:
@@ -57,14 +67,11 @@ def _signalHandler(signum, frame):
     """
     raise TimeoutError("The process reached timeout.")
 
-def _runChildWorker(work, workArgs, timeout, loggerName):
+def _runChildWorker(work, workArgs, timeout, logger):
     """
     The wrapper function to start running `work()` on the child-worker. It
     install SIGALARM with `timeout` to stop processing current work and raise
     TimeoutError when timeout is reach.
-
-    Note about loggerConfig argument, logging object cannot be pickled so we pass
-    the logging configuration and set it up on child-worker side.
 
     :param work: a function that need to run in child process
     :type work: function
@@ -78,19 +85,6 @@ def _runChildWorker(work, workArgs, timeout, loggerName):
     :returns: return value from `work()`
     :rtype: any
     """
-    procName = f'{loggerName}.ChildWorker'
-    logger = logging.getLogger(procName)
-    # not 100% sure what is going on here but StreamHandler make the logs
-    # from child process go through parent process and write out to
-    # process/tasks log files.
-    handler = logging.StreamHandler()
-    # hardcode formatter to make in more simple. The format is based on:
-    # https://github.com/dmwm/CRABServer/blob/43a8454abec4059ae5b2804b4efe8e77553d1f38/src/python/TaskWorker/Worker.py#L30
-    formatter = f"%(asctime)s:%(levelname)s:%(module)s:{procName}: %(message)s"
-    handler.setFormatter(logging.Formatter(formatter))
-    # also hardcode the log level
-    handler.setLevel(logging.DEBUG)
-    logger.addHandler(handler)
 
     # main
     logger.debug(f'Installing SIGALARM with timeout {timeout} seconds.')
