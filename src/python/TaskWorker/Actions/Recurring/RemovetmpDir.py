@@ -10,7 +10,7 @@ from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 SECONDS_IN_HOUR = 60 * 60
 SECONDS_IN_DAY = 60 * 60 * 24
 
-DAYS = SECONDS_IN_HOUR * 12
+DAYS = SECONDS_IN_HOUR * 6
 
 class RemovetmpDir(BaseRecurringAction):
     pollingTime = 60*24 #minutes
