@@ -553,7 +553,7 @@ class DBSDataDiscovery(DataDiscovery):
                 msg = "Task could not be submitted because blocks specified in 'Data.inputBlocks' are not on disk."
                 if not userHasQuota:
                     msg += overQmsg
-                    raise TaskWorkerException("You are over quota")
+                    raise TaskWorkerException(msg)
                 msg += "\nWill request a disk copy for you. See"
                 msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
             else:
