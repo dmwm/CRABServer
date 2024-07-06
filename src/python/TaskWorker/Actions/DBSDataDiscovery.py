@@ -529,7 +529,7 @@ class DBSDataDiscovery(DataDiscovery):
         maxRecallPerUserTB = getattr(self.config.TaskWorker, 'maxRecallPerUserTB', 100e3)  # defaul to 100PB for testing
 
         # how much this user is recalling already
-        self.logger.debug("Find how much uaer %s is recalling already", self.username)
+        self.logger.debug("Find how much user %s is recalling already", self.username)
         usage = getTapeRecallUsage(self.rucioClient, self.username)  # in Bytes
         usageTB = int(usage / 1e12)
         self.logger.debug("User is using %sTB.", usageTB)
