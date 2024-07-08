@@ -119,8 +119,6 @@ def getTapeRecallUsage(rucioClient=None, account=None):
     """ size of ongoing tape recalls for this account """
     activity = 'Analysis Tape Recall'
     rucioAccount = account
-    activity = 'Analysis TapeRecall'
-    rucioAccount = 'crab_tape_recall'
     rules = rucioClient.list_replication_rules(
         filters={'account': rucioAccount, 'activity': activity})
     usage = sum(getRuleQuota(rucioClient, rule['id']) for rule in rules\
