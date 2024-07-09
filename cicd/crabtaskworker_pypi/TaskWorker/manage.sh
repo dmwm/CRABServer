@@ -24,29 +24,32 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 ## some variable use in start_srv
 CONFIG="${SCRIPT_DIR}"/current/TaskWorkerConfig.py
+# path where we install crab code
+APP_PATH="${APP_PATH:-/data/srv/current/lib/python/site-packages/}"
 
 # CRABTASKWORKER_ROOT is a mandatory variable for getting data directory in `DagmanCreator.getLocation()`
 # Hardcoded the path and use new_updateTMRuntime.sh to build it from source and copy to this path.
-export CRABTASKWORKER_ROOT=/data/srv/current/lib/python/site-packages/
+export CRABTASKWORKER_ROOT="${APP_PATH}"
 
 helpFunction() {
     grep "^##H" "${0}" | sed -r "s/##H(| )//g"
 }
 
+_getMasterWorkerPid() {
+    pid=$(pgrep -f 'crab-taskworker' | grep -v grep | head -1 ) || true
+    echo "${pid}"
+}
+
 start_srv() {
     # Check require env
-    # shellcheck disable=SC2269
-    DEBUG="${DEBUG}"
-    export PYTHONPATH="${PYTHONPATH}"
-
-    # hardcode APP_DIR, but if debug mode, APP_DIR can be override
-    if [[ "$DEBUG" = 'true' ]]; then
-        APP_DIR="${APP_DIR:-/data/repos/CRABServer/src/python}"
-        python3 -m pdb "${APP_DIR}"/TaskWorker/SequentialWorker.py "${CONFIG}" --logDebug
+    export PYTHONPATH
+    echo "Starting TaskWorker..."
+    if [[ $DEBUG ]]; then
+        crab-taskworker --config "${CONFIG}" --logDebug --pdb
     else
-        APP_DIR=/data/srv/current/lib/python/site-packages
-        python3 "${APP_DIR}"/TaskWorker/MasterWorker.py --config "${CONFIG}" --logDebug &
+        crab-taskworker --config "${CONFIG}" --logDebug &
     fi
+    echo "Started TaskWorker with MasterWorker pid $(_getMasterWorkerPid)"
 }
 
 stop_srv() {
@@ -57,7 +60,7 @@ stop_srv() {
     checkTimes=12
     timeout=15 #that will give 12*15=180 seconds (3min) for the TW to finish work
 
-    TaskMasterPid=$(ps exfww | grep MasterWorker | grep -v grep | head -1 | awk '{print $1}') || true
+    TaskMasterPid=$(_getMasterWorkerPid)
     if [[ -z $TaskMasterPid ]]; then
         echo "No master process running."
         return;
