@@ -17,6 +17,9 @@ RUN apt-get update \
     && apt-get install -y tini \
     && apt-get clean all
 
+# local timezone (hardcode)
+RUN ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
+
 # Copy CERN tnsnames.ora
 COPY --from=tnsnames /etc/tnsnames.ora /etc/tnsnames.ora
 

@@ -60,6 +60,9 @@ RUN apt-get update \
     && apt-get install -y tini git zip voms-clients-java fd-find ripgrep libsasl2-dev python3-dev libldap-dev libssl-dev \
     && apt-get clean all
 
+# local timezone (hardcode)
+RUN ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
+
 # prepare build
 RUN mkdir /build
 WORKDIR /build
