@@ -125,8 +125,8 @@ class TapeRecallManager(BaseRecurringAction):
                 # Clean up previous "dataset on tape" warnings
                 self.deleteWarnings(taskName)
                 # Make sure data will stay on disk for NOW + 4 days
-                self.logger.info("Extending rule lifetime to last 4 days from now")
-                self.privilegedRucioClient.update_replication_rule(reqId, {'lifetime': (time.time() + 4 * 24 * 60 * 60)}) #lifetime is in seconds
+                self.logger.info("Extending rule lifetime to last 4 days")
+                self.privilegedRucioClient.update_replication_rule(reqId, {'lifetime': (4 * 24 * 60 * 60)}) #lifetime is in seconds
             else:
                 # still in progress, report status and keep waiting
                 ok = rule['locks_ok_cnt']
