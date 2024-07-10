@@ -60,6 +60,9 @@ RUN apt-get update \
     && apt-get install -y tini git zip voms-clients-java fd-find ripgrep libsasl2-dev python3-dev libldap-dev libssl-dev \
     && apt-get clean all
 
+# local timezone (hardcode)
+RUN ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
+
 # prepare build
 RUN mkdir /build
 WORKDIR /build
@@ -120,6 +123,8 @@ COPY cicd/crabtaskworker_pypi/TaskWorker/start.sh \
      cicd/crabtaskworker_pypi/TaskWorker/manage.sh \
      cicd/crabtaskworker_pypi/updateDatafiles.sh \
      ${WDIR}/srv/TaskManager/
+
+COPY cicd/crabtaskworker_pypi/bin/crab-taskworker /usr/local/bin/crab-taskworker
 
 ## publisher
 COPY cicd/crabtaskworker_pypi/Publisher/start.sh \
