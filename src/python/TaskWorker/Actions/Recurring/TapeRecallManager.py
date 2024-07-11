@@ -14,7 +14,7 @@ from urllib.parse import urlencode
 
 from rucio.common.exception import RuleNotFound
 
-from ServerUtilities import MAX_DAYS_FOR_TAPERECALL, TASKLIFETIME, getTimeFromTaskname
+from ServerUtilities import MAX_DAYS_FOR_TAPERECALL, getTimeFromTaskname
 from RESTInteractions import CRABRest
 from RucioUtils import getNativeRucioClient
 from TaskWorker.MasterWorker import getRESTParams
