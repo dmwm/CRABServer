@@ -73,7 +73,7 @@ build_rest_image:
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" 
     - docker build -f "${CI_PROJECT_DIR}/cicd/crabserver_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqai" .
-    - docker login -u $CMSCRAB_REGITRY_USER -p $CMSCRAB_REGITRY_PASSWORD $CMSCRAB_REGISTRY_URL
+    - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
     - docker push "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqai" 
 
   cache:
