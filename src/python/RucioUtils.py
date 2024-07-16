@@ -3,7 +3,7 @@ import logging
 
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from rucio.client import Client
-from rucio.common.exception import RSENotFound
+from rucio.common.exception import RSENotFound, RuleNotFound
 
 
 def getNativeRucioClient(config=None, logger=None):
@@ -101,3 +101,26 @@ def getWritePFN(rucioClient=None, siteName='', lfn='',  # pylint: disable=danger
     logger.info(f"Will use {pfn} as stageout location")
 
     return pfn
+
+
+def getRuleQuota(rucioClient=None, ruleId=None):
+    """ return quota needed by this rule in Bytes """
+    size = 0
+    try:
+        rule = rucioClient.get_replication_rule(ruleId)
+    except RuleNotFound:
+        return 0
+    files = rucioClient.list_files(scope=rule['scope'], name= rule['name'])
+    size = sum(file['bytes'] for file in files)
+    return size
+
+
+def getTapeRecallUsage(rucioClient=None, account=None):
+    """ size of ongoing tape recalls for this account """
+    activity = 'Analysis TapeRecall'
+    rucioAccount = account
+    rules = rucioClient.list_replication_rules(
+        filters={'account': rucioAccount, 'activity': activity})
+    usage = sum(getRuleQuota(rucioClient, rule['id']) for rule in rules\
+                if rule['state'] in ['REPLICATING', 'STUCK', 'SUSPENDED'])  # in Bytes
+    return usage

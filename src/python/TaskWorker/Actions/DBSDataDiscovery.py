@@ -12,7 +12,7 @@ from WMCore.Services.DBS.DBSErrors import DBSReaderError
 from WMCore.Configuration import ConfigurationEx
 from WMCore import Lexicon
 
-from RucioUtils import getNativeRucioClient
+from RucioUtils import getNativeRucioClient, getTapeRecallUsage
 
 from ServerUtilities import MAX_LUMIS_IN_BLOCK, parseDBSInstance, isDatasetUserDataset
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
@@ -523,29 +523,50 @@ class DBSDataDiscovery(DataDiscovery):
         :rtype: str
         """
         dataTier = inputDataset.split('/')[3]
+        totalSizeTB = int(totalSizeBytes / 1e12)
         maxTierToBlockRecallSizeTB = getattr(self.config.TaskWorker, 'maxTierToBlockRecallSizeTB', 0)
-        maxTierToBlockRecallSize = maxTierToBlockRecallSizeTB * 1e12
         maxAnyTierRecallSizeTB = getattr(self.config.TaskWorker, 'maxAnyTierRecallSizeTB', 0)
-        maxAnyTierRecallSize = maxAnyTierRecallSizeTB * 1e12
-        if dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []) or totalSizeBytes < maxAnyTierRecallSize:
+        maxRecallPerUserTB = getattr(self.config.TaskWorker, 'maxRecallPerUserTB', 100e3)  # defaul to 100PB for testing
+
+        # how much this user is recalling already
+        self.logger.debug("Find how much user %s is recalling already", self.username)
+        usage = getTapeRecallUsage(self.rucioClient, self.username)  # in Bytes
+        usageTB = int(usage / 1e12)
+        self.logger.debug("User is using %sTB.", usageTB)
+        # is there room  for adding this recall ?
+        userHasQuota = (usageTB + totalSizeTB) < maxRecallPerUserTB
+        if not userHasQuota:
+            # prepare a message to send back
+            overQmsg = "\n Recall from tape is not possible at the moment. You need to wait until"
+            overQmsg += "\n enough of your ongoing tape recall are completed"
+            overQmsg += f"\n  used so far: {usageTB}TB, this request: {totalSizeTB}TB, total: "
+            overQmsg += f"{usageTB + totalSizeTB}TB, max allowed: {maxRecallPerUserTB}TB"
+        if dataTier in getattr(self.config.TaskWorker, 'tiersToRecall', []) or totalSizeTB < maxAnyTierRecallSizeTB:
             msg = f"Task could not be submitted because not all blocks of dataset {inputDataset} are on DISK"
+            if not userHasQuota:
+                msg += overQmsg
+                raise TaskWorkerException(msg)
             msg += "\nWill request a full disk copy for you. See"
             msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
         elif inputBlocks:
-            if totalSizeBytes < maxTierToBlockRecallSize:
+            if totalSizeTB < maxTierToBlockRecallSizeTB:
                 msg = "Task could not be submitted because blocks specified in 'Data.inputBlocks' are not on disk."
+                if not userHasQuota:
+                    msg += overQmsg
+                    raise TaskWorkerException(msg)
                 msg += "\nWill request a disk copy for you. See"
                 msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
             else:
                 msg = "Some blocks are on TAPE only and will not be processed."
-                msg += f"\n'The 'Data.inputBlocks' size is larger than allowed size ({totalSizeBytes/1e12:.3f}TB/{maxTierToBlockRecallSizeTB}TB)"\
-                        "to issue automatically recall from TAPE."
+                msg += "\n'The 'Data.inputBlocks' size is larger than allowed size"\
+                       " ({totalSizeTB}TB/{maxTierToBlockRecallSizeTB}TB) "\
+                       "to issue automatically recall from TAPE."
                 msg += "\nIf you need these blocks, contact Data Transfer team via https://its.cern.ch/jira/browse/CMSTRANSF"
                 raise TaskWorkerException(msg)
         else:
             msg = "Some blocks are on TAPE only and will not be processed."
             msg += "\nThis dataset is too large for automatic recall from TAPE."
-            msg += "\nIf you can do with only a piece, use Data.inputBlocks configuration."
+            msg += "\nIf you can do with only a part of the dataset, use Data.inputBlocks configuration."
             msg += "\nIf you need the full dataset, contact Data Transfer team via https://its.cern.ch/jira/browse/CMSTRANSF"
             raise TaskWorkerException(msg)
         return msg
@@ -557,13 +578,17 @@ if __name__ == '__main__':
     # Usage: python3 DBSDataDiscovery.py dbs_instance dbsDataset [secondaryDataset]
     # where dbs_instance should be either prod/global or prod/phys03
     #
-    # Example:  /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
+    # Example: python3 DBSDataDiscovery.py prod/global /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
     ###
     import json
     from ServerUtilities import newX509env
 
     dbsInstance = sys.argv[1]
     dbsDataset = sys.argv[2]
+    blockList = []
+    if '#' in dbsDataset:  # accep a block name as input
+        blockList = [dbsDataset]
+        dbsDataset = dbsDataset.split('#')[0]
     dbsSecondaryDataset = sys.argv[3] if len(sys.argv) == 4 else None  # pylint: disable=invalid-name
     DBSUrl = f"https://cmsweb.cern.ch/dbs/{dbsInstance}/DBSReader/"
 
@@ -598,17 +623,20 @@ if __name__ == '__main__':
 
     rucioClient = getNativeRucioClient(config=config, logger=logging.getLogger())
 
-    fileset = DBSDataDiscovery(config=config, rucioClient=rucioClient)
+    discovery = DBSDataDiscovery(config=config, rucioClient=rucioClient)
     userConfig = {'partialdataset':False,
-                  'inputblocks':[]
+                  'inputblocks':blockList
                   }
-    discoveryOutput = (
-        fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, 'user_proxy': 'None',
-                          'tm_input_dataset': dbsDataset, 'tm_secondary_input_dataset': dbsSecondaryDataset,
-                          'tm_taskname': 'pippo1', 'tm_username':config.Services.Rucio_account,
-                          'tm_split_algo' : 'automatic', 'tm_split_args' : {'runs':[], 'lumis':[]},
-                          'tm_user_config': userConfig,
-                          'tm_dbs_url': DBSUrl}, tempDir=''))
+    discoveryOutput = discovery.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0,
+                                              'user_proxy': 'None','tm_input_dataset': dbsDataset,
+                                              'tm_secondary_input_dataset': dbsSecondaryDataset,
+                                              'tm_taskname': 'dummyTaskName',
+                                              'tm_username':config.Services.Rucio_account,
+                                              'tm_split_algo' : 'automatic',
+                                              'tm_split_args' : {'runs':[], 'lumis':[]},
+                                              'tm_user_config': userConfig, 'tm_user_files': [],
+                                              'tm_dbs_url': DBSUrl},
+                                        tempDir='')
     # discoveryOutput.result is a WMCore fileset structure
     fileObjects = discoveryOutput.result.getFiles()
     fileDictionaries = [file.json() for file in fileObjects]
