@@ -5,6 +5,8 @@ default:
 
 variables:
   IMAGE_TAG: "${CI_COMMIT_REF_SLUG}"  # to distinct it from commit tag and final image tag
+  DOCKER_TLS_CERTDIR: "/certs"
+
 
 .default_rules:
   default:
@@ -55,9 +57,6 @@ set_version_name:
         - src/python/TaskWorker/__init__.py
         - src/python/CRABInterface/__init__.py
       policy: push
-
-variables:
-  DOCKER_TLS_CERTDIR: "/certs"
 
 build_rest_image:
   rules:
