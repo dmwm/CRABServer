@@ -66,9 +66,9 @@ build_rest_image:
   # tags: crabdind
   stage: build_docker
   image:
-    name: docker:latest
+    name: docker:24.0.5
   services:
-    - docker:latest-dind
+    - docker:24.0.5-dind
   before_script:
     - docker info
   script:
