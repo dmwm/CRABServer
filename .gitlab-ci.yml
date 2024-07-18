@@ -82,7 +82,7 @@ build_rest_image:
         - src/python/CRABInterface/__init__.py
       policy: pull
 
-build_tw_image:
+build_tw_base_image:
   rules:
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -94,6 +94,26 @@ build_tw_image:
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
     - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqai" .
+    - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
+    - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqai" 
+  cache:
+    - key: $CI_PIPELINE_ID
+      paths:
+        - src/python/TaskWorker/__init__.py
+      policy: pull
+
+build_tw_image:
+  rules:
+    - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
+  stage: build_docker
+  image:
+    name: docker:24.0.5
+  services:
+  - docker:24.0.5-dind
+  script:
+    - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
+    - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/taskworker.Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqai" .
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
     - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqai" 
   cache:
