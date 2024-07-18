@@ -102,45 +102,45 @@ build_tw_image:
         - src/python/TaskWorker/__init__.py
       policy: pull
 
-build_monit_image:
-  rules:
-    - !reference [.default_rules, default]
-    - !reference [.default_rules, release]
-  stage: build_docker
-  needs: ["build_tw_image"]
-  image:
-    name: docker:24.0.5
-  services:
-  - docker:24.0.5-dind
-  script:
-    - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
-    - docker build -f "${CI_PROJECT_DIR}/cicd/monit_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.monit" --build-arg="BASE_TAG=${IMAGE_TAG}" 
-    - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
-    - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.monit" 
-  cache:
-    - key: $CI_PIPELINE_ID
-      paths:
-        - src/python/TaskWorker/__init__.py
-      policy: pull
-
-# deploy_server:
+# build_monit_image:
 #   rules:
-#     - if: $SKIP_DEPLOY || $FORCE_RELEASE
-#       when: never
 #     - !reference [.default_rules, default]
 #     - !reference [.default_rules, release]
-#   stage: deploy
+#   stage: build_docker
+#   needs: ["build_tw_image"]
 #   image:
-#     name: registry.cern.ch/cmscrab/buildtools
-#     entrypoint: [""]
+#     name: docker:24.0.5
+#   services:
+#   - docker:24.0.5-dind
 #   script:
-#     # load KUBECONTEXT
-#     - source .env
-#     - echo $KUBECONFIG_FILE
-#     - yq -i -y ".\"current-context\" = \"$KUBECONTEXT\"" $KUBECONFIG_FILE
-#     - export KUBECONFIG=$KUBECONFIG_FILE
-#     - kubectl set image deployment/crabserver "crabserver=registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}"
-#     - kubectl rollout status deployment crabserver --watch --timeout=5m
+#     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
+#     - docker build -f "${CI_PROJECT_DIR}/cicd/monit_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.monit" --build-arg="BASE_TAG=${IMAGE_TAG}" 
+#     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
+#     - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.monit" 
+#   cache:
+#     - key: $CI_PIPELINE_ID
+#       paths:
+#         - src/python/TaskWorker/__init__.py
+#       policy: pull
+
+deploy_server:
+  rules:
+    - if: $SKIP_DEPLOY || $FORCE_RELEASE
+      when: never
+    - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
+  stage: deploy
+  image:
+    name: registry.cern.ch/cmscrab/buildtools
+    entrypoint: [""]
+  script:
+    # load KUBECONTEXT
+    - source .env
+    - echo $KUBECONFIG_FILE
+    - yq -i -y ".\"current-context\" = \"$KUBECONTEXT\"" $KUBECONFIG_FILE
+    - export KUBECONFIG=$KUBECONFIG_FILE
+    - kubectl set image deployment/crabserver "crabserver=registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}"
+    - kubectl rollout status deployment crabserver --watch --timeout=5m
 
 # .deploy_tw_template:
 #   rules:
