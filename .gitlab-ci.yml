@@ -114,9 +114,9 @@ build_monit_image:
   - docker:24.0.5-dind
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
-    - docker build -f "${CI_PROJECT_DIR}/cicd/monit_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.monit" --build-arg="BASE_TAG=${IMAGE_TAG}" .
+    - docker build -f "${CI_PROJECT_DIR}/cicd/monit_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqai.monit" --build-arg="BASE_TAG=${IMAGE_TAG}" .
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
-    - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.monit" 
+    - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqai.monit" 
   cache:
     - key: $CI_PIPELINE_ID
       paths:
