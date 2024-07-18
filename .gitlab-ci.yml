@@ -123,24 +123,24 @@ build_tw_image:
 #         - src/python/TaskWorker/__init__.py
 #       policy: pull
 
-deploy_server:
-  rules:
-    - if: $SKIP_DEPLOY || $FORCE_RELEASE
-      when: never
-    - !reference [.default_rules, default]
-    - !reference [.default_rules, release]
-  stage: deploy
-  image:
-    name: registry.cern.ch/cmscrab/buildtools
-    entrypoint: [""]
-  script:
-    # load KUBECONTEXT
-    - source .env
-    - echo $KUBECONFIG_FILE
-    - yq -i -y ".\"current-context\" = \"$KUBECONTEXT\"" $KUBECONFIG_FILE
-    - export KUBECONFIG=$KUBECONFIG_FILE
-    - kubectl set image deployment/crabserver "crabserver=registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}"
-    - kubectl rollout status deployment crabserver --watch --timeout=5m
+# deploy_server:
+#   rules:
+#     - if: $SKIP_DEPLOY || $FORCE_RELEASE
+#       when: never
+#     - !reference [.default_rules, default]
+#     - !reference [.default_rules, release]
+#   stage: deploy
+#   image:
+#     name: registry.cern.ch/cmscrab/buildtools
+#     entrypoint: [""]
+#   script:
+#     # load KUBECONTEXT
+#     - source .env
+#     - echo $KUBECONFIG_FILE
+#     - yq -i -y ".\"current-context\" = \"$KUBECONTEXT\"" $KUBECONFIG_FILE
+#     - export KUBECONFIG=$KUBECONFIG_FILE
+#     - kubectl set image deployment/crabserver "crabserver=registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}"
+#     - kubectl rollout status deployment crabserver --watch --timeout=5m
 
 # .deploy_tw_template:
 #   rules:
