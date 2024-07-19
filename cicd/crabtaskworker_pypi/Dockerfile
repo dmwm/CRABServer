@@ -1,13 +1,13 @@
-# caching wmcore src, need for building TaskManagerRun.tar.gz
-# FROM python:3.8 as wmcore-src
-# SHELL ["/bin/bash", "-c"]
-# # Use the "magic" requirements.txt from crabserver pypi
-# COPY cicd/crabserver_pypi/ .
-# RUN wmcore_repo="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f1)" \
-#     && wmcore_version="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f2)" \
-#     && git clone ${wmcore_repo} -b "${wmcore_version}" /WMCore \
-#     && ( cd /WMCore; git status ) \
-#     && echo "${wmcore_version}" > /wmcore_version
+caching wmcore src, need for building TaskManagerRun.tar.gz
+FROM python:3.8 as wmcore-src
+SHELL ["/bin/bash", "-c"]
+# Use the "magic" requirements.txt from crabserver pypi
+COPY cicd/crabserver_pypi/ .
+RUN wmcore_repo="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f1)" \
+    && wmcore_version="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f2)" \
+    && git clone ${wmcore_repo} -b "${wmcore_version}" /WMCore \
+    && ( cd /WMCore; git status ) \
+    && echo "${wmcore_version}" > /wmcore_version
 
 # create data files ./data
 FROM python:3.8 as build-data
