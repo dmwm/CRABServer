@@ -1,4 +1,4 @@
-caching wmcore src, need for building TaskManagerRun.tar.gz
+# caching wmcore src, need for building TaskManagerRun.tar.gz
 FROM python:3.8 as wmcore-src
 SHELL ["/bin/bash", "-c"]
 # Use the "magic" requirements.txt from crabserver pypi
