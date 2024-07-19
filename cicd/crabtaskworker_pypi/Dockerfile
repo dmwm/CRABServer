@@ -40,6 +40,12 @@ RUN pushd /data/miniconda \
 # cern ldap config
 FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 as cern-cc7
 
+# start image
+FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
+SHELL ["/bin/bash", "-c"]
+ENV USER=crab3
+ENV WDIR=/data
+
 # install gfal
 # symlink to workaround calling gfal from absolute path
 COPY --from=wmcore-gfal ${WDIR}/miniconda ${WDIR}/miniconda
@@ -107,8 +113,26 @@ RUN mkdir -p ${WDIR}/srv/TaskManager/current \
 RUN mkdir -p ${WDIR}/srv/Publisher/current \
            ${WDIR}/srv/Publisher/cfg \
            ${WDIR}/srv/Publisher/logs \
-           ${WDIR}/srv/Publisher/PublisherFiles \
-    
+           ${WDIR}/srv/Publisher/PublisherFiles
+
+# copy process executor scripts
+## TaskWorker
+COPY cicd/crabtaskworker_pypi/TaskWorker/start.sh \
+     cicd/crabtaskworker_pypi/TaskWorker/env.sh \
+     cicd/crabtaskworker_pypi/TaskWorker/stop.sh \
+     cicd/crabtaskworker_pypi/TaskWorker/manage.sh \
+     cicd/crabtaskworker_pypi/updateDatafiles.sh \
+     ${WDIR}/srv/TaskManager/
+
+COPY cicd/crabtaskworker_pypi/bin/crab-taskworker /usr/local/bin/crab-taskworker
+
+## publisher
+COPY cicd/crabtaskworker_pypi/Publisher/start.sh \
+     cicd/crabtaskworker_pypi/Publisher/env.sh \
+     cicd/crabtaskworker_pypi/Publisher/stop.sh \
+     cicd/crabtaskworker_pypi/Publisher/manage.sh \
+     ${WDIR}/srv/Publisher/
+
 ## entrypoint
 COPY cicd/crabtaskworker_pypi/run.sh /data
 
@@ -122,3 +146,4 @@ USER ${USER}
 
 ENTRYPOINT ["tini", "--"]
 CMD ["/data/run.sh"]
+
