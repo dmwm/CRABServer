@@ -91,6 +91,10 @@ build_tw_base_image:
     name: docker:24.0.5
   services:
   - docker:24.0.5-dind
+  artifacts:
+    paths:
+      - crabtaskworker-base.tar
+    expire_in: 1 week
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
     - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqai" .
@@ -102,10 +106,6 @@ build_tw_base_image:
       paths:
         - src/python/TaskWorker/__init__.py
       policy: pull
-  artifacts:
-    paths:
-      - crabtaskworker-base.tar
-    expire_in: 1 week
 
 build_tw_image:
   rules:
