@@ -94,8 +94,11 @@ build_tw_image:
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
     - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqai" .
+    - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/taskworker.Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqai.tw" .
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
     - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqai"
+    - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqai.tw"
+
   cache:
     - key: $CI_PIPELINE_ID
       paths:
