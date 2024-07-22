@@ -27,15 +27,15 @@ RUN WMCOREDIR=./WMCore \
     DATAFILES_WORKDIR=./data_files\
     bash buildDatafiles.sh
 
-# gfal, wmcore only has gfal lib but not cli
-FROM registry.cern.ch/cmsweb/gfal:latest as wmcore-gfal
-SHELL ["/bin/bash", "-c"]
-RUN pushd /data/miniconda \
-    && git clone https://gitlab.cern.ch/dmc/gfal2-util -b v1.8.0 \
-    && pushd gfal2-util \
-    && python setup.py install \
-    && popd \
-    && rm -rf gfal2-util
+# # gfal, wmcore only has gfal lib but not cli
+# FROM registry.cern.ch/cmsweb/gfal:latest as wmcore-gfal
+# SHELL ["/bin/bash", "-c"]
+# RUN pushd /data/miniconda \
+#     && git clone https://gitlab.cern.ch/dmc/gfal2-util -b v1.8.0 \
+#     && pushd gfal2-util \
+#     && python setup.py install \
+#     && popd \
+#     && rm -rf gfal2-util
 
 # cern ldap config
 FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 as cern-cc7

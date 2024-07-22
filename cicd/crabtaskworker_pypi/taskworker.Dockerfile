@@ -7,6 +7,15 @@ ENV USER=crab3
 ENV WDIR=/data
 
 # install gfal
+RUN apt-get update \
+    && apt-get install -y git python3-pip \
+    && git clone https://gitlab.cern.ch/dmc/gfal2-util -b v1.8.0 /tmp/gfal2-util \
+    && pushd /tmp/gfal2-util \
+    && python setup.py install \
+    && popd \
+    && rm -rf /tmp/gfal2-util
+
+# install gfal
 # symlink to workaround calling gfal from absolute path
 COPY --from=wmcore-gfal ${WDIR}/miniconda ${WDIR}/miniconda
 RUN ln -sf ${WDIR}/miniconda/bin/gfal-ls /usr/bin/gfal-ls \
