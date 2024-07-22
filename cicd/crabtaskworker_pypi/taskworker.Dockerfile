@@ -10,7 +10,7 @@ RUN wmcore_repo="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f1)" \
     && echo "${wmcore_version}" > /wmcore_version
 
 # start image
-FROM registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw as base-image
+FROM registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase as base-image
 
 # copy TaskManagerRun.tar.gz
 COPY --from=build-data /build/data_files/data ${WDIR}/srv/current/lib/python/site-packages/data
