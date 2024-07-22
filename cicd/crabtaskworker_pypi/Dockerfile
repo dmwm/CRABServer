@@ -39,3 +39,6 @@ RUN pushd /data/miniconda \
 
 # cern ldap config
 FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 as cern-cc7
+
+
+EXPOSE 8080

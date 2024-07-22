@@ -1,3 +1,5 @@
+FROM registry.cern.ch/cmscrab/crabtaskworker:latest
+
 # start image
 FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
 SHELL ["/bin/bash", "-c"]
