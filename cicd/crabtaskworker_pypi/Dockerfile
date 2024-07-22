@@ -140,7 +140,7 @@ RUN mkdir -p ${WDIR}/srv/Publisher/current \
 # RUN echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3
 
 # make sure all /data own by running user
-RUN chown -R 1000:1000 ${WDIR}
+# RUN chown -R 1000:1000 ${WDIR}
 
 USER ${USER}
 

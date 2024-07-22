@@ -10,13 +10,12 @@ RUN wmcore_repo="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f1)" \
     && echo "${wmcore_version}" > /wmcore_version
 
 # start image
-FROM base-image
+FROM registry.cern.ch/cmscrab/crabtaskworker:latest as base-image
 
 # copy TaskManagerRun.tar.gz
 COPY --from=build-data /build/data_files/data ${WDIR}/srv/current/lib/python/site-packages/data
 
 # install crabserver
-# will replace with pip later
 COPY src/python/ ${WDIR}/srv/current/lib/python/site-packages/
 
 # copy process executor scripts
@@ -30,21 +29,21 @@ COPY cicd/crabtaskworker_pypi/TaskWorker/start.sh \
 
 COPY cicd/crabtaskworker_pypi/bin/crab-taskworker /usr/local/bin/crab-taskworker
 
-## publisher
+## Publisher
 COPY cicd/crabtaskworker_pypi/Publisher/start.sh \
      cicd/crabtaskworker_pypi/Publisher/env.sh \
      cicd/crabtaskworker_pypi/Publisher/stop.sh \
      cicd/crabtaskworker_pypi/Publisher/manage.sh \
      ${WDIR}/srv/Publisher/
 
-## entrypoint
+## Entrypoint
 COPY cicd/crabtaskworker_pypi/run.sh /data
 
 # for debugging purpose
 RUN echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3
 
 # ensure all /data owned by running user
-RUN chown -R 1000:1000 ${WDIR}
+# RUN chown -R 1000:1000 ${WDIR}
 
 USER ${USER}
 
