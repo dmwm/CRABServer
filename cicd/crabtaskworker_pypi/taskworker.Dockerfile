@@ -10,7 +10,7 @@ RUN wmcore_repo="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f1)" \
     && echo "${wmcore_version}" > /wmcore_version
 
 # start image
-FROM registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase as base-image
+FROM registry.cern.ch/cmscrab/crabtaskworker:latest as base-image
 
 # copy TaskManagerRun.tar.gz
 COPY --from=build-data /build/data_files/data ${WDIR}/srv/current/lib/python/site-packages/data
@@ -44,7 +44,7 @@ COPY cicd/crabtaskworker_pypi/run.sh /data
 RUN echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3
 
 # ensure all /data owned by running user
-# RUN chown -R 1000:1000 ${WDIR}
+RUN chown -R 1000:1000 ${WDIR}
 
 USER ${USER}
 
