@@ -72,9 +72,9 @@ build_rest_image:
     - docker info
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" 
-    - docker build -f "${CI_PROJECT_DIR}/cicd/crabserver_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqai" .
+    - docker build -f "${CI_PROJECT_DIR}/cicd/crabserver_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqaibase" .
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
-    - docker push "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqai" 
+    - docker push "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqaibase" 
 
   cache:
     - key: $CI_PIPELINE_ID
@@ -92,12 +92,12 @@ build_tw_image:
   services:
   - docker:24.0.5-dind
   script:
-    - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
-    - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqai" .
-    - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/taskworker.Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqai.tw" .
+    - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" > ~/.docker/config.json
+    - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase" .
+    - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/taskworker.Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw" .
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
-    - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqai"
-    - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqai.tw"
+    - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase"
+    - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw"
 
   cache:
     - key: $CI_PIPELINE_ID
