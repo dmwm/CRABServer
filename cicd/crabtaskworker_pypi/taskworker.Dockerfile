@@ -60,6 +60,7 @@ COPY cicd/crabtaskworker_pypi/Publisher/start.sh \
 
 ## entrypoint
 COPY cicd/crabtaskworker_pypi/run.sh /data
+USER root
 
 # for debugging purpose
 RUN echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3
