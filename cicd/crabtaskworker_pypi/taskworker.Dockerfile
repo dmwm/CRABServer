@@ -31,7 +31,7 @@ RUN WMCOREDIR=./WMCore \
     bash buildDatafiles.sh
 
 # start image
-FROM registry.cern.ch/cmscrab/crabtaskworker:latest as base-image
+FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG} as base-image
 
 # copy TaskManagerRun.tar.gz
 COPY --from=build-data /build/data_files/data ${WDIR}/srv/current/lib/python/site-packages/data
