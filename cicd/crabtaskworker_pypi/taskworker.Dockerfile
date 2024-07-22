@@ -10,12 +10,13 @@ RUN wmcore_repo="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f1)" \
     && echo "${wmcore_version}" > /wmcore_version
 
 # start image
-FROM registry.cern.ch/cmscrab/crabtaskworker:latest as base-image
+FROM base-image
 
 # copy TaskManagerRun.tar.gz
 COPY --from=build-data /build/data_files/data ${WDIR}/srv/current/lib/python/site-packages/data
 
 # install crabserver
+# will replace with pip later
 COPY src/python/ ${WDIR}/srv/current/lib/python/site-packages/
 
 # copy process executor scripts
@@ -29,14 +30,14 @@ COPY cicd/crabtaskworker_pypi/TaskWorker/start.sh \
 
 COPY cicd/crabtaskworker_pypi/bin/crab-taskworker /usr/local/bin/crab-taskworker
 
-## Publisher
+## publisher
 COPY cicd/crabtaskworker_pypi/Publisher/start.sh \
      cicd/crabtaskworker_pypi/Publisher/env.sh \
      cicd/crabtaskworker_pypi/Publisher/stop.sh \
      cicd/crabtaskworker_pypi/Publisher/manage.sh \
      ${WDIR}/srv/Publisher/
 
-## Entrypoint
+## entrypoint
 COPY cicd/crabtaskworker_pypi/run.sh /data
 
 # for debugging purpose
