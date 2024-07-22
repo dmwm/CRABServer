@@ -1,4 +1,5 @@
-FROM registry.cern.ch/cmscrab/crabtaskworker:latest
+ARG BASE_TAG=latest
+FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG}
 
 # caching wmcore src, need for building TaskManagerRun.tar.gz
 FROM python:3.8 as wmcore-src
@@ -10,6 +11,24 @@ RUN wmcore_repo="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f1)" \
     && git clone ${wmcore_repo} -b "${wmcore_version}" /WMCore \
     && ( cd /WMCore; git status ) \
     && echo "${wmcore_version}" > /wmcore_version
+
+# create data files ./data
+FROM python:3.8 as build-data
+SHELL ["/bin/bash", "-c"]
+RUN mkdir /build \
+    && apt-get update \
+    && apt-get install -y curl zip git \
+    && apt-get clean all
+WORKDIR /build
+COPY cicd/crabtaskworker_pypi/buildTWTarballs.sh cicd/crabtaskworker_pypi/buildDatafiles.sh /build/
+COPY setup.py /build
+COPY src /build/src
+COPY scripts /build/scripts
+COPY --from=wmcore-src /WMCore /build/WMCore
+RUN WMCOREDIR=./WMCore \
+    CRABSERVERDIR=./ \
+    DATAFILES_WORKDIR=./data_files\
+    bash buildDatafiles.sh
 
 # start image
 FROM registry.cern.ch/cmscrab/crabtaskworker:latest as base-image
