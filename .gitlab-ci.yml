@@ -67,8 +67,9 @@ check_docker_images:
   image:
     name: python:3.9-alpine
   script:
-    - pip install -r requirements.txt  # Ensure any dependencies for the script are installed
-    - python3 scripts/docker_images_has_changed.py -r "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase"  # Adjust repository and tags as needed
+    - python -m pip install --upgrade pip  # Ensure pip is up to date
+    - python -m pip install -r requirements.txt  # Install dependencies
+    - python scripts/docker_images_has_changed.py -r "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase"  # Adjust repository and tags as needed
   artifacts:
     paths:
       - "*.txt"  # Ensure the output files are saved as artifacts
