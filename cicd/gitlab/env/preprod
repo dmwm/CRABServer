@@ -1,3 +1,4 @@
 KUBECONTEXT=cmsweb-testbed
 Environment=crab-preprod-tw01
 REST_Instance=preprod
+CRABClient_version=prod
