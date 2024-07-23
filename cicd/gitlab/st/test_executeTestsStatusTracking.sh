@@ -15,7 +15,6 @@ export REST_Instance=test12
 # ci
 export X509_USER_PROXY="$(cicd/gitlab/credFile.sh $X509_USER_PROXY)"
 export CRABClient_version=prod
-export CRABServer_tag=HEAD
 export REST_Instance # from .env
 export CMSSW_release=CMSSW_13_0_2
 export Task_Submission_Status_Tracking=true
