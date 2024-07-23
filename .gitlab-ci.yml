@@ -65,12 +65,7 @@ check_docker_images:
     - !reference [.default_rules, release]
   stage: check_image
   image:
-    name: docker:24.0.5
-  services:
-    - docker:24.0.5-dind
-  before_script:
-    - apk add --no-cache python3 py3-pip  # Install Python and pip
-    - pip3 install -r requirements.txt  # Ensure any dependencies for the script are installed
+    name: python:3.9-alpine
   script:
     - pip install -r requirements.txt  # Ensure any dependencies for the script are installed
     - python3 scripts/docker_images_has_changed.py -r "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase"  # Adjust repository and tags as needed
