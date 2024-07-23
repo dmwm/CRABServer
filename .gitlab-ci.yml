@@ -58,6 +58,8 @@ set_version_name:
 
 build_rest_image:
   rules:
+    - if: $SUBMIT_STATUS_TRACKING
+      when: never
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: build_docker
@@ -79,6 +81,8 @@ build_rest_image:
 
 build_tw_image:
   rules:
+    - if: $SUBMIT_STATUS_TRACKING
+      when: never
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: build_docker
@@ -100,6 +104,8 @@ build_tw_image:
 
 build_monit_image:
   rules:
+    - if: $SUBMIT_STATUS_TRACKING
+      when: never
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: build_docker
@@ -123,7 +129,7 @@ build_monit_image:
 
 deploy_server:
   rules:
-    - if: $SKIP_DEPLOY || $FORCE_RELEASE
+    - if: $SKIP_DEPLOY || $FORCE_RELEASE || $SUBMIT_STATUS_TRACKING
       when: never
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -142,7 +148,7 @@ deploy_server:
 
 .deploy_tw_template:
   rules:
-    - if: $SKIP_DEPLOY || $FORCE_RELEASE
+    - if: $SKIP_DEPLOY || $FORCE_RELEASE || $SUBMIT_STATUS_TRACKING
       when: never
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
