@@ -72,7 +72,7 @@ check_docker_images:
     - python scripts/docker-images-has-changed.py -r "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase"  # Adjust repository and tags as needed
   artifacts:
     paths:
-      - ".txt"  # Ensure the output files are saved as artifacts
+      - "*.txt"  # Ensure the output files are saved as artifacts
     expire_in: 1 week
 
 build_rest_image:
@@ -87,12 +87,16 @@ build_rest_image:
     - docker:24.0.5-dind
   before_script:
     - docker info
+  dependencies:
+    - check_docker_images
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" 
     - docker build -f "${CI_PROJECT_DIR}/cicd/crabserver_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqaibase" .
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
     - docker push "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqaibase" 
-
+  artifacts:
+    paths:
+      - "*.txt"
   cache:
     - key: $CI_COMMIT_REF_SLUG
       paths:
@@ -108,14 +112,25 @@ build_tw_image:
     name: docker:24.0.5
   services:
   - docker:24.0.5-dind
+  dependencies:
+  - build_rest_image
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
-    - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase" .
-    - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase"
-    - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/taskworker.Dockerfile" --build-arg="BASE_TAG=${IMAGE_TAG}" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw" .
-    - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw"
-
+    - if [ -f "${IMAGE_TAG}.jalmuqaibase.txt" ]; then
+        echo "Building base image...";
+        docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase" .
+        docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase"
+        docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/taskworker.Dockerfile" --build-arg="BASE_TAG=${IMAGE_TAG}" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw" .
+        docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw"
+      else
+        echo "Base image did not change. Skipping build.";
+        docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/taskworker.Dockerfile" --build-arg="BASE_TAG=${IMAGE_TAG}" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw" .
+        docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw"
+      fi
+  artifacts:
+    paths:
+      - "*.txt"
   cache:
     - key: $CI_COMMIT_REF_SLUG
       paths:
