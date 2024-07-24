@@ -12,7 +12,7 @@ SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 TAG="${1}"
 
 # validate tag
-REGEX_DEV_TAG='^pypi-(preprod|test2|test11|test12)-.*'
+REGEX_DEV_TAG='^pypi-(preprod|test2|test11|test12|test1)-.*'
 REGEX_RELEASE_TAG='^v3\.[0-9]{6}.*'
 if [[ $TAG =~ $REGEX_DEV_TAG ]]; then # Do not quote regexp variable here
     IFS='-' read -ra TMPSTR <<< "${TAG}"
