@@ -1,0 +1,9 @@
+[cern]
+name=CentOS-7 - CERN [20230323]
+baseurl=http://linuxsoft.cern.ch/internal/yumsnapshot/20230323/cern/centos/7/cern/x86_64
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-cern
+exclude=golang,golang-*,aims2-client,libxerces-c-3_1,python-logilab-*,cvmfs,puppet,puppet-server,facter,mcollective*,hiera,puppet-agent,puppet-agent-extra-gems
+includepkgs=
+priority=10

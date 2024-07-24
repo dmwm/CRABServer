@@ -4,3 +4,5 @@
 # Dependency==version
 
 # wmcver==2.3.3
+PyYAML
+
