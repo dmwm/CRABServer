@@ -69,7 +69,7 @@ check_docker_images:
   script:
     - python -m pip install --upgrade pip  # Ensure pip is up to date
     - python -m pip install -r requirements.txt  # Install dependencies
-    - python scripts/docker-images-has-changed.py -r "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase"  # Adjust repository and tags as needed
+    - python scripts/docker-images-has-changed.py -r cc7  # Adjust repository and tags as needed
   artifacts:
     paths:
       - "*.txt"  # Ensure the output files are saved as artifacts
@@ -101,7 +101,7 @@ build_rest_image:
     - key: $CI_COMMIT_REF_SLUG
       paths:
         - src/python/CRABInterface/__init__.py
-      policy: pull
+      policy: pull-push
 
 build_tw_image:
   rules:
@@ -118,7 +118,7 @@ build_tw_image:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
     - |
-      if [ -f "${IMAGE_TAG}.jalmuqaibase.txt" ]; then 
+      if [ -f "cc7.txt" ]; then 
         echo "Building base image..."
         docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase" .
         docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase"
@@ -134,7 +134,7 @@ build_tw_image:
     - key: $CI_COMMIT_REF_SLUG
       paths:
         - src/python/TaskWorker/__init__.py
-      policy: pull
+      policy: pull-push
 
 # build_monit_image:
 #   rules:
