@@ -53,7 +53,7 @@ set_version_name:
     - |
         echo -e "\n__version__ = \"${RELEASE_NAME:-$CI_COMMIT_TAG}\" #Automatically added during build process" >> src/python/CRABInterface/__init__.py;
   cache:
-    - key: $CI_PIPELINE_ID
+    - key: $CI_COMMIT_REF_SLUG
       paths:
         - src/python/TaskWorker/__init__.py
         - src/python/CRABInterface/__init__.py
@@ -72,7 +72,7 @@ check_docker_images:
     - python scripts/docker-images-has-changed.py -r "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase"  # Adjust repository and tags as needed
   artifacts:
     paths:
-      - "*.txt"  # Ensure the output files are saved as artifacts
+      - ".txt"  # Ensure the output files are saved as artifacts
     expire_in: 1 week
 
 build_rest_image:
@@ -94,7 +94,7 @@ build_rest_image:
     - docker push "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqaibase" 
 
   cache:
-    - key: $CI_PIPELINE_ID
+    - key: $CI_COMMIT_REF_SLUG
       paths:
         - src/python/CRABInterface/__init__.py
       policy: pull
@@ -117,7 +117,7 @@ build_tw_image:
     - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw"
 
   cache:
-    - key: $CI_PIPELINE_ID
+    - key: $CI_COMMIT_REF_SLUG
       paths:
         - src/python/TaskWorker/__init__.py
       policy: pull
