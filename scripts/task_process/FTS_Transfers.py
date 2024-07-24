@@ -191,9 +191,12 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
     logger.info(f"Getting state of job {jobid}")
 
     jobs_ongoing.append(jobid)
+    file_statuses = {}
 
     try:
         status = fts3.get_job_status(ftsContext, jobid, list_files=False)
+        if status["job_state"] in ['ACTIVE', 'FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"]:
+            file_statuses = fts3.get_job_status(ftsContext, jobid, list_files=True)['files']
     except HTTPException as hte:
         logger.exception(f"failed to retrieve status for {jobid}")
         logger.exception(f"httpExeption headers {hte.headers}")
@@ -209,8 +212,7 @@ def check_FTSJob(logger, ftsContext, jobid, jobsEnded, jobs_ongoing, done_id, fa
 
     if status["job_state"] in ('FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"):
         jobsEnded.append(jobid)
-    if status["job_state"] in ['ACTIVE', 'FINISHED', 'FINISHEDDIRTY', "FAILED", "CANCELED"]:
-        file_statuses = fts3.get_job_status(ftsContext, jobid, list_files=True)['files']
+    if file_statuses:
         done_id[jobid] = []
         failed_id[jobid] = []
         failed_reasons[jobid] = []
