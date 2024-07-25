@@ -41,17 +41,16 @@ class StageoutCheck(TaskAction):
         if exitcode != 0:
             isPermanent, failure, dummyExitCode = isFailurePermanent(err)
             if isPermanent:
-                # prepare a msg to log and a shorter msg to upload
+                # prepare a msg to log and a shorter msg to propagate up
                 msg = f"CRAB3 refuses to send jobs to grid scheduler for {self.task['tm_taskname']}."
                 msg += f" Error message:\n{failure}"
-                msgToUpload = msg
-                msg += "\n" + out
+                fullMsg = msg
+                fullMsg += "\n" + out
+                fullMsg += "\n" + err
+                self.logger.warning(fullMsg)
+                # out for now-a-days gfal-copy is awfully verbose, first lise will suffice
+                msg += "\n" + out.split('\n', maxsplit=1)[0]
                 msg += "\n" + err
-                self.logger.warning(msg)
-                # out for now-a-days gfal-copy is awfully verbose, first lise will suffice for upload
-                msgToUpload += "\n" + out.split('\n', maxsplit=1)[0]
-                msgToUpload += "\n" + err
-                uploadWarning(self.crabserver, self.task['tm_taskname'], msgToUpload, self.logger)
                 raise SubmissionRefusedException(msg)
             # Unknown error. Operators should check it from time to time and add failures if they are permanent.
             msg = "CRAB3 was not able to identify if failure is permanent. "

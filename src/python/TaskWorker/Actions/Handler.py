@@ -28,7 +28,7 @@ from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
 from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException,\
     TaskWorkerException, SubmissionRefusedException
 
-from CRABUtils.TaskUtils import updateTaskStatus
+from CRABUtils.TaskUtils import updateTaskStatus, uploadWarning
 from ServerUtilities import uploadToS3
 
 
@@ -97,6 +97,7 @@ class TaskHandler():
         except TapeDatasetException as e:
             raise TapeDatasetException(str(e)) from e
         except SubmissionRefusedException as e:
+            uploadWarning(self.crabserver, self.task['tm_taskname'], str(e), self.logger)
             updateTaskStatus(self.crabserver, taskName=self.task['tm_taskname'],
                              status='SUBMITREFUSED', logger=self.logger)
             raise SubmissionRefusedException(str(e)) from e
