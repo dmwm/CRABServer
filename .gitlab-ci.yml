@@ -59,22 +59,6 @@ set_version_name:
         - src/python/CRABInterface/__init__.py
       policy: push
 
-check_docker_images:
-  rules:
-    - !reference [.default_rules, default]
-    - !reference [.default_rules, release]
-  stage: check_image
-  image:
-    name: python:3.9-alpine
-  script:
-    - python -m pip install --upgrade pip  # Ensure pip is up to date
-    - python -m pip install -r requirements.txt  # Install dependencies
-    - python scripts/docker-images-has-changed.py -r "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqaibase"  # Adjust repository and tags as needed
-  artifacts:
-    paths:
-      - "*.txt"  # Ensure the output files are saved as artifacts
-    expire_in: 1 week
-
 build_rest_image:
   rules:
     - !reference [.default_rules, default]
@@ -87,8 +71,6 @@ build_rest_image:
     - docker:24.0.5-dind
   before_script:
     - docker info
-  dependencies:
-    - check_docker_images
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" 
     - docker build -f "${CI_PROJECT_DIR}/cicd/crabserver_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqaibase" .
@@ -112,8 +94,6 @@ build_base_image:
     name: docker:24.0.5
   services:
   - docker:24.0.5-dind
-  dependencies:
-  - build_rest_image
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
@@ -138,8 +118,6 @@ build_tw_image:
     name: docker:24.0.5
   services:
   - docker:24.0.5-dind
-  dependencies:
-  - build_base_image
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
