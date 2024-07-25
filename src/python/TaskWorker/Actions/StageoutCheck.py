@@ -8,7 +8,6 @@ import re
 
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedException
-from CRABUtils.TaskUtils import uploadWarning
 from ServerUtilities import isFailurePermanent
 from ServerUtilities import getCheckWriteCommand, createDummyFile
 from ServerUtilities import removeDummyFile, execute_command, isEnoughRucioQuota, getRucioAccountFromLFN
@@ -108,7 +107,7 @@ class StageoutCheck(TaskAction):
             if not quotaCheck['isEnough']:
                 msg = f"Not enough Rucio quota at {self.task['tm_asyncdest']}:{self.task['tm_output_lfn']}."\
                       f" Remain quota: {quotaCheck['free']} GB."
-                raise TaskWorkerException(msg)
+                raise SubmissionRefusedException(msg)
             self.logger.info(" Remain quota: %s GB.", quotaCheck['free'])
             if quotaCheck['isQuotaWarning']:
                 msg = 'Rucio Quota is very little and although CRAB will submit, stageout may fail.'
