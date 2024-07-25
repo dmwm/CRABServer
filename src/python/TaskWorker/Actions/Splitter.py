@@ -1,13 +1,14 @@
 """
 Split a task request into a set of jobs
 """
+# pylint: disable=too-many-branches
 from WMCore.DataStructs.Workflow import Workflow
 from WMCore.DataStructs.Subscription import Subscription
 from WMCore.JobSplitting.SplitterFactory import SplitterFactory
 
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.TaskAction import TaskAction
-from TaskWorker.WorkerExceptions import TaskWorkerException
+from TaskWorker.WorkerExceptions import SubmissionRefusedException
 
 
 class Splitter(TaskAction):
@@ -48,7 +49,7 @@ class Splitter(TaskAction):
             # sanity check
             nJobs = kwargs['task']['tm_totalunits'] // splitparam['events_per_job']
             if nJobs > maxJobs:
-                raise TaskWorkerException(
+                raise SubmissionRefusedException(
                     f"Your task would generate {nJobs} jobs. The maximum number of jobs in each task is {maxJobs}"
                 )
             if 'tm_events_per_lumi' in kwargs['task'] and kwargs['task']['tm_events_per_lumi']:
@@ -67,7 +68,7 @@ class Splitter(TaskAction):
             numJobs = sum([len(jobgroup.getJobs()) for jobgroup in factory])
         except RuntimeError:
             msg = f"The splitting on your task generated more than {maxJobs} jobs (the maximum)."
-            raise TaskWorkerException(msg) from RuntimeError
+            raise SubmissionRefusedException(msg) from RuntimeError
         if numJobs == 0:
             msg = "CRAB could not submit any job to the Grid scheduler:"
             msg += f"\nsplitting task {kwargs['task']['tm_taskname']}"
@@ -76,9 +77,9 @@ class Splitter(TaskAction):
             msg += f"\nwith {kwargs['task']['tm_split_algo']} method does not generate any job. See\n"
             msg += "https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Splitting"
             msg += diagnoseRunMatch(splitparam['runs'], data)
-            raise TaskWorkerException(msg)
+            raise SubmissionRefusedException(msg)
         if numJobs > maxJobs:
-            raise TaskWorkerException(
+            raise SubmissionRefusedException(
                 f"The splitting on your task generated {numJobs} jobs. The maximum number of jobs in each task is {maxJobs}"
             )
 
@@ -86,7 +87,7 @@ class Splitter(TaskAction):
         if kwargs['task']['tm_split_algo'] == 'Automatic' and \
                 kwargs['task']['tm_split_args']['minutes_per_job'] < minRuntime:
             msg = f"Minimum runtime requirement for automatic splitting is {minRuntime} minutes."
-            raise TaskWorkerException(msg)
+            raise SubmissionRefusedException(msg)
 
         # printing duplicated lumis if any
         lumiChecker = getattr(jobfactory, 'lumiChecker', None)
