@@ -1,5 +1,0 @@
-FROM @BASE_IMAGE_NAME@
-RUN yum --disablerepo=base --disablerepo=updates --disablerepo=extras \
-        install -y bzip2-devel file popt-devel nspr-devel nss-devel \
-        rpm-build autoconf automake libtool gettext-devel &&\
-    yum clean all

@@ -1,5 +1,0 @@
-FROM @BASE_IMAGE_NAME@
-RUN dnf --enablerepo=powertools install -y bzip2-devel file popt-devel nspr-devel nss-devel \
-        rpm-build autoconf automake libtool gettext-devel \
-        python3-devel cmake bison bison-devel && \
-    dnf clean all
