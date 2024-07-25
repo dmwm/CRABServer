@@ -7,6 +7,17 @@ tmp/runtime/*
 *.gz
 *.zip
 
+# python virtualenv
+.venv/
+# ci directory
+build/
+workdir/
+# direnv
+.envrc
+# pylint config
+.pylintrc
+
+# test workdir
 test/Playbook/ASORucio/*
 !test/Playbook/ASORucio/inventory
 !test/Playbook/ASORucio/playbook.yml
