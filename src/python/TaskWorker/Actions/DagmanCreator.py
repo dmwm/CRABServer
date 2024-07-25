@@ -3,6 +3,7 @@ Create a set of files for a DAG submission.
 
 Generates the condor submit files and the master DAG.
 """
+# pylint:  disable=invalid-name  # have a lot of snake_case varaibles here from "old times"
 
 import os
 import re
@@ -246,7 +247,6 @@ def validateLFNs(path, outputFiles):
             msg += "\n which exceeds maximum length of 500"
             msg += "\n and therefore can not be handled in our DataBase"
             raise SubmissionRefusedException(msg)
-    return
 
 def validateUserLFNs(path, outputFiles):
     """
@@ -592,7 +592,7 @@ class DagmanCreator(TaskAction):
             msg = "\nYour task specifies an output LFN which fails validation in"
             msg += "\n WMCore/Lexicon and therefore can not be handled in our DataBase"
             msg += "\nError detail: %s" % (str(ex))
-            raise SubmissionRefusedException(msg)
+            raise SubmissionRefusedException(msg) from ex
         groupid = len(siteinfo['group_sites'])
         siteinfo['group_sites'][groupid] = list(availablesites)
         siteinfo['group_datasites'][groupid] = list(datasites)
@@ -883,7 +883,7 @@ class DagmanCreator(TaskAction):
                         msg += " Please try to submit a new task (resubmit will not work)"
                         msg += " and contact the experts if the error persists."
                         msg += "\nError reason: %s" % (str(ex))
-                        raise TaskWorkerException(msg)
+                        raise TaskWorkerException(msg) from ex
             else:
                 possiblesites = locations
             ## At this point 'possiblesites' should never be empty.
