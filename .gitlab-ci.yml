@@ -76,9 +76,6 @@ build_rest_image:
     - docker build -f "${CI_PROJECT_DIR}/cicd/crabserver_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqaibase" .
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
     - docker push "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqaibase" 
-  artifacts:
-    paths:
-      - "*.txt"
   cache:
     - key: $CI_COMMIT_REF_SLUG
       paths:
@@ -97,12 +94,26 @@ build_base_image:
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
+    - if [[ "${CI_COMMIT_TAG}" =~ ^pypi-.*-([0-9]+)$ ]]; then
+        TAG_NUMBER="${BASH_REMATCH[1]}"
+        IMAGE_TAG="${CI_COMMIT_TAG}"
+        echo "Extracted tag number:${TAG_NUMBER}"
+        NEW_TAG_NUMBER=$((${TAG_NUMBER} - 1))
+        BASE_TAG="pypi-$(echo ${CI_COMMIT_TAG} | sed -e 's/[0-9]\+$/'"${NEW_TAG_NUMBER}"'/)"
+        echo "New tag:${NEW_TAG}"
+        echo "${IMAGE_TAG}" > image_tag.txt
+        echo "${BASE_TAG}" > base_tag.txt
+      else
+        echo "The CI_COMMIT_TAG does not match the expected pattern."
+        exit 1
+      fi
     - echo "Building base image..."
     - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase" .
     - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase"
   artifacts:
     paths:
-      - "*.txt"
+      - "base_tag.txt"
+      - "image_tag.txt"
   cache:
     - key: $CI_COMMIT_REF_SLUG
       paths:
@@ -124,9 +135,6 @@ build_tw_image:
     - echo "Building task worker image..."
     - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/taskworker.Dockerfile" --build-arg="BASE_TAG=${IMAGE_TAG}" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw" .
     - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw"
-  artifacts:
-    paths:
-      - "*.txt"
   cache:
     - key: $CI_COMMIT_REF_SLUG
       paths:
