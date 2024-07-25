@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name  # have a lot of snake_case varaibles here from "old times"
+# pylint: disable=invalid-name  # have a lot of snake_case variables here from "old times"
 
 """
 Here's the algorithm
@@ -314,7 +314,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
                     lfnsToPublish.append(fileDict['destination_lfn'])
             FilesInfoFromTBDInBlock[blockName] = filesInfo
 
-        logger.info(f"Prepare publish info for {len(blocksToPublish)} blocks")
+        logger.info("Prepare publish info for %s blocks", len(blocksToPublish))
 
         # so far so good
 
