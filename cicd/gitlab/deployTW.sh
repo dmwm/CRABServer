@@ -12,7 +12,7 @@ WORK_DIR=$PWD
 if [ "X${Service}" == "XTaskWorker" ] ; then
 	processName=crab-taskworker
 else
-	processName=RunPublisher
+	processName=crab-publisher
 fi
 
 
