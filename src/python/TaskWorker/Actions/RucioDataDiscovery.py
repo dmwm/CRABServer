@@ -9,7 +9,7 @@ import copy
 
 import sys
 
-from TaskWorker.WorkerExceptions import TaskWorkerException
+from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 from RucioUtils import getNativeRucioClient
 
@@ -49,13 +49,13 @@ class RucioDataDiscovery(DataDiscovery):
 
         if kwargs['task']['tm_split_algo'] != 'FileBased':
             msg = "Data.splitting must be set to 'FileBased' when using Rucio for DataDiscovery."
-            raise TaskWorkerException(msg)
+            raise SubmissionRefusedException(msg)
         if kwargs['task']['tm_use_parent']:
             msg = "Parent processing needs lumi info from DBS.\nCan't work when using Rucio for DataDiscovery."
-            raise TaskWorkerException(msg)
+            raise SubmissionRefusedException(msg)
         if kwargs['task']['tm_secondary_input_dataset']:
             msg = "Secondary dataset processing needs lumi info from DBS.\nCan't work when using Rucio for DataDiscovery."
-            raise TaskWorkerException(msg)
+            raise SubmissionRefusedException(msg)
 
         rucioDID = kwargs['task']['tm_input_dataset']
         rucioContainer = rucioDID.split(':')[1]
@@ -71,10 +71,10 @@ class RucioDataDiscovery(DataDiscovery):
         except Exception as ex:
             # dataset not found is a known use case
             if str(ex).find('No Dids found'):
-                raise TaskWorkerException(f"Did not find container {rucioContainer} in scope {rucioScope}:") from ex
+                raise SubmissionRefusedException(f"Did not find container {rucioContainer} in scope {rucioScope}:") from ex
             raise
         if not datasets:
-            raise TaskWorkerException(f"Rucio DID {rucioScope}:{rucioContainer} not existing or empty")
+            raise SubmissionRefusedException(f"Rucio DID {rucioScope}:{rucioContainer} not existing or empty")
 
         # Create a map for block's locations: for each block get the list of locations.
         # locationsMap is a dictionary, key=blockName, value=list of RSE's
@@ -163,7 +163,7 @@ class RucioDataDiscovery(DataDiscovery):
                                       "This could be a temporary glitch. Try to submit a new task (resubmit will not work)" + \
                                       f" and contact the experts if the error persists.\nError reason: {ex}") from ex
         if not filedetails:
-            raise TaskWorkerException("Cannot find any file inside the dataset. Check dataset scope and name\n" + \
+            raise SubmissionRefusedException("Cannot find any file inside the dataset. Check dataset scope and name\n" + \
                                       "Aborting submission. Submitting your task again will not help.")
 
         # Format the output creating the data structures required by WMCore. Filters out invalid files,
@@ -177,7 +177,7 @@ class RucioDataDiscovery(DataDiscovery):
             msg = "Cannot find any valid file inside the input container."
             msg += f"\nPlease check {rucioDID}"
             msg += "\nAborting submission. Resubmitting your task will not help."
-            raise TaskWorkerException(msg)
+            raise SubmissionRefusedException(msg)
 
         self.logger.debug("Got %s files", len(result.result.getFiles()))
 

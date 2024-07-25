@@ -5,7 +5,7 @@ from WMCore.Services.CRIC.CRIC import CRIC
 
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
-from TaskWorker.WorkerExceptions import TaskWorkerException
+from TaskWorker.WorkerExceptions import SubmissionRefusedException
 
 
 class UserDataDiscovery(DataDiscovery):
@@ -24,7 +24,7 @@ class UserDataDiscovery(DataDiscovery):
                 msg = "No files specified to process for task %s." % kwargs['task']['tm_taskname']
             if splitting != 'FileBased':
                 msg = "Data.splitting must be set to 'FileBased' when using a custom set of files."
-            raise TaskWorkerException(msg)
+            raise SubmissionRefusedException(msg)
 
         if hasattr(self.config.Sites, 'available'):
             locations = self.config.Sites.available
