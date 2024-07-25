@@ -1,6 +1,9 @@
 ARG BASE_TAG=latest
 FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG}
 
+## build with
+# docker buildx build -t registry.cern.ch/cmscrab/??:?? -f cicd/monit_pypi/Dockerfile .
+
 RUN pip install --user pandas 
 
 RUN mkdir -p /data/srv/monit/

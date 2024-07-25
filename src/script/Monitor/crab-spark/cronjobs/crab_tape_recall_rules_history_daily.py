@@ -120,9 +120,9 @@ def get_index_schema():
 
 # Send data to Opensearch
 
-_index_template = 'crab-tape-recall-daily-ekong'
-client = osearch.get_es_client("es-cms1.cern.ch/es", 'secret_opensearch.txt', get_index_schema())
-idx = client.get_or_create_index(timestamp=time.time(), index_template=_index_template, index_mod="M")
+_index_template = 'crab-tape-recall-daily'
+client = osearch.get_es_client("os-cms.cern.ch/es", '/data/certs/monit.d/monit_spark_crab.txt', get_index_schema())
+idx = client.get_or_create_index(timestamp=day.strftime("%s"), index_template=_index_template, index_mod="M")
 no_of_fail_saved = client.send(idx, docs, metadata=None, batch_size=10000, drop_nulls=False)
 
 print("=================================== RUCIO : Rules History ====================================="

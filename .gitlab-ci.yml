@@ -162,6 +162,28 @@ build_crabtwfilebeat_image:
         - src/python/TaskWorker/__init__.py
       policy: pull
 
+build_spark_image:
+  rules:
+    - if: $BUILD
+    - !reference [.default_rules, release]
+  stage: build_docker
+  image:
+    name: docker:27.1.1
+  services:
+    - name: docker:27.1.1-dind
+  script:
+    - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
+    - source .env
+    - docker context create mycontext
+    - docker buildx create mycontext --use --name mybuilder --bootstrap
+    - docker buildx build --push --build-arg="BASE_TAG=${IMAGE_TAG}" -f "${CI_PROJECT_DIR}/cicd/monit_spark/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabspark:pypi-${REST_Instance}-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabspark:pypi-${REST_Instance}-cache" -t "registry.cern.ch/cmscrab/crabspark:${IMAGE_TAG}" -t "registry.cern.ch/cmscrab/crabspark:latest" .
+  cache:
+    - key: $CI_PIPELINE_ID
+      paths:
+        - src/python/TaskWorker/__init__.py
+      policy: pull
+
+
 deploy_server:
   rules:
     - if: $BUILD_DEPLOY
