@@ -18,7 +18,7 @@ from TaskWorker.WorkerUtilities import getCrabserver
 from Publisher.PublisherUtils import setupLogging, prepareDummySummary, saveSummaryJson, \
     markGood, markFailed, getDBSInputInformation
 
-from PublisherDbsUtils import format_file_3, setupDbsAPIs, findParentBlocks, \
+from Publisher.PublisherDbsUtils import format_file_3, setupDbsAPIs, findParentBlocks, \
     prepareDbsPublishingConfigs, createBulkBlock, migrateByBlockDBS3
 
 
