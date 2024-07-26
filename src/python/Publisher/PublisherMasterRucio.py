@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name  # have a lot of snake_case varaibles here from "old times"
+# pylint: disable=invalid-name  # have a lot of snake_case variables here from "old times"
 
 """
 Here's the algorithm
@@ -314,7 +314,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
                     lfnsToPublish.append(fileDict['destination_lfn'])
             FilesInfoFromTBDInBlock[blockName] = filesInfo
 
-        logger.info(f"Prepare publish info for {len(blocksToPublish)} blocks")
+        logger.info("Prepare publish info for %s blocks", len(blocksToPublish))
 
         # so far so good
 
@@ -378,8 +378,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
 
             if toFail:
                 logger.info('Did not find useful metadata for %d files. Mark as failed', len(toFail))
-                nMarked = self.markAsFailed(lfns=toFail, reason='FileMetadata not found')
-                logger.info('marked %d files as Failed', nMarked)
+                self.markAsFailed(lfns=toFail, reason='FileMetadata not found')
 
             # call taskPublishRucio
             self.runTaskPublish(workflow, logger)
@@ -393,9 +392,8 @@ class Master():  # pylint: disable=too-many-instance-attributes
         """
         handy wrapper for PublisherUtils/markFailed
         """
-        nMarked = markFailed(files=lfns, crabserver=self.crabserver, failureReason=reason,
+        markFailed(files=lfns, crabServer=self.crabserver, failureReason=reason,
                              asoworker=self.config.asoworker, logger=self.logger)
-        return nMarked
 
     def pollInterval(self):
         """

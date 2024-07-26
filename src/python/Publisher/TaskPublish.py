@@ -29,7 +29,8 @@ def publishInDBS3(config, taskname, verbose, console):
     """
     # a few dictionaries to pass global information around all these functions
     # initialized here to None simply as documentation
-    log = {'logger': None, 'logdir': None, 'logTaskDir': None, 'taskFilesDir': None}
+    log = {'logger': None, 'logdir': None, 'logTaskDir': None,
+           'taskFilesDir': None, 'migrationLogDir': None}
     DBSApis = {'source': None, 'destRead': None, 'destWrite': None, 'global': None, 'migrate': None}
     nothingToDo = {}  # a pre-filled SummaryFile in case of no useful input or errors
 
