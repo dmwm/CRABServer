@@ -5,6 +5,7 @@ default:
 
 variables:
   IMAGE_TAG: "${CI_COMMIT_REF_SLUG}"  # to distinct it from commit tag and final image tag
+  BASE_TAG: pypi-test12-6.jalmuqaibase
   DOCKER_TLS_CERTDIR: "/certs"
 
 
@@ -94,13 +95,13 @@ build_base_image:
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
-    - chmod +x ./scripts/extract_tag.sh
-    - ./scripts/extract_tag.sh
     - echo "Building base image..."
     - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase" .
     - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase"
   rules:
-    - if: '$CI_COMMIT_TAG =~ /^pypi-.*-([0-9]+)$/'
+    - if: 
+      changes:
+      - "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile"
   artifacts:
     paths:
       - "base_tag.txt"
