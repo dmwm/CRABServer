@@ -95,7 +95,7 @@ build_base_image:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
     - if [[ "${CI_COMMIT_TAG}" =~ ^pypi-.*-([0-9]+)$ ]]; then
-        TAG_NUMBER="${BASH_REMATCH[1]}"
+        TAG_NUMBER="${BASH_REMATCH[2]}"
         IMAGE_TAG="${CI_COMMIT_TAG}"
         echo "Extracted tag number:${TAG_NUMBER}"
         NEW_TAG_NUMBER=$((${TAG_NUMBER} - 1))
