@@ -21,7 +21,7 @@ def deleteRules(client=None, filters=None):
     """
     # get rules, apply filters
     allRules = client.list_replication_rules(filters=filters)
-    formattedRules = [(x['created_at'], x['id'], x['name']) for x in allRules]
+    formattedRules = [(x['created_at'], x['id'], x['name'], x['scope']) for x in allRules]
 
     #pprint.pprint(formattedRules)
     now = datetime.datetime.now()
@@ -40,22 +40,30 @@ def deleteRules(client=None, filters=None):
     print(f'Found {len(formattedRules)} rules, match {len(matchRules)} rules')
 
     # deleting the rules
+    count = 0
     for x in matchRules:
         try:
-            print(f'Deleting rules {x[1]}')
+            print(f'Deleting rules {x[1]} {x[3]}:{x[2]}')
             if DRY_RUN:
                 raise Exception('Dry run.')
             client.delete_replication_rule(x[1], purge_replicas=True)
+            count +=1
         except Exception as e:
             print(f'Error: {e}')
             print('Skipping...')
 
+    print(f'Matched {len(matchRules)} rules, cleaned up {count} rules')
 
-# Cleanup cmsbot account
+
+# Cleanup bot account
 rucio=Client()
-rucio.whoami()
-deleteRules(client=rucio, filters={'account': 'cmsbot', 'scope': 'user.cmsbot'})
-# Cleanup crab_test_group account
+rucioClientInfo = rucio.whoami()
+print(rucioClientInfo)
+print(f"cleanup {rucioClientInfo['account']} account")
+deleteRules(client=rucio, filters={'account': rucioClientInfo['account'], 'scope': f'user.{rucioClientInfo["account"]}'})
+# Cleanup crab_test_group group account
 rucioGroup=Client(account='crab_test_group')
-rucioGroup.whoami()
+rucioClientInfo = rucio.whoami()
+print(rucioClientInfo)
+print("cleanup crab_test_group group account")
 deleteRules(client=rucioGroup, filters={'account': 'crab_test_group', 'scope': 'group.crab_test'})
