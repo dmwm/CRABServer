@@ -5,7 +5,6 @@ default:
 
 variables:
   IMAGE_TAG: "${CI_COMMIT_REF_SLUG}"  # to distinct it from commit tag and final image tag
-  BASE_TAG: pypi-test12-6.jalmuqaibase
   DOCKER_TLS_CERTDIR: "/certs"
 
 
@@ -126,7 +125,8 @@ build_tw_image:
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
     - echo "Building task worker image..."
     - export NEW_TAG=$(cat base_tag.txt | grep NEW_TAG | cut -d '=' -f2)
-    - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/taskworker.Dockerfile" --build-arg="BASE_TAG=${NEW_TAG}" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw" .
+    - echo "Extracted NEW_TAG:$NEW_TAG"
+    - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/taskworker.Dockerfile" --build-arg="BASE_TAG=${IMAGE_TAG}" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw" .
     - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw"
   cache:
     - key: $CI_COMMIT_REF_SLUG
