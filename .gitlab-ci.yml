@@ -98,7 +98,7 @@ build_base_image:
     - echo "Building base image..."
     - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase" .
     - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase"
-    - echo "BASE-TAG=${IMAGE_TAG}" > base_tag.txt
+    - echo "${IMAGE_TAG}" > base_tag.txt
   rules:
     - if: 
       changes:
