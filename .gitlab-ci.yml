@@ -98,6 +98,7 @@ build_base_image:
     - echo "Building base image..."
     - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase" .
     - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase"
+    - echo "BASE-TAG=${IMAGE_TAG}" > base_tag.txt
   rules:
     - if: 
       changes:
@@ -105,7 +106,6 @@ build_base_image:
   artifacts:
     paths:
       - "base_tag.txt"
-      - "image_tag.txt"
   cache:
     - key: $CI_COMMIT_REF_SLUG
       paths:
@@ -125,7 +125,8 @@ build_tw_image:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
     - echo "Building task worker image..."
-    - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/taskworker.Dockerfile" --build-arg="BASE_TAG=${IMAGE_TAG}" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw" .
+    - export NEW_TAG=$(cat base_tag.txt | grep NEW_TAG | cut -d '=' -f2)
+    - docker build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/taskworker.Dockerfile" --build-arg="BASE_TAG=${NEW_TAG}" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw" .
     - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw"
   cache:
     - key: $CI_COMMIT_REF_SLUG
