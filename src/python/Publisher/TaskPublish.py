@@ -16,10 +16,10 @@ from WMCore.Configuration import loadConfigurationFile
 from TaskWorker.WorkerExceptions import CannotMigrateException
 from TaskWorker.WorkerUtilities import getCrabserver
 
-from PublisherUtils import setupLogging, prepareDummySummary, saveSummaryJson, \
+from Publisher.PublisherUtils import setupLogging, prepareDummySummary, saveSummaryJson, \
     markGood, markFailed, getDBSInputInformation
 
-from PublisherDbsUtils import format_file_3, setupDbsAPIs, findParentBlocks, \
+from Publisher.PublisherDbsUtils import format_file_3, setupDbsAPIs, findParentBlocks, \
     createBulkBlock, migrateByBlockDBS3, prepareDbsPublishingConfigs
 
 

@@ -90,7 +90,7 @@ def setSlaveLogger(logsDir, name):
     return logger
 
 
-def setRootLogger(logsDir, quiet=False, debug=True, console=False):
+def setRootLogger(logsDir, logDebug=False, console=False):
     """Sets the root logger with the desired verbosity level
        The root logger logs to logs/log.txt and every single
        logging instruction is propagated to it (not really nice
@@ -114,9 +114,7 @@ def setRootLogger(logsDir, quiet=False, debug=True, console=False):
         logHandler.setFormatter(logFormatter)
         logging.getLogger().addHandler(logHandler)
     loglevel = logging.INFO
-    if quiet:
-        loglevel = logging.WARNING
-    if debug:
+    if logDebug:
         loglevel = logging.DEBUG
     logging.getLogger().setLevel(loglevel)
     logger = setMasterLogger(logsDir)

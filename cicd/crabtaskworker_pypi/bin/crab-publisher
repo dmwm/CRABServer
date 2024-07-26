@@ -1,0 +1,8 @@
+#!/usr/bin/env python
+"""
+Entrypoint for Publisher Process
+"""
+
+from Publisher.Main import main
+
+main()
