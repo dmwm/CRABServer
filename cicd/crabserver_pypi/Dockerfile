@@ -1,5 +1,5 @@
-# Get CERN tsanames.ora from cmsweb rpm image
-FROM registry.cern.ch/cmsweb/cmsweb:20230427-stable as tnsnames
+# Get CERN tsanames.ora, process_exporter from cmsweb rpm image
+FROM registry.cern.ch/cmsweb/cmsweb:20230427-stable AS cmsweb
 
 # Use `wmagent-base` image as our baseimage:
 # https://github.com/dmwm/CMSKubernetes/blob/2b0454f9205cb8f97fecb91bf6661b59e4b31424/docker/pypi/wmagent-base/Dockerfile
@@ -21,12 +21,16 @@ RUN apt-get update \
 RUN ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
 
 # Copy CERN tnsnames.ora
-COPY --from=tnsnames /etc/tnsnames.ora /etc/tnsnames.ora
-
-#RUN mkdir -p /opt/rucio/etc/
+COPY --from=cmsweb /etc/tnsnames.ora /etc/tnsnames.ora
+# Copy process exporter
+COPY --from=cmsweb /data/cmsweb/bin/process_monitor.sh \
+     /data/cmsweb/bin/process_exporter \
+     /usr/local/bin
+COPY cicd/crabserver_pypi/monitor.sh /data/monitor.sh
 
 RUN mkdir /build
 WORKDIR /build
+
 COPY cicd/crabserver_pypi/requirements.txt cicd/crabserver_pypi/wmcore_requirements.txt .
 # Install wmcore/crab dependencies
 RUN pip install -r requirements.txt
