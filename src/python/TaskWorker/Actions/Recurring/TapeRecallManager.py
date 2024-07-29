@@ -9,7 +9,6 @@ import os
 import time
 import copy
 
-from http.client import HTTPException
 from urllib.parse import urlencode
 
 from rucio.common.exception import RuleNotFound
@@ -17,6 +16,7 @@ from rucio.common.exception import RuleNotFound
 from ServerUtilities import MAX_DAYS_FOR_TAPERECALL, getTimeFromTaskname
 from RESTInteractions import CRABRest
 from RucioUtils import getNativeRucioClient
+from CRABUtils.TaskUtils import uploadWarning, deleteWarnings, updateTaskStatus, getTasks
 from TaskWorker.MasterWorker import getRESTParams
 from TaskWorker.Worker import failTask
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
@@ -49,7 +49,7 @@ class TapeRecallManager(BaseRecurringAction):
     def handleKill(self):
         """ looks for tasks in KILLRECALL and deals with them """
         status = 'KILLRECALL'
-        tasksToWorkOn = self.getTasks(status)
+        tasksToWorkOn = getTasks(crabserver=self.crabserver, status=status, logger=self.logger)
 
         for aTask in tasksToWorkOn:
             taskName = aTask['tm_taskname']
@@ -78,15 +78,16 @@ class TapeRecallManager(BaseRecurringAction):
             else:
                 msg = f"rule {reqId} used by tasks {tasksUsingThisRule}. Will not delete it"
                 self.logger.info(msg)
-            self.updateTaskStatus(taskName, 'KILLED')
+            updateTaskStatus(crabserver=self.crabserver, taskName=taskName, status='KILLED', logger=self.logger)
             # Clean up previous "dataset on tape" warnings
-            self.deleteWarnings(taskName)
+            deleteWarnings(crabserver=self.crabserver, taskname=taskName, logger=self.logger)
             self.logger.info("Done on this task")
 
     def handleRecall(self):
         """ looks for tasks in TAPERECALL and deals with them """
         status = 'TAPERECALL'
-        tasksToWorkOn = self.getTasks(status)
+        tasksToWorkOn = getTasks(crabserver=self.crabserver, status=status, logger=self.logger)
+
         for aTask in tasksToWorkOn:
             taskName = aTask['tm_taskname']
             msg = f"Working on task {taskName}"
@@ -97,7 +98,7 @@ class TapeRecallManager(BaseRecurringAction):
                 msg = f"Tape recall request did not complete in {MAX_DAYS_FOR_TAPERECALL} days."
                 self.logger.info(msg)
                 failTask(taskName, self.crabserver, msg, self.logger, 'FAILED')
-                # there is no need to remove the rule since it will expire one month after
+                # there is no need to remove the rule since it will expire after
                 # last task requesting those data was submitted.
                 continue
             # 2.) integrity checks
@@ -112,7 +113,7 @@ class TapeRecallManager(BaseRecurringAction):
             except RuleNotFound:
                 msg = f"Rucio rule id {reqId} not found. Please report to experts"
                 self.logger.error(msg)
-                self.uploadWarning(taskname=taskName, msg=msg)
+                uploadWarning(crabserver=self.crabserver, taskname=taskName, msg=msg, logger=self.logger)
                 continue
             msg = f"Rule {reqId} is {rule['state']}"
             self.logger.info(msg)
@@ -121,12 +122,12 @@ class TapeRecallManager(BaseRecurringAction):
                 # all good kick off a new processing
                 msg = f"Request {reqId} is completed, proceed with submission"
                 self.logger.info(msg)
-                self.updateTaskStatus(taskName, 'NEW')
+                updateTaskStatus(crabserver=self.crabserver, taskName=taskName, status='NEW', logger=self.logger)
                 # Clean up previous "dataset on tape" warnings
-                self.deleteWarnings(taskName)
-                # Make sure data will stay on disk for NOW + 4 days
+                deleteWarnings(crabserver=self.crabserver, taskname=taskName, logger=self.logger)
+                # Make sure data will stay on disk for NOW + 4 days. A new rule will kick in when task is submitted
                 self.logger.info("Extending rule lifetime to last 4 days")
-                self.privilegedRucioClient.update_replication_rule(reqId, {'lifetime': (4 * 24 * 60 * 60)}) #lifetime is in seconds
+                self.privilegedRucioClient.update_replication_rule(reqId, {'lifetime': (4 * 24 * 60 * 60)})  # lifetime is in seconds
             else:
                 # still in progress, report status and keep waiting
                 ok = rule['locks_ok_cnt']
@@ -141,8 +142,8 @@ class TapeRecallManager(BaseRecurringAction):
                     msg += (f"\nThis recall has lasted {waitDays} days already and it is >= {okFraction}% complete")
                     msg += ("\nYour needs are very likely to be satisfied with what's on disk now")
                     msg += ("\nSuggestion: kill this task and submit another one with config.Data.partialDataset=True")
-                self.deleteWarnings(taskName)
-                self.uploadWarning(taskname=taskName, msg=msg)
+                deleteWarnings(crabserver=self.crabserver, taskname=taskName, logger=self.logger)
+                uploadWarning(crabserver=self.crabserver, taskname=taskName, msg=msg, logger=self.logger)
             self.logger.info("Done on this task")
 
     def init(self):
@@ -187,70 +188,12 @@ class TapeRecallManager(BaseRecurringAction):
             tapeRecallConfig.Services.Rucio_account = 'crab_tape_recall'
             self.privilegedRucioClient = getNativeRucioClient(tapeRecallConfig, self.logger)
 
-    def getTasks(self, status):
-        """retrieve from DB a list of tasks with given status"""
-        # TODO this is also a candidate for TaskWorker/TaskUtils.py
-        msg = f"Retrieving {status} tasks"
-        tasks = []
-        configreq = {'limit': 1000, 'workername': '%', 'getstatus': status}
-        try:
-            data = urlencode(configreq)
-            tasks = self.crabserver.get(api='workflowdb', data=data)[0]['result']
-        except Exception:  # pylint: disable=broad-except
-            pass
-        if not tasks:
-            msg = f"No {status} task retrieved."
-            self.logger.info(msg)
-        else:
-            msg = f"Retrieved a total of {len(tasks)} {status} tasks"
-            self.logger.info(msg)
-        return tasks
-
-    def uploadWarning(self, taskname='', msg=''):
-        """ Uploads a warning message to the Task DB so that crab status can show it """
-        # TODO this is duplicated in TaskWorker/Actions/TaskAction.py but it is not possible
-        # to import from there. Should probably create a TaskWorker/TaskUtils.py for such functions
-        configreq = {'subresource': 'addwarning', 'workflow': taskname, 'warning': msg}
-        try:
-            data = urlencode(configreq)
-            self.crabserver.post(api='task', data=data)
-        except HTTPException as hte:
-            self.logger.error("Error uploading warning: %s", str(hte))
-            self.logger.warning("Cannot add a warning to REST interface. Warning message: %s", msg)
-
-    def deleteWarnings(self, taskname):
-        """ Removes all warnings uploaded so fare for this task """
-        # TODO this is also a candidate for TaskWorker/TaskUtils.py
-        configreq = {'subresource': 'deletewarnings', 'workflow': taskname}
-        data = urlencode(configreq)
-        try:
-            self.crabserver.post(api='task', data=data)
-        except HTTPException as hte:
-            self.logger.error("Error deleting warnings: %s", str(hte))
-            self.logger.warning("Can not delete warnings from REST interface.")
-
-    def updateTaskStatus(self, taskName, status):
-        """ change task status in the DB """
-        # TODO this is also a candidate for TaskWorker/TaskUtils.py
-        msg = f"Will set to {status} task {taskName}"
-        self.logger.info(msg)
-        if status == 'NEW':
-            command = 'SUBMIT'
-        elif status == 'KILLED':
-            command = 'KILL'
-        else:
-            self.logger.error('updateTaskStatus does not know how to handle status %s. Do nothing', status)
-            return
-        configreq = {'subresource': 'state', 'workflow': taskName, 'status': status, 'command': command}
-        data = urlencode(configreq)
-        self.crabserver.post(api='workflowdb', data=data)
-
     def findTasksForRule(self, ruleId=None):
         """
         returns the list of task names which have stored the given Rucio
         rule as ddmreqid in DB Tasks table
         """
-        # TODO this is also a candidate for TaskWorker/TaskUtils.py
+        # should this go in CRABUtils/TaskUtils.py ?
         data = {'subresource': 'taskbyddmreqid', 'ddmreqid': ruleId}
         res = self.crabserver.get(api='task', data=urlencode(data))
         tasks = res[0]['result']  # for obscure reasons this has the form [['task1'],['task2']...]
@@ -274,5 +217,5 @@ if __name__ == '__main__':
     from WMCore.Configuration import loadConfigurationFile
     cfg = loadConfigurationFile(TWCONFIG)
 
-    trs = TapeRecallManager(cfg.TaskWorker.logsDir)
-    trs._execute(cfg, None)  # pylint: disable=protected-access
+    trm = TapeRecallManager(cfg.TaskWorker.logsDir)
+    trm._execute(cfg, None)  # pylint: disable=protected-access
