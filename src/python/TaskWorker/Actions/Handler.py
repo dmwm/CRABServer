@@ -193,7 +193,7 @@ def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
         elif task.get('tm_user_files'):
             handler.addWork(UserDataDiscovery(config=config, crabserver=crabserver, procnum=procnum))
         else:
-            raise WorkerHandlerException("Neither inputDataset nor userInputFiles specified", retry=0)
+            raise SubmissionRefusedException("Neither inputDataset nor userInputFiles specified", retry=0)
     elif task['tm_job_type'] == 'PrivateMC':
         handler.addWork(MakeFakeFileSet(config=config, crabserver=crabserver, procnum=procnum))
     handler.addWork(Splitter(config=config, crabserver=crabserver, procnum=procnum))
