@@ -10,6 +10,7 @@ if [[ -n ${TRACE+x} ]]; then
 fi
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
+# source required function
 source $SCRIPT_DIR/source.sh
 
 ACTION=""
