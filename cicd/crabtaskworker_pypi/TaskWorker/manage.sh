@@ -11,7 +11,7 @@ fi
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 helpFunction() {
-    echo " Usage: manage.sh start -c/-g -d"
+    echo " Usage: manage.sh ACTION [OPTION]"
     echo ""
     echo " Available actions:"
     echo "   help        show this help"
