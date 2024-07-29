@@ -2,7 +2,7 @@
 
 # Start the TaskWorker service.
 
-##H Usage: manage.sh ACTION
+##H Usage: manage.sh start -c/-g -d
 ##H
 ##H Available actions:
 ##H   help        show this help
@@ -10,6 +10,8 @@
 ##H   restart     (re)start the service
 ##H   start       (re)start the service
 ##H   stop        stop the service
+##H   status      show pid
+##H   env         eval
 ##H
 ##H This script needs following environment variables for start action:
 ##H   - DEBUG:      if `true`, setup debug mode environment.
@@ -22,94 +24,73 @@ if [[ -n ${TRACE+x} ]]; then
 fi
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-## some variable use in start_srv
-CONFIG="${SCRIPT_DIR}"/current/TaskWorkerConfig.py
-# path where we install crab code
-APP_PATH="${APP_PATH:-/data/srv/current/lib/python/site-packages/}"
+MODE="current"
+DEBUG="f"
+ACTION=""
 
-# CRABTASKWORKER_ROOT is a mandatory variable for getting data directory in `DagmanCreator.getLocation()`
-# Hardcoded the path and use new_updateTMRuntime.sh to build it from source and copy to this path.
-export CRABTASKWORKER_ROOT="${APP_PATH}"
-
-helpFunction() {
-    grep "^##H" "${0}" | sed -r "s/##H(| )//g"
-}
-
-_getMasterWorkerPid() {
-    pid=$(pgrep -f 'crab-taskworker' | grep -v grep | head -1 ) || true
-    echo "${pid}"
-}
-
-start_srv() {
-    # Check require env
-    export PYTHONPATH
-    echo "Starting TaskWorker..."
-    if [[ $DEBUG ]]; then
-        crab-taskworker --config "${CONFIG}" --logDebug --pdb
+while [[ $OPTIND -le "$#" ]]; do
+    if getopts ":hgcd" opt; then
+        if [[ ${ACTION} != "start" ]]; then
+            helpFunction; exit 1
+        fi
+        case "${opt}" in
+            h )
+                helpFunction; exit 0
+                ;;
+            g )
+                if [[ -n "$MODE" ]]; then
+                   helpFunction
+                   exit 1
+                fi
+                MODE="fromGH"
+                ;;
+            c )
+                if [[ -n "$MODE" ]]; then
+                   helpFunction
+                   exit 1
+                fi
+                MODE="current"
+                ;;
+            d )
+                DEBUG="t"
+                ;;
+            * )
+                echo "$0: unknown action '$1', please try '$0 help' or documentation."
+                exit 1
+                ;;
+        esac
+    elif [[ -n $ACTION ]]; then
+         helpFunction; exit 1
     else
-        crab-taskworker --config "${CONFIG}" --logDebug &
+        ACTION="${!OPTIND}"
+        ((OPTIND++))
     fi
-    echo "Started TaskWorker with MasterWorker pid $(_getMasterWorkerPid)"
-}
-
-stop_srv() {
-    # This part is copy from https://github.com/dmwm/CRABServer/blob/3af9d658271a101db02194f48c5cecaf5fab7725/src/script/Deployment/TaskWorker/stop.sh
-    # TW is given checkTimes*timeout seconds to stop, if it is still running after
-    # this period, TW and all its slaves are killed by sending SIGKILL signal.
-    echo 'Stopping TaskWorker...'
-    checkTimes=12
-    timeout=15 #that will give 12*15=180 seconds (3min) for the TW to finish work
-
-    TaskMasterPid=$(_getMasterWorkerPid)
-    if [[ -z $TaskMasterPid ]]; then
-        echo "No master process running."
-        return;
-    fi
-    kill $TaskMasterPid
-    echo "SIGTERM sent to MasterWorker pid $TaskMasterPid"
-
-    for (( i=0; i<$checkTimes; ++i)); do
-      # get only alive slaves, i.e. exclude defunct processes
-      aliveSlaves=$(ps --ppid $TaskMasterPid  -o pid,s | grep -v "Z" | awk '{print $1}' | tail -n +2 | tr '\n' ' ') || true
-
-      if [ -n "$aliveSlaves" ]; then
-        echo "slave(s) PID [ ($aliveSlaves) ] are still running, sleeping for $timeout seconds. ($((i+1)) of $checkTimes try)"
-        sleep $timeout
-      else
-        echo "Slaves gracefully stopped after $((i * timeout)) seconds."
-        sleep 1
-        break
-      fi
-    done
-
-    runningProcesses=$(pgrep -f TaskWorker | tr '\n' ' ') || true
-    if [ -n "$runningProcesses" ]; then
-      echo -e "After max allowed time ($((checkTimes * timeout)) seconds) following TW processes are still running: $runningProcesses \nSending SIGKILL to stop it."
-      pkill -9 -f TaskWorker
-      echo "Running TW processes: `pgrep -f TaskWorker | tr '\n' ' '`"
-    else
-      echo "TaskWorker master has shutdown successfully."
-    fi
-}
+done
 
 # Main routine, perform action requested on command line.
-case ${1:-help} in
-  start | restart )
-    stop_srv
-    start_srv
-    ;;
+case ${ACTION:-help} in
+    start | restart )
+        stop_srv
+        start_srv
+        ;;
 
-  stop )
-    stop_srv
-    ;;
+    stop )
+        stop_srv
+        ;;
 
-  help )
-    helpFunction
-    exit 0
-    ;;
+    help )
+        helpFunction
+        exit 0
+        ;;
 
-  * )
-    echo "$0: unknown action '$1', please try '$0 help' or documentation." 1>&2
-    exit 1
-    ;;
+    env )
+        echo "export CONFIG=$CONFIG"
+        echo "export APP_PATH=$APP_PATH"
+        echo "export PYTHONPATH=$PYTHONPATH"
+        echo "export CRABTASKWORKER_ROOT=$CRABTASKWORKER_ROOT"
+        ;;
+    * )
+        echo "$0: unknown action '$1', please try '$0 help' or documentation." 1>&2
+        exit 1
+        ;;
 esac
