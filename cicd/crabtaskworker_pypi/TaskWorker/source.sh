@@ -5,7 +5,9 @@ if [[ -n ${TRACE+x} ]]; then
     export TRACE
 fi
 
-# checking SCRIPT_DIR var script dir must provide by caller
+# checking SCRIPT_DIR var. It must provide by caller.
+# The solution from link below for source script is too complicate.
+# https://stackoverflow.com/questions/59895/how-do-i-get-the-directory-where-a-bash-script-is-located-from-within-the-script
 echo "${SCRIPT_DIR}" > /dev/null
 
 helpFunction() {
@@ -48,10 +50,12 @@ _getMasterWorkerPid() {
 start_srv() {
     script_env
     echo "Starting TaskWorker..."
+    markmodify_path=/data/srv/current/data_files_modified
     if [[ $MODE = "fromGH" ]]; then
-        markmodify_path=/data/srv/current/data_files_modified
         touch ${markmodify_path}
         ./updateDatafiles.sh
+    elif [[ -f ${markmodify_path} ]]; then
+        echo "Error: ${markmodify_path} exists."
     fi
 
     if [[ $DEBUG ]]; then
@@ -63,9 +67,6 @@ start_srv() {
 }
 
 stop_srv() {
-    echo stop_srv
-    return 0
-
     # This part is copy from https://github.com/dmwm/CRABServer/blob/3af9d658271a101db02194f48c5cecaf5fab7725/src/script/Deployment/TaskWorker/stop.sh
     # TW is given checkTimes*timeout seconds to stop, if it is still running after
     # this period, TW and all its slaves are killed by sending SIGKILL signal.
