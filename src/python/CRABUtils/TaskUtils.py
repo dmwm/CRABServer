@@ -23,6 +23,7 @@ def getTasks(crabserver=None, status=None, logger=None, limit=1000):
     else:
         msg = f"Retrieved a total of {len(tasks)} {status} tasks"
         logger.info(msg)
+    return tasks
 
 
 def uploadWarning(crabserver=None, taskname=None, msg='', logger=None):
