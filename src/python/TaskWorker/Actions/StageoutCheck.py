@@ -1,8 +1,13 @@
+"""
+Ensure that ASO will be able to write at destination
+"""
+# pylint: disable=too-many-branches
+
 import os
 import re
 
 from TaskWorker.Actions.TaskAction import TaskAction
-from TaskWorker.WorkerExceptions import TaskWorkerException
+from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedException
 from ServerUtilities import isFailurePermanent
 from ServerUtilities import getCheckWriteCommand, createDummyFile
 from ServerUtilities import removeDummyFile, execute_command, isEnoughRucioQuota, getRucioAccountFromLFN
@@ -19,34 +24,42 @@ class StageoutCheck(TaskAction):
     def __init__(self, config, crabserver, procnum=-1, rucioClient=None):
         TaskAction.__init__(self, config, crabserver, procnum)
         self.rucioClient = rucioClient
+        self.crabserver = crabserver
         self.task = None
         self.proxy = None
         self.workflow = None
 
-    def checkPermissions(self, Cmd):
+    def checkPermissions(self, cmd):
         """
         Execute command and in case of permanent issue, raise error
         If issue unknown, upload warning message and return 1
         Return 0 otherwise
         """
-        self.logger.info("Executing command: %s ", Cmd)
-        out, err, exitcode = execute_command(Cmd)
+        self.logger.info("Executing command: %s ", cmd)
+        out, err, exitcode = execute_command(cmd)
         if exitcode != 0:
             isPermanent, failure, dummyExitCode = isFailurePermanent(err)
             if isPermanent:
-                msg = "CRAB3 refuses to send jobs to grid scheduler for %s. Error message: %s" %(self.task['tm_taskname'], failure)
-                msg += "\n" + out
+                # prepare a msg to log and a shorter msg to propagate up
+                msg = f"CRAB3 refuses to send jobs to grid scheduler for {self.task['tm_taskname']}."
+                msg += f" Error message:\n{failure}"
+                fullMsg = msg
+                fullMsg += "\n" + out
+                fullMsg += "\n" + err
+                self.logger.warning(fullMsg)
+                # out for now-a-days gfal-copy is awfully verbose, first lise will suffice
+                msg += "\n" + out.split('\n', maxsplit=1)[0]
                 msg += "\n" + err
-                self.logger.warning(msg)
-                raise TaskWorkerException(msg)
-            else:
-                # Unknown error. Operators should check it from time to time and add failures if they are permanent.
-                self.logger.warning("CRAB3 was not able to identify if failure is permanent. Err: %s Out: %s ExitCode: %s", err, out, exitcode)
-                # Upload warning to user about not being able to check stageout
-                msg = "The CRAB3 server got a non-critical error while checking stageout permissions. Please use checkwrite to check if everything is fine."
-                self.uploadWarning(msg, self.task['user_proxy'], self.task['tm_taskname'])
-                self.logger.info("UNKNOWN ERROR. Operator should check if it is permanent, but for now we go ahead and submit a task.")
-                return 1
+                raise SubmissionRefusedException(msg)
+            # Unknown error. Operators should check it from time to time and add failures if they are permanent.
+            msg = "CRAB3 was not able to identify if failure is permanent. "
+            msg += f"Err: {err} Out: {out} ExitCode: {exitcode}"
+            self.logger.warning(msg)
+            # Upload warning to user about not being able to check stageout
+            msg = "The CRAB3 server got a non-critical error while checking stageout permissions. Please use checkwrite to check if everything is fine."
+            self.uploadWarning(msg, self.task['user_proxy'], self.task['tm_taskname'])
+            self.logger.info("UNKNOWN ERROR. Operator should check if it is permanent, but for now we go ahead and submit a task.")
+            return 1
         return 0
 
 
@@ -59,15 +72,21 @@ class StageoutCheck(TaskAction):
         # ActivitiesToRunEverywhere is used mainly for HC and there is no need to check for it.
         if hasattr(self.config.TaskWorker, 'ActivitiesToRunEverywhere') and \
                    self.task['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere:
-            self.logger.info("Will not check possibility to write to destination site because activity: %s is in ActivitiesToRunEverywhere", self.task['tm_activity'])
+            msg = "Will not check possibility to write to destination site because activity: "
+            msg += f"{ self.task['tm_activity']} is in ActivitiesToRunEverywhere"
+            self.logger.info(msg)
             return
         # If user specified no output and no logs transfer, there is also no need to check it.
         if self.task['tm_save_logs'] == 'F' and self.task['tm_transfer_outputs'] == 'F':
-            self.logger.info("Will not check possibility to write to destination site because user specified not transfer any output/log files.")
+            msg = "Will not check possibility to write to destination site"
+            msg += "because user specified not transfer any output/log files."
+            self.logger.info(msg)
             return
         # Do not need to check if it is dryrun.
         if self.task['tm_dry_run'] == 'T':
-            self.logger.info("Will not check possibility to write to destination site. User specified dryrun option.")
+            msg = "Will not check possibility to write to destination site."
+            msg += "User specified dryrun option."
+            self.logger.info(msg)
             return
         self.workflow = self.task['tm_taskname']
         self.proxy = self.task['user_proxy']
@@ -88,7 +107,7 @@ class StageoutCheck(TaskAction):
             if not quotaCheck['isEnough']:
                 msg = f"Not enough Rucio quota at {self.task['tm_asyncdest']}:{self.task['tm_output_lfn']}."\
                       f" Remain quota: {quotaCheck['free']} GB."
-                raise TaskWorkerException(msg)
+                raise SubmissionRefusedException(msg)
             self.logger.info(" Remain quota: %s GB.", quotaCheck['free'])
             if quotaCheck['isQuotaWarning']:
                 msg = 'Rucio Quota is very little and although CRAB will submit, stageout may fail.'

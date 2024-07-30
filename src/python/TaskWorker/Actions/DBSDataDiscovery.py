@@ -15,7 +15,7 @@ from WMCore import Lexicon
 from RucioUtils import getNativeRucioClient, getTapeRecallUsage
 
 from ServerUtilities import MAX_LUMIS_IN_BLOCK, parseDBSInstance, isDatasetUserDataset
-from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
+from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException, SubmissionRefusedException
 from TaskWorker.Actions.DataDiscovery import DataDiscovery
 from TaskWorker.Actions.RucioActions import RucioAction
 
@@ -35,9 +35,9 @@ class DBSDataDiscovery(DataDiscovery):
         """ as the name says """
         res = self.dbs.dbs.listDatasets(dataset=dataset, detail=1, dataset_access_type='*')
         if not res:
-            raise TaskWorkerException(f"Cannot find dataset {dataset} in {self.dbsInstance} DBS instance")
+            raise SubmissionRefusedException(f"Cannot find dataset {dataset} in {self.dbsInstance} DBS instance")
         if len(res) > 1:
-            raise TaskWorkerException(f"Found more than one dataset while checking in DBS the status of {dataset}")
+            raise SubmissionRefusedException(f"Found more than one dataset while checking in DBS the status of {dataset}")
         res = res[0]
         #import pprint
         #self.logger.info("Input dataset details: %s", pprint.pformat(res))
@@ -53,7 +53,7 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += " To allow CRAB to consider a dataset that is not 'VALID', set Data.allowNonValidInputDataset = True in the CRAB configuration."
                 msg += " Notice that this will not force CRAB to run over all files in the dataset;"
                 msg += " CRAB will still check if there are any valid files in the dataset and run only over those files."
-                raise TaskWorkerException(msg)
+                raise SubmissionRefusedException(msg)
             msg = f"The input dataset {dataset} is not 'VALID' but '{accessType}'."
             msg += " CRAB will check if there are any valid files in the dataset and run only over those files."
             if accessType == 'DEPRECATED':
@@ -92,7 +92,7 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += "\nusing FileBased split algorithm and avoiding any additional request"
                 msg += "\nwich may cause lumi information to be looked up. See CRAB FAQ for more info:"
                 msg += "\nhttps://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ"
-                raise TaskWorkerException(msg)
+                raise SubmissionRefusedException(msg)
 
     @staticmethod
     def lumiOverlap(d1, d2):
@@ -119,11 +119,11 @@ class DBSDataDiscovery(DataDiscovery):
             for file in files:
                 Lexicon.lfn(file)  # will raise if file is not a valid lfn
         except AssertionError as ex:
-            raise TaskWorkerException(f"input file is not a valid LFN: {file}") from ex
+            raise SubmissionRefusedException(f"input file is not a valid LFN: {file}") from ex
         filesInDataset = self.dbs.listDatasetFiles(datasetPath=dataset)
         for file in files:
             if not file in filesInDataset:
-                raise TaskWorkerException(f"input file use does not belong to input dataset: {file}")
+                raise SubmissionRefusedException(f"input file use does not belong to input dataset: {file}")
     @staticmethod
     def validateInputBlocks(dataset=None, blocks=None):
         """ make sure that blocks in input list match input dataset """
@@ -131,10 +131,10 @@ class DBSDataDiscovery(DataDiscovery):
             for block in blocks:
                 Lexicon.block(block)  # will raise if file is not a valid lfn
         except AssertionError as ex:
-            raise TaskWorkerException(f"input block is not a valid block name: {block}") from ex
+            raise SubmissionRefusedException(f"input block is not a valid block name: {block}") from ex
         for block in blocks:
             if not block.split('#')[0] == dataset:
-                raise TaskWorkerException(f"input block does not belong to input dataset: {block}")
+                raise SubmissionRefusedException(f"input block does not belong to input dataset: {block}")
 
     def execute(self, *args, **kwargs):
         """
@@ -213,7 +213,7 @@ class DBSDataDiscovery(DataDiscovery):
         except DBSReaderError as dbsexc:
             # dataset not found in DBS is a known use case
             if str(dbsexc).find('No matching data'):
-                raise TaskWorkerException(
+                raise SubmissionRefusedException(
                     f"CRAB could not find dataset {inputDataset} in this DBS instance: {dbsurl}"
                 ) from dbsexc
             raise
@@ -297,7 +297,7 @@ class DBSDataDiscovery(DataDiscovery):
                     if 'T3_CH_CERNBOX' in v:
                         useCernbox = True
                 if useCernbox:
-                    raise TaskWorkerException(
+                    raise SubmissionRefusedException(
                         "USER dataset is located at T3_CH_CERNBOX, but this location \n"+\
                         "is not available to CRAB jobs."
                     )
@@ -337,7 +337,7 @@ class DBSDataDiscovery(DataDiscovery):
                     self.logger.warning(msg)
             if not secondaryLocationsMap:
                 msg = f"No locations found for secondaryDataset {secondaryDataset}."
-                raise TaskWorkerException(msg)
+                raise SubmissionRefusedException(msg)
 
 
         # From now on code is not dependent from having used Rucio or PhEDEx
@@ -425,7 +425,7 @@ class DBSDataDiscovery(DataDiscovery):
                 f" and contact the experts if the error persists.\nError reason: {ex}"
             ) from ex
         if not filedetails:
-            raise TaskWorkerException(
+            raise SubmissionRefusedException(
                 ("Cannot find any file inside the dataset. Please, check your dataset in DAS\n%s\n" +
                  "Aborting submission. Resubmitting your task will not help.") %
                 (f"https://cmsweb.cern.ch/das/request?instance={self.dbsInstance}&input=dataset={inputDataset}")
@@ -438,7 +438,7 @@ class DBSDataDiscovery(DataDiscovery):
                                    tempDir=kwargs['tempDir'])
 
         if not result.result:
-            raise TaskWorkerException(("Cannot find any valid file inside the dataset. Please, check your dataset in DAS, %s.\n" +
+            raise SubmissionRefusedException(("Cannot find any valid file inside the dataset. Please, check your dataset in DAS, %s.\n" +
                                        "Aborting submission. Resubmitting your task will not help.") %
                                       (f"https://cmsweb.cern.ch/das/request?instance={self.dbsInstance}&input=dataset={inputDataset}"))
 
@@ -545,7 +545,7 @@ class DBSDataDiscovery(DataDiscovery):
             msg = f"Task could not be submitted because not all blocks of dataset {inputDataset} are on DISK"
             if not userHasQuota:
                 msg += overQmsg
-                raise TaskWorkerException(msg)
+                raise SubmissionRefusedException(msg)
             msg += "\nWill request a full disk copy for you. See"
             msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
         elif inputBlocks:
@@ -553,7 +553,7 @@ class DBSDataDiscovery(DataDiscovery):
                 msg = "Task could not be submitted because blocks specified in 'Data.inputBlocks' are not on disk."
                 if not userHasQuota:
                     msg += overQmsg
-                    raise TaskWorkerException(msg)
+                    raise SubmissionRefusedException(msg)
                 msg += "\nWill request a disk copy for you. See"
                 msg += "\n https://twiki.cern.ch/twiki/bin/view/CMSPublic/CRAB3FAQ#crab_submit_fails_with_Task_coul"
             else:
@@ -562,13 +562,13 @@ class DBSDataDiscovery(DataDiscovery):
                        " ({totalSizeTB}TB/{maxTierToBlockRecallSizeTB}TB) "\
                        "to issue automatically recall from TAPE."
                 msg += "\nIf you need these blocks, contact Data Transfer team via https://its.cern.ch/jira/browse/CMSTRANSF"
-                raise TaskWorkerException(msg)
+                raise SubmissionRefusedException(msg)
         else:
             msg = "Some blocks are on TAPE only and will not be processed."
             msg += "\nThis dataset is too large for automatic recall from TAPE."
             msg += "\nIf you can do with only a part of the dataset, use Data.inputBlocks configuration."
             msg += "\nIf you need the full dataset, contact Data Transfer team via https://its.cern.ch/jira/browse/CMSTRANSF"
-            raise TaskWorkerException(msg)
+            raise SubmissionRefusedException(msg)
         return msg
 
 

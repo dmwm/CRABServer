@@ -25,8 +25,10 @@ from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
 from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
 from TaskWorker.Actions.RucioDataDiscovery import RucioDataDiscovery
 from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
-from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException, TaskWorkerException
+from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException,\
+    TaskWorkerException, SubmissionRefusedException
 
+from CRABUtils.TaskUtils import updateTaskStatus, uploadWarning
 from ServerUtilities import uploadToS3
 
 
@@ -92,8 +94,13 @@ class TaskHandler():
         """
         try:
             output = work.execute(nextinput, task=self.task, tempDir=self.tempDir)
-        except TapeDatasetException as tde:
-            raise TapeDatasetException(str(tde)) from tde
+        except TapeDatasetException as e:
+            raise TapeDatasetException(str(e)) from e
+        except SubmissionRefusedException as e:
+            uploadWarning(self.crabserver, self.task['tm_taskname'], str(e), self.logger)
+            updateTaskStatus(self.crabserver, taskName=self.task['tm_taskname'],
+                             status='SUBMITREFUSED', logger=self.logger)
+            raise SubmissionRefusedException(str(e)) from e
         except TaskWorkerException as twe:
             self.logger.debug(str(traceback.format_exc()))  # print the stacktrace only in debug mode
             raise WorkerHandlerException(str(twe), retry=twe.retry) from twe  # TaskWorker error, do not add traceback
@@ -186,7 +193,7 @@ def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
         elif task.get('tm_user_files'):
             handler.addWork(UserDataDiscovery(config=config, crabserver=crabserver, procnum=procnum))
         else:
-            raise WorkerHandlerException("Neither inputDataset nor userInputFiles specified", retry=0)
+            raise SubmissionRefusedException("Neither inputDataset nor userInputFiles specified", retry=0)
     elif task['tm_job_type'] == 'PrivateMC':
         handler.addWork(MakeFakeFileSet(config=config, crabserver=crabserver, procnum=procnum))
     handler.addWork(Splitter(config=config, crabserver=crabserver, procnum=procnum))

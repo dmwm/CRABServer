@@ -22,7 +22,7 @@ from ServerUtilities import MAX_MEMORY_PER_CORE, MAX_MEMORY_SINGLE_CORE
 
 from TaskWorker.DataObjects import Result
 from TaskWorker.Actions import TaskAction
-from TaskWorker.WorkerExceptions import TaskWorkerException
+from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedException
 
 if sys.version_info >= (3, 0):
     from urllib.parse import urlencode  # pylint: disable=no-name-in-module
@@ -184,7 +184,7 @@ def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
         msg = f"Task requests {memory} MB of memory, above the allowed maximum of {absmaxmemory}"
         msg += f" for a {ncores} core(s) job.\n"
         logger.error(msg)
-        raise TaskWorkerException(msg)
+        raise SubmissionRefusedException(msg)
     if memory is not None and memory > MAX_MEMORY_PER_CORE:
         if ncores is not None and ncores < 2:
             msg = f"Task requests {memory} MB of memory, but only {MAX_MEMORY_PER_CORE} are guaranteed to be available."

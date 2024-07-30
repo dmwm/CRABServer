@@ -3,6 +3,7 @@ Create a set of files for a DAG submission.
 
 Generates the condor submit files and the master DAG.
 """
+# pylint:  disable=invalid-name  # have a lot of snake_case varaibles here from "old times"
 
 import os
 import re
@@ -18,10 +19,9 @@ from ast import literal_eval
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
 from ServerUtilities import getLock, downloadFromS3
 
-import TaskWorker.WorkerExceptions
 import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
-from TaskWorker.WorkerExceptions import TaskWorkerException
+from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedException
 from RucioUtils import getWritePFN
 from CMSGroupMapper import get_egroup_users
 
@@ -246,8 +246,7 @@ def validateLFNs(path, outputFiles):
             msg = "\nYour task specifies an output LFN %d-char long " % len(testLfn)
             msg += "\n which exceeds maximum length of 500"
             msg += "\n and therefore can not be handled in our DataBase"
-            raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
-    return
+            raise SubmissionRefusedException(msg)
 
 def validateUserLFNs(path, outputFiles):
     """
@@ -274,7 +273,7 @@ def validateUserLFNs(path, outputFiles):
             msg = "\nYour task specifies an output LFN %d-char long " % len(testLfn)
             msg += "\n which exceeds maximum length of 500"
             msg += "\n and therefore can not be handled in our DataBase"
-            raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
+            raise SubmissionRefusedException(msg)
     return
 
 def transform_strings(data):
@@ -376,7 +375,7 @@ class DagmanCreator(TaskAction):
             _, _, arch, _ = m.groups()
             if arch not in SCRAM_TO_ARCH:
                 msg = f"Job configured for non-supported ScramArch '{arch}'"
-                raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
+                raise SubmissionRefusedException(msg)
             info['required_arch'] = SCRAM_TO_ARCH.get(arch)
             # if arch == "amd64":
             #     info['required_arch'] = "X86_64"
@@ -527,7 +526,7 @@ class DagmanCreator(TaskAction):
         arch = info['jobarch_flatten'].split("_")[0]  # extracts "slc7" from "slc7_amd64_gcc10"
         required_os_list = ARCH_TO_OS.get(arch)
         if not required_os_list:
-            raise TaskWorkerException(f"Unsupported architecture {arch}")
+            raise SubmissionRefusedException(f"Unsupported architecture {arch}")
         # ARCH_TO_OS.get("slc7") gives a list with one item only: ['rhel7']
         info['opsys_req'] = f'+REQUIRED_OS="{required_os_list[0]}"'
 
@@ -593,7 +592,7 @@ class DagmanCreator(TaskAction):
             msg = "\nYour task specifies an output LFN which fails validation in"
             msg += "\n WMCore/Lexicon and therefore can not be handled in our DataBase"
             msg += "\nError detail: %s" % (str(ex))
-            raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
+            raise SubmissionRefusedException(msg) from ex
         groupid = len(siteinfo['group_sites'])
         siteinfo['group_sites'][groupid] = list(availablesites)
         siteinfo['group_datasites'][groupid] = list(datasites)
@@ -884,7 +883,7 @@ class DagmanCreator(TaskAction):
                         msg += " Please try to submit a new task (resubmit will not work)"
                         msg += " and contact the experts if the error persists."
                         msg += "\nError reason: %s" % (str(ex))
-                        raise TaskWorker.WorkerExceptions.TaskWorkerException(msg)
+                        raise TaskWorkerException(msg) from ex
             else:
                 possiblesites = locations
             ## At this point 'possiblesites' should never be empty.

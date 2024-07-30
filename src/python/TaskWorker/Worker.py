@@ -18,7 +18,8 @@ if sys.version_info < (3, 0):
 from RESTInteractions import CRABRest
 from TaskWorker.DataObjects.Result import Result
 from ServerUtilities import truncateError, executeCommand, FEEDBACKMAIL
-from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException, ChildUnexpectedExitException, ChildTimeoutException
+from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException,\
+    ChildUnexpectedExitException, ChildTimeoutException, SubmissionRefusedException
 from TaskWorker.ChildWorker import startChildWorker
 
 
@@ -107,6 +108,8 @@ def processWorkerLoop(inputs, results, resthost, dbInstance, procnum, logger, lo
                 outputs = work(resthost, dbInstance, WORKER_CONFIG, task, procnum, inputargs)
         except TapeDatasetException as tde:
             outputs = Result(task=task, err=str(tde))
+        except SubmissionRefusedException as sre:
+            outputs = Result(task=task, err=str(sre))
         except WorkerHandlerException as we:
             outputs = Result(task=task, err=str(we))
             msg = str(we)

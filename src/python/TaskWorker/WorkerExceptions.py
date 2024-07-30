@@ -18,15 +18,18 @@ class TaskWorkerException(Exception):
         Exception.__init__(self, message)
         self.retry = retry
 
+
 class ConfigException(TaskWorkerException):
     """Returned in case there are issues with the input
        TaskWorker configuration"""
     exitcode = 4000
 
+
 class NoAvailableSite(TaskWorkerException):
     """In case there is no site available to run the jobs
     use this exception"""
     exitcode = 5000
+
 
 class WorkerHandlerException(TaskWorkerException):
     """Generic exception in case slave worker action
@@ -37,15 +40,23 @@ class WorkerHandlerException(TaskWorkerException):
     """
     exitcode = 6666
 
+
 class TapeDatasetException(TaskWorkerException):
     """Returned in case the input dataset is present only on tape"""
+
 
 
 class CannotMigrateException(TaskWorkerException):
     """Used by Publisher in case DBS server refuses to migrate"""
 
+
 class ChildUnexpectedExitException(TaskWorkerException):
     """Used by ChildWorker simply to rename BrokenProcessPool to be more understandable name"""
 
+
 class ChildTimeoutException(TaskWorkerException):
     """Used by ChildWorker to rename built-in TimeoutException from SIGALARM's signalHandler function to be more understandable name"""
+
+
+class SubmissionRefusedException(TaskWorkerException):
+    """Used by TW actions to report that submission can not be done due to user mistake or lack of resource"""

@@ -13,7 +13,7 @@ from rucio.common.exception import (DuplicateRule, DataIdentifierAlreadyExists, 
 from ServerUtilities import MAX_DAYS_FOR_TAPERECALL, MAX_TB_TO_RECALL_AT_A_SINGLE_SITE
 from ServerUtilities import TASKLIFETIME
 from TaskWorker.WorkerUtilities import uploadWarning
-from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException
+from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException, SubmissionRefusedException
 
 
 class RucioAction():
@@ -187,7 +187,7 @@ class RucioAction():
         # Sanity check
         if teraBytesToRecall > 1e3:
             msg = msgHead + f"\nDataset size {teraBytesToRecall} TB. Will not trigger automatic recall for >1PB. Contact DataOps"
-            raise TaskWorkerException(msg)
+            raise SubmissionRefusedException(msg)
 
         # a friendly-formatted string to print the size
         recallSize = f"{teraBytesToRecall:.0f} TBytes" if teraBytesToRecall > 0 else f"{sizeToRecall / 1e9:.0f} GBytes"

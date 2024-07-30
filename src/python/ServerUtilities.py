@@ -411,8 +411,9 @@ def isFailurePermanent(reason, gridJob=False):
         permanent failure and submit task or not.
     """
 
-    checkQuota = " Please check that you have write access to destination site and that your quota is not exceeded, use crab checkwrite for more information."
-    refuseToSubmit = " Can't submit task because write check at destination site fails."
+    checkQuota = "Please check that you have write access to destination site\n and that your quota is not exceeded"
+    checkQuota += "\n use crab checkwrite for more information."
+    refuseToSubmit = " Can't submit task because write check at destination site fails.\n"
     if gridJob:
         refuseToSubmit = ""
     for exitCode in STAGEOUT_ERRORS:
@@ -497,14 +498,14 @@ def getUsernameFromTaskname(taskname):
 
 def getTimeFromTaskname(taskname):
     """ Get the submission time from the taskname and return the seconds since epoch
-        corresponding to it. The function is not currently used.
+        corresponding to it.
     """
 
     # validate taskname. In principle not necessary, but..
     if not isinstance(taskname, str):
         raise TypeError('In ServerUtilities.getTimeFromTaskname: "taskname" parameter must be a string')
     stime = taskname.split(':')[0]  # s stands for string
-    stimePattern = '^\d{6}_\d{6}$'
+    stimePattern = r'^\d{6}_\d{6}$'
     if not re.match(stimePattern, stime):
         raise ValueError('In ServerUtilities.getTimeFromTaskname: "taskname" parameter must match %s' % stimePattern)
     # convert the time
