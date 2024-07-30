@@ -50,6 +50,8 @@ pushd "${WORKDIR}"
 
 # execute
 ./start.sh -c
+/data/monitor.sh
+
 
 while true; do
     sleep 3600

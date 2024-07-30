@@ -60,6 +60,13 @@ RUN apt-get update \
     && apt-get install -y tini git zip voms-clients-java fd-find ripgrep libsasl2-dev python3-dev libldap-dev libssl-dev \
     && apt-get clean all
 
+# install filebeat
+RUN wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add  - && \
+  apt-get install apt-transport-https && \
+  echo "deb https://artifacts.elastic.co/packages/oss-8.x/apt stable main" |  tee -a /etc/apt/sources.list.d/elastic-8.x.list && \
+  apt-get update && apt-get install filebeat && \
+  apt-get clean all
+
 # local timezone (hardcode)
 RUN ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
 
@@ -105,6 +112,8 @@ RUN useradd -m ${USER} \
 
 # create working directory
 RUN mkdir -p ${WDIR}/srv/tmp
+RUN mkdir /var/lib/filebeat && chown crab3:crab3 /var/lib/filebeat && \
+    mkdir /var/log/filebeat && chown crab3:crab3 /var/log/filebeat 
 ## taskworker
 RUN mkdir -p ${WDIR}/srv/TaskManager/current \
            ${WDIR}/srv/TaskManager/cfg \
@@ -135,6 +144,7 @@ COPY cicd/crabtaskworker_pypi/Publisher/start.sh \
 
 ## entrypoint
 COPY cicd/crabtaskworker_pypi/run.sh /data
+COPY cicd/crabtaskworker_pypi/monitor.sh /data
 
 # for debuggin purpose
 RUN echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3
