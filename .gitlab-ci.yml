@@ -95,7 +95,8 @@ build_base_image:
   before_script:
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
     - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-    - docker buildx create --name mybuilder --use
+    - docker context create tls-context --docker "host=tcp://docker:2376,certs-dir=${DOCKER_TLS_CERTDIR}"
+    - docker buildx create tls-context --name mybuilder --use
     - docker buildx inspect --bootstrap
     - mkdir -p /cache
   script:
