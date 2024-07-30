@@ -7,8 +7,6 @@ variables:
   IMAGE_TAG: "${CI_COMMIT_REF_SLUG}"  # to distinct it from commit tag and final image tag
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
-  BUILDKIT_INLINE_CACHE: 1
-
 
 .default_rules:
   default:
