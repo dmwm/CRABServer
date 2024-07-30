@@ -24,14 +24,6 @@ stages:
   - check_testsuite
   - tagging_release
 
-before_script:
-  - docker info
-  - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
-  - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-  - docker buildx create --name mybuilder --use
-  - docker buildx inspect --bootstrap
-  - mkdir -p /cache
-
 get_env:
   rules:
     - !reference [.default_rules, default]
@@ -77,8 +69,8 @@ build_rest_image:
     name: docker:24.0.5
   services:
     - docker:24.0.5-dind
-  # before_script:
-  #   - docker info
+  before_script:
+    - docker info
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" 
     - docker build -f "${CI_PROJECT_DIR}/cicd/crabserver_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqaibase" .
@@ -88,6 +80,7 @@ build_rest_image:
     - key: $CI_COMMIT_REF_SLUG
       paths:
         - src/python/CRABInterface/__init__.py
+        - /cache
       policy: pull-push
 
 build_base_image:
@@ -99,6 +92,12 @@ build_base_image:
     name: docker:24.0.5
   services:
   - docker:24.0.5-dind
+  before_script:
+    - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
+    - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+    - docker buildx create --name mybuilder --use
+    - docker buildx inspect --bootstrap
+    - mkdir -p /cache
   script:
     - echo "Building base image..."
     - docker buildx build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" --build-arg BUILDKIT_INLINE_CACHE=1  --cache-from=type=local,src=/cache --cache-to=type=local,dest=/cache -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase" .
@@ -111,6 +110,7 @@ build_base_image:
     - key: $CI_COMMIT_REF_SLUG
       paths:
         - src/python/TaskWorker/__init__.py
+        - /cache
       policy: pull-push
 
 build_tw_image:
@@ -129,6 +129,7 @@ build_tw_image:
     - key: $CI_COMMIT_REF_SLUG
       paths:
         - src/python/TaskWorker/__init__.py
+        - /cache
       policy: pull-push
 
 # build_monit_image:
