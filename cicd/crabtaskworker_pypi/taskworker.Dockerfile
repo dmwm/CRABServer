@@ -65,9 +65,6 @@ USER root
 # for debugging purpose
 RUN echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3
 
-# ensure all /data owned by running user
-# RUN chown -R 1000:1000 ${WDIR}
-
 USER ${USER}
 
 ENTRYPOINT ["tini", "--"]
