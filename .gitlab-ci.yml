@@ -93,7 +93,7 @@ build_image:
     name: docker:24.0.5
   services:
     - name: docker:24.0.5-dind
-      command: ["--host=tcp://0.0.0.0:2375", "--host=unix:///var/run/docker.sock"]
+      command: ["--registry-mirror=http://registry:5000", "--host=tcp://0.0.0.0:2375", "--host=unix:///var/run/docker.sock"]
   before_script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" 
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
