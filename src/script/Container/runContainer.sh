@@ -124,5 +124,8 @@ if [ $? -eq 0 ]; then
   rm -f $tmpfile
 fi
 
+docker run -it --rm -v /data/container/:/data/hostdisk:ro --net=host \
+  registry.cern.ch/cmscrab/crabtwfilebeat:v3.latest
+
 echo -e "Sleeping for 3 seconds.\nRunning containers:"
 sleep 3 && docker ps
