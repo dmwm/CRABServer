@@ -97,9 +97,9 @@ build_image:
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
     - docker context create mycontext
     - docker buildx create mycontext --use --name mybuilder --use --bootstrap
-    - docker buildx build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}" --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabtaskworker:pypi-test11-jalmuqai-20240730-10.jalmuqaibase" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase" .
+    - docker buildx build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabtaskworker:pypi-test11-jalmuqai-20240730-10.jalmuqaibase" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase" .
     - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaibase"
-    - docker buildx build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/taskworker.Dockerfile" --build-arg="BASE_TAG=${IMAGE_TAG}" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}" --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabtaskworker:pypi-test11-jalmuqai-20240730-10.jalmuqaitw" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw" .
+    - docker buildx build -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/taskworker.Dockerfile" --build-arg="BASE_TAG=${IMAGE_TAG}" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabtaskworker:pypi-test11-jalmuqai-20240730-10.jalmuqaitw" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw" .
     - docker push "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.jalmuqaitw"
   # rules:
   #   - if: 
