@@ -66,9 +66,9 @@ build_rest_image:
   # tags: crabdind
   stage: build_docker
   image:
-    name: docker:24.0.5
+    name: docker:27.1.1
   services:
-    - name: docker:24.0.5-dind
+    - name: docker:27.1.1-dind
   before_script:
     - docker info
   script:
@@ -89,9 +89,9 @@ build_image:
     - !reference [.default_rules, release]
   stage: build_docker
   image:
-    name: docker:24.0.5
+    name: docker:27.1.1
   services:
-    - name: docker:24.0.5-dind
+    - name: docker:27.1.1-dind
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
