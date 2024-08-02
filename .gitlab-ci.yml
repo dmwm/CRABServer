@@ -106,7 +106,6 @@ build_monit_image:
   rules:
     - if: $SUBMIT_STATUS_TRACKING
       when: never
-    - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: build_docker
   needs: ["build_tw_image"]
@@ -120,6 +119,29 @@ build_monit_image:
       --context "${CI_PROJECT_DIR}"
       --dockerfile "${CI_PROJECT_DIR}/cicd/monit_pypi/Dockerfile"
       --destination "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.monit"
+      --build-arg "BASE_TAG=${IMAGE_TAG}"
+  cache:
+    - key: $CI_PIPELINE_ID
+      paths:
+        - src/python/TaskWorker/__init__.py
+      policy: pull
+
+build_crabtwfilebeat_image:
+  rules:
+    - if: $SUBMIT_STATUS_TRACKING
+      when: never
+    - !reference [.default_rules, release]
+  stage: build_docker
+  image:
+    name: gcr.io/kaniko-project/executor:v1.14.0-debug
+    entrypoint: [""]
+  script:
+    - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" > /kaniko/.docker/config.json
+    - cat /kaniko/.docker/config.json
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/cicd/filebeat/Dockerfile"
+      --destination "registry.cern.ch/cmscrab/crabtwfilebeat:${IMAGE_TAG}"
       --build-arg "BASE_TAG=${IMAGE_TAG}"
   cache:
     - key: $CI_PIPELINE_ID
@@ -273,3 +295,17 @@ tag_monit_latest:
   script:
     - crane auth login -u ${CMSCRAB_REGISTRY_USER} -p ${CMSCRAB_REGISTRY_PASSWORD} ${CMSCRAB_REGISTRY_URL}
     - crane cp registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.monit registry.cern.ch/cmscrab/crabtaskworker:v3.latest.monit
+
+tag_filebeat_latest:
+  rules:
+    - !reference [.default_rules, release]
+  stage: tagging_release
+  image:
+    name: registry.cern.ch/cmscrab/buildtools
+    entrypoint: [""]
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - crane auth login -u ${CMSCRAB_REGISTRY_USER} -p ${CMSCRAB_REGISTRY_PASSWORD} ${CMSCRAB_REGISTRY_URL}
+    - crane cp registry.cern.ch/cmscrab/crabtwfilebeat:${IMAGE_TAG} registry.cern.ch/cmscrab/crabtwfilebeat:v3.latest
+
