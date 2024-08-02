@@ -120,7 +120,7 @@ DEBUG="f"
 # first args always ACTION
 ACTION=${!OPTIND}
 ((OPTIND++))
-if [[ $ACTION = "start" ]]; then
+if [[ $ACTION =~ /(start/env)/ ]]; then
     while getopts ":hgcd" opt; do
         case "${opt}" in
             g )
@@ -152,6 +152,9 @@ if [[ $ACTION = "start" ]]; then
         echo "Error: starting mode not are not provided (add -c or -g option)." && helpFunction;
         exit 1
     fi
+else
+    echo "Error: action ${ACTION} not support."
+    helpFunction && exit 1
 fi
 # Main routine, perform action requested on command line.
 case ${ACTION:-help} in
