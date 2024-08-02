@@ -1,6 +1,4 @@
-# Dependencies needed to run crabserver, crabcache, crabtaskworker
-# This file is used by Jenkins to create RPMs and docker image
-# Format:
-# Dependency==version
-
+# THIS FILE IS DEPRECATED.
+# PLEASE USE cicd/crabserver_pypi/wmcore_requirements.txt INSTEAD.
+# https://github.com/dmwm/CRABServer/blob/master/cicd/crabserver_pypi/wmcore_requirements.txt
 wmcver==2.3.3

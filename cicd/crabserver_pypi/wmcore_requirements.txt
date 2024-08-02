@@ -1,5 +1,6 @@
 # WMCore dependency version.
 # Only for parsing repo url and version number in the building script later.
+# Beware, the format is not the same as the normal python requirements.txt
 # Format:
 # <repository clone url> <tag>
-https://github.com/dmwm/WMCore 2.2.4rc6
+https://github.com/dmwm/WMCore 2.3.3
