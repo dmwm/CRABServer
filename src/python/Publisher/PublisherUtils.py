@@ -139,7 +139,7 @@ def logVersionAndConfig(config=None, logger=None):
     pubstartDict['max_slaves'] = config.General.max_slaves
     pubstartDict['DBShost'] = config.TaskPublisher.DBShost
     pubstartDict['dryRun'] = config.TaskPublisher.dryRun
-    # one line for automatic parsing
+    #log entry below is used for logs parsing, therefore, changing it might require to update logstash configuration
     logger.info('PUBSTART: %s', json.dumps(pubstartDict))
     # multiple lines for humans to read
     for k, v in pubstartDict.items():
