@@ -523,8 +523,14 @@ class DagmanSubmitter(TaskAction.TaskAction):
         for k,v in jobJDL.items():     # so we have to create a new object and
             subdagJDL[k] = v           # fill it one element at a time
         subdagJDL['X509UserProxy'] = os.path.basename(jobJDL['X509UserProxy'])  # proxy in scheduler will be in cwd
+
+        # make sure that there is no "queue" statement in subdagJDL "jdl fragment" (introduced in v2 HTC bindings)
+        # since condor_submit_dag will add one anyhow
+        subdag = str(subdagJDL)  # print subdagJDL into a string
+        subdag = subdag.rstrip('queue\n')  # strip "queue" from last line
+        # save to the file
         with open('subdag.jdl', 'w', encoding='utf-8') as fd:
-            print(subdagJDL, file=fd)
+            print(subdag, file=fd)
 
         jobJDL["+TaskType"] = classad.quote("ROOT")  # we want the ad value to be "ROOT", not ROOT
         jobJDL["output"] = os.path.join(info['scratch'], "request.out")
