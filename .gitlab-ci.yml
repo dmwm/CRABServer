@@ -59,29 +59,29 @@ set_version_name:
         - src/python/CRABInterface/__init__.py
       policy: push
 
-# build_rest_image:
-#   rules:
-#     - !reference [.default_rules, default]
-#     - !reference [.default_rules, release]
-#   # tags: crabdind
-#   stage: build_docker
-#   image:
-#     name: docker:27.1.1
-#   services:
-#     - name: docker:27.1.1-dind
-#   before_script:
-#     - docker info
-#   script:
-#     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" 
-#     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
-#     - docker build -f "${CI_PROJECT_DIR}/cicd/crabserver_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqaibase" .
-#     - docker push "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqaibase" 
-#   cache:
-#     - key: $CI_COMMIT_REF_SLUG
-#       paths:
-#         - src/python/CRABInterface/__init__.py
-#         - /cache
-#       policy: pull-push
+build_rest_image:
+  rules:
+    - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
+  # tags: crabdind
+  stage: build_docker
+  image:
+    name: docker:27.1.1
+  services:
+    - name: docker:27.1.1-dind
+  before_script:
+    - docker info
+  script:
+    - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" 
+    - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
+    - docker build -f "${CI_PROJECT_DIR}/cicd/crabserver_pypi/Dockerfile" -t "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqaibase" .
+    - docker push "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}.jalmuqaibase" 
+  cache:
+    - key: $CI_COMMIT_REF_SLUG
+      paths:
+        - src/python/CRABInterface/__init__.py
+        - /cache
+      policy: pull-push
 
 build_image:
   rules:
