@@ -1,0 +1,3 @@
+[[runners]]
+    executor = "docker"
+    network_mode = "host"
