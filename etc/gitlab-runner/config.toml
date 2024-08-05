@@ -1,3 +1,4 @@
 [[runners]]
-    executor = "docker"
-    network_mode = "host"
+    [runners.docker]
+        executor = "docker"
+        network_mode = "host"
