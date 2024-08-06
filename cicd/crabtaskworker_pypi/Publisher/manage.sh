@@ -2,26 +2,17 @@
 
 # Start the Publisher service.
 
-##H Usage: manage.sh ACTION
-##H
-##H Available actions:
-##H   help        show this help
-##H   version     get current version of the service
-##H   restart     (re)start the service
-##H   start       (re)start the service
-##H   stop        stop the service
-##H
-##H This script needs following environment variables for start action:
-##H   - DEBUG:      if `true`, setup debug mode environment.
-##H   - PYTHONPATH: inherit from ./start.sh
-##H   - SERVICE:    inherit from container environment
-##H                 (e.g., `-e SERVICE=Publisher_schedd` when do `docker run`)
 set -euo pipefail
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 if [[ -n ${TRACE+x} ]]; then
     set -x
     export TRACE
 fi
+
+echo $COMMAND > /dev/null
+echo $MODE > /dev/null
+echo $DEBUG > /dev/null
+echo $SERVICE > /dev/null
 
 script_env() {
     # some variable use in start_srv
@@ -30,11 +21,6 @@ script_env() {
     export PYTHONPATH="${PYTHONPATH}"
     export DEBUG
     export SERVICE="${SERVICE}"
-
-}
-
-helpFunction() {
-    grep "^##H" "${0}" | sed -r "s/##H(| )//g"
 }
 
 _getPublisherPid() {
@@ -73,9 +59,7 @@ _isPublisherBusy(){
 
 
 start_srv() {
-    # Check require env
-
-
+    script_env
     # hardcode APP_DIR, but if debug mode, APP_DIR can be override
     if [[ "${DEBUG}" = 'true' ]]; then
         crab-publisher --config "${CONFIG}" --service "${SERVICE}" --logDebug --pdb
@@ -119,67 +103,13 @@ stop_srv() {
 }
 
 env_eval() {
+    script_env
     echo "export PYTHONPATH=${PYTHONPATH}"
     echo "export SERVICE=${SERVICE}"
 }
 
-# parsing args
-ACTION=""
-MODE=""
-DEBUG="f"
-OPT_SERVICE=""
-
-# first args always ACTION
-ACTION=${!OPTIND}
-((OPTIND++))
-if [[ $ACTION =~ /(start|env)/ ]]; then
-    while getopts ":hgcd" opt; do
-        case "${opt}" in
-            g )
-                if [[ -n "$MODE" ]]; then
-                    echo "Error: only one mode support"
-                    helpFunction
-                    exit 1
-                fi
-                MODE="fromGH"
-                ;;
-            c )
-                if [[ -n "$MODE" ]]; then
-                    echo "Error: only one mode support"
-                    helpFunction
-                    exit 1
-                fi
-                MODE="current"
-                ;;
-            d )
-                DEBUG="t"
-                ;;
-            s )
-                OPT_SERVICE=${OPTARG}
-                ;;
-            * )
-                echo "$0: unknown action '$1', please try '$0 help' or documentation."
-                exit 1
-                ;;
-        esac
-    done
-    if [[ -z $MODE ]]; then
-        echo "Error: starting mode not are not provided (add -c or -g option)." && helpFunction;
-        exit 1
-    fi
-    if [[ -n $OPT_SERVICE ]]; then
-        SERVICE=${OPT_SERVICE}
-    elif [[ -n $SERVICE ]]; then
-         :
-    else
-        echo "Error: $SERVICE variable are not defined (either pass from "
-    fi
-else
-    echo "Error: action ${ACTION} not support."
-    helpFunction && exit 1
-fi
 # Main routine, perform action requested on command line.
-case ${ACTION:-help} in
+case ${COMMAND:-help} in
     start | restart )
         stop_srv
         start_srv
