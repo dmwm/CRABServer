@@ -2,17 +2,6 @@
 
 # Start the TaskWorker service.
 
-##H usage: manage.sh action [option]"
-##H
-##H available actions:"
-##H   help        show this help"
-##H   version     get current version of the service"
-##H   restart     (re)start the service"
-##H   start       (re)start the service"
-##H   stop        stop the service"
-##H   status      print pid"
-##H   env         print exported variableeval"
-
 set -euo pipefail
 if [[ -n ${TRACE+x} ]]; then
     set -x
@@ -20,9 +9,6 @@ if [[ -n ${TRACE+x} ]]; then
 fi
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-helpFunction() {
-    grep "^##H" "${0}" | sed -r "s/##H(| )//g"
-}
 
 script_env() {
     ## some variable use in start_srv
@@ -113,52 +99,8 @@ env_eval() {
     echo "export PYTHONPATH=${PYTHONPATH}"
 }
 
-# parsing args
-ACTION=""
-MODE=""
-DEBUG="f"
-
-# first args always ACTION
-ACTION=${!OPTIND}
-((OPTIND++))
-if [[ $ACTION =~ /(start|env)/ ]]; then
-    while getopts ":hgcd" opt; do
-        case "${opt}" in
-            g )
-                if [[ -n "$MODE" ]]; then
-                    echo "Error: only one mode support"
-                    helpFunction
-                    exit 1
-                fi
-                MODE="fromGH"
-                ;;
-            c )
-                if [[ -n "$MODE" ]]; then
-                    echo "Error: only one mode support"
-                    helpFunction
-                    exit 1
-                fi
-                MODE="current"
-                ;;
-            d )
-                DEBUG="t"
-                ;;
-            * )
-                echo "$0: unknown action '$1', please try '$0 help' or documentation."
-                exit 1
-                ;;
-        esac
-    done
-    if [[ -z $MODE ]]; then
-        echo "Error: starting mode not are not provided (add -c or -g option)." && helpFunction;
-        exit 1
-    fi
-else
-    echo "Error: action ${ACTION} not support."
-    helpFunction && exit 1
-fi
 # Main routine, perform action requested on command line.
-case ${ACTION:-help} in
+case ${COMMAND:-help} in
     start | restart )
         stop_srv
         start_srv
@@ -168,16 +110,11 @@ case ${ACTION:-help} in
         stop_srv
         ;;
 
-    help )
-        helpFunction
-        exit 0
-        ;;
-
     env )
         env_eval
         ;;
     * )
-        echo "$0: unknown action '$1', please try '$0 help' or documentation." 1>&2
+        echo "Error: Unknown command: $COMMAND"
         exit 1
         ;;
 esac
