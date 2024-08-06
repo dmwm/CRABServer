@@ -2,6 +2,16 @@
 
 # Start the TaskWorker service.
 
+##H usage: manage.sh action [option]"
+##H
+##H available actions:"
+##H   help        show this help"
+##H   version     get current version of the service"
+##H   restart     (re)start the service"
+##H   start       (re)start the service"
+##H   stop        stop the service"
+##H   status      print pid"
+##H   env         print exported variableeval"
 
 set -euo pipefail
 if [[ -n ${TRACE+x} ]]; then
@@ -11,17 +21,7 @@ fi
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 helpFunction() {
-    echo " Usage: manage.sh ACTION [OPTION]"
-    echo ""
-    echo " Available actions:"
-    echo "   help        show this help"
-    echo "   version     get current version of the service"
-    echo "   restart     (re)start the service"
-    echo "   start       (re)start the service"
-    echo "   stop        stop the service"
-    echo "   status      show pid"
-    echo "   env         eval"
-    echo ""
+    grep "^##H" "${0}" | sed -r "s/##H(| )//g"
 }
 
 script_env() {
@@ -40,6 +40,7 @@ script_env() {
        PYTHONPATH=/data/srv/current/lib/python/site-packages:${PYTHONPATH:-}
     fi
     export PYTHONPATH
+    export DEBUG
 }
 
 _getMasterWorkerPid() {
@@ -120,7 +121,7 @@ DEBUG="f"
 # first args always ACTION
 ACTION=${!OPTIND}
 ((OPTIND++))
-if [[ $ACTION =~ /(start/env)/ ]]; then
+if [[ $ACTION =~ /(start|env)/ ]]; then
     while getopts ":hgcd" opt; do
         case "${opt}" in
             g )

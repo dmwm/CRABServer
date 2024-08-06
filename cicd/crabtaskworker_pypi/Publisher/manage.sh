@@ -23,8 +23,15 @@ if [[ -n ${TRACE+x} ]]; then
     export TRACE
 fi
 
-# some variable use in start_srv
-CONFIG="${SCRIPT_DIR}"/current/PublisherConfig.py
+script_env() {
+    # some variable use in start_srv
+    CONFIG="${SCRIPT_DIR}"/current/PublisherConfig.py
+    # just t
+    export PYTHONPATH="${PYTHONPATH}"
+    export DEBUG
+    export SERVICE="${SERVICE}"
+
+}
 
 helpFunction() {
     grep "^##H" "${0}" | sed -r "s/##H(| )//g"
@@ -67,11 +74,7 @@ _isPublisherBusy(){
 
 start_srv() {
     # Check require env
-    # shellcheck disable=SC2269
-    SERVICE="${SERVICE}"
-    # shellcheck disable=SC2269
-    DEBUG="${DEBUG}"
-    export PYTHONPATH="${PYTHONPATH}"
+
 
     # hardcode APP_DIR, but if debug mode, APP_DIR can be override
     if [[ "${DEBUG}" = 'true' ]]; then
@@ -115,24 +118,86 @@ stop_srv() {
 
 }
 
+env_eval() {
+    echo "export PYTHONPATH=${PYTHONPATH}"
+    echo "export SERVICE=${SERVICE}"
+}
+
+# parsing args
+ACTION=""
+MODE=""
+DEBUG="f"
+OPT_SERVICE=""
+
+# first args always ACTION
+ACTION=${!OPTIND}
+((OPTIND++))
+if [[ $ACTION =~ /(start|env)/ ]]; then
+    while getopts ":hgcd" opt; do
+        case "${opt}" in
+            g )
+                if [[ -n "$MODE" ]]; then
+                    echo "Error: only one mode support"
+                    helpFunction
+                    exit 1
+                fi
+                MODE="fromGH"
+                ;;
+            c )
+                if [[ -n "$MODE" ]]; then
+                    echo "Error: only one mode support"
+                    helpFunction
+                    exit 1
+                fi
+                MODE="current"
+                ;;
+            d )
+                DEBUG="t"
+                ;;
+            s )
+                OPT_SERVICE=${OPTARG}
+                ;;
+            * )
+                echo "$0: unknown action '$1', please try '$0 help' or documentation."
+                exit 1
+                ;;
+        esac
+    done
+    if [[ -z $MODE ]]; then
+        echo "Error: starting mode not are not provided (add -c or -g option)." && helpFunction;
+        exit 1
+    fi
+    if [[ -n $OPT_SERVICE ]]; then
+        SERVICE=${OPT_SERVICE}
+    elif [[ -n $SERVICE ]]; then
+         :
+    else
+        echo "Error: $SERVICE variable are not defined (either pass from "
+    fi
+else
+    echo "Error: action ${ACTION} not support."
+    helpFunction && exit 1
+fi
 # Main routine, perform action requested on command line.
-case ${1:-help} in
-  start | restart )
-    stop_srv
-    start_srv
-    ;;
+case ${ACTION:-help} in
+    start | restart )
+        stop_srv
+        start_srv
+        ;;
 
-  stop )
-    stop_srv
-    ;;
+    stop )
+        stop_srv
+        ;;
 
-  help )
-    helpFunction
-    exit 0
-    ;;
+    help )
+        helpFunction
+        ;;
 
-  * )
-    echo "$0: unknown action '$1', please try '$0 help' or documentation." 1>&2
-    exit 1
-    ;;
+    env )
+        env_eval
+        ;;
+    * )
+        echo "$0: unknown action '$1', please try '$0 help' or documentation." 1>&2
+        exit 1
+        ;;
 esac
