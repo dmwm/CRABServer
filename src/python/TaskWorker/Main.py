@@ -73,14 +73,14 @@ def main():
     if not status:
         raise ConfigException(msg)
 
-    # must set userHtcV2 in the environment before importing TaskWorker
+    # must set useHtcV2 in the environment before importing TaskWorker
     # so that in all files we can use it to decide if to import htcondor or htcondor2
     if getattr(configuration.TaskWorker, 'useHtcV2', None):
         os.environ['useHtcV2'] = 'True'
-        print("Using HTTC Bindings V2")
+        print("Using HTC Bindings V2")
     else:
         os.environ.pop('useHtcV2', None)
-        print("Using HTTC Bindings V1")
+        print("Using HTC Bindings V1")
     from TaskWorker.MasterWorker import MasterWorker  # pylint: disable=import-outside-toplevel
 
     if options.pdb:
