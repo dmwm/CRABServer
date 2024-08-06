@@ -9,6 +9,10 @@ if [[ -n ${TRACE+x} ]]; then
 fi
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
+echo $COMMAND > /dev/null
+echo $MODE > /dev/null
+echo $DEBUG > /dev/null
+echo $SERVICE > /dev/null
 
 script_env() {
     ## some variable use in start_srv
@@ -45,7 +49,7 @@ start_srv() {
         echo "Error: ${markmodify_path} exists."
     fi
 
-    if [[ $DEBUG ]]; then
+    if [[ $DEBUG = 't' ]]; then
         crab-taskworker --config "${CONFIG}" --logDebug --pdb
     else
         crab-taskworker --config "${CONFIG}" --logDebug &

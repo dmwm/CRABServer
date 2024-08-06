@@ -121,6 +121,7 @@ RUN mkdir -p ${WDIR}/srv/Publisher/current \
 COPY cicd/crabserver_pypi/start.sh \
      cicd/crabserver_pypi/env.sh \
      cicd/crabserver_pypi/stop.sh \
+     cicd/crabserver_pypi/manage.py \
      ${WDIR}/srv/TaskManager/
 
 ## TaskWorker
