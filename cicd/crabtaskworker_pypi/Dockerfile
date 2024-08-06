@@ -116,13 +116,19 @@ RUN mkdir -p ${WDIR}/srv/Publisher/current \
            ${WDIR}/srv/Publisher/PublisherFiles
 
 # copy process executor scripts
+
+# common script
+COPY cicd/crabserver_pypi/start.sh \
+     cicd/crabserver_pypi/env.sh \
+     cicd/crabserver_pypi/stop.sh \
+     ${WDIR}/srv/TaskManager/
+
 ## TaskWorker
-COPY cicd/crabtaskworker_pypi/TaskWorker/start.sh \
-     cicd/crabtaskworker_pypi/TaskWorker/env.sh \
-     cicd/crabtaskworker_pypi/TaskWorker/stop.sh \
-     cicd/crabtaskworker_pypi/TaskWorker/manage.sh \
+COPY cicd/crabtaskworker_pypi/TaskWorker/manage.sh \
      cicd/crabtaskworker_pypi/updateDatafiles.sh \
      ${WDIR}/srv/TaskManager/
+
+
 
 COPY cicd/crabtaskworker_pypi/bin/crab-taskworker cicd/crabtaskworker_pypi/bin/crab-publisher /usr/local/bin
 
