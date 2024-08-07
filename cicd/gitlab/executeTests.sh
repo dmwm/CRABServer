@@ -36,8 +36,10 @@ if [ "X${singularity}" == X6 ] || [ "X${singularity}" == X7 ] || [ "X${singulari
     if [ "X${singularity}" == X6 ]; then scramprefix=cc${singularity}; fi
     if [ "X${singularity}" == X7 ]; then scramprefix=el${singularity}; fi
     if [ "X${singularity}" == X8 ]; then scramprefix=el${singularity}; fi
-    ERR=false
-    /cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- "${ROOT_DIR}"/cicd/gitlab/taskSubmission.sh || ERR=true
+    ERR_1=false; ERR_2=false; ERR_3=false;
+    /cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- "${ROOT_DIR}"/cicd/gitlab/taskSubmission.sh || ERR_1=true
+    /cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- "${ROOT_DIR}"/cicd/gitlab/clientValidation.sh || ERR_2=true
+    /cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- "${ROOT_DIR}"/cicd/gitlab/clientConfigurationValidation.sh || ERR_3=true
 else
     echo "!!! I am not prepared to run for slc${singularity}."
     exit 1
@@ -45,8 +47,14 @@ fi
 
 popd
 
-if $ERR ; then
+if $ERR_1 ; then
     echo -e "Something went wrong during task submission. None of the downstream jobs were triggered."
+    exit 1
+elif $ERR_2 ; then
+    echo -e "Something went wrong during client validation. None of the downstream jobs were triggered."
+    exit 1
+elif $ERR_2 ; then
+    echo -e "Something went wrong during client configuration validation. None of the downstream jobs were triggered."
     exit 1
 else
     declare -A tests=( ["Task_Submission_Status_Tracking"]=submitted_tasks_TS ["Client_Validation_Suite"]=submitted_tasks_CV ["Client_Configuration_Validation"]=submitted_tasks_CCV)
