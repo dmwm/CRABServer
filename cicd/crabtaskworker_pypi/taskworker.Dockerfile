@@ -1,5 +1,5 @@
 ARG BASE_TAG=latest
-FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG}.jalmuqaibase
+FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG}.base
 
 # caching wmcore src, need for building TaskManagerRun.tar.gz
 FROM python:3.8 as wmcore-src
@@ -31,7 +31,7 @@ RUN WMCOREDIR=./WMCore \
     bash buildDatafiles.sh
 
 # start image
-FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG}.jalmuqaibase as base-image
+FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG}.base as base-image
 
 # copy TaskManagerRun.tar.gz
 COPY --from=build-data /build/data_files/data ${WDIR}/srv/current/lib/python/site-packages/data
