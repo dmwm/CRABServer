@@ -382,6 +382,18 @@ class RetryJob():
         if exitCode == 10034 or exitCode == 50:
             raise RecoverableError("Required application version not found at the site.")
 
+        if exitCode in {8020, 8021, 8028, 8033}:
+            raise RecoverableError("Site Error: File Open/Read/Write Error") 
+
+        if exitCode in {11003, 11004, 11005}:
+            raise RecoverableError("Site Error: Error during job bootstrap")
+
+        if exitCode in {60311, 60315, 60321}:
+            raise RecoverableError("Site Error: StageOutRelated Problems")
+
+        if exitCode in {10032, 10043, 10040, 10042, 10050, 10051, 10052, 10053, 10054}:
+            raise RecoverableError("Site Error: Failure related to the environment setup.")
+
         if exitCode == 60403 or exitCode == 243:
             raise RecoverableError("Timeout during attempted file stageout.")
 
