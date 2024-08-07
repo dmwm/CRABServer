@@ -201,6 +201,36 @@ deploy_publisher_rucio:
   variables:
     SERVICE: Publisher_rucio
 
+client_validation_suite:
+  rules:
+    - if: $MANUAL_CI_PIPELINE_ID
+      when: never
+    - if: $CLIENT_VALIDATION_SUITE
+    - if: $SKIP_DEPLOY || $FORCE_RELEASE
+      when: never
+    - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
+  stage: run_testsuite
+  tags:
+    - crab3-shell
+  script:
+    - source .env
+    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
+    - export CRABClient_version  # from .env
+    - export REST_Instance  # from .env
+    - export CMSSW_release=CMSSW_13_0_2
+    - export Client_Validation_Suite=true
+    - bash -x cicd/gitlab/executeTests.sh
+  cache:
+    - key: $CI_PIPELINE_ID
+      paths:
+        - workdir/submitted_tasks_CV
+      policy: push
+    - key: submitted_tasks_CV_latest
+      paths:
+        - workdir/submitted_tasks_CV
+      policy: push
+
 task_submission_status_tracking:
   rules:
     - if: $MANUAL_CI_PIPELINE_ID
@@ -229,6 +259,36 @@ task_submission_status_tracking:
     - key: submitted_tasks_TS_latest
       paths:
         - workdir/submitted_tasks_TS
+      policy: push
+
+client_configuration_validation:
+  rules:
+    - if: $MANUAL_CI_PIPELINE_ID
+      when: never
+    - if: $CLIENT_CONFIGURATION_VALIDATION
+    - if: $SKIP_DEPLOY || $FORCE_RELEASE
+      when: never
+    - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
+  stage: run_testsuite
+  tags:
+    - crab3-shell
+  script:
+    - source .env
+    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
+    - export CRABClient_version  # from .env
+    - export REST_Instance  # from .env
+    - export CMSSW_release=CMSSW_13_0_2
+    - export Client_Configuration_Validation=true
+    - bash -x cicd/gitlab/executeTests.sh
+  cache:
+    - key: $CI_PIPELINE_ID
+      paths:
+        - workdir/submitted_tasks_CCV
+      policy: push
+    - key: submitted_tasks_CCV_latest
+      paths:
+        - workdir/submitted_tasks_CCV
       policy: push
 
 check_test_result:
