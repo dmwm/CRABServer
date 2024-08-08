@@ -44,15 +44,16 @@ FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 as cern-cc7
 
 # start image
 FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
-
-FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG}
-
-# start image
-FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG} as base-image
-
 SHELL ["/bin/bash", "-c"]
 ENV USER=crab3
 ENV WDIR=/data
+
+# FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG}
+
+# # start image
+# FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG} as base-image
+
+
 
 # install gfal
 # symlink to workaround calling gfal from absolute path
@@ -86,11 +87,11 @@ RUN pip install -r requirements.txt \
 RUN mkdir /etc/condor
 COPY cicd/crabtaskworker_pypi/condor_config /etc/condor/
 
-# # install crabserver
-# # will replace with pip later
-# COPY src/python/ ${WDIR}/srv/current/lib/python/site-packages/
-# # copy TaskManagerRun.tar.gz
-# COPY --from=build-data /build/data_files/data ${WDIR}/srv/current/lib/python/site-packages/data
+# install crabserver
+# will replace with pip later
+COPY src/python/ ${WDIR}/srv/current/lib/python/site-packages/
+# copy TaskManagerRun.tar.gz
+COPY --from=build-data /build/data_files/data ${WDIR}/srv/current/lib/python/site-packages/data
 
 # copy cern openldap config
 COPY --from=cern-cc7 /etc/openldap /etc/openldap
