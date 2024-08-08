@@ -243,7 +243,7 @@ class Overflow:
 
             results = self.schedd.query(constraint, projection)
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             warnings.warn( e ,category=ScheddAlarm)
 
         # Creating a dict of classad.objects from the query result with keys = CRAB_RegName (to be used in the search later).

@@ -42,7 +42,7 @@ MODEURL = {'cmsweb-dev': {'host': 'cmsweb-dev.cern.ch', 'instance':  'dev'},
 def getRESTParams(config, logger):
     """ get REST host name and db instance from a config object
     returns a tuple of strings (host, dbinstance). If can't, raises exception"""
-    # TODO this is also a candidate for TaskWorker/TaskUtils.py
+    # this is also a candidate for CRABUtils/TaskUtils.py
 
     try:
         instance = config.TaskWorker.instance
@@ -287,7 +287,7 @@ class MasterWorker(object):
         return pendingwork
 
 
-    def quit_(self, dummyCode, dummyTraceback):
+    def quit_(self, dummyCode, dummyTraceback):  # pylint: disable=unused-argument
         self.logger.info("Received kill request. Setting STOP flag in the master process...")
         self.STOP = True
 
@@ -357,7 +357,7 @@ class MasterWorker(object):
                          'warning': warning}
             try:
                 self.crabserver.post(api='task', data=urlencode(configreq))
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 self.logger.error("Error uploading warning: %s", str(e))
                 self.logger.warning("Cannot add a warning to REST interface. Warning message: %s", warning)
             return True
@@ -385,7 +385,7 @@ class MasterWorker(object):
             configreq = {'subresource': 'addwarning', 'workflow': taskname, 'warning': warning}
             try:
                 self.crabserver.post(api='task', data=urlencode(configreq))
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 self.logger.error("Error uploading warning: %s", str(e))
                 self.logger.warning("Cannot add a warning to REST interface. Warning message: %s", warning)
             return True

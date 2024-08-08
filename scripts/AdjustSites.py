@@ -4,6 +4,8 @@
     - For resubmission: adjust the exit codes of the PJ in the RunJobs.dag.nodes.log files and
       the max retries in the RunJobs.dag files
 """
+# this is full of snake_case variables from old times, which we do not casre to change
+# pylint: disable=invalid-name
 
 from __future__ import print_function
 
@@ -348,7 +350,7 @@ def clearAutomaticBlacklist():
     for filename in glob.glob("task_statistics.*"):
         try:
             os.unlink(filename)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             printLog("ERROR when clearing statistics: %s" % str(e))
 
 

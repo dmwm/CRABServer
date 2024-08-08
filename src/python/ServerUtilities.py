@@ -198,7 +198,7 @@ STAGEOUT_ERRORS = {60317: [{"regex": ".*Cancelled ASO transfer after timeout.*",
                           ]}
 
 
-def NEW_USER_SANDBOX_EXCLUSIONS(tarmembers):  # TODO move to CRABClient !!!
+def NEW_USER_SANDBOX_EXCLUSIONS(tarmembers):  # This is only used in CRABClient !!! MOVE IT THERE
     """ Exclusion function used with the new crabclient (>= 3.3.1607). Since the new client sandbox no longer
         contains the debug files, it's pointless to exclude them. Also, this function is used when getting
         the hash of the debug tarball (a new addition in 3.3.1607). If the debug files are excluded, the tarball
@@ -511,7 +511,7 @@ def getTimeFromTaskname(taskname):
     return calendar.timegm(dtime)
 
 
-# TODO: Remove this from CRABClient. This is kind of common for WMCore not only for CRAB. Maybe better place to have this in WMCore?
+# Remove this from CRABClient ? This is kind of common for WMCore not only for CRAB. Maybe better place to have this in WMCore?
 def encodeRequest(configreq, listParams=None):
     """ Used to encode the request from a dict to a string. Include the code needed for transforming lists in the format required by
         cmsweb, e.g.:   adduserfiles = ['file1','file2']  ===>  [...]adduserfiles=file1&adduserfiles=file2[...]
