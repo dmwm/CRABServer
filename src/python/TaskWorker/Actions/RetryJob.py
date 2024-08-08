@@ -382,6 +382,9 @@ class RetryJob():
         if exitCode == 10034 or exitCode == 50:
             raise RecoverableError("Required application version not found at the site.")
 
+        if exitCode == 10040:
+            raise RecoverableError("Site Error: failed to generate cmsRun cfg file at runtime.")
+
         if exitCode == 60403 or exitCode == 243:
             raise RecoverableError("Timeout during attempted file stageout.")
 
