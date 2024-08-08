@@ -115,14 +115,15 @@ RUN useradd -m ${USER} \
 # create working directory
 RUN mkdir -p ${WDIR}/srv/tmp
 ## taskworker
-RUN mkdir -p ${WDIR}/srv/TaskManager/current \
-           ${WDIR}/srv/TaskManager/cfg \
-           ${WDIR}/srv/TaskManager/logs
+RUN install -d -o 1000 -g 1000 ${WDIR}/srv/TaskManager/current \
+    && install -d -o 1000 -g 1000 ${WDIR}/srv/TaskManager/cfg \
+    && install -d -o 1000 -g 1000 ${WDIR}/srv/TaskManager/log
+
 ## publisher
-RUN mkdir -p ${WDIR}/srv/Publisher/current \
-           ${WDIR}/srv/Publisher/cfg \
-           ${WDIR}/srv/Publisher/logs \
-           ${WDIR}/srv/Publisher/PublisherFiles
+RUN install -d -o 1000 -g 1000 ${WDIR}/srv/Publisher/current \
+    && install -d -o 1000 -g 1000 ${WDIR}/srv/Publisher/cfg \
+    && install -d -o 1000 -g 1000 ${WDIR}/srv/Publisher/log \
+    && install -d -o 1000 -g 1000 ${WDIR}/srv/Publisher/PublisherFiles
 
 # # copy process executor scripts
 # ## TaskWorker
