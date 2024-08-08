@@ -1,3 +1,5 @@
+ARG BASE_TAG=latest
+
 # caching wmcore src, need for building TaskManagerRun.tar.gz
 FROM python:3.8 as wmcore-src
 SHELL ["/bin/bash", "-c"]
@@ -42,6 +44,12 @@ FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 as cern-cc7
 
 # start image
 FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
+
+FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG}
+
+# start image
+FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG} as base-image
+
 SHELL ["/bin/bash", "-c"]
 ENV USER=crab3
 ENV WDIR=/data
@@ -146,12 +154,6 @@ USER ${USER}
 
 ENTRYPOINT ["tini", "--"]
 CMD ["/data/run.sh"]
-
-ARG BASE_TAG=latest
-FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG}
-
-# start image
-FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG} as base-image
 
 # copy TaskManagerRun.tar.gz
 COPY --from=build-data /build/data_files/data ${WDIR}/srv/current/lib/python/site-packages/data
