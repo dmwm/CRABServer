@@ -2,20 +2,6 @@
 
 # Start the Publisher service.
 
-##H Usage: manage.sh ACTION
-##H
-##H Available actions:
-##H   help        show this help
-##H   version     get current version of the service
-##H   restart     (re)start the service
-##H   start       (re)start the service
-##H   stop        stop the service
-##H
-##H This script needs following environment variables for start action:
-##H   - DEBUG:      if `true`, setup debug mode environment.
-##H   - PYTHONPATH: inherit from ./start.sh
-##H   - SERVICE:    inherit from container environment
-##H                 (e.g., `-e SERVICE=Publisher_schedd` when do `docker run`)
 set -euo pipefail
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 if [[ -n ${TRACE+x} ]]; then
@@ -23,11 +9,18 @@ if [[ -n ${TRACE+x} ]]; then
     export TRACE
 fi
 
-# some variable use in start_srv
-CONFIG="${SCRIPT_DIR}"/current/PublisherConfig.py
+echo $COMMAND > /dev/null
+echo $MODE > /dev/null
+echo $DEBUG > /dev/null
+echo $SERVICE > /dev/null
 
-helpFunction() {
-    grep "^##H" "${0}" | sed -r "s/##H(| )//g"
+script_env() {
+    # some variable use in start_srv
+    CONFIG="${SCRIPT_DIR}"/current/PublisherConfig.py
+    # just t
+    export PYTHONPATH="${PYTHONPATH}"
+    export DEBUG
+    export SERVICE="${SERVICE}"
 }
 
 _getPublisherPid() {
@@ -66,13 +59,7 @@ _isPublisherBusy(){
 
 
 start_srv() {
-    # Check require env
-    # shellcheck disable=SC2269
-    SERVICE="${SERVICE}"
-    # shellcheck disable=SC2269
-    DEBUG="${DEBUG}"
-    export PYTHONPATH="${PYTHONPATH}"
-
+    script_env
     # hardcode APP_DIR, but if debug mode, APP_DIR can be override
     if [[ "${DEBUG}" = 'true' ]]; then
         crab-publisher --config "${CONFIG}" --service "${SERVICE}" --logDebug --pdb
@@ -115,24 +102,32 @@ stop_srv() {
 
 }
 
+env_eval() {
+    script_env
+    echo "export PYTHONPATH=${PYTHONPATH}"
+    echo "export SERVICE=${SERVICE}"
+}
+
 # Main routine, perform action requested on command line.
-case ${1:-help} in
-  start | restart )
-    stop_srv
-    start_srv
-    ;;
+case ${COMMAND:-help} in
+    start | restart )
+        stop_srv
+        start_srv
+        ;;
 
-  stop )
-    stop_srv
-    ;;
+    stop )
+        stop_srv
+        ;;
 
-  help )
-    helpFunction
-    exit 0
-    ;;
+    help )
+        helpFunction
+        ;;
 
-  * )
-    echo "$0: unknown action '$1', please try '$0 help' or documentation." 1>&2
-    exit 1
-    ;;
+    env )
+        env_eval
+        ;;
+    * )
+        echo "$0: unknown action '$1', please try '$0 help' or documentation." 1>&2
+        exit 1
+        ;;
 esac

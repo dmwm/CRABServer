@@ -2,19 +2,6 @@
 
 # Start the TaskWorker service.
 
-##H Usage: manage.sh ACTION
-##H
-##H Available actions:
-##H   help        show this help
-##H   version     get current version of the service
-##H   restart     (re)start the service
-##H   start       (re)start the service
-##H   stop        stop the service
-##H
-##H This script needs following environment variables for start action:
-##H   - DEBUG:      if `true`, setup debug mode environment.
-##H   - PYTHONPATH: inherit from ./start.sh
-
 set -euo pipefail
 if [[ -n ${TRACE+x} ]]; then
     set -x
@@ -22,17 +9,28 @@ if [[ -n ${TRACE+x} ]]; then
 fi
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-## some variable use in start_srv
-CONFIG="${SCRIPT_DIR}"/current/TaskWorkerConfig.py
-# path where we install crab code
-APP_PATH="${APP_PATH:-/data/srv/current/lib/python/site-packages/}"
+echo $COMMAND > /dev/null
+echo $MODE > /dev/null
+echo $DEBUG > /dev/null
+echo $SERVICE > /dev/null
 
-# CRABTASKWORKER_ROOT is a mandatory variable for getting data directory in `DagmanCreator.getLocation()`
-# Hardcoded the path and use new_updateTMRuntime.sh to build it from source and copy to this path.
-export CRABTASKWORKER_ROOT="${APP_PATH}"
+script_env() {
+    ## some variable use in start_srv
+    CONFIG="${SCRIPT_DIR}"/current/TaskWorkerConfig.py
+    # path where we install crab code
+    APP_PATH="${APP_PATH:-/data/srv/current/lib/python/site-packages/}"
 
-helpFunction() {
-    grep "^##H" "${0}" | sed -r "s/##H(| )//g"
+    # CRABTASKWORKER_ROOT is a mandatory variable for getting data directory in `DagmanCreator.getLocation()`
+    # Hardcoded the path and use new_updateTMRuntime.sh to build it from source and copy to this path.
+    export CRABTASKWORKER_ROOT="${APP_PATH}"
+
+    if [[ $MODE = 'fromGH' ]]; then
+       PYTHONPATH=/data/repos/CRABServer/src/python:/data/repos/WMCore/src/python:${PYTHONPATH:-}
+    else
+       PYTHONPATH=/data/srv/current/lib/python/site-packages:${PYTHONPATH:-}
+    fi
+    export PYTHONPATH
+    export DEBUG
 }
 
 _getMasterWorkerPid() {
@@ -41,10 +39,17 @@ _getMasterWorkerPid() {
 }
 
 start_srv() {
-    # Check require env
-    export PYTHONPATH
+    script_env
     echo "Starting TaskWorker..."
-    if [[ $DEBUG ]]; then
+    markmodify_path=/data/srv/current/data_files_modified
+    if [[ $MODE = "fromGH" ]]; then
+        touch ${markmodify_path}
+        ./updateDatafiles.sh
+    elif [[ -f ${markmodify_path} ]]; then
+        echo "Error: ${markmodify_path} exists."
+    fi
+
+    if [[ $DEBUG = 't' ]]; then
         crab-taskworker --config "${CONFIG}" --logDebug --pdb
     else
         crab-taskworker --config "${CONFIG}" --logDebug &
@@ -92,24 +97,28 @@ stop_srv() {
     fi
 }
 
+env_eval() {
+    script_env
+    echo "export CRABTASKWORKER_ROOT=${CRABTASKWORKER_ROOT}"
+    echo "export PYTHONPATH=${PYTHONPATH}"
+}
+
 # Main routine, perform action requested on command line.
-case ${1:-help} in
-  start | restart )
-    stop_srv
-    start_srv
-    ;;
+case ${COMMAND:-help} in
+    start | restart )
+        stop_srv
+        start_srv
+        ;;
 
-  stop )
-    stop_srv
-    ;;
+    stop )
+        stop_srv
+        ;;
 
-  help )
-    helpFunction
-    exit 0
-    ;;
-
-  * )
-    echo "$0: unknown action '$1', please try '$0 help' or documentation." 1>&2
-    exit 1
-    ;;
+    env )
+        env_eval
+        ;;
+    * )
+        echo "Error: Unknown command: $COMMAND"
+        exit 1
+        ;;
 esac
