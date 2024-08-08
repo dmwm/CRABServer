@@ -9,9 +9,6 @@ import sys
 
 from WMCore.Configuration import loadConfigurationFile
 from TaskWorker.WorkerExceptions import ConfigException
-from TaskWorker.MasterWorker import MasterWorker
-import HTCondorLocator
-
 def validateConfig(config):
     """Verify that the input configuration contains all needed info
 
@@ -19,8 +16,6 @@ def validateConfig(config):
     :return bool, string: flag for validation result and a message."""
     if getattr(config, 'TaskWorker', None) is None:
         return False, "Configuration problem: Task worker section is missing. "
-    if not hasattr(config.TaskWorker, 'scheddPickerFunction'):
-        config.TaskWorker.scheddPickerFunction = HTCondorLocator.memoryBasedChoices
     return True, 'Ok'
 
 
@@ -73,12 +68,14 @@ def main():
     if not status:
         raise ConfigException(msg)
 
-    # must set useHtcV2 in the environment before importing TaskWorker
-    # so that in all files we can use it to decide if to import htcondor or htcondor2
+    # Only after loacConfiguratiob has set useHtcV2 in the environment
+    # we can importing HTCondorLocator and TaskWorker so that in all files we can use
+    # the env.vat. to decide if to import htcondor or htcondor2
     if getattr(configuration.TaskWorker, 'useHtcV2', None):
         print("Configuration says to use HTC Bindings V2")
     else:
         print("Configuration says to use HTC Bindings V1")
+    from TaskWorker.MasterWorker import MasterWorker
 
     if options.pdb:
         # override root loglevel to debug
