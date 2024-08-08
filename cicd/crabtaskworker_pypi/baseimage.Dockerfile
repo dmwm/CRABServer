@@ -147,48 +147,4 @@ USER ${USER}
 ENTRYPOINT ["tini", "--"]
 CMD ["/data/run.sh"]
 
-ARG BASE_TAG=latest
-FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG}
 
-# start image
-FROM registry.cern.ch/cmscrab/crabtaskworker:${BASE_TAG} as base-image
-
-# copy TaskManagerRun.tar.gz
-COPY --from=build-data /build/data_files/data ${WDIR}/srv/current/lib/python/site-packages/data
-
-# install crabserver
-# will replace with pip later
-COPY src/python/ ${WDIR}/srv/current/lib/python/site-packages/
-
-# copy process executor scripts
-## TaskWorker
-COPY cicd/crabtaskworker_pypi/TaskWorker/start.sh \
-     cicd/crabtaskworker_pypi/TaskWorker/env.sh \
-     cicd/crabtaskworker_pypi/TaskWorker/stop.sh \
-     cicd/crabtaskworker_pypi/TaskWorker/manage.sh \
-     cicd/crabtaskworker_pypi/updateDatafiles.sh \
-     ${WDIR}/srv/TaskManager/
-
-COPY cicd/crabtaskworker_pypi/bin/crab-taskworker /usr/local/bin/crab-taskworker
-
-## publisher
-COPY cicd/crabtaskworker_pypi/Publisher/start.sh \
-     cicd/crabtaskworker_pypi/Publisher/env.sh \
-     cicd/crabtaskworker_pypi/Publisher/stop.sh \
-     cicd/crabtaskworker_pypi/Publisher/manage.sh \
-     ${WDIR}/srv/Publisher/
-
-## entrypoint
-COPY cicd/crabtaskworker_pypi/run.sh /data
-USER root
-
-# for debugging purpose
-RUN echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3
-
-# ensure all /data owned by running user
-# RUN chown -R 1000:1000 ${WDIR}
-
-USER ${USER}
-
-ENTRYPOINT ["tini", "--"]
-CMD ["/data/run.sh"]
