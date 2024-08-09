@@ -426,6 +426,8 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("collector", param, safe, RX_COLLECTOR, optional=True)
             validate_strlist("extrajdl", param, safe, RX_SCRIPTARGS)
             validate_num("dryrun", param, safe, optional=True)
+            if safe.kwargs["dryrun"] == 1:
+                raise InvalidParameter("Submit with --dryrun is deprecate. Submit task and run \"crab preparelocal\" instead.")
             validate_num("ignoreglobalblacklist", param, safe, optional=True)
             validate_num("partialdataset", param, safe, optional=True)
             validate_num("requireaccelerator", param, safe, optional=True)
