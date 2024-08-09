@@ -26,22 +26,21 @@ import htcondor
 from RESTInteractions import CRABRest
 from ServerUtilities import getProxiedWebDir, getColumn, downloadFromS3
 
-def setupStreamLogger():
-    logHandler = logging.StreamHandler()
-    logFormatter = logging.Formatter(
-        "%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
-    logHandler.setFormatter(logFormatter)
-    logger = logging.getLogger('AdjustSites')
-    logger.addHandler(logging.StreamHandler())
-    logger.setLevel(logging.DEBUG)
-    return logger
-
 def printLog(msg):
     """ Utility function to print the timestamp in the log. Can be replaced
         with anything (e.g.: logging.info if we decided to set up a logger here)
     """
     print("%s: %s" % (datetime.utcnow(), msg))
 
+def setupStreamLogger():
+    logHandler = logging.StreamHandler()
+    logFormatter = logging.Formatter(
+        "%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
+    logHandler.setFormatter(logFormatter)
+    logger = logging.getLogger('AdjustSites') # hardcode
+    logger.addHandler(logHandler)
+    logger.setLevel(logging.DEBUG)
+    return logger
 
 def adjustPostScriptExitStatus(resubmitJobIds, filename):
     """
@@ -430,6 +429,7 @@ def getSandbox(crabserver, ad, logger):
         logger.exception("The CRAB server backend could not download the input sandbox with your code " + \
                          "from S3.\nThis could be a temporary glitch; please try to submit a new task later " + \
                          "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex))
+        sys.exit(4)
 
 
 def main():
@@ -458,8 +458,8 @@ def main():
     crabserver.setDbInstance(dbInstance)
 
     time.sleep(60)  # give TW time to update taskDB #8411
+    # check task status
     checkTaskInfo(crabserver, ad)
-
     # get sandbox
     getSandbox(crabserver, ad, logger)
 
