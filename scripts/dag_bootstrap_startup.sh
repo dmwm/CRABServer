@@ -33,6 +33,11 @@ fi
 srcname=$0
 env > ${srcname%.sh}.env
 
+if [ "X$useHtcV2" != "X" ]; then
+  echo "WILL USE HTC BINDINGS V2"  # make a note in logfile dag_bootstrap.out
+  touch USE_HTC_V2_BINDINGS        # create an empty file to make it easy to tell when investigating
+fi
+
 #Sourcing Remote Condor setup
 source_script=`grep '^RemoteCondorSetup =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
 if [ "X$source_script" != "X" ] && [ -e $source_script ]; then
@@ -240,8 +245,14 @@ Error         = task_process/daemon.err.\$(Cluster).\$(Process)
 
 Queue 1
 EOF
-        # TODO - remove chmod
-        chmod 777 task_process/task_proc_wrapper.sh
+
+    if [ "X$useHtcV2" != "X" ]; then
+      # add a directitve to the task_process submission JDL to pass this in the env. of the job
+      cat >> task_process/daemon.jdl << EOF
+environment = "useHtcV2=True"
+EOF
+    fi
+        chmod +x task_process/task_proc_wrapper.sh
         condor_submit task_process/daemon.jdl
     else
         echo "task_process/task_process_running found, not submitting the daemon task"

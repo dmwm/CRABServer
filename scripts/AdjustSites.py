@@ -4,6 +4,8 @@
     - For resubmission: adjust the exit codes of the PJ in the RunJobs.dag.nodes.log files and
       the max retries in the RunJobs.dag files
 """
+# this is full of snake_case variables from old times, which we do not casre to change
+# pylint: disable=invalid-name
 
 from __future__ import print_function
 
@@ -19,12 +21,15 @@ import traceback
 from datetime import datetime
 from http.client import HTTPException
 
-import classad
-import htcondor
-
 from RESTInteractions import CRABRest
 from ServerUtilities import getProxiedWebDir, getColumn
 
+if 'useHtcV2' in os.environ:
+    import htcondor2 as htcondor
+    import classad2 as classad
+else:
+    import htcondor
+    import classad
 
 def printLog(msg):
     """ Utility function to print the timestamp in the log. Can be replaced
@@ -74,7 +79,7 @@ def adjustPostScriptExitStatus(resubmitJobIds, filename):
     alt = None
     output = ''
     adjustedJobIds = []
-    for line in open(filename).readlines():
+    for line in open(filename, 'r', encoding='utf-8').readlines():
         if len(ra_buffer) == 0:
             m = terminator_re.search(line)
             if m:
@@ -129,11 +134,11 @@ def adjustPostScriptExitStatus(resubmitJobIds, filename):
     # best we can do given the constraints.  Note that we don't race with the
     # shadow as we have a write lock on the file itself.
     tmpfilename = filename + ".tmp"
-    output_fd = open(tmpfilename, "w")
+    output_fd = open(tmpfilename, "w", encoding='utf-8')
     output_fd.write(output)
     output_fd.close()
     os.unlink(tmpfilename)
-    output_fd = open(filename, "w")
+    output_fd = open(filename, "w", encoding='utf-8')
     output_fd.write(output)
     output_fd.close()
     return adjustedJobIds
@@ -165,7 +170,7 @@ def adjustMaxRetries(adjustJobIds, ad):
     retriesDict = {}
     filenames = getGlob(ad, "node_state", "node_state.[1-9]*")
     for fn in filenames:
-        with open(fn, 'r') as fd:
+        with open(fn, 'r', encoding='utf-8') as fd:
             for nodeStatusAd in classad.parseAds(fd):
                 if nodeStatusAd['Type'] != "NodeStatus":
                     continue
@@ -183,7 +188,7 @@ def adjustMaxRetries(adjustJobIds, ad):
     filenames = getGlob(ad, "RunJobs.dag", "RunJobs[1-9]*.subdag")
     for fn in filenames:
         output = ""
-        with open(fn, 'r') as fd:
+        with open(fn, 'r', encoding='utf-8') as fd:
             for line in fd.readlines():
                 match_retry_re = retry_re.search(line)
                 if match_retry_re:
@@ -202,7 +207,7 @@ def adjustMaxRetries(adjustJobIds, ad):
                         printLog("Adjusted maxRetries for {0} to {1}".format(jobId, maxRetries))
                         line = retry_re.sub(r'RETRY Job%s %d ' % (jobId, maxRetries), line)
                 output += line
-        with open(fn, 'w') as fd:
+        with open(fn, 'w', encoding='utf-8') as fd:
             fd.write(output)
 
 
@@ -268,7 +273,7 @@ def makeWebDir(ad):
     fakeInfo = startInfo + "{"
     fakeInfo += "'DagStatus': {'SubDagStatus': {}, 'Timestamp': 0L, 'NodesTotal': 1L, 'SubDags': {}, 'DagStatus': 1L}"
     fakeInfo += "}\n{}\n"
-    with open(os.path.abspath(os.path.join(".", "task_process/status_cache.txt")), 'w') as fd:
+    with open(os.path.abspath(os.path.join(".", "task_process/status_cache.txt")), 'w', encoding='utf-8') as fd:
         fd.write(fakeInfo)
     printLog("WEB_DIR created, sym links in place and status_cache initialized")
 
@@ -330,7 +335,7 @@ def saveProxiedWebdir(crabserver, ad):
         # We need to use a file to communicate this to the prejob. I tried to read the corresponding ClassAd from the preJob like:
         # htcondor.Schedd().xquery(requirements="ClusterId == %d && ProcId == %d" % (self.task_ad['ClusterId'], self.task_ad['ProcId']), projection=[webDir_adName]).next().get(webDir_adName)
         # but it is too heavy of an operation with HTCondor v8.8.3
-        with open("webdir", "w") as fd:
+        with open("webdir", "w", encoding='utf-8') as fd:
             fd.write(ad[webDir_adName])
     else:
         printLog("Cannot get proxied webdir from the server. Maybe the schedd does not have one in the REST configuration?")
@@ -345,7 +350,7 @@ def clearAutomaticBlacklist():
     for filename in glob.glob("task_statistics.*"):
         try:
             os.unlink(filename)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             printLog("ERROR when clearing statistics: %s" % str(e))
 
 
@@ -407,7 +412,7 @@ def main():
 
     printLog("Starting AdjustSites with _CONDOR_JOB_AD=%s" % os.environ['_CONDOR_JOB_AD'])
 
-    with open(os.environ['_CONDOR_JOB_AD']) as fd:
+    with open(os.environ['_CONDOR_JOB_AD'], 'r', encoding='utf-8') as fd:
         ad = classad.parseOne(fd)
     printLog("Parsed ad: %s" % ad)
 
@@ -474,7 +479,7 @@ def main():
                 # file; hence, we only edit the file while holding an appropriate lock.
                 # Note this lock method didn't exist until 8.1.6; prior to this, we simply
                 # run dangerously.
-                with htcondor.lock(open(fn, 'a'), htcondor.LockType.WriteLock):
+                with htcondor.lock(open(fn, 'a', encoding='utf-8'), htcondor.LockType.WriteLock):
                     adjustedJobIds.extend(adjustPostScriptExitStatus(resubmitJobIds, fn))
             else:
                 adjustedJobIds.extend(adjustPostScriptExitStatus(resubmitJobIds, fn))
@@ -488,10 +493,10 @@ def main():
 
     if 'CRAB_SiteAdUpdate' in ad:
         newSiteAd = ad['CRAB_SiteAdUpdate']
-        with open("site.ad") as fd:
+        with open("site.ad", 'r', encoding='utf-8') as fd:
             siteAd = classad.parseOne(fd)
         siteAd.update(newSiteAd)
-        with open("site.ad", "w") as fd:
+        with open("site.ad", "w", encoding='utf-8') as fd:
             fd.write(str(siteAd))
 
     if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':

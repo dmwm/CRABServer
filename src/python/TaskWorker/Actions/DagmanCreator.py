@@ -25,11 +25,14 @@ from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedEx
 from RucioUtils import getWritePFN
 from CMSGroupMapper import get_egroup_users
 
-import classad
-
 import WMCore.WMSpec.WMTask
 from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS, SCRAM_TO_ARCH
+
+if 'useHtcV2' in os.environ:
+    import classad2 as classad
+else:
+    import classad
 
 DAG_HEADER = """
 

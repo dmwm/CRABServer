@@ -12,7 +12,7 @@ import signal
 import json
 from pprint import pprint
 
-import htcondor
+import htcondor2 as htcondor
 from socket import gethostname
 import requests
 from requests.auth import HTTPBasicAuth

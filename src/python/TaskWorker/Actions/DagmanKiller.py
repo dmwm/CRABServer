@@ -1,9 +1,8 @@
 """ need a doc string here """
+import os
 import re
-import sys
 from http.client import HTTPException
-import htcondor
-import classad
+from urllib.parse import urlencode
 
 import HTCondorLocator
 from ServerUtilities import FEEDBACKMAIL
@@ -11,11 +10,12 @@ from TaskWorker.DataObjects import Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
-if sys.version_info >= (3, 0):
-    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
-if sys.version_info < (3, 0):
-    from urllib import urlencode
-
+if 'useHtcV2' in os.environ:
+    import htcondor2 as htcondor
+    import classad2 as classad
+else:
+    import htcondor
+    import classad
 
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
 
@@ -89,7 +89,7 @@ class DagmanKiller(TaskAction):
         try:
             self.schedd.act(htcondor.JobAction.Hold, rootConst)
             self.schedd.act(htcondor.JobAction.Remove, jobConst)
-        except  htcondor.HTCondorException as hte:
+        except  Exception as hte:
             msg = "The CRAB server backend was not able to kill the task,"
             msg += " because the Grid scheduler answered with an error."
             msg += " This is probably a temporary glitch. Please try again later."

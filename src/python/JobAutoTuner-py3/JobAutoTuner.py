@@ -29,7 +29,7 @@ class GwmsmonAlarm():
     Attributes:
     message -- explanation of the error
     """
-    # todo - here to send emails to the operator or lemon alarms
+    # NB here to send emails to the operator or lemon alarms
     def __init__(self, message):
         self.message = message
         self.time = str(datetime.now())
@@ -46,7 +46,7 @@ class ScheddAlarm():
     Attributes:
     message -- explanation of the error
     """
-    # todo - here to send emails to the operator or lemon alarms
+    # NB here to send emails to the operator or lemon alarms
     def __init__(self, message):
         self.message = message
         self.time = str(datetime.now())
@@ -62,7 +62,7 @@ class ConfigAlarm():
     configKey -- config paramater that is searched in condor_config_val
     message -- additional info for the alarm
     """
-    # todo - here to send emails to the operator or lemon alarms
+    # NB here to send emails to the operator or lemon alarms
     def __init__(self, configKey, errMessage ):
         self.configKey = configKey
         self.errMessage = errMessage
@@ -122,7 +122,7 @@ class Overflow:
         }
 
         self.htCollector = htcondor.param['COLLECTOR_HOST']
-        logging.debug("HTCondor collector = %s" % self.htCollector)
+        logging.debug("HTCondor collector = %s", self.htCollector)
 
         self.schedd = htcondor.Schedd()
 
@@ -144,7 +144,7 @@ class Overflow:
         """
 
         if type(requirementsString) != str:
-            logging.warning("Wrong type %s requirementsString of  %s" % (requirementsString.__class__, requirementsString))
+            logging.warning("Wrong type %s requirementsString of  %s", requirementsString.__class__, requirementsString)
             return
 
         routerEntry = classad.ClassAd()
@@ -160,11 +160,11 @@ class Overflow:
         routerEntry["set_DESIRED_SITES"] = newSiteList
         routerEntry["set_DESIRED_SITES_Orig"] = self.currSiteList
         routerEntry["set_DESIRED_SITES_Diff"] = self.currSiteListDiff
-        routerEntry["set_HasBeenOverflowRouted"] = True;
-        routerEntry["set_RouteType"] = "overflow";
+        routerEntry["set_HasBeenOverflowRouted"] = True
+        routerEntry["set_RouteType"] = "overflow"
         routerEntry["eval_set_LastRouted"] = classad.ExprTree('time()')
 
-        logging.info("A new Route has been added:  %s" % routerEntry)
+        logging.info("A new Route has been added:  %s", routerEntry)
         print(routerEntry)
 
     def needOverflow(self, jobObject):
@@ -182,7 +182,7 @@ class Overflow:
         if not idleTooMuch:
             return False
 
-        logging.debug(f"job was idle > {self.maxIdleTime} min")
+        logging.debug("job was idle > %s min", self.maxIdleTime)
         if len(jobObject["DESIRED_Sites"].split(',')) > 1:
             # targeting 2 or more sites
             return False
@@ -198,14 +198,14 @@ class Overflow:
     def overflow(self, jobsInThisSchedd):
         """ create and print overflow routes as needed """
 
-        for clusterId, jobObj in jobsInThisSchedd.items():
+        for _, jobObj in jobsInThisSchedd.items():
             self.currJobObj = jobObj
             # Set the self.currJobObj  var to the current job in order to extract classads from other functions
             # Set the self.currSiteListDiff var to be used later as the DESIRED_SITES_Diff classad (
             # This one cannot be added as a field to the self.currJobObj - it is a condor obj
             requirementsString = '(HasBeenOverflowRouted is undefined)'
             requirementsString = f'((target.Crab_ReqName == "{jobObj["CRAB_ReqName"]}") && {requirementsString})'
-            logging.debug(f"requirementsString: {requirementsString}")
+            logging.debug("requirementsString: %s", requirementsString)
 
             if self.needOverflow(jobObj):
                 thisReqString = requirementsString.lower()
@@ -220,7 +220,7 @@ class Overflow:
                 logging.debug("newSiteList: %s", newSiteList)
                 self.currSiteListDiff = self.nearbyT2s[targetT1]
                 self.createJobRouterAd(requirementsString, newSiteList, jobObj["CRAB_ReqName"])
-        logging.debug("self.requirementsStringSet: \n%s\n" % pformat(self.requirementsStringSet))
+        logging.debug("self.requirementsStringSet: \n%s\n", pformat(self.requirementsStringSet))
 
     def run(self):
         """
@@ -243,7 +243,7 @@ class Overflow:
 
             results = self.schedd.query(constraint, projection)
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             warnings.warn( e ,category=ScheddAlarm)
 
         # Creating a dict of classad.objects from the query result with keys = CRAB_RegName (to be used in the search later).

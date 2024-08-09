@@ -7,19 +7,11 @@ import os
 import shutil
 import sys
 import time
-import signal
 import logging
 
 from http.client import HTTPException
+from urllib.parse import urlencode
 from MultiProcessingLog import MultiProcessingLog
-
-if sys.version_info >= (3, 0):
-    from urllib.parse import urlencode  # pylint: disable=no-name-in-module
-if sys.version_info < (3, 0):
-    from urllib import urlencode
-
-#WMcore dependencies
-from WMCore.Configuration import loadConfigurationFile
 
 #CRAB dependencies
 from RESTInteractions import CRABRest
@@ -50,13 +42,13 @@ MODEURL = {'cmsweb-dev': {'host': 'cmsweb-dev.cern.ch', 'instance':  'dev'},
 def getRESTParams(config, logger):
     """ get REST host name and db instance from a config object
     returns a tuple of strings (host, dbinstance). If can't, raises exception"""
-    # TODO this is also a candidate for TaskWorker/TaskUtils.py
+    # this is also a candidate for CRABUtils/TaskUtils.py
 
     try:
         instance = config.TaskWorker.instance
-    except:
+    except Exception as e:
         msg = "No instance provided: need to specify config.TaskWorker.instance in the configuration"
-        raise ConfigException(msg)
+        raise ConfigException(msg) from e
 
     if instance in SERVICE_INSTANCES:
         logger.info('Will connect to CRAB service: %s', instance)
@@ -70,9 +62,9 @@ def getRESTParams(config, logger):
         try:
             restHost = config.TaskWorker.restHost
             dbInstance = config.TaskWorker.dbInstance
-        except:
+        except Exception as e:
             msg = "Need to specify config.TaskWorker.restHost and dbInstance in the configuration"
-            raise ConfigException(msg)
+            raise ConfigException(msg) from e
     return restHost, dbInstance
 
 
@@ -212,6 +204,11 @@ class MasterWorker(object):
         self.dbInstance = dbInstance
         self.logger.info('Will connect via URL: https://%s/%s', self.restHost, self.dbInstance)
 
+        if 'useHtcV2' in os.environ:
+            self.logger.info("Will use HTC python bindings V2")
+        else:
+            self.logger.info("Will use HTC python bindings V1")
+
         #Let's increase the server's retries for recoverable errors in the MasterWorker
         #60 means we'll keep retrying for 1 hour basically (we retry at 20*NUMRETRY seconds, so at: 20s, 60s, 120s, 200s, 300s ...)
         self.crabserver = CRABRest(self.restHost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey, retry=20,
@@ -290,7 +287,7 @@ class MasterWorker(object):
         return pendingwork
 
 
-    def quit_(self, dummyCode, dummyTraceback):
+    def quit_(self, dummyCode, dummyTraceback):  # pylint: disable=unused-argument
         self.logger.info("Received kill request. Setting STOP flag in the master process...")
         self.STOP = True
 
@@ -360,7 +357,7 @@ class MasterWorker(object):
                          'warning': warning}
             try:
                 self.crabserver.post(api='task', data=urlencode(configreq))
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 self.logger.error("Error uploading warning: %s", str(e))
                 self.logger.warning("Cannot add a warning to REST interface. Warning message: %s", warning)
             return True
@@ -388,7 +385,7 @@ class MasterWorker(object):
             configreq = {'subresource': 'addwarning', 'workflow': taskname, 'warning': warning}
             try:
                 self.crabserver.post(api='task', data=urlencode(configreq))
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 self.logger.error("Error uploading warning: %s", str(e))
                 self.logger.warning("Cannot add a warning to REST interface. Warning message: %s", warning)
             return True

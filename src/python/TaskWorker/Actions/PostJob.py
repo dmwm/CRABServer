@@ -101,8 +101,6 @@ from http.client import HTTPException
 import requests
 from requests.auth import HTTPBasicAuth
 
-import htcondor
-import classad
 from WMCore import Lexicon
 from WMCore.DataStructs.LumiList import LumiList
 from WMCore.Services.WMArchive.DataMap import createArchiverDoc
@@ -113,6 +111,13 @@ from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 from ServerUtilities import isFailurePermanent, mostCommon, TRANSFERDB_STATES, PUBLICATIONDB_STATES, encodeRequest, oracleOutputMapping
 from ServerUtilities import getLock, getHashLfn
 from RESTInteractions import CRABRest
+
+if 'useHtcV2' in os.environ:
+    import htcondor2 as htcondor
+    import classad2 as classad
+else:
+    import htcondor
+    import classad
 
 ASO_JOB = None
 G_JOB_REPORT_NAME = None
