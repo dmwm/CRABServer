@@ -198,7 +198,10 @@ def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
         handler.addWork(MakeFakeFileSet(config=config, crabserver=crabserver, procnum=procnum))
     handler.addWork(Splitter(config=config, crabserver=crabserver, procnum=procnum))
     handler.addWork(DagmanCreator(config=config, crabserver=crabserver, procnum=procnum, rucioClient=rucioClient))
-    handler.addWork(DagmanSubmitter(config=config, crabserver=crabserver, procnum=procnum))
+    if task['tm_dry_run'] == 'T':
+        handler.addWork(DryRunUploader(config=config, crabserver=crabserver, procnum=procnum))
+    else:
+        handler.addWork(DagmanSubmitter(config=config, crabserver=crabserver, procnum=procnum))
 
     return handler.actionWork(args, kwargs)
 

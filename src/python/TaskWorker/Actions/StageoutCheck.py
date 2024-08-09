@@ -82,6 +82,12 @@ class StageoutCheck(TaskAction):
             msg += "because user specified not transfer any output/log files."
             self.logger.info(msg)
             return
+        # Do not need to check if it is dryrun.
+        if self.task['tm_dry_run'] == 'T':
+            msg = "Will not check possibility to write to destination site."
+            msg += "User specified dryrun option."
+            self.logger.info(msg)
+            return
         self.workflow = self.task['tm_taskname']
         self.proxy = self.task['user_proxy']
 
