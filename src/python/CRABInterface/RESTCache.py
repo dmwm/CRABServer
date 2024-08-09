@@ -13,7 +13,8 @@ from WMCore.REST.Error import MissingParameter, ExecutionError
 
 # CRABServer dependecies here
 from CRABInterface.RESTExtensions import authz_login_valid, authz_operator
-from CRABInterface.Regexps import RX_SUBRES_CACHE, RX_CACHE_OBJECTTYPE, RX_TASKNAME, RX_USERNAME, RX_TARBALLNAME
+from CRABInterface.Regexps import (RX_SUBRES_CACHE, RX_CACHE_OBJECTTYPE, RX_TASKNAME,
+                                   RX_USERNAME, RX_TARBALLNAME, RX_PRESIGNED_CLIENT_METHOD)
 from ServerUtilities import getUsernameFromTaskname, MeasureTime
 
 
@@ -99,9 +100,10 @@ class RESTCache(RESTEntity):
             validate_str('taskname', param, safe, RX_TASKNAME, optional=True)
             validate_str('username', param, safe, RX_USERNAME, optional=True)
             validate_str('tarballname', param, safe, RX_TARBALLNAME, optional=True)
+            validate_str('clientmethod', param, safe, RX_PRESIGNED_CLIENT_METHOD, optional=True)
 
     @restcall
-    def get(self, subresource, objecttype, taskname, username, tarballname):  # pylint: disable=redefined-builtin
+    def get(self, subresource, objecttype, taskname, username, tarballname, clientmethod):  # pylint: disable=redefined-builtin
         """
            :arg str subresource: the specific information to be accessed;
         """
@@ -165,6 +167,8 @@ class RESTCache(RESTEntity):
             authz_operator(username=ownerName, group='crab3', role='operator')
             if subresource == 'sandbox' and not username:
                 raise MissingParameter("username is missing")
+            if not clientmethod:
+                clientmethod = 'get_object'
             # returns a PreSignedUrl to download the file within the expiration time
             expiration = 60 * 60  # 1 hour default is good for retries and debugging
             if objecttype in ['debugfiles', 'clientlog', 'twlog']:
@@ -172,7 +176,7 @@ class RESTCache(RESTEntity):
             try:
                 with MeasureTime(self.logger, modulename=__name__, label="get.download.generate_presigned_post") as _:
                     response = self.s3_client.generate_presigned_url(
-                        'get_object', Params={'Bucket': self.s3_bucket, 'Key': s3_objectKey},
+                        clientmethod, Params={'Bucket': self.s3_bucket, 'Key': s3_objectKey},
                         ExpiresIn=expiration)
                 preSignedUrl = response
             except ClientError as e:

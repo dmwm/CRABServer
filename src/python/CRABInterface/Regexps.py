@@ -93,6 +93,7 @@ RX_SUBRES_TASK = re.compile(r"^(allinfo|allusers|summary|search|taskbystatus|tas
 #subresources of Cache resource
 RX_SUBRES_CACHE = re.compile(r"^(upload|download|retrieve|list|used)$")
 RX_CACHE_OBJECTTYPE = re.compile(r"^(clientlog|twlog|sandbox|debugfiles|runtimefiles)$")
+RX_PRESIGNED_CLIENT_METHOD = re.compile(r"^(get_object|head_object)$")
 
 #worker workflow
 RX_WORKER_NAME = re.compile(r"^[A-Za-z0-9\-\._%]{1,100}$")

@@ -773,16 +773,14 @@ def checkS3Object(crabserver=None, objecttype=None, username=None, tarballname=N
     :return: None, but raise exception if wget is exit with non-zero.
     """
     preSignedUrl = getDownloadUrlFromS3(crabserver=crabserver, objecttype=objecttype,
-                                        username=username,
-                                        tarballname=tarballname, logger=logger)
+                                        username=username, tarballname=tarballname,
+                                        clientmethod='head_object',
+                                        logger=logger)
     downloadCommand = ''
     if os.getenv('CRAB_useGoCurl'):
         raise NotImplementedError('HEAD with gocurl is not implemented')
-
-    downloadCommand += 'bash -c "set -o pipefail;'
-    downloadCommand += ' wget -Sq -O -'
-    downloadCommand += ' \\"%s\\"' % preSignedUrl
-    downloadCommand += ' | head -c1000 > /dev/null"'
+    downloadCommand += ' wget -Sq -O /dev/null --method=HEAD'
+    downloadCommand += ' "%s"' % preSignedUrl
 
     with subprocess.Popen(downloadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True) as downloadProcess:
         logger.debug("Will execute:\n%s", downloadCommand)
@@ -869,7 +867,8 @@ def uploadToS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
 
 
 def getDownloadUrlFromS3(crabserver=None, objecttype=None, taskname=None,
-                         username=None, tarballname=None, logger=None):
+                         username=None, tarballname=None, clientmethod=None,
+                         logger=None):
     """
     obtains a PreSigned URL to access an existing object in S3
     :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
@@ -887,6 +886,8 @@ def getDownloadUrlFromS3(crabserver=None, objecttype=None, taskname=None,
         dataDict['username'] = username
     if tarballname:
         dataDict['tarballname'] = tarballname
+    if clientmethod:
+        dataDict['clientmethod'] = clientmethod
     data = encodeRequest(dataDict)
     try:
         # calls to restServer alway return a 3-ple ({'result':a-list}, HTTPcode, HTTPreason)
