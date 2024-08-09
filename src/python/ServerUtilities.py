@@ -751,6 +751,35 @@ def downloadFromS3(crabserver=None, filepath=None, objecttype=None, taskname=Non
                                         tarballname=tarballname, logger=logger)
     downloadFromS3ViaPSU(filepath=filepath, preSignedUrl=preSignedUrl, logger=logger)
 
+def S3HeadObject(crabserver=None, objecttype=None, username=None, tarballname=None,
+                 logger=None):
+    """
+    one call to make a 2-step operation:
+    obtains a preSignedUrl from crabserver RESTCache and use it to check if file exist
+    :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
+    :param objecttype: string : the kind of object to dowbload: clientlog|twlog|sandbox|debugfiles|runtimefiles
+    :param username: string : the username this sandbox belongs to, in case objecttype=sandbox
+    :param tarballname: string : for sandbox, taskname is not used but tarballname is needed
+    :return: nothing. Raises an exception in case of error
+    """
+    preSignedUrl = getDownloadUrlFromS3(crabserver=crabserver, objecttype=objecttype,
+                                        username=username,
+                                        tarballname=tarballname, logger=logger)
+    downloadCommand = ''
+    if os.getenv('CRAB_useGoCurl'):
+        raise NotImplementedError('HEAD with gocurl is not implemented')
+
+    downloadCommand += 'wget -Sq --method=HEAD'
+    downloadCommand += ' "%s"' % preSignedUrl
+
+    with subprocess.Popen(downloadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True) as downloadProcess:
+        logger.debug("Will execute:\n%s", downloadCommand)
+        stdout, stderr = downloadProcess.communicate()
+        exitcode = downloadProcess.returncode
+        logger.debug('exitcode: %s\nstdout: %s', exitcode, stdout)
+
+    if exitcode != 0:
+        raise Exception('Download command %s failed. stderr is:\n%s' % (downloadCommand, stderr))
 
 def retrieveFromS3(crabserver=None, objecttype=None, taskname=None,
                    username=None, tarballname=None, logger=None):
