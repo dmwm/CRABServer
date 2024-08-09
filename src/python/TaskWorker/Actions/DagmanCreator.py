@@ -1204,8 +1204,10 @@ class DagmanCreator(TaskAction):
             sandboxName = kw['task']['tm_user_sandbox']
             dbgFilesName = kw['task']['tm_debug_files']
             try:
-                downloadFromS3(crabserver=self.crabserver, objecttype='sandbox', username=username,
-                               tarballname=sandboxName, filepath=sandboxTarBall, logger=self.logger)
+                self.logger.debug(f"Skip download sandbox.tar.gz: {sandboxName}")
+                # TODO: need function to check if sandbox exist instead
+                #downloadFromS3(crabserver=self.crabserver, objecttype='sandbox', username=username,
+                #               tarballname=sandboxName, filepath=sandboxTarBall, logger=self.logger)
                 kw['task']['tm_user_sandbox'] = sandboxTarBall
             except Exception as ex:
                 raise TaskWorkerException("The CRAB server backend could not download the input sandbox with your code " + \
@@ -1233,8 +1235,8 @@ class DagmanCreator(TaskAction):
 
         self.extractMonitorFiles(inputFiles, **kw)
 
-        if kw['task'].get('tm_user_sandbox') == 'sandbox.tar.gz':
-            inputFiles.append('sandbox.tar.gz')
+        #if kw['task'].get('tm_user_sandbox') == 'sandbox.tar.gz':
+        #    inputFiles.append('sandbox.tar.gz')
         if os.path.exists("CMSRunAnalysis.tar.gz"):
             inputFiles.append("CMSRunAnalysis.tar.gz")
         if os.path.exists("TaskManagerRun.tar.gz"):

@@ -14,6 +14,7 @@ import sys
 import time
 import glob
 import shutil
+import logging
 from urllib.parse import urlencode
 import traceback
 from datetime import datetime
@@ -23,8 +24,17 @@ import classad
 import htcondor
 
 from RESTInteractions import CRABRest
-from ServerUtilities import getProxiedWebDir, getColumn
+from ServerUtilities import getProxiedWebDir, getColumn, downloadFromS3
 
+def setupStreamLogger():
+    logHandler = logging.StreamHandler()
+    logFormatter = logging.Formatter(
+        "%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
+    logHandler.setFormatter(logFormatter)
+    logger = logging.getLogger('AdjustSites')
+    logger.addHandler(logging.StreamHandler())
+    logger.setLevel(logging.DEBUG)
+    return logger
 
 def printLog(msg):
     """ Utility function to print the timestamp in the log. Can be replaced
@@ -395,11 +405,39 @@ def checkTaskInfo(crabserver, ad):
         sys.exit(3)
 
 
+def getSandbox(crabserver, ad, logger):
+    """
+    """
+
+    task = ad['CRAB_ReqName']
+    data = {'subresource': 'search', 'workflow': task}
+
+    try:
+        dictresult, _, _ = crabserver.get(api='task', data=data)
+    except HTTPException as hte:
+        printLog(traceback.format_exc())
+        printLog(hte.headers)
+        printLog(hte.result)
+        sys.exit(2)
+
+    username = getColumn(dictresult, 'tm_username')
+    sandboxName = getColumn(dictresult, 'tm_user_sandbox')
+    sandboxTarBall = 'sandbox.tar.gz'
+    try:
+        downloadFromS3(crabserver=crabserver, objecttype='sandbox', username=username,
+                       tarballname=sandboxName, filepath=sandboxTarBall, logger=logger)
+    except Exception as ex:
+        logger.exception("The CRAB server backend could not download the input sandbox with your code " + \
+                         "from S3.\nThis could be a temporary glitch; please try to submit a new task later " + \
+                         "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex))
+
+
 def main():
     """
     Need a doc string here.
     """
     setupLog()
+    logger = setupStreamLogger()
 
     if '_CONDOR_JOB_AD' not in os.environ or not os.path.exists(os.environ["_CONDOR_JOB_AD"]):
         printLog("Exiting AdjustSites since _CONDOR_JOB_AD is not in the environment or does not exist")
@@ -421,6 +459,9 @@ def main():
 
     time.sleep(60)  # give TW time to update taskDB #8411
     checkTaskInfo(crabserver, ad)
+
+    # get sandbox
+    getSandbox(crabserver, ad, logger)
 
     # is this the first time this script runs for this task ? (it runs at each resubmit as well !)
     if not os.path.exists('WEB_DIR'):
@@ -503,4 +544,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
