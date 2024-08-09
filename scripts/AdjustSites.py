@@ -404,7 +404,7 @@ def checkTaskInfo(crabserver, ad):
         sys.exit(3)
 
 
-def getSandbox(crabserver, ad, logger):
+def getSandbox(crabserver, ad):
     """
     """
     sandboxTarBall = 'sandbox.tar.gz'
