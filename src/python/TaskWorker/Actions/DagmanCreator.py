@@ -1206,7 +1206,7 @@ class DagmanCreator(TaskAction):
             try:
                 self.logger.debug(f"Checking if sandbox file is available: {sandboxName}")
                 S3HeadObject(crabserver=self.crabserver, objecttype='sandbox',
-                             username=username, tarballname=sandboxName+'temp___', logger=self.logger)
+                             username=username, tarballname=sandboxName, logger=self.logger)
                 kw['task']['tm_user_sandbox'] = sandboxTarBall
             except Exception as ex:
                 raise TaskWorkerException("The CRAB server backend could not download the input sandbox with your code " + \
