@@ -423,6 +423,7 @@ def getSandbox(taskDict, crabserver):
     :type crabserver: RESTInteractions.CRABRest
     """
     sandboxTarBall = 'sandbox.tar.gz'
+    sandboxTarBallTmp = sandboxTarBall + '_tmp'
     if os.path.exists(sandboxTarBall):
         printLog('sandbox.tar.gz already exist. Do nothing.')
         return
@@ -437,7 +438,8 @@ def getSandbox(taskDict, crabserver):
     # download
     try:
         downloadFromS3(crabserver=crabserver, objecttype='sandbox', username=username,
-                       tarballname=sandboxName, filepath=sandboxTarBall, logger=logger)
+                       tarballname=sandboxName, filepath=sandboxTarBallTmp, logger=logger)
+        shutil.move(sandboxTarBallTmp, sandboxTarBall)
     except Exception as ex:
         logger.exception("The CRAB server backend could not download the input sandbox with your code " + \
                          "from S3.\nThis could be a temporary glitch; please try to submit a new task later " + \
