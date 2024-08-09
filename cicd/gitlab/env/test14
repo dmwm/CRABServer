@@ -1,4 +1,4 @@
 KUBECONTEXT=cmsweb-test14
 Environment=crab-dev-tw07
 REST_Instance=test14
-CRABClient_version=prod
+CRABClient_version=GH
