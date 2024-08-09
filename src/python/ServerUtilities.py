@@ -778,9 +778,10 @@ def checkS3Object(crabserver=None, objecttype=None, username=None, tarballname=N
     if os.getenv('CRAB_useGoCurl'):
         raise NotImplementedError('HEAD with gocurl is not implemented')
 
-    downloadCommand += 'wget -Sq -O -'
-    downloadCommand += ' "%s"' % preSignedUrl
-    downloadCommand += ' | head -c1000 > /dev/null'
+    downloadCommand += 'bash -c "set -o pipefail;'
+    downloadCommand += ' wget -Sq -O -'
+    downloadCommand += ' \\"%s\\"' % preSignedUrl
+    downloadCommand += ' | head -c1000 > /dev/null"'
 
     with subprocess.Popen(downloadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True) as downloadProcess:
         logger.debug("Will execute:\n%s", downloadCommand)
