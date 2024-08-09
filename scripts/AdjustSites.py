@@ -36,6 +36,12 @@ def printLog(msg):
     print("%s: %s" % (datetime.utcnow(), msg))
 
 def setupStreamLogger():
+    """
+    Setup logger object with stream handler. Needed by `downloadFromS3()`.
+
+    :returns: stream logger object
+    :rtype: logging.Logger
+    """
     logHandler = logging.StreamHandler()
     logFormatter = logging.Formatter(
         "%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
@@ -453,7 +459,7 @@ def main():
 
     with open(os.environ['_CONDOR_JOB_AD']) as fd:
         ad = classad.parseOne(fd)
-    printLog("Parsed ad: %s" % ad)
+    printLog("Parsed ad: %s\n" % ad)
 
     # instantiate a server object to talk with crabserver
     host = ad['CRAB_RestHost']
@@ -462,6 +468,7 @@ def main():
     crabserver = CRABRest(host, cert, cert, retry=3, userAgent='CRABSchedd')
     crabserver.setDbInstance(dbInstance)
 
+    printLog("Sleeping 60 seconds to give TW time to update taskDB")
     time.sleep(60)  # give TW time to update taskDB #8411
 
     # get task info
