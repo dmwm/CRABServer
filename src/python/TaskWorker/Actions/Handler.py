@@ -7,8 +7,6 @@ import tempfile
 import traceback
 import copy
 
-import htcondor
-
 from RESTInteractions import CRABRest
 from RucioUtils import getNativeRucioClient
 
@@ -31,6 +29,10 @@ from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetExcep
 from CRABUtils.TaskUtils import updateTaskStatus, uploadWarning
 from ServerUtilities import uploadToS3
 
+if 'useHtcV2' in os.environ:
+    import htcondor2 as htcondor
+else:
+    import htcondor
 
 class TaskHandler():
     """Handling the set of operations to be performed."""

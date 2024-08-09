@@ -7,10 +7,13 @@ import subprocess
 import socket
 from collections import namedtuple
 
-import classad
-
 from ServerUtilities import executeCommand
 from ServerUtilities import MAX_DISK_SPACE, MAX_WALLTIME, MAX_MEMORY
+
+if 'useHtcV2' in os.environ:
+    import classad2 as classad
+else:
+    import classad
 
 JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERROR')(0, 1, 2)
 

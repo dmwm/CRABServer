@@ -3,10 +3,9 @@
 from __future__ import print_function
 import re
 import pprint
-import optparse
+import optparse  # pylint: disable=deprecated-module
 
-import classad
-import htcondor
+import htcondor2 as htcondor
 
 class PoolStatus(object):
 
@@ -14,7 +13,9 @@ class PoolStatus(object):
         self.pool = pool
         self.se_to_site = {}
         self.coll = htcondor.Collector(pool)
+        self.neg = None
         self.neg_ad = None
+        self.pool_status = None
 
 
     split_re = re.compile(r",\s*")
@@ -52,7 +53,7 @@ class PoolStatus(object):
             factory_info["GlideFactoryName", entry["GLIDEIN_CMSSite"]] = entry.get("GlideFactoryMonitorStatusIdle", 0)
 
         for entry, idle in factory_info.items():
-            name, site = entry
+            name, site = entry  # pylint: disable=unused-variable
             site_info = self.pool_status.setdefault(site, {})
             cur = site_info.setdefault("IdleGlideins", 0)
             site_info["IdleGlideins"] = cur + int(idle)

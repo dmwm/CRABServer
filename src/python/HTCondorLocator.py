@@ -1,11 +1,15 @@
 """ used by TaskWorker to decide which scheduler to submit to """
+import os
 import time
 import bisect
 import random
 
-import classad
-import htcondor
-
+if 'useHtcV2' in os.environ:
+    import htcondor2 as htcondor
+    import classad2 as classad
+else:
+    import htcondor
+    import classad
 
 # From http://stackoverflow.com/questions/3679694/a-weighted-version-of-random-choice
 def weightedChoice(choices):
@@ -122,7 +126,7 @@ class HTCondorLocator():
         schedd = None
         try:
             collParam = 'COLLECTOR_HOST'
-            htcondor.param[collParam] = collector.encode('ascii', 'ignore')
+            htcondor.param[collParam] = collector
             coll = htcondor.Collector()
             # select from collector crabschedds and pull some add values
             # this call returns a list of schedd objects.
@@ -181,7 +185,7 @@ class HTCondorLocator():
         Return a tuple (schedd, address) containing an object representing the
         remote schedd and its corresponding address.
         """
-        htcondor.param['COLLECTOR_HOST'] = self.getCollector().encode('ascii', 'ignore')
+        htcondor.param['COLLECTOR_HOST'] = self.getCollector()
         coll = htcondor.Collector()
         schedds = coll.query(htcondor.AdTypes.Schedd, f"Name=?={classad.quote(schedd)}",
                              ["AddressV1", "CondorPlatform", "CondorVersion", "Machine", "MyAddress", "Name", "MyType",
