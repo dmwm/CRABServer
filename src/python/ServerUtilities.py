@@ -751,16 +751,23 @@ def downloadFromS3(crabserver=None, filepath=None, objecttype=None, taskname=Non
                                         tarballname=tarballname, logger=logger)
     downloadFromS3ViaPSU(filepath=filepath, preSignedUrl=preSignedUrl, logger=logger)
 
-def S3HeadObject(crabserver=None, objecttype=None, username=None, tarballname=None,
+def checkS3Object(crabserver=None, objecttype=None, username=None, tarballname=None,
                  logger=None):
     """
-    one call to make a 2-step operation:
-    obtains a preSignedUrl from crabserver RESTCache and use it to check if file exist
-    :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
-    :param objecttype: string : the kind of object to dowbload: clientlog|twlog|sandbox|debugfiles|runtimefiles
-    :param username: string : the username this sandbox belongs to, in case objecttype=sandbox
-    :param tarballname: string : for sandbox, taskname is not used but tarballname is needed
-    :return: nothing. Raises an exception in case of error
+    Check if file exist in S3. Raise exception if wget is exit with non-zero.
+    Note that presigned url from GetObject API could not use by HeadObject API.
+    So, use `--header="Range: bytes=0-0"` to fetch zero bytes instead.o
+
+    :param crabserver: CRABRest object, points to CRAB Server to use
+    :type crabserver: RESTInteractions.CRABRest
+    :param objecttype: the kind of object to dowbload: clientlog|twlog|sandbox|debugfiles|runtimefiles
+    :type objecttype: str
+    :param username: the username this sandbox belongs to, in case objecttype=sandbox
+    :type username: str
+    :param tarballname: for sandbox, taskname is not used but tarballname is needed
+    :type tarballname: str
+
+    :return: None, but raise exception if wget is exit with non-zero.
     """
     preSignedUrl = getDownloadUrlFromS3(crabserver=crabserver, objecttype=objecttype,
                                         username=username,

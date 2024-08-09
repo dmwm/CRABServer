@@ -17,7 +17,7 @@ import tempfile
 from ast import literal_eval
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import getLock, downloadFromS3, S3HeadObject
+from ServerUtilities import getLock, downloadFromS3, checkS3Object
 
 import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
@@ -1205,8 +1205,8 @@ class DagmanCreator(TaskAction):
             dbgFilesName = kw['task']['tm_debug_files']
             try:
                 self.logger.debug(f"Checking if sandbox file is available: {sandboxName}")
-                S3HeadObject(crabserver=self.crabserver, objecttype='sandbox',
-                             username=username, tarballname=sandboxName, logger=self.logger)
+                checkS3Object(crabserver=self.crabserver, objecttype='sandbox',
+                              username=username, tarballname=sandboxName, logger=self.logger)
                 kw['task']['tm_user_sandbox'] = sandboxTarBall
             except Exception as ex:
                 raise TaskWorkerException("The CRAB server backend could not download the input sandbox with your code " + \
