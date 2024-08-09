@@ -755,8 +755,10 @@ def checkS3Object(crabserver=None, objecttype=None, username=None, tarballname=N
                  logger=None):
     """
     Check if file exist in S3. Raise exception if wget is exit with non-zero.
+    Usually, you will see stderr with http response `404 Not Found` if file does not exists.
     Note that presigned url from GetObject API could not use by HeadObject API.
-    So, use `--header="Range: bytes=0-0"` to fetch zero bytes instead.o
+    Use `` to fetch few bytes instead.
+
 
     :param crabserver: CRABRest object, points to CRAB Server to use
     :type crabserver: RESTInteractions.CRABRest
@@ -776,8 +778,9 @@ def checkS3Object(crabserver=None, objecttype=None, username=None, tarballname=N
     if os.getenv('CRAB_useGoCurl'):
         raise NotImplementedError('HEAD with gocurl is not implemented')
 
-    downloadCommand += 'wget -Sq --header="Range: bytes=0-0"'
+    downloadCommand += 'wget -Sq -O -'
     downloadCommand += ' "%s"' % preSignedUrl
+    downloadCommand += ' | head -c1000 > /dev/null'
 
     with subprocess.Popen(downloadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True) as downloadProcess:
         logger.debug("Will execute:\n%s", downloadCommand)
