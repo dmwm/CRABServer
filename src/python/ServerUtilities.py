@@ -24,6 +24,7 @@ import datetime
 import traceback
 import subprocess
 import contextlib
+import shutil
 
 if sys.version_info >= (3, 0):
     from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
@@ -948,6 +949,7 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
     if not preSignedUrl:
         raise Exception("mandatory preSignedUrl argument missing")
 
+    tmpPath = filepath + '_tmp'
     downloadCommand = ''
 
     # CRAB_useGoCurl env. variable is used to define how download from S3 command should be executed.
@@ -955,10 +957,10 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
     # The same variable is also used inside CRABClient, we should keep name changes (if any) synchronized
     if os.getenv('CRAB_useGoCurl'):
         downloadCommand += '/cvmfs/cms.cern.ch/cmsmon/gocurl -verbose 2 -method GET'
-        downloadCommand += ' -out "%s"' % filepath
+        downloadCommand += ' -out "%s"' % tmpPath
         downloadCommand += ' -url "%s"' % preSignedUrl
     else:
-        downloadCommand += 'wget -Sq -O %s ' % filepath
+        downloadCommand += 'wget -Sq -O %s ' % tmpPath
         downloadCommand += ' "%s"' % preSignedUrl
 
     downloadProcess = subprocess.Popen(downloadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
@@ -969,6 +971,8 @@ def downloadFromS3ViaPSU(filepath=None, preSignedUrl=None, logger=None):
 
     if exitcode != 0:
         raise Exception('Download command %s failed. stderr is:\n%s' % (downloadCommand, stderr))
+    logger.debug('Move downloaded file to destination "%s"', filepath)
+    shutil.move(tmpPath, filepath)
     if not os.path.exists(filepath):
         raise Exception("Download failure with %s. File %s was not created" % (downloadCommand, filepath))
 
