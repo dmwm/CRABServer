@@ -407,6 +407,13 @@ def checkTaskInfo(crabserver, ad):
 def getSandbox(crabserver, ad, logger):
     """
     """
+    sandboxTarBall = 'sandbox.tar.gz'
+    if os.path.exists(sandboxTarBall):
+        printLog('sandbox.tar.gz already exist. Do nothing.')
+        return
+
+    # init logger require by downloadFromS3
+    logger = setupStreamLogger()
 
     task = ad['CRAB_ReqName']
     data = {'subresource': 'search', 'workflow': task}
@@ -421,7 +428,6 @@ def getSandbox(crabserver, ad, logger):
 
     username = getColumn(dictresult, 'tm_username')
     sandboxName = getColumn(dictresult, 'tm_user_sandbox')
-    sandboxTarBall = 'sandbox.tar.gz'
     try:
         downloadFromS3(crabserver=crabserver, objecttype='sandbox', username=username,
                        tarballname=sandboxName, filepath=sandboxTarBall, logger=logger)
@@ -437,7 +443,6 @@ def main():
     Need a doc string here.
     """
     setupLog()
-    logger = setupStreamLogger()
 
     if '_CONDOR_JOB_AD' not in os.environ or not os.path.exists(os.environ["_CONDOR_JOB_AD"]):
         printLog("Exiting AdjustSites since _CONDOR_JOB_AD is not in the environment or does not exist")
@@ -461,7 +466,7 @@ def main():
     # check task status
     checkTaskInfo(crabserver, ad)
     # get sandbox
-    getSandbox(crabserver, ad, logger)
+    getSandbox(crabserver, ad)
 
     # is this the first time this script runs for this task ? (it runs at each resubmit as well !)
     if not os.path.exists('WEB_DIR'):
