@@ -757,8 +757,9 @@ def checkS3Object(crabserver=None, objecttype=None, username=None, tarballname=N
     Check if file exist in S3. Raise exception if wget is exit with non-zero.
     Usually, you will see stderr with http response `404 Not Found` if file does not exists.
     Note that presigned url from GetObject API could not use by HeadObject API.
-    Use `` to fetch few bytes instead.
-
+    Use 'head -c1000' to fetch few bytes instead, and need to wrap inside bash
+    with `set -o pipefail` to make it early exit, so exit code from wget can
+    propagate back to Popen properly.
 
     :param crabserver: CRABRest object, points to CRAB Server to use
     :type crabserver: RESTInteractions.CRABRest
