@@ -442,8 +442,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
             self.logger.debug("Finally submitting to the schedd")
             if address:
                 try:
-                    import pdb;
-                    pdb.set_trace()
                     self.clusterId = self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
                 except Exception as submissionError:
                     msg = f"Something went wrong: {submissionError} \n"
@@ -544,8 +542,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         htcondor.param['DELEGATE_FULL_JOB_GSI_CREDENTIALS'] = 'true'
         htcondor.param['DELEGATE_JOB_GSI_CREDENTIALS_LIFETIME'] = '0'
         try:
-            import pdb;
-            pdb.set_trace()
             submitResult = schedd.submit(description=jobJDL, count=1, spool=True)
             clusterId = submitResult.cluster()
             numProcs = submitResult.num_procs()
