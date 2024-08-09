@@ -398,7 +398,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         os.chdir(kwargs['tempDir'])
 
         info['start_time'] = task['tm_start_time']
-        info['inputFilesString'] = ", ".join(inputFiles + ['subdag.jdl'])
+        info['inputFilesString'] = ", ".join(inputFiles + ['sandbox.tar.gz', 'subdag.jdl'])
         outputFiles = ["RunJobs.dag.dagman.out", "RunJobs.dag.rescue.001"]
         info['outputFilesString'] = ", ".join(outputFiles)
         arg = "RunJobs.dag"
@@ -442,6 +442,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
             self.logger.debug("Finally submitting to the schedd")
             if address:
                 try:
+                    import pdb;
+                    pdb.set_trace()
                     self.clusterId = self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
                 except Exception as submissionError:
                     msg = f"Something went wrong: {submissionError} \n"
@@ -542,6 +544,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
         htcondor.param['DELEGATE_FULL_JOB_GSI_CREDENTIALS'] = 'true'
         htcondor.param['DELEGATE_JOB_GSI_CREDENTIALS_LIFETIME'] = '0'
         try:
+            import pdb;
+            pdb.set_trace()
             submitResult = schedd.submit(description=jobJDL, count=1, spool=True)
             clusterId = submitResult.cluster()
             numProcs = submitResult.num_procs()
