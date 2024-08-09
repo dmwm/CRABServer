@@ -3,7 +3,7 @@
 
 dbs3-client~=4.0.12
 future~=0.18.2
-htcondor==23.9.0a3
+htcondor==23.9.6
 psutil~=5.9.1
 pycurl~=7.45.1
 pyOpenSSL~=18.0.0
