@@ -149,6 +149,7 @@ cp $_CONDOR_JOB_AD  ./_CONDOR_JOB_AD
 if [ -e AdjustSites.py ]; then
     export schedd_name=`condor_config_val schedd_name`
     echo "Execute AdjustSites.py ..."
+    # need unbffered otherwise it will got weird looking log.
     PYTHONUNBUFFERED=1 python3 AdjustSites.py
     ret=$?
     if [ $ret -eq 1 ]; then
