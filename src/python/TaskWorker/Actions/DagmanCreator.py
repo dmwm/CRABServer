@@ -1209,7 +1209,7 @@ class DagmanCreator(TaskAction):
                               username=username, tarballname=sandboxName, logger=self.logger)
                 kw['task']['tm_user_sandbox'] = sandboxTarBall
             except Exception as ex:
-                raise TaskWorkerException("The CRAB server backend could not download the input sandbox with your code " + \
+                raise TaskWorkerException("The CRAB server backend could not find the input sandbox with your code " + \
                                   "from S3.\nThis could be a temporary glitch; please try to submit a new task later " + \
                                   "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex)) from ex
             try:
