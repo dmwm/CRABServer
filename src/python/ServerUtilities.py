@@ -769,7 +769,7 @@ def S3HeadObject(crabserver=None, objecttype=None, username=None, tarballname=No
     if os.getenv('CRAB_useGoCurl'):
         raise NotImplementedError('HEAD with gocurl is not implemented')
 
-    downloadCommand += 'wget -Sq --method=HEAD'
+    downloadCommand += 'wget -Sq --header="Range: bytes=0-0"'
     downloadCommand += ' "%s"' % preSignedUrl
 
     with subprocess.Popen(downloadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True) as downloadProcess:
