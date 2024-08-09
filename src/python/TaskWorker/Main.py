@@ -9,6 +9,13 @@ import sys
 
 from WMCore.Configuration import loadConfigurationFile
 from TaskWorker.WorkerExceptions import ConfigException
+
+# NOTE: While importing the list of exceptions must be done before code starts
+# and it is safe, CRAB related code can not imported here. We need first
+# to load the TW configuration to know if to import htcondor/classad
+# or htcondor2/classad2. So it is done below after config. validation
+
+
 def validateConfig(config):
     """Verify that the input configuration contains all needed info
 
