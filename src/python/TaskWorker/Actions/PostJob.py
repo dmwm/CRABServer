@@ -2907,22 +2907,21 @@ class PostJob():
         msg += " ClassAd attributes to set are: %s" % (str(params))
         self.logger.info(msg)
 
-        limit = 5
+        limit = 5  # we retry these actions in case schedd is busy and refuses to edit the job
         counter = 0
         while counter < limit:
             try:
                 counter += 1
                 msg = "attempt %d out of %d" % (counter, limit)
                 self.logger.info("       -----> Started %s -----", msg)
-                with self.schedd.transaction(htcondor.TransactionFlags.NonDurable):
-                    for param in params:
-                        self.schedd.edit([self.dag_jobid], param, str(params[param]))
-                    self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
-                    # Once ClassAd state attributes have been updated, let HTCondor remove the job from the queue
-                    self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
-                    self.logger.info("       -----> Finished %s -----", msg)
-                    self.logger.info("====== Finished to update job ClassAd.")
-                    break
+                for param in params:
+                    self.schedd.edit([self.dag_jobid], param, str(params[param]))
+                self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
+                # Once ClassAd state attributes have been updated, let HTCondor remove the job from the queue
+                self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
+                self.logger.info("       -----> Finished %s -----", msg)
+                self.logger.info("====== Finished to update job ClassAd.")
+                break
             except Exception:
                 self.logger.exception("Exception in setting job ClassAd attributes:")
 
