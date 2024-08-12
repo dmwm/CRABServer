@@ -449,7 +449,7 @@ def main():
     # Hold and release processing and tail DAGs here so that modifications
     # to the submission and log files will be picked up.
     schedd = htcondor.Schedd()
-    tailconst = "TaskType =?= \"TAIL\" && CRAB_ReqName =?= %s" % classad.quote(ad.get("CRAB_ReqName"))
+    tailconst = "CRAB_DAGType =?= \"TAIL\" && CRAB_ReqName =?= %s" % classad.quote(ad.get("CRAB_ReqName"))
     if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
         printLog("Holding processing and tail DAGs")
         schedd.edit(tailconst, "HoldKillSig", 'SIGKILL')

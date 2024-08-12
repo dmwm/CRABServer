@@ -70,7 +70,7 @@ class DagmanResubmitter(TaskAction):
         #
         # Processing and tail DAGs will be restarted by these scrips on the
         # schedd after the modifications are made.
-        rootConst = f"TaskType =?= \"ROOT\" && CRAB_ReqName =?= {classad.quote(workflow)}"
+        rootConst = f"CRAB_DAGType =?= \"ROOT\" && CRAB_ReqName =?= {classad.quote(workflow)}"
 
         ## Calculate new parameters for resubmitted jobs. These parameters will
         ## be (re)written in the _CONDOR_JOB_AD when we do schedd.edit() below.
