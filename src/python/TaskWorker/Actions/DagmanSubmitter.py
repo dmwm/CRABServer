@@ -398,7 +398,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         os.chdir(kwargs['tempDir'])
 
         info['start_time'] = task['tm_start_time']
-        info['inputFilesString'] = ", ".join(inputFiles + ['sandbox.tar.gz', 'subdag.jdl'])
+        info['inputFilesString'] = ", ".join(inputFiles + ['subdag.jdl'])
         outputFiles = ["RunJobs.dag.dagman.out", "RunJobs.dag.rescue.001"]
         info['outputFilesString'] = ", ".join(outputFiles)
         arg = "RunJobs.dag"
