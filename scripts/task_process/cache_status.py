@@ -3,7 +3,6 @@
 VERSION OF CACHE_STATUS USING HTCONDOR JobEventLog API
 THIS REQUIRES HTCONDOR 8.9.3 OR ABOVE
 """
-from __future__ import print_function, division
 import re
 import time
 import logging
@@ -14,8 +13,14 @@ import copy
 from shutil import move
 import pickle
 import json
-import htcondor
-import classad
+
+if 'useHtcV2' in os.environ:
+    import htcondor2 as htcondor
+    import classad2 as classad
+else:
+    import htcondor
+    import classad
+
 
 logging.basicConfig(filename='task_process/cache_status.log', level=logging.DEBUG)
 
@@ -68,8 +73,8 @@ def insertCpu(event, info):
             info['TotalUserCpuTimeHistory'][-1] = float(event['RemoteUserCpu'])
 
 
-nodeNameRe = re.compile("DAG Node: Job(\d+(?:-\d+)?)")
-nodeName2Re = re.compile("Job(\d+(?:-\d+)?)")
+nodeNameRe = re.compile(r"DAG Node: Job(\d+(?:-\d+)?)")
+nodeName2Re = re.compile(r"Job(\d+(?:-\d+)?)")
 
 # this now takes as input an htcondor.JobEventLog object
 # which as of HTCondor 8.9 can be saved/restored with memory of
@@ -307,19 +312,18 @@ def storeNodesInfoInFile():
     if os.path.exists(STATUS_CACHE_FILE) and os.stat(STATUS_CACHE_FILE).st_size > 0:
         logging.debug("cache file found, opening")
         try:
-            nodesStorage = open(STATUS_CACHE_FILE, "r")
-            jobLogCheckpoint = nodesStorage.readline().strip()
-            if jobLogCheckpoint.startswith('#') :
-                logging.debug("cache file contains initial comments, skipping")
-                # comment line indicates a place-holder file created at DAG bootstrap time
-                jobLogCheckpoint = None
-            else:
-                logging.debug("reading cache file")
-                fjrParseResCheckpoint = int(nodesStorage.readline())
-                nodes = ast.literal_eval(nodesStorage.readline())
-                nodeMap = ast.literal_eval(nodesStorage.readline())
-                nodesStorage.close()
-        except Exception:
+            with open(STATUS_CACHE_FILE, "r", encoding='utf-8') as nodesStorage:
+                jobLogCheckpoint = nodesStorage.readline().strip()
+                if jobLogCheckpoint.startswith('#') :
+                    logging.debug("cache file contains initial comments, skipping")
+                    # comment line indicates a place-holder file created at DAG bootstrap time
+                    jobLogCheckpoint = None
+                else:
+                    logging.debug("reading cache file")
+                    fjrParseResCheckpoint = int(nodesStorage.readline())
+                    nodes = ast.literal_eval(nodesStorage.readline())
+                    nodeMap = ast.literal_eval(nodesStorage.readline())
+        except Exception:  # pylint: disable=broad-except
             logging.exception("error during status_cache handling")
             jobLogCheckpoint = None
 
@@ -350,7 +354,7 @@ def storeNodesInfoInFile():
 
     for fn in glob.glob("node_state*"):
         level = re.match(r'(\w+)(?:.(\w+))?', fn).group(2)
-        with open(fn, 'r') as nodeState:
+        with open(fn, 'r', encoding='utf-8') as nodeState:
             parseNodeStateV2(nodeState, nodes, level)
 
     try:
@@ -364,12 +368,11 @@ def storeNodesInfoInFile():
     # don't get an incomplete result. Then replace the old one with the new one.
     tempFilename = (STATUS_CACHE_FILE + ".%s") % os.getpid()
 
-    nodesStorage = open(tempFilename, "w")
-    nodesStorage.write(str(newJobLogCheckpoint) + "\n")
-    nodesStorage.write(str(newFjrParseResCheckpoint) + "\n")
-    nodesStorage.write(str(nodes) + "\n")
-    nodesStorage.write(str(nodeMap) + "\n")
-    nodesStorage.close()
+    with open(tempFilename, "w", encoding='utf-8') as nodesStorage:
+        nodesStorage.write(str(newJobLogCheckpoint) + "\n")
+        nodesStorage.write(str(newFjrParseResCheckpoint) + "\n")
+        nodesStorage.write(str(nodes) + "\n")
+        nodesStorage.write(str(nodeMap) + "\n")
 
     move(tempFilename, STATUS_CACHE_FILE)
 
@@ -397,7 +400,7 @@ def readOldStatusCacheFile():
             fjrParseResCheckpoint = getattr(cacheDoc, 'fjrParseResCheckpoint', None)
             nodes = getattr(cacheDoc, 'nodes', None)
             nodeMap = getattr(cacheDoc, 'nodeMap', None)
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             logging.exception("error during status_cache handling")
             jobLogCheckpoint = None
 
@@ -446,7 +449,7 @@ def parseCondorLog(cacheDoc):
 
     for fn in glob.glob("node_state*"):
         level = re.match(r'(\w+)(?:.(\w+))?', fn).group(2)
-        with open(fn, 'r') as nodeState:
+        with open(fn, 'r', encoding='utf-8') as nodeState:
             parseNodeStateV2(nodeState, nodes, level)
 
     try:
@@ -491,12 +494,11 @@ def storeNodesInfoInTxtFile(cacheDoc):
     # don't get an incomplete result. Then replace the old one with the new one.
     tempFilename = (STATUS_CACHE_FILE + ".%s") % os.getpid()
 
-    nodesStorage = open(tempFilename, "w")
-    nodesStorage.write(str(jobLogCheckpoint) + "\n")
-    nodesStorage.write(str(fjrParseResCheckpoint) + "\n")
-    nodesStorage.write(str(nodes) + "\n")
-    nodesStorage.write(str(nodeMap) + "\n")
-    nodesStorage.close()
+    with open(tempFilename, "w", encoding='utf-8') as nodesStorage:
+        nodesStorage.write(str(jobLogCheckpoint) + "\n")
+        nodesStorage.write(str(fjrParseResCheckpoint) + "\n")
+        nodesStorage.write(str(nodes) + "\n")
+        nodesStorage.write(str(nodeMap) + "\n")
 
 def summarizeFjrParseResults(checkpoint):
     '''
@@ -520,7 +522,7 @@ def summarizeFjrParseResults(checkpoint):
     '''
 
     if os.path.exists(FJR_PARSE_RES_FILE):
-        with open(FJR_PARSE_RES_FILE, "r") as f:
+        with open(FJR_PARSE_RES_FILE, "r", encoding='utf-8') as f:
             f.seek(checkpoint)
             content = f.readlines()
             newCheckpoint = f.tell()
@@ -530,8 +532,7 @@ def summarizeFjrParseResults(checkpoint):
             for jobId,msg in fjrResult.items():
                 errDict[jobId] = msg
         return errDict, newCheckpoint
-    else:
-        return None, 0
+    return None, 0
 
 def main():
     """
@@ -550,7 +551,7 @@ def main():
         storeNodesInfoInPklFile(cacheDoc)
         # in case we still need the text file (e.g. for the UI) when we remove the old code:
         # storeNodesInfoInTxtFile(cacheDoc)
-    except Exception:
+    except Exception:  # pylint: disable=broad-except
         logging.exception("error during main loop")
 
 main()

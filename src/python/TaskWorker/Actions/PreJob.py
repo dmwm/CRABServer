@@ -1,18 +1,29 @@
-from __future__ import print_function
+"""
+PRE script for DAGMAN nodes
+"""
+# tell pylint to not complain on "old times" naming and uses
+# pylint: disable=broad-except
+# pylint: disable=invalid-name
+# pylint: disable=consider-using-f-string
 import os
 import sys
 import time
 import json
 import errno
-import classad
 import logging
-import htcondor
 from ast import literal_eval
 
 from ServerUtilities import getWebdirForDb, insertJobIdSid
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
 import CMSGroupMapper
+
+if 'useHtcV2' in os.environ:
+    import htcondor2 as htcondor
+    import classad2 as classad
+else:
+    import htcondor
+    import classad
 
 class PreJob:
     """
