@@ -541,8 +541,8 @@ class DagmanCreator(TaskAction):
             info['additional_environment_options'] += ' CRAB_TASKMANAGER_TARBALL=local'
         else:
             raise TaskWorkerException("Cannot find TaskManagerRun.tar.gz inside the cwd: %s" % os.getcwd())
-        if os.path.exists("sandbox.tar.gz"):
-            info['additional_input_file'] += ", sandbox.tar.gz"
+
+        info['additional_input_file'] += ", sandbox.tar.gz" # will be available at dag bootstrap time
         info['additional_input_file'] += ", run_and_lumis.tar.gz"
         info['additional_input_file'] += ", input_files.tar.gz"
         info['additional_input_file'] += ", submit_env.sh"
