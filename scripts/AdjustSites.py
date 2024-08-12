@@ -320,28 +320,13 @@ def saveProxiedWebdir(crabserver, ad):
     webDir_adName = 'CRAB_WebDirURL'
     ad[webDir_adName] = ad['CRAB_localWebDirURL']
     proxied_webDir = getProxiedWebDir(crabserver=crabserver, task=task, logFunction=printLog)
-    if proxied_webDir: # Prefer the proxied webDir to the non-proxied one
-        ad[webDir_adName] = str(proxied_webDir)
-
-    if webDir_adName in ad:
-        # This condor_edit is required because in the REST interface we look for the webdir if the DB upload failed (or in general if we use the "old logic")
-        # See https://github.com/dmwm/CRABServer/blob/3.3.1507.rc8/src/python/CRABInterface/HTCondorDataWorkflow.py#L398
-        dagJobId = '%d.%d' % (ad['ClusterId'], ad['ProcId'])
-        try:
-            htcondor.Schedd().edit([dagJobId], webDir_adName, '{0}'.format(ad.lookup(webDir_adName)))
-        except RuntimeError as reerror:
-            printLog(str(reerror))
-
-        # We need to use a file to communicate this to the prejob. I tried to read the corresponding ClassAd from the preJob like:
-        # htcondor.Schedd().xquery(requirements="ClusterId == %d && ProcId == %d" % (self.task_ad['ClusterId'], self.task_ad['ProcId']), projection=[webDir_adName]).next().get(webDir_adName)
-        # but it is too heavy of an operation with HTCondor v8.8.3
+    if proxied_webDir:
+        # Use a file to communicate webDir to the prejob
         with open("webdir", "w", encoding='utf-8') as fd:
-            fd.write(ad[webDir_adName])
+            fd.write(proxied_webDir)
     else:
         printLog("Cannot get proxied webdir from the server. Maybe the schedd does not have one in the REST configuration?")
-        return 1
 
-    return 0
 
 def clearAutomaticBlacklist():
     """
