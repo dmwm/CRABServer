@@ -70,9 +70,9 @@ class DagmanKiller(TaskAction):
 
         """ submit the proper commands to condor """
 
-        # We need to keep ROOT, PROCESSING, and TAIL DAGs in hold until periodic remove kicks in.
+        # We need to keep BASE, PROCESSING, and TAIL DAGs in hold until periodic remove kicks in.
         # This is needed in case user wants to resubmit.
-        rootConst = f'stringListMember(CRAB_DAGType, "ROOT PROCESSING TAIL", " ") && CRAB_ReqName =?= {classad.quote(self.workflow)}'
+        rootConst = f'stringListMember(CRAB_DAGType, "BASE PROCESSING TAIL", " ") && CRAB_ReqName =?= {classad.quote(self.workflow)}'
 
         # Holding DAG job does not mean that it will remove all jobs
         # and this must be done separately
