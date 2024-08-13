@@ -23,6 +23,8 @@ from TaskWorker.Worker import Worker, setProcessLogger
 from TaskWorker.WorkerExceptions import ConfigException
 from TaskWorker.Actions.Recurring.BaseRecurringAction import handleRecurring
 from TaskWorker.Actions.Handler import handleResubmit, handleNewTask, handleKill
+from CRABUtils.TaskUtils import getTasks, updateTaskStatus
+import random
 
 ## NOW placing this here, then to be verified if going into Action.Handler, or TSM
 ## The meaning of the elements in the 3-tuples are as follows:
@@ -245,6 +247,91 @@ class MasterWorker(object):
         return getattr(mod, actionName)(self.config.TaskWorker.logsDir)
 
 
+    def _externalScheduling(self, limit):
+        """
+        External scheduling method using round-robin algorithm to get tasks
+        in waiting status and consider resource utilization for fair share.
+        """
+        self.logger.info("Starting external scheduling with round-robin algorithm.")
+
+        try:
+            # Retrieve tasks with 'WAITING' status
+            waiting_tasks = getTasks(crabserver=self.crabserver, status='WAITING', logger=self.logger, limit=limit)
+
+            if not waiting_tasks:
+                self.logger.info("No tasks in 'WAITING' status found.")
+                return []
+
+            # Organize tasks by user
+            tasks_by_user = {}
+            for task in waiting_tasks:
+                user = task['user']
+                if user not in tasks_by_user:
+                    tasks_by_user[user] = []
+                tasks_by_user[user].append(task)
+
+            # Perform round-robin selection among users
+            users = list(tasks_by_user.keys())
+            random.shuffle(users)  # To ensure fair round-robin each time
+            selected_tasks = []
+
+            for user in users:
+                user_tasks = tasks_by_user[user]
+                selected_tasks.extend(user_tasks[:limit // len(users)])
+
+            return selected_tasks
+
+        except Exception as e:
+            self.logger.exception("Exception occurred during external scheduling: %s", str(e))
+            return []
+
+    def _pruneTaskQueue(self):
+        self.logger.info("Pruning the queue if required...logic tbd")
+
+    def _reportQueueStatus(self):
+        self.logger.info("Report Queue status... logic tbd")
+
+
+    def _selectWork(self, limit):
+        """Presently this always returns true, because we do not want the worker to die if
+           the server endpoint is not available.
+           Prints a log entry if answer is greater than 400:
+            * the server call succeeded or
+            * the server could not find anything to update or
+            * the server has an internal error"""
+        self.logger.info("Starting work selection process.")
+
+        # Call the external scheduling method
+        selected_tasks = self._externalScheduling(limit)
+
+        if not selected_tasks:
+            return False
+
+        try:
+            # Update the status of each selected task to 'NEW'
+            for task in selected_tasks:
+                task_name = task['taskName']
+                updateTaskStatus(crabserver=self.crabserver, taskName=task_name, status='NEW', logger=self.logger)
+                self.logger.info(f"Task {task_name} status updated to 'NEW'.")
+
+            # Prune the task queue if necessary
+            self._pruneTaskQueue()
+
+            # Report queue status
+            self._reportQueueStatus()
+
+        except HTTPException as hte:
+            msg = "HTTP Error during _lockWork: %s\n" % str(hte)
+            msg += "HTTP Headers are %s: " % hte.headers
+            self.logger.error(msg)
+            return False
+
+        except Exception: #pylint: disable=broad-except
+            self.logger.exception("Server could not process the _lockWork request (prameters are %s)", configreq)
+            return False
+
+        return True
+
     def _lockWork(self, limit, getstatus, setstatus):
         """Today this is always returning true, because we do not want the worker to die if
            the server endpoint is not avaialable.
@@ -400,6 +487,8 @@ class MasterWorker(object):
         self.restartQueuedTasks()
         self.logger.debug("Master Worker Starting Main Cycle.")
         while not self.STOP:
+            selection_limit = 10 #TBD what should be the value
+            self._selectWork(limit=selection_limit)
             limit = self.slaves.queueableTasks()
             if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
                 time.sleep(self.config.TaskWorker.polling)
