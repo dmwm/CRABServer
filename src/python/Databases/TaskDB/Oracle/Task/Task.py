@@ -48,7 +48,7 @@ class Task(object):
               tm_split_algo, tm_split_args, tm_totalunits, tm_user_sandbox, tm_debug_files, tm_cache_url, tm_username, tm_user_dn, \
               tm_user_vo, tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, tm_publish_dbs_url, \
               tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, tm_job_type, tm_generator, tm_arguments, \
-              tm_save_logs, tm_user_infiles, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority, \
+              tm_save_logs, tw_name, tm_user_infiles, tm_maxjobruntime, tm_numcores, tm_maxmemory, tm_priority, \
               tm_scriptexe, tm_scriptargs, tm_extrajdl, tm_events_per_lumi, tm_collector, tm_schedd, tm_dry_run, \
               tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode, tm_submitter_ip_addr, tm_ignore_global_blacklist, \
               tm_user_config) \
@@ -57,7 +57,7 @@ class Task(object):
               :split_algo, :split_args, :total_units, :user_sandbox, :debug_files, :cache_url, :username, :user_dn, \
               :user_vo, :user_role, :user_group, :publish_name, :asyncdest, :dbs_url, :publish_dbs_url, \
               :publication, :outfiles, :tfile_outfiles, :edm_outfiles, :job_type, :generator, :arguments, \
-              :save_logs, :user_infiles, :maxjobruntime, :numcores, :maxmemory, :priority, \
+              :save_logs, 'any', :user_infiles, :maxjobruntime, :numcores, :maxmemory, :priority, \
               :scriptexe, :scriptargs, :extrajdl, :events_per_lumi, :collector, :schedd_name, :dry_run, \
               :user_files, :transfer_outputs, :output_lfn, :ignore_locality, :fail_limit, :one_event_mode, :submitter_ip_addr, :ignore_global_blacklist, \
               :user_config)"
