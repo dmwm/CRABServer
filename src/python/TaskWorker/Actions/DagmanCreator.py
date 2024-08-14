@@ -17,7 +17,7 @@ import tempfile
 from ast import literal_eval
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import getLock, downloadFromS3, checkS3Object
+from ServerUtilities import getLock, downloadFromS3, checkS3Object, uploadToS3
 
 import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
@@ -726,6 +726,12 @@ class DagmanCreator(TaskAction):
                 tf.add(ifname)
         finally:
             tf.close()
+
+        # also upload InputFiles.tar.gz to s3
+        task = kw['task']['tm_taskname']
+        uploadToS3(crabserver=self.crabserver, filepath='InputFiles.tar.gz',
+                   objecttype='runtimefiles', taskname=task,
+                   logger=self.logger)
 
     def createSubdag(self, splitterResult, **kwargs):
 
