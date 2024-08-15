@@ -1,0 +1,3 @@
+teams:
+  all: @cms-sw/externals-l2
+  hlt: @fwyzard

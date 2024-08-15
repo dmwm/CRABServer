@@ -5,6 +5,8 @@ default:
 
 variables:
   IMAGE_TAG: "${CI_COMMIT_REF_SLUG}"  # to distinct it from commit tag and final image tag
+  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_BUILDKIT: 1
 
 .default_rules:
   default:
@@ -64,22 +66,24 @@ build_rest_image:
     - !reference [.default_rules, release]
   stage: build_docker
   image:
-    name: gcr.io/kaniko-project/executor:v1.14.0-debug
-    entrypoint: [""]
+    name: docker:27.1.1
+  services:
+    - name: docker:27.1.1-dind
+  before_script:
+    - docker info
   script:
-    - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" > /kaniko/.docker/config.json
-    - cat /kaniko/.docker/config.json
-    - /kaniko/executor
-      --context "${CI_PROJECT_DIR}"
-      --dockerfile "${CI_PROJECT_DIR}/cicd/crabserver_pypi/Dockerfile"
-      --destination "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}"
+    - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" 
+    - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
+    - docker context create mycontext
+    - docker buildx create mycontext --use --name mybuilder --use --bootstrap
+    - docker buildx build --push -f "${CI_PROJECT_DIR}/cicd/crabserver_pypi/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabserver:pypi-test12-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabserver:pypi-test12-cache" -t "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}" . 
   cache:
     - key: $CI_PIPELINE_ID
       paths:
         - src/python/CRABInterface/__init__.py
       policy: pull
 
-build_tw_image:
+build_image:
   rules:
     - if: $SUBMIT_STATUS_TRACKING
       when: never
@@ -87,44 +91,45 @@ build_tw_image:
     - !reference [.default_rules, release]
   stage: build_docker
   image:
-    name: gcr.io/kaniko-project/executor:v1.14.0-debug
-    entrypoint: [""]
+    name: docker:27.1.1
+  services:
+    - name: docker:27.1.1-dind
   script:
-    - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" > /kaniko/.docker/config.json
-    - cat /kaniko/.docker/config.json
-    - /kaniko/executor
-      --context "${CI_PROJECT_DIR}"
-      --dockerfile "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile"
-      --destination "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}"
+    - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
+    - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
+    # Required to be able to cache to the registry
+    - docker context create mycontext
+    - docker buildx create mycontext --use --name mybuilder --use --bootstrap
+    - docker buildx build --build-arg="BASE_TAG=${IMAGE_TAG}" --push -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabtaskworker:pypi-test12-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabtaskworker:pypi-test12-cache" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}" .
   cache:
     - key: $CI_PIPELINE_ID
       paths:
         - src/python/TaskWorker/__init__.py
       policy: pull
 
-build_monit_image:
-  rules:
-    - if: $SUBMIT_STATUS_TRACKING
-      when: never
-    - !reference [.default_rules, release]
-  stage: build_docker
-  needs: ["build_tw_image"]
-  image:
-    name: gcr.io/kaniko-project/executor:v1.14.0-debug
-    entrypoint: [""]
-  script:
-    - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" > /kaniko/.docker/config.json
-    - cat /kaniko/.docker/config.json
-    - /kaniko/executor
-      --context "${CI_PROJECT_DIR}"
-      --dockerfile "${CI_PROJECT_DIR}/cicd/monit_pypi/Dockerfile"
-      --destination "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.monit"
-      --build-arg "BASE_TAG=${IMAGE_TAG}"
-  cache:
-    - key: $CI_PIPELINE_ID
-      paths:
-        - src/python/TaskWorker/__init__.py
-      policy: pull
+# build_monit_image:
+#   rules:
+#     - if: $SUBMIT_STATUS_TRACKING
+#       when: never
+#     - !reference [.default_rules, release]
+#   stage: build_docker
+#   needs: ["build_tw_image"]
+#   image:
+#     name: gcr.io/kaniko-project/executor:v1.14.0-debug
+#     entrypoint: [""]
+#   script:
+#     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" > /kaniko/.docker/config.json
+#     - cat /kaniko/.docker/config.json
+#     - /kaniko/executor
+#       --context "${CI_PROJECT_DIR}"
+#       --dockerfile "${CI_PROJECT_DIR}/cicd/monit_pypi/Dockerfile"
+#       --destination "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.monit"
+#       --build-arg "BASE_TAG=${IMAGE_TAG}"
+#   cache:
+#     - key: $CI_PIPELINE_ID
+#       paths:
+#         - src/python/TaskWorker/__init__.py
+#       policy: pull
 
 build_crabtwfilebeat_image:
   rules:
@@ -133,16 +138,14 @@ build_crabtwfilebeat_image:
     - !reference [.default_rules, release]
   stage: build_docker
   image:
-    name: gcr.io/kaniko-project/executor:v1.14.0-debug
-    entrypoint: [""]
+    name: docker:27.1.1
+  services:
+    - name: docker:27.1.1-dind
   script:
-    - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" > /kaniko/.docker/config.json
-    - cat /kaniko/.docker/config.json
-    - /kaniko/executor
-      --context "${CI_PROJECT_DIR}"
-      --dockerfile "${CI_PROJECT_DIR}/cicd/filebeat/Dockerfile"
-      --destination "registry.cern.ch/cmscrab/crabtwfilebeat:${IMAGE_TAG}"
-      --build-arg "BASE_TAG=${IMAGE_TAG}"
+    - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" 
+    - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
+    - docker build --build-arg "BASE_TAG=${IMAGE_TAG}" -f "${CI_PROJECT_DIR}/cicd/filebeat/Dockerfile" -t "registry.cern.ch/cmscrab/crabtwfilebeat:${IMAGE_TAG}" .
+    - docker push "registry.cern.ch/cmscrab/crabtwfilebeat:${IMAGE_TAG}"
   cache:
     - key: $CI_PIPELINE_ID
       paths:
@@ -295,17 +298,3 @@ tag_monit_latest:
   script:
     - crane auth login -u ${CMSCRAB_REGISTRY_USER} -p ${CMSCRAB_REGISTRY_PASSWORD} ${CMSCRAB_REGISTRY_URL}
     - crane cp registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.monit registry.cern.ch/cmscrab/crabtaskworker:v3.latest.monit
-
-tag_filebeat_latest:
-  rules:
-    - !reference [.default_rules, release]
-  stage: tagging_release
-  image:
-    name: registry.cern.ch/cmscrab/buildtools
-    entrypoint: [""]
-  variables:
-    GIT_STRATEGY: none
-  script:
-    - crane auth login -u ${CMSCRAB_REGISTRY_USER} -p ${CMSCRAB_REGISTRY_PASSWORD} ${CMSCRAB_REGISTRY_URL}
-    - crane cp registry.cern.ch/cmscrab/crabtwfilebeat:${IMAGE_TAG} registry.cern.ch/cmscrab/crabtwfilebeat:v3.latest
-
