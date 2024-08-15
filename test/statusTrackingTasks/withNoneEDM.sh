@@ -5,4 +5,4 @@ set -x
 
 dd if=/dev/urandom of=miniaodfake.root bs=1M count=10
 
-cmsRun -j FrameworkJobReport.xml -p PSet.py
+cmsRun -j FrameworkJobReport.xml PSet.py
