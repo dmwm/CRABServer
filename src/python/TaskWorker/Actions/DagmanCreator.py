@@ -728,6 +728,10 @@ class DagmanCreator(TaskAction):
             tf.close()
 
         # also upload InputFiles.tar.gz to s3
+        # Wa: Now (2024) I am still not sure if we need to poll uploaded file
+        # until it available (see #6706). If this still the case, use
+        # implementation from the old DryRunUploader action.
+        # https://github.com/dmwm/CRABServer/blob/9b4679d14bb19ccc7373d56c20631eea34d80a69/src/python/TaskWorker/Actions/DryRunUploader.py#L61-L75
         task = kw['task']['tm_taskname']
         uploadToS3(crabserver=self.crabserver, filepath='InputFiles.tar.gz',
                    objecttype='runtimefiles', taskname=task,
