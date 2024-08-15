@@ -18,7 +18,7 @@ from TaskWorker.Actions.DagmanKiller import DagmanKiller
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
 from TaskWorker.Actions.StageoutCheck import StageoutCheck
-from TaskWorker.Actions.DryRunUploader import DryRunUploader
+from TaskWorker.Actions.DryRun import DryRun
 from TaskWorker.Actions.MakeFakeFileSet import MakeFakeFileSet
 from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
 from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
