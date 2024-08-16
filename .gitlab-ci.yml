@@ -74,9 +74,10 @@ build_rest_image:
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" 
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
+    - source .env
     - docker context create mycontext
     - docker buildx create mycontext --use --name mybuilder --bootstrap
-    - docker buildx build --push -f "${CI_PROJECT_DIR}/cicd/crabserver_pypi/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabserver:pypi-test12-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabserver:pypi-test12-cache" -t "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}" . 
+    - docker buildx build --push -f "${CI_PROJECT_DIR}/cicd/crabserver_pypi/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabserver:pypi-${REST_Instance}-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabserver:pypi-${REST_Instance}-cache" -t "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}" . 
   cache:
     - key: $CI_PIPELINE_ID
       paths:
@@ -97,10 +98,11 @@ build_image:
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
+    - source .env
     # Required to be able to cache to the registry
     - docker context create mycontext
     - docker buildx create mycontext --use --name mybuilder --bootstrap
-    - docker buildx build --push -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabtaskworker:pypi-test12-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabtaskworker:pypi-test12-cache" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}" .
+    - docker buildx build --push -f "${CI_PROJECT_DIR}/cicd/crabtaskworker_pypi/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabtaskworker:pypi-${REST_Instance}-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabtaskworker:pypi-${REST_Instance}-cache" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}" .
   cache:
     - key: $CI_PIPELINE_ID
       paths:
@@ -121,9 +123,10 @@ build_monit_image:
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}"
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
+    - source .env
     - docker context create mycontext
     - docker buildx create mycontext --use --name mybuilder --bootstrap
-    - docker buildx build --push --build-arg="BASE_TAG=${IMAGE_TAG}" -f "${CI_PROJECT_DIR}/cicd/monit_pypi/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabtaskworker:pypi-test12-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabtaskworker:pypi-test12-cache" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.monit" .
+    - docker buildx build --push --build-arg="BASE_TAG=${IMAGE_TAG}" -f "${CI_PROJECT_DIR}/cicd/monit_pypi/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabtaskworker:pypi-${REST_Instance}-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabtaskworker:pypi-${REST_Instance}-cache" -t "registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.monit" .
   cache:
     - key: $CI_PIPELINE_ID
       paths:
@@ -143,9 +146,10 @@ build_crabtwfilebeat_image:
   script:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" 
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
+    - source .env
     - docker context create mycontext
     - docker buildx create mycontext --use --name mybuilder --bootstrap
-    - docker buildx build --push --build-arg="BASE_TAG=${IMAGE_TAG}" -f "${CI_PROJECT_DIR}/cicd/filebeat/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabtwfilebeat:pypi-test12-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabtwfilebeat:pypi-test12-cache" -t "registry.cern.ch/cmscrab/crabtwfilebeat:${IMAGE_TAG}" .
+    - docker buildx build --push --build-arg="BASE_TAG=${IMAGE_TAG}" -f "${CI_PROJECT_DIR}/cicd/filebeat/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabtwfilebeat:pypi-${REST_Instance}-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabtwfilebeat:pypi-${REST_Instance}-cache" -t "registry.cern.ch/cmscrab/crabtwfilebeat:${IMAGE_TAG}" .
   cache:
     - key: $CI_PIPELINE_ID
       paths:
