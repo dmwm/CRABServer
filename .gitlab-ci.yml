@@ -75,7 +75,7 @@ build_rest_image:
     - echo "{\"auths\":{\"$CMSCRAB_REGISTRY_URL\":{\"auth\":\"$(echo -n $CMSCRAB_REGISTRY_USER:$CMSCRAB_REGISTRY_PASSWORD | base64)\"}}}" 
     - docker login -u $CMSCRAB_REGISTRY_USER -p $CMSCRAB_REGISTRY_PASSWORD $CMSCRAB_REGISTRY_URL
     - docker context create mycontext
-    - docker buildx create mycontext --use --name mybuilder --use --bootstrap
+    - docker buildx create mycontext --use --name mybuilder --bootstrap
     - docker buildx build --push -f "${CI_PROJECT_DIR}/cicd/crabserver_pypi/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabserver:pypi-test12-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabserver:pypi-test12-cache" -t "registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}" . 
   cache:
     - key: $CI_PIPELINE_ID
