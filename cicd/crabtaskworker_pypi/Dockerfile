@@ -75,7 +75,7 @@ RUN pip install -r requirements.txt \
     && pip cache purge
 
 # copy htcondor config
-RUN install -d -o ${USER} -g ${USER} mkdir /etc/condor
+RUN mkdir /etc/condor
 COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/condor_config /etc/condor/
 
 # install crabserver
