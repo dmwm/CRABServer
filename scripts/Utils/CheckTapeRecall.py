@@ -103,7 +103,11 @@ def main():
 
     # combine all pending rules in a single dataframe
     pending = pd.concat([stuck, replicating, suspended]).reset_index(drop=True)
-    pendingCompact = createRulesDataframe(pending, rucio, crab, logger)
+
+    if not pending.empty:
+        pendingCompact = createRulesDataframe(pending, rucio, crab, logger)
+    else:
+        pendingCompact = pd.DataFrame()
 
     # prepare an HTML table
     if pendingCompact.empty:
