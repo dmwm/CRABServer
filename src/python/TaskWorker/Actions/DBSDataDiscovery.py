@@ -197,16 +197,18 @@ class DBSDataDiscovery(DataDiscovery):
         isUserDataset = isDatasetUserDataset(inputDataset, self.dbsInstance)
 
         self.checkDatasetStatus(inputDataset, kwargs)
+        self.logger.info("Input Dataset: %s", inputDataset)
         if secondaryDataset:
             self.checkDatasetStatus(secondaryDataset, kwargs)
+            self.logger.info("Secondary Dataset: %s", secondaryDataset)
 
         try:
             # Get the list of blocks for the locations.
             blocks = self.dbs.listFileBlocks(inputDataset)
-            self.logger.debug("Datablock from DBS: %s ", blocks)
+            #self.logger.debug("Datablock from DBS: %s ", blocks)
             if inputBlocks:
                 blocks = [x for x in blocks if x in inputBlocks]
-                self.logger.debug("Matched inputBlocks: %s ", blocks)
+                #self.logger.debug("Matched inputBlocks: %s ", blocks)
             secondaryBlocks = []
             if secondaryDataset:
                 secondaryBlocks = self.dbs.listFileBlocks(secondaryDataset)
