@@ -1,5 +1,4 @@
-# pylint: disable=W0703
-from __future__ import print_function
+# pylint: disable=broad-except
 import os
 import sys
 import time
@@ -230,7 +229,7 @@ class CRAB3CreateJson:
         twStatus = self.getCountTasksByStatus()
 
         statesFilter = ['SUBMITTED', 'FAILED', 'QUEUED', 'NEW', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED',
-                         'SUBMITFAILED', 'TAPERECALL']
+                         'SUBMITFAILED', 'SUBMITREFUSED', 'TAPERECALL']
         if len(twStatus) > 0:
             for state in twStatus.keys():
                 if state in statesFilter:
@@ -240,7 +239,7 @@ class CRAB3CreateJson:
         twStatus = self.getCountTasksByStatusAbs()
 
         statesFilter = ['KILL', 'RESUBMIT', 'NEW', 'QUEUED', 'KILLFAILED', 'RESUBMITFAILED', 'SUBMITFAILED',
-                         'UPLOADED', 'TAPERECALL']
+                         'SUBMITREFUSED', 'UPLOADED', 'TAPERECALL']
         if len(twStatus) > 0:
             for state in statesFilter:
                 self.jsonDoc['abs_task_states'].update({str(state): 0})
@@ -292,11 +291,11 @@ class CRAB3CreateJson:
                     continue
                 schedd = htcondor.Schedd(scheddAdd)
                 try:
-                    idleDags = list(schedd.xquery(pickSchedulerIdle))
+                    idleDags = schedd.query(pickSchedulerIdle)
                 except Exception:
                     idleDags = []
                 try:
-                    runningTPs = list(schedd.xquery(pickLocalRunning))
+                    runningTPs = schedd.query(pickLocalRunning)
                 except Exception:
                     runningTPs = []
                 numDagIdle = len(idleDags)

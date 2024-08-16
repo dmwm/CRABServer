@@ -100,7 +100,9 @@ class DagmanResubmitter(TaskAction):
                 # files are in the directory resubmit_info in the schedd).
                 for adparam, taskparam in params.items():
                     if taskparam in ad:
-                        schedd.edit(rootConst, adparam, ad.lookup(taskparam))
+                        # repr() in the line below is a workaround for V2 bindings bug
+                        # https://github.com/dmwm/CRABServer/issues/8604#issuecomment-2284346056
+                        schedd.edit(rootConst, adparam, repr(ad.lookup(taskparam)))
                     elif task['resubmit_' + taskparam] is not None:
                         schedd.edit(rootConst, adparam, str(task['resubmit_' + taskparam]))
                 schedd.act(htcondor.JobAction.Hold, rootConst)
