@@ -141,7 +141,7 @@ COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/Publisher/start.sh \
      ${WDIR}/srv/Publisher/
 
 ## entrypoint
-COPY chown -R ${USER}:${USER} cicd/crabtaskworker_pypi/run.sh /data/
+COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/run.sh /data/
 
 # for debuggin purpose
 RUN echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3
