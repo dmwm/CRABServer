@@ -25,10 +25,10 @@ while read task ; do
 
   retVal=$?
   if [ $retVal -eq 0 ]; then
-        echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/artifacts/successful_tests
+        echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/successful_tests
   elif [ $retVal -eq 2 ]; then
-        echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/artifacts/retry_tests
+        echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/retry_tests
   else
-        echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/artifacts/failed_tests
+        echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/failed_tests
   fi
-done <${WORK_DIR}/artifacts/submitted_tasks
+done <${WORK_DIR}/submitted_tasks_CCV
