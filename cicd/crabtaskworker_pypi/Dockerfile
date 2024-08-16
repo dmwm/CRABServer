@@ -110,8 +110,7 @@ RUN install -d -o ${USER} -g ${USER} ${WDIR}/srv/TaskManager/current \
     && install -d -o ${USER} -g ${USER} ${WDIR}/srv/TaskManager/cfg \
     && install -d -o ${USER} -g ${USER} ${WDIR}/srv/TaskManager/logs \
     # Change ownership to the running user
-    && chown -R ${USER}:${USER} ${WDIR}/srv \
-    && chown -R ${USER}:${USER} ${WDIR}/srv/TaskManager
+    && chown -R ${USER}:${USER} ${WDIR}/srv 
 
 # Create directories for Publisher
 RUN install -d -o ${USER} -g ${USER} ${WDIR}/srv/Publisher/current \
@@ -119,8 +118,7 @@ RUN install -d -o ${USER} -g ${USER} ${WDIR}/srv/Publisher/current \
     && install -d -o ${USER} -g ${USER} ${WDIR}/srv/Publisher/logs \
     && install -d -o ${USER} -g ${USER} ${WDIR}/srv/Publisher/PublisherFiles \
     # Change ownership of parent and current directories to the running user
-    && chown -R ${USER}:${USER} ${WDIR}/srv \
-    && chown -R ${USER}:${USER} ${WDIR}/srv/Publisher
+    && chown -R ${USER}:${USER} ${WDIR}/srv 
 
 # copy process executor scripts
 ## TaskWorker
