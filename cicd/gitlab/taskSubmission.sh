@@ -78,31 +78,31 @@ submitTasks() {
 #  done
 #}
 
-#Client_Validation_Suite=${Client_Validation_Suite:-}
-#Client_Configuration_Validation=${Client_Configuration_Validation:-}
-#Task_Submission_Status_Tracking=${Task_Submission_Status_Tracking:-}
+Client_Validation_Suite=${Client_Validation_Suite:-}
+Client_Configuration_Validation=${Client_Configuration_Validation:-}
+Task_Submission_Status_Tracking=${Task_Submission_Status_Tracking:-}
 
-#if [ "${Client_Validation_Suite}" = true ]; then
-#    echo -e "\nStarting task submission for Client Validation testing.\n"
-#    cd test/clientValidationTasks/
-#    filesToSubmit=`find . -type f -name '*.py' ! -name '*pset*'`
-#    submitTasks "${filesToSubmit}" "CV"
-#    cp ${WORK_DIR}/artifacts/submitted_tasks_CV ${WORK_DIR}/artifacts/submitted_tasks_CV_$CMSSW_release
-#fi
-#
-## TODO: need to run makeTests.py outside apptainer because python3 is not available in slc6
-#if [ "${Client_Configuration_Validation}" = true ]; then
-#    echo -e "\nStarting task submission for Client Configuration Validation testing.\n"
-#    rm -rf tmpWorkDir "${WORK_DIR}"/artifacts/submitted_tasks_CCV
-#    mkdir -p tmpWorkDir
-#    cd tmpWorkDir
-#    python3 ${WORK_DIR}/test/makeTests.py
-#    filesToSubmit=`find . -maxdepth 1 -type f -name '*.py' ! -name '*PSET*'`
-#    submitTasks "${filesToSubmit}" "CCV"
-#    tasksToCheck=`cat ${WORK_DIR}/artifacts/submitted_tasks_CCV`
-#    immediateCheck "${tasksToCheck}"
-#    cd ${WORK_DIR}
-#fi
+if [ "${Client_Validation_Suite}" = true ]; then
+   echo -e "\nStarting task submission for Client Validation testing.\n"
+   cd test/clientValidationTasks/
+   filesToSubmit=`find . -type f -name '*.py' ! -name '*pset*'`
+   submitTasks "${filesToSubmit}" "CV"
+   cp ${WORK_DIR}/artifacts/submitted_tasks_CV ${WORK_DIR}/artifacts/submitted_tasks_CV_$CMSSW_release
+fi
+
+# TODO: need to run makeTests.py outside apptainer because python3 is not available in slc6
+if [ "${Client_Configuration_Validation}" = true ]; then
+   echo -e "\nStarting task submission for Client Configuration Validation testing.\n"
+   rm -rf tmpWorkDir "${WORK_DIR}"/artifacts/submitted_tasks_CCV
+   mkdir -p tmpWorkDir
+   cd tmpWorkDir
+   python3 ${WORK_DIR}/test/makeTests.py
+   filesToSubmit=`find . -maxdepth 1 -type f -name '*.py' ! -name '*PSET*'`
+   submitTasks "${filesToSubmit}" "CCV"
+   tasksToCheck=`cat ${WORK_DIR}/artifacts/submitted_tasks_CCV`
+   immediateCheck "${tasksToCheck}"
+   cd ${WORK_DIR}
+fi
 
 if [ "${Task_Submission_Status_Tracking}" = true ]; then
     echo -e "\nStarting task submission for Status Tracking testing.\n"
