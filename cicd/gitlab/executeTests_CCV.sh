@@ -37,7 +37,7 @@ if [ "X${singularity}" == X6 ] || [ "X${singularity}" == X7 ] || [ "X${singulari
     if [ "X${singularity}" == X7 ]; then scramprefix=el${singularity}; fi
     if [ "X${singularity}" == X8 ]; then scramprefix=el${singularity}; fi
     ERR=false;
-    /cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- "${ROOT_DIR}"/cicd/gitlab/taskSubmission.sh || ERR=true
+    /cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- "${ROOT_DIR}"/cicd/gitlab/taskSubmission_CCV.sh || ERR=true
 else
     echo "!!! I am not prepared to run for slc${singularity}."
     exit 1
@@ -46,7 +46,7 @@ fi
 popd
 
 if $ERR ; then
-    echo -e "Something went wrong during task submission. None of the downstream jobs were triggered."
+    echo -e "Something went wrong during task submission_CCV. None of the downstream jobs were triggered."
     exit 1
 else
     declare -A tests=( ["Task_Submission_Status_Tracking"]=submitted_tasks_TS ["Client_Validation_Suite"]=submitted_tasks_CV ["Client_Configuration_Validation"]=submitted_tasks_CCV)

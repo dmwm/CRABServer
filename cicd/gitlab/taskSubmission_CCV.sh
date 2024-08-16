@@ -43,8 +43,8 @@ submitTasks() {
   done
 }
 
-#killAfterFailure(){
-##In case at least one task submission failed, kill all succesfully submitted tasks
+# killAfterFailure(){
+# #In case at least one task submission failed, kill all succesfully submitted tasks
 #  if [ -e "${WORK_DIR}/artifacts/project_directories" ]; then
 #    echo -e "\nTask submission failed. Killing submitted tasks.\n"
 #    while read task ; do
@@ -59,18 +59,37 @@ submitTasks() {
 #    done <${WORK_DIR}/artifacts/project_directories
 #  fi
 #  exit 1
-#}
-#
+# }
 
-if [ "${Task_Submission_Status_Tracking}" = true ]; then
-    echo -e "\nStarting task submission for Status Tracking testing.\n"
-    pushd "${ROOT_DIR}"/test/statusTrackingTasks/
-    # for test
-    if [[ -n ${DEBUG_TEST:-} ]]; then
-        filesToSubmit=$(find . -type f -name '*.py' ! -name '*pset*' | grep HC-splitByLumi.py)
-    else
-        filesToSubmit=$(find . -type f -name '*.py' ! -name '*pset*')
-    fi
-    submitTasks "${filesToSubmit}" "TS"
-    popd
+immediateCheck(){
+#Run immediate check on tasks submitted for Client_Configuration_Validation testing
+#Save results to failed_tests and successful_tests files
+ for task in ${tasksToCheck};
+ do
+     echo -e "\nRunning immediate test on task: ${task}"
+     test_to_execute=`echo "${task}" | grep -oP '(?<=_crab_).*(?=)'`
+     task_dir=${WORK_DIR}/crab_${test_to_execute}
+     bash -x ${test_to_execute}-testSubmit.sh ${task_dir} && \
+       echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> ${WORK_DIR}/successful_tests || \
+       echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> ${WORK_DIR}/failed_tests
+ done
+}
+
+Client_Validation_Suite=${Client_Validation_Suite:-}
+Client_Configuration_Validation=${Client_Configuration_Validation:-}
+Task_Submission_Status_Tracking=${Task_Submission_Status_Tracking:-}
+
+# TODO: need to run makeTests.py outside apptainer because python3 is not available in slc6
+if [ "${Client_Configuration_Validation}" = true ]; then
+   echo -e "\nStarting task submission for Client Configuration Validation testing.\n"
+   tmpWorkDir="${WORK_DIR}/submitted_tasks_CCV"
+   rm -rf "$tmpWorkDir"
+   mkdir -p "$tmpWorkDir"
+   cd "$tmpWorkDir"
+   python3 "${WORK_DIR}/test/makeTests.py"
+   filesToSubmit=`find . -maxdepth 1 -type f -name '*.py' ! -name '*PSET*'`
+   submitTasks "${filesToSubmit}" "CCV"
+   tasksToCheck=`cat ${WORK_DIR}/submitted_tasks_CCV`
+   immediateCheck "${tasksToCheck}"
+   cd ${WORK_DIR}
 fi
