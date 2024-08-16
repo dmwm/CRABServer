@@ -5,6 +5,8 @@ default:
 
 variables:
   IMAGE_TAG: "${CI_COMMIT_REF_SLUG}"  # to distinct it from commit tag and final image tag
+  # The `DOCKER_TLS_CERTDIR` variables is needed to run Docker-in-Docker, `DOCKER_BUILDKIT` is to make sure the docker build use the new BuildKit.  
+  # https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#docker-in-docker-with-tls-enabled-in-the-docker-executor
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
 
