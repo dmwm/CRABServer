@@ -64,7 +64,7 @@ def sendAndCheck(document):
 
 def main():
     """
-        get all rules for this account, find pending ones,
+        get all rules, find pending ones,
         order, pretty format, print them and write an HTML file
     """
 
@@ -80,12 +80,12 @@ def main():
     logger.setLevel(logging.INFO)
 
     rucio, crab = ensureEnvironment(logger)
-    account = 'crab_tape_recall'
+    activity = "Analysis TapeRecall"
 
-    # get rules for this account
-    ruleGen = rucio.list_replication_rules({'account': account})
+    # get rules for this activity
+    ruleGen = rucio.list_replication_rules({'activity': activity})
     rules = list(ruleGen)
-    logger.info(f"{len(rules)} rules exist for account: {account}")
+    logger.info(f"{len(rules)} rules exist for activity: {activity}")
 
     # make a DataFrame
     df = pd.DataFrame(rules)
@@ -381,7 +381,8 @@ def ensureEnvironment(logger=None):
               "export RUCIO_ACCOUNT='crab_server'")
         sys.exit()
     # make sure Rucio client is initialized, this also ensures X509 proxy
-    rucio = Client(
+    # our robot certificate can access multiple Rucio account, use the non-privileged one here
+    rucio = Client(account="crab_server",
         creds={"client_cert": "/data/certs/robotcert.pem", "client_key": "/data/certs/robotkey.pem"},
         auth_type='x509',
     )
