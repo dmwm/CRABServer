@@ -100,7 +100,7 @@ class RucioAction():
             if not ruleId:
                 msg = "Failed to creaed Rucio rule to recall data. Rucio DuplicateException raised "
                 msg += "but a rule for this account was not found in the list"
-                raise TaskWorkerException(msg)
+                raise TaskWorkerException(msg) from DuplicateRule
             # extend rule lifetime
             self.rucioClient.update_replication_rule(ruleId, {'lifetime': lifetime})
         except (InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage) as e:

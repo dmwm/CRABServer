@@ -85,7 +85,8 @@ def main():
     # get rules for this activity
     ruleGen = rucio.list_replication_rules({'activity': activity})
     rules = list(ruleGen)
-    logger.info(f"{len(rules)} rules exist for activity: {activity}")
+    msg = f"{len(rules)} rules exist for activity: {activity}"
+    logger.info(msg)
 
     # make a DataFrame
     df = pd.DataFrame(rules)
