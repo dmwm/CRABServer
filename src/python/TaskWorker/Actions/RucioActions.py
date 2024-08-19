@@ -90,10 +90,17 @@ class RucioAction():
             self.logger.debug("A duplicate rule for this account, did, rse_expression, copies already exists. Use that")
             # find the existing rule id
             ruleIdGen = self.rucioClient.list_did_rules(scope=did['scope'], name=did['name'])
+            self.logger.debug("List of existing rules for this DID")
+            ruleId = None
             for rule in ruleIdGen:
-                if rule['account'] == self.rucioAccount:
+                self.logger.debug("id: %s account: %s activity %s")
+                if rule['account'] == account:
                     ruleId = rule['id']
                     break
+            if not ruleId:
+                msg = "Failed to creaed Rucio rule to recall data. Rucio DuplicateException raised "
+                msg += "but a rule for this account was not found in the list"
+                raise TaskWorkerException(msg) from DuplicateRule
             # extend rule lifetime
             self.rucioClient.update_replication_rule(ruleId, {'lifetime': lifetime})
         except (InsufficientTargetRSEs, InsufficientAccountLimit, FullStorage) as e:
