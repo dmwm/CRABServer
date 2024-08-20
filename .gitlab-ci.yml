@@ -1,5 +1,6 @@
 ---
 default:
+  # we use this tag to select the runner to be used for a given job
   tags:
     - crab3
 
@@ -12,6 +13,7 @@ variables:
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
 
+# this defines two variables .default_rules.default and .default_rules.release which are True when the if is satisfied
 .default_rules:
   default:
     - if: $CI_COMMIT_TAG =~ /pypi-.*/         # pypi-(prod|preprod|test*)-1714418922
@@ -28,7 +30,9 @@ stages:
   - tagging_release
 
 get_env:
+  # NB if there is no rule the job runs all of the times
   rules:
+    # !reference in following lines tells GITLAB to replace with the value of the indicated varaibles
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: prepare_env
