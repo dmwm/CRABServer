@@ -116,7 +116,7 @@ build_monit_image:
       when: never
     - !reference [.default_rules, release]
   stage: build_docker
-  needs: ["build_image"]
+  needs: ["build_image", "get_env"]
   image:
     name: docker:27.1.1
   services:
