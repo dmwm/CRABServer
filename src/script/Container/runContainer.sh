@@ -28,13 +28,16 @@ do
     esac
 done
 
-if [ -z "${TW_VERSION}" ] || [ -z "${SERVICE}" ]; then
-  echo "Make sure to set both -v and -s variables."; helpFunction; exit 1
-fi
 # define vars but set initial value to empty strgin to prevent unbound error
+TW_VERSION=${TW_VERSION:-}
+SERVICE=${SERVICE:-}
 TW_REPO=${TW_REPO:-}
 COMMAND=${COMMAND:-}
 LOGUUID=${LOGUUID:-}
+
+if [ -z "${TW_VERSION}" ] || [ -z "${SERVICE}" ]; then
+  echo "Make sure to set both -v and -s variables."; helpFunction; exit 1
+fi
 
 #list of directories that should exist on the host machine before container start
 dir=("/data/container/${SERVICE}/cfg" "/data/container/${SERVICE}/logs")
