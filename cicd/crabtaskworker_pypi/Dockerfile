@@ -57,7 +57,7 @@ RUN ln -sf ${WDIR}/miniconda/bin/gfal-ls /usr/bin/gfal-ls \
 # install package from debian repository
 # deps for openldap: libsasl2-dev python3-dev libldap-dev libssl-dev
 RUN apt-get update \
-    && apt-get install -y tini git zip voms-clients-java fd-find ripgrep libsasl2-dev python3-dev libldap-dev libssl-dev \
+    && apt-get install -y tini voms-clients-java libsasl2-dev python3-dev libldap-dev libssl-dev zip git fd-find ripgrep bash-completion \
     && apt-get clean all
 
 # local timezone (hardcode)
@@ -110,7 +110,7 @@ RUN install -d -o ${USER} -g ${USER} ${WDIR}/srv/TaskManager/current \
     && install -d -o ${USER} -g ${USER} ${WDIR}/srv/TaskManager/cfg \
     && install -d -o ${USER} -g ${USER} ${WDIR}/srv/TaskManager/logs \
     # Change ownership to the running user
-    && chown -R ${USER}:${USER} ${WDIR}/srv 
+    && chown -R ${USER}:${USER} ${WDIR}/srv
 
 # Create directories for Publisher
 RUN install -d -o ${USER} -g ${USER} ${WDIR}/srv/Publisher/current \
@@ -118,7 +118,7 @@ RUN install -d -o ${USER} -g ${USER} ${WDIR}/srv/Publisher/current \
     && install -d -o ${USER} -g ${USER} ${WDIR}/srv/Publisher/logs \
     && install -d -o ${USER} -g ${USER} ${WDIR}/srv/Publisher/PublisherFiles \
     # Change ownership of parent and current directories to the running user
-    && chown -R ${USER}:${USER} ${WDIR}/srv 
+    && chown -R ${USER}:${USER} ${WDIR}/srv
 
 # copy process executor scripts
 ## TaskWorker
@@ -148,4 +148,3 @@ USER ${USER}
 
 ENTRYPOINT ["tini", "--"]
 CMD ["/data/run.sh"]
-

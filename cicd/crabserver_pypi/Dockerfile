@@ -14,7 +14,7 @@ RUN useradd ${USER} \
 
 # install packages from debian official repo
 RUN apt-get update \
-    && apt-get install -y tini \
+    && apt-get install -y tini git bash-completion fd-find ripgrep \
     && apt-get clean all
 
 # local timezone (hardcode)
