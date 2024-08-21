@@ -100,29 +100,20 @@ if [[ "$OS_Version" = "7" ]]; then
     DOCKER_VOL="${DOCKER_VOL} -v /var/run/nscd/socket:/var/run/nscd/socket"
 fi
 
-DOCKER_OPT="-e SERVICE=${SERVICE} -w /data/srv/${DIRECTORY} "
+DOCKER_OPT="-d -e SERVICE=${SERVICE} -w /data/srv/${DIRECTORY} "
 
 DOCKER_IMAGE=${TW_REPO:-registry.cern.ch/cmscrab}/crabtaskworker:${TW_VERSION}
 
-if [[ "${SERVICE}" == TaskWorker_monit_*  ]]; then
-  echo "TaskWorker_monit_* detected"
-  # # the following two bind mounts are necessary to write to eos. it has been superseded by sending data to opensearch
-  # DOCKER_OPT="${DOCKER_OPT} -v /eos/project-c/cmsweb/www/CRAB/:/data/eos "
-  # DOCKER_OPT="${DOCKER_OPT} -v /tmp/krb5cc_1000:/tmp/krb5cc_1000 "
-
-  # - monit script does not work with `-di` option inside crontab.
-  # - in order to get the exit code of the command run inside docker container,
-  #   remove the `-d` option for monit crontabs
-else
-  # start docker container in background when you run TW and Published, not monitoring scripts.
-  DOCKER_OPT="${DOCKER_OPT} -d"
-fi
-
 docker run --name ${SERVICE} -t --net host --privileged $DOCKER_OPT $DOCKER_VOL $DOCKER_IMAGE $COMMAND > $tmpfile
-if [ $? -eq 0 ]; then
-  # if the crontab does not fail, remove the log file
-  rm -f $tmpfile
+if [[ "${SERVICE}" == TaskWorker_monit_*  ]]; then
+  echo "TaskWorker_monit_* detected, waiting for it to finish..."
+  docker_wait_return=$(docker wait ${SERVICE})
+  if [ $docker_wait_return -eq 0 ]; then
+    # if the crontab does not fail, remove the log file
+    rm -f $tmpfile
+  fi
 fi
+
 
 echo -e "Sleeping for 3 seconds.\nRunning containers:"
 sleep 3 && docker ps
