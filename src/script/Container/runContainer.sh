@@ -40,7 +40,7 @@ LOGUUID=${LOGUUID:-}
 dir=("/data/container/${SERVICE}/cfg" "/data/container/${SERVICE}/logs")
 
 case $SERVICE in
-  TaskWorker_monit_*)
+  TaskWorker_monit*)
     DIRECTORY='monit'
     ;;
   TaskWorker*)
