@@ -111,6 +111,7 @@ docker run --name ${SERVICE} -t --net host --privileged $DOCKER_OPT $DOCKER_VOL 
 if [[ "${SERVICE}" == TaskWorker_monit_*  ]]; then
   echo "TaskWorker_monit_* detected, waiting for it to finish..."
   docker_wait_return=$(docker wait ${SERVICE})
+  docker logs $SERVICE > $tmpfile
   if [ $docker_wait_return -eq 0 ]; then
     # if the crontab does not fail, remove the log file
     rm -f $tmpfile
