@@ -72,6 +72,9 @@ class TapeRecallManager(BaseRecurringAction):
                 msg = f"Will delete rule {reqId}"
                 self.logger.info(msg)
                 try:
+                    # suspend rule first to avoid more FTS submissions while delete daemon kicks in
+                    self.privilegedRucioClient.update_replication_rule(rule_id=reqId,
+                                                                       options={'state':'SUSPENDED'})
                     self.privilegedRucioClient.delete_replication_rule(reqId)
                 except RuleNotFound:
                     self.logger.info("Rule not found, can not delete it. Simply set task as KILLED")
