@@ -8,13 +8,13 @@ FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
 SHELL ["/bin/bash", "-c"]
 ENV WDIR=/data
 ENV USER=crab3
-RUN useradd ${USER} \
+RUN useradd -m ${USER} \
     && install -o ${USER} -d ${WDIR} \
     && echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3
 
 # install packages from debian official repo
 RUN apt-get update \
-    && apt-get install -y tini \
+    && apt-get install -y tini git bash-completion fd-find ripgrep \
     && apt-get clean all
 
 # local timezone (hardcode)

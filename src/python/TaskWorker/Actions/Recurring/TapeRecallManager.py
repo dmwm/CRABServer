@@ -128,8 +128,8 @@ class TapeRecallManager(BaseRecurringAction):
                 # Make sure data will stay on disk for NOW + 4 days. A new rule will kick in when task is submitted
                 self.logger.info("Extending rule lifetime to last 4 days")
                 self.privilegedRucioClient.update_replication_rule(reqId, {'lifetime': (4 * 24 * 60 * 60)})  # lifetime is in seconds
-            else:
-                # still in progress, report status and keep waiting
+            elif rule['state'] in ['REPLICATING', 'STUCK', 'SUSPENDED']:
+                # in progress, report status and keep waiting
                 ok = rule['locks_ok_cnt']
                 rep = rule['locks_replicating_cnt']
                 stuck = rule['locks_stuck_cnt']

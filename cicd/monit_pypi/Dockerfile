@@ -23,7 +23,8 @@ ENV RUCIO_ACCOUNT="crab_server"
 
 ENTRYPOINT ["tini", "--"]
 
-CMD python3 /data/srv/monit/GenerateMONIT.py
+CMD bash
+# CMD python3 /data/srv/monit/GenerateMONIT.py
 # CMD python3.8 /data/srv/monit/CheckTapeRecall.py
     # cp -v RecallRules.html /data/eos/RecallRules-docker.html
     ## we decided to send data to opensearch instead of saving it to eos. no need to copy the file.

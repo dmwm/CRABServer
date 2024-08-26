@@ -71,7 +71,7 @@ function dag_status {
 }
 
 function perform_condorq {
-    DAG_INFO=$(condor_q -constr 'CRAB_ReqName =?= "'$REQUEST_NAME'" && stringListMember(TaskType, "ROOT PROCESSING TAIL", " ")' -af ClusterId JobStatus EnteredCurrentStatus)
+    DAG_INFO=$(condor_q -constr 'CRAB_ReqName =?= "'$REQUEST_NAME'" && (stringListMember(TaskType, "ROOT PROCESSING TAIL", " ") || stringListMember(CRAB_DAGType, "BASE PROCESSING TAIL", " "))' -af ClusterId JobStatus EnteredCurrentStatus)
     TIME_OF_LAST_QUERY=$(date +"%s")
     log "HTCondor query of DAG status done on $(date '+%Y/%m/%d %H:%M:%S %Z')"
 }

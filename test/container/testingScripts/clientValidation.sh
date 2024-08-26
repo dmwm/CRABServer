@@ -12,7 +12,7 @@ source setupCRABClient.sh
   TASK_DIR="${WORK_DIR}/CRABServer/test/clientValidationTasks"
 
   #list of commands to execute for full testing (sl7/8)
-  FULL_TEST=(createmyproxy checkusername checkwrite tasks preparelocal status report getlog getoutput)
+  FULL_TEST=(createmyproxy checkusername checkwrite tasks preparelocal status report getlog getoutput recover)
   #list of commands to execute on sl6
   SL6_TESTS=(status checkusername)
   
@@ -194,9 +194,15 @@ source setupCRABClient.sh
   done
   for param in "${USETHISPARMS[@]}"; do
     checkThisCommand status "$param"
-
   done
 
+  ### 6b. test  crab status --proxy=PROXY --task=TASKNAME --instance=INSTANCE
+  USETHISPARMS=()
+  INITPARMS="--proxy --task --instance"
+  feedParms "$PROXY $TASKTOTRACK $REST_Instance"
+  for param in "${USETHISPARMS[@]}"; do
+    checkThisCommand status "$param"
+  done
 
   ### 7. test crab report --proxy=PROXY --dir=PROJDIR --outputdir=OUTPUTDIR
   USETHISPARMS=()
@@ -245,5 +251,20 @@ source setupCRABClient.sh
     checkThisCommand kill "$param"
   done
 
+  ### 11. test crab recover --proxy=PROXY --dir=PROJDIR
+  USETHISPARMS=()
+  INITPARMS="--proxy --dir"
+  feedParms "$PROXY $PROJDIR"
+  for param in "${USETHISPARMS[@]}"; do
+    checkThisCommand recover "$param"
+  done
+
+  ### 12. test  crab recover --proxy=PROXY --task=TASKNAME --instance=INSTANCE
+  USETHISPARMS=()
+  INITPARMS="--proxy --task --instance"
+  feedParms "$PROXY $TASKTOTRACK $REST_Instance"
+  for param in "${USETHISPARMS[@]}"; do
+    checkThisCommand recover "$param"
+  done
 
 } 2>&1 | tee ${WORK_DIR}/client-validation.log
