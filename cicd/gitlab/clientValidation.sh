@@ -94,20 +94,23 @@ source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
   }
 
   # check for a valid proxy
-  function checkProxy(){
-    voms-proxy-init -rfc -voms cms -valid 192:00 > /dev/null 2>&1
-    export PROXY=$(voms-proxy-info -path 2>&1)
-
-    noProxy=`echo "$PROXY" | grep 'Proxy not found'`
-    if [ "$noProxy" != "" ];then
-      echo -ne "Fatal Proxy error: No proxy found..Please create one to proceed with the validation\n"
-      exit 1
+  function checkProxy() {
+    # Use the X509_USER_PROXY value that was set in the .gitlab-ci.yml script
+    if [ -z "$X509_USER_PROXY" ]; then
+        echo "Fatal Proxy error: No proxy found or the X509_USER_PROXY environment variable is not set. Please ensure a valid proxy is available."
+        exit 1
     fi
 
-    voms-proxy-info -all
-    export X509_USER_PROXY=$PROXY
+    # Verify that the proxy path is valid
+    PROXY_INFO=$(voms-proxy-info -path 2>&1)
+    if echo "$PROXY_INFO" | grep -q 'Proxy not found'; then
+        echo "Fatal Proxy error: No proxy found at $X509_USER_PROXY. Please create one to proceed with the validation."
+        exit 1
+    fi
 
-  }
+    # Display all proxy information
+    voms-proxy-info -all
+}
 
   TMP_PARM1=("")
   function checkCmdParam() {
