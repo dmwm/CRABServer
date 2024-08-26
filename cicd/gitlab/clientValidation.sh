@@ -15,6 +15,7 @@ echo "(debug) ROOT_DIR=${ROOT_DIR}"
 echo "(debug) WORK_DIR=${WORK_DIR}"
 echo "(debug) X509_USER_PROXY=${X509_USER_PROXY}"
 echo "(debug) Client_Validation_Suite=${Client_Validation_Suite}"
+echo "(debug) CMSSW_release: ${CMSSW_release}"
 
 source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
 
@@ -33,7 +34,13 @@ source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
   SL6_TESTS=(status checkusername)
   
   #${TEST_LIST} comes from Jenkins and is used to specify which testing should be done: PR_TEST or FULL_TEST
-  export singularity=$singularity  
+  # Get configuration from CMSSW_release   
+  
+  CONFIG_LINE="$(grep "CMSSW_release=${CMSSW_release};" "${ROOT_DIR}"/test/testingConfigs)"
+  SCRAM_ARCH="$(echo "${CONFIG_LINE}" | tr ';' '\n' | grep SCRAM_ARCH | sed 's|SCRAM_ARCH=||')"
+  # see https://github.com/dmwm/WMCore/issues/11051 for info about SCRAM_ARCH formatting
+  singularity="$(echo "${SCRAM_ARCH}" | cut -d"_" -f 1 | tail -c 2)"
+  export SCRAM_ARCH singularity  
   if [ "X${singularity}" == X6 ] ; then export TEST_LIST=SL6_TESTS; fi
   if [ "X${singularity}" == X7 ] ; then export TEST_LIST=FULL_TEST; fi
   if [ "X${singularity}" == X8 ] ; then export TEST_LIST=FULL_TEST; fi

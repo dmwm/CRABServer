@@ -31,4 +31,4 @@ while read task ; do
   else
         echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/failed_tests
   fi
-done <${WORK_DIR}/submitted_tasks_CCV
+done <${WORK_DIR}/submitted_tasks
