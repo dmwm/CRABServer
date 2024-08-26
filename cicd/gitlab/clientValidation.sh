@@ -33,7 +33,7 @@ source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
   SL6_TESTS=(status checkusername)
   
   #${TEST_LIST} comes from Jenkins and is used to specify which testing should be done: PR_TEST or FULL_TEST
-  TEST_TO_EXECUTE=${TEST_LIST}[@]
+  TEST_TO_EXECUTE=${FULL_TEST}   #${TEST_LIST}[@]
 
   function logMsg() {
     local kind=$1
