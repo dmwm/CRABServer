@@ -13,8 +13,8 @@ variables:
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
 
-This key define variables which are later used in `!reference` tag in `rules`. 
-# Ref https://docs.gitlab.com/ee/ci/jobs/index.html#hide-jobs 
+# This key define variables which are later used in `!reference` tag in `rules`.
+# Ref https://docs.gitlab.com/ee/ci/jobs/index.html#hide-jobs
 # and https://docs.gitlab.com/ee/ci/yaml/yaml_optimization.html#reference-tags
 .default_rules:
   default:
@@ -32,7 +32,7 @@ stages:
   - tagging_release
 
 get_env:
-  # NB rules are evaluated like python `any()`. If there is no rule the job runs all of the times. 
+  # NB rules are evaluated like python `any()`. If there is no rule the job runs all of the times.
   rules:
     # !reference in following lines tells GITLAB to replace with the value of the indicated variables.
     - !reference [.default_rules, default]
