@@ -30,7 +30,7 @@ stages:
   - tagging_release
 
 get_env:
-  # NB if there is no rule the job runs all of the times
+  # NB rules are evaluated like python `any()`. If there is no rule the job runs all of the times. 
   rules:
     # !reference in following lines tells GITLAB to replace with the value of the indicated variables.
     - !reference [.default_rules, default]
