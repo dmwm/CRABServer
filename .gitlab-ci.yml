@@ -13,7 +13,9 @@ variables:
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
 
-# this defines two variables .default_rules.default and .default_rules.release which are True when the if is satisfied
+This key define variables which are later used in `!reference` tag in `rules`. 
+# Ref https://docs.gitlab.com/ee/ci/jobs/index.html#hide-jobs 
+# and https://docs.gitlab.com/ee/ci/yaml/yaml_optimization.html#reference-tags
 .default_rules:
   default:
     - if: $CI_COMMIT_TAG =~ /pypi-.*/         # pypi-(prod|preprod|test*)-1714418922
