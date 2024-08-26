@@ -3,6 +3,12 @@
 set -x
 set -euo pipefail
 
+# always run inside ./workdir
+export ROOT_DIR=$PWD
+export WORK_DIR=$PWD/workdir
+mkdir -p workdir
+pushd "${WORK_DIR}"
+
 # validate env var
 # note: $PWD is (default to `./workdir`)
 echo "(debug) ROOT_DIR=${ROOT_DIR}"
@@ -257,3 +263,5 @@ source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
 
 
 } 2>&1 | tee ${WORK_DIR}/client-validation.log
+popd
+
