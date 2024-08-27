@@ -49,7 +49,7 @@ done
 pushd "${WORKDIR}"
 
 # execute
-./start.sh -c
+./manage.py start -c
 
 while true; do
     sleep 3600

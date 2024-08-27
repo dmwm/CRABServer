@@ -16,7 +16,7 @@ cat /data/srv/state/crabserver/crabserver-fifo &
 
 #start the service
 #export CRYPTOGRAPHY_ALLOW_OPENSSL_102=true
-/data/start.sh -c
+./manage.py start -c -s REST
 
 # cat fifo forever to read logs
 while true;
