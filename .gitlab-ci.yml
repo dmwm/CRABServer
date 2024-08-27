@@ -134,7 +134,7 @@ build_monit_image:
     - source .env
     - docker context create mycontext
     - docker buildx create mycontext --use --name mybuilder --bootstrap
-    - docker buildx build --push --build-arg="BASE_TAG=${IMAGE_TAG}" -f "${CI_PROJECT_DIR}/cicd/monit_pypi/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabtwmonit:pypi-${REST_Instance}-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabtwmonit:pypi-${REST_Instance}-cache" -t "registry.cern.ch/cmscrab/crabtwmonit:${IMAGE_TAG}" .
+    - docker buildx build --push --build-arg="BASE_TAG=${IMAGE_TAG}" -f "${CI_PROJECT_DIR}/cicd/monit_pypi/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabtwmonit:pypi-${REST_Instance}-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabtwmonit:pypi-${REST_Instance}-cache" -t "registry.cern.ch/cmscrab/crabtwmonit:${IMAGE_TAG}" -t "registry.cern.ch/cmscrab/crabtwmonit:v3.latest" .
   cache:
     - key: $CI_PIPELINE_ID
       paths:
