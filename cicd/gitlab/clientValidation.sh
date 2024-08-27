@@ -63,6 +63,7 @@ source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
 }
 
   function checkThisCommand() {
+    set +euo pipefail
     local cmd="$1"
     local parms="$2"
 
@@ -71,7 +72,7 @@ source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
     else
       echo "____________"
     	echo -ne "TEST_COMMAND: crab $cmd $parms \n" 
-    	crab $cmd $parms 2>&1 > $TMP_BUFFER
+    	crab --debug $cmd $parms 2>&1 > $TMP_BUFFER
     	if [ $? != 0 ]; then
       		error=`cat $TMP_BUFFER`
       		if [[ $error == *"Cannot retrieve the status_cache file"* ]]; then
@@ -87,6 +88,7 @@ source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
     	cat $TMP_BUFFER
     	echo -e "____________\n"
      fi
+     set -euo pipefail
   }
 
   # check for a valid proxy
@@ -145,11 +147,9 @@ source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
   USETHISPARMS=()
   INITPARMS="--days"
   feedParms "100"
-  set +euo pipefail
   for parm in "${USETHISPARMS[@]}"; do
        checkThisCommand createmyproxy "$parm"
   done
-  set -euo pipefail
 
   ### 2. test crab checkusername -h, --proxy=PROXY
   USETHISPARMS=()
