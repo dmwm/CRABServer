@@ -1,4 +1,6 @@
-
+"""
+Ensure that TaskWorker has a valid VOMS proxy for this user via myproxy-logon
+"""
 import logging
 from WMCore.Credential.Proxy import Proxy
 from TaskWorker.DataObjects.Result import Result
@@ -35,13 +37,17 @@ class MyProxyLogon(TaskAction):
             userproxy = proxy.getProxyFilename(serverRenewer=True)  # this only returns a filename
             proxy.logonRenewMyProxy()  # this tries to create the proxy, but if it fails it does not rise
             usergroups = set(proxy.getAllUserGroups(userproxy))  # get VOMS groups from created proxy (if any)
-            timeleft = proxy.getTimeLeft(userproxy)  # this is the way to tell if proxy creation succeeded
-
+            try:
+                timeleft = proxy.getTimeLeft(userproxy)  # this is the way to tell if proxy creation succeeded
+            except Exception as e:  # pylint: disable=broad-except
+                errmsg = f"Exception raised inside Proxy.getTimeLeft: {e}"
+                self.logger.error(errmsg)
+                timeleft = 0
         errmsg = ''
         if timeleft is None or timeleft <= 0:
-            errmsg = "Impossible to retrieve proxy from %s for %s." % (proxycfg['myProxySvr'], proxycfg['userDN'])
+            errmsg = f"Impossible to retrieve proxy from {proxycfg['myProxySvr']} for {proxycfg['userDN']}."
         if timeleft < (5*24*3600):
-            errmsg = "Could not get a proxy valid for at least 5-days from %s for %s." % (proxycfg['myProxySvr'], proxycfg['userDN'])
+            errmsg = f"Could not get a proxy valid for at least 5-days from {proxycfg['myProxySvr']} for {proxycfg['userDN']}."
         if errmsg:
             self.logger.error(errmsg)
             self.logger.error("Will try again in verbose mode")
@@ -63,7 +69,6 @@ class MyProxyLogon(TaskAction):
                     'myProxySvr': self.config.Services.MyProxy,
                     'proxyValidity' : '144:0',
                     'min_time_left' : 36000, ## do we need this ? or should we use self.myproxylen?
-                    'userName' : kwargs['task']['tm_username'] + '_CRAB',
                     'userDN' : kwargs['task']['tm_user_dn'],
                     'group' : kwargs['task']['tm_user_group'] if kwargs['task']['tm_user_group'] else '',
                     'role' : kwargs['task']['tm_user_role'] if kwargs['task']['tm_user_role'] else '',
@@ -74,24 +79,16 @@ class MyProxyLogon(TaskAction):
                     'credServerPath': self.config.MyProxy.credpath,
                     'cleanEnvironment' : getattr(self.config.MyProxy, 'cleanEnvironment', False)
                    }
+        self.logger.info("try to retrieve credential with DN hash as myproxy username")
         try:
-            self.logger.info("try first to retrieve credential with login name %s",
-                             proxycfg['userName'])
             (userproxy, usergroups) = self.tryProxyLogon(proxycfg=proxycfg)
-        except TaskWorkerException:
-            self.logger.error("proxy retrieval from %s failed with login name %s.",
-                              proxycfg['myProxySvr'], proxycfg['userName'])
-            self.logger.error("will try with old-style DN hash")
-            del proxycfg['userName']
-            try:
-                (userproxy, usergroups) = self.tryProxyLogon(proxycfg=proxycfg)
-            except TaskWorkerException as ex:
-                self.logger.error("proxy retrieval from %s failed with DN hash as credential name.",
-                                  proxycfg['myProxySvr'])
-                raise TaskWorkerException(str(ex))
+        except TaskWorkerException as ex:
+            self.logger.error("proxy retrieval from %s failed with DN hash as credential name.",
+                              proxycfg['myProxySvr'])
+            raise TaskWorkerException(str(ex)) from ex
         #  minimal sanity check. Submission will fail if there's no group
         if not usergroups:
-            raise TaskWorkerException('Could not retrieve VOMS groups list from %s' % userproxy)
+            raise TaskWorkerException(f"Could not retrieve VOMS groups list from {userproxy}")
         kwargs['task']['user_proxy'] = userproxy
         kwargs['task']['user_groups'] = usergroups
         self.logger.debug("Valid proxy for %s now in %s", proxycfg['userDN'], userproxy)
