@@ -51,31 +51,16 @@ source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
     local msg=$2
     case $kind in
     OK)
-      if [ -n "$LSB_DISTRO" ] && [ "$LSB_DISTRO" == "true" ]; then
-        log_success_msg "$msg"
-      else
-        printf "$kind %-80s"
-        #echo_success
-      fi
+      printf "$kind %-80s\n" "$msg"
       ;;
     WARNING)
-      if [ -n "$LSB_DISTRO" ] && [ "$LSB_DISTRO" == "true" ]; then
-        log_warning_msg "$msg"
-      else
-        printf "$kind %-80s"
-        #echo_warning
-      fi
+      printf "$kind %-80s\n" "$msg"
       ;;
     FAILED)
-      if [ -n "$LSB_DISTRO" ] && [ "$LSB_DISTRO" == "true" ]; then
-        log_failure_msg "$msg"
-      else
-        printf "$kind %-80s"
-        #echo_failure
-      fi
+      printf "$kind %-80s\n" "$msg"
       ;;
     esac
-  }
+}
 
   function checkThisCommand() {
     local cmd="$1"
