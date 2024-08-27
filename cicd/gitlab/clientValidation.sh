@@ -160,10 +160,11 @@ source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
   USETHISPARMS=()
   INITPARMS="--days"
   feedParms "100"
+  set +euo pipefail
   for parm in "${USETHISPARMS[@]}"; do
-      checkThisCommand createmyproxy "$parm"
+       checkThisCommand createmyproxy "$parm"
   done
-
+  set -euo pipefail
 
   ### 2. test crab checkusername -h, --proxy=PROXY
   USETHISPARMS=()
