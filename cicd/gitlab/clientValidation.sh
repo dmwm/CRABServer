@@ -51,7 +51,7 @@ source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
     local msg=$2
     case $kind in
     OK)
-      if [ "$LSB_DISTRO" == "true" ]; then
+      if [ -n "$LSB_DISTRO" ] && [ "$LSB_DISTRO" == "true" ]; then
         log_success_msg "$msg"
       else
         printf "$kind %-80s"
@@ -59,7 +59,7 @@ source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
       fi
       ;;
     WARNING)
-      if [ "$LSB_DISTRO" == "true" ]; then
+      if [ -n "$LSB_DISTRO" ] && [ "$LSB_DISTRO" == "true" ]; then
         log_warning_msg "$msg"
       else
         printf "$kind %-80s"
@@ -67,7 +67,7 @@ source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
       fi
       ;;
     FAILED)
-      if [ "$LSB_DISTRO" == "true" ]; then
+      if [ -n "$LSB_DISTRO" ] && [ "$LSB_DISTRO" == "true" ]; then
         log_failure_msg "$msg"
       else
         printf "$kind %-80s"
