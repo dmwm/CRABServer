@@ -90,13 +90,13 @@ source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
     	if [ $? != 0 ]; then
       		error=`cat $TMP_BUFFER`
       		if [[ $error == *"Cannot retrieve the status_cache file"* ]]; then
-        		echo "TEST_RESULT: `logMsg WARNING`"
+        		echo "TEST_RESULT: `logMsg WARNING 'This is a warning message'`"
       		else
-        		echo "TEST_RESULT: `logMsg FAILED`"
+        		echo "TEST_RESULT: `logMsg FAILED 'This is a failure message'`"
       		fi
     	else
           
-      		echo "TEST_RESULT: `logMsg OK`"
+      		echo "TEST_RESULT: `logMsg OK 'This is a status ok message'`"
     	fi
     	echo "TEST_MESSAGE:"
     	cat $TMP_BUFFER
@@ -199,6 +199,8 @@ source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
   ##################################################
   # START CHECKING SUBMITTED TASK'S STATUS
   ##################################################
+  mkdir -p "${WORK_DIR}/artifacts"
+  echo "240812_144237:cmsbot_crab_20240812_164235" > "${WORK_DIR}/artifacts/submitted_tasks"
 
   TASKTOTRACK=`cat ${WORK_DIR}/artifacts/submitted_tasks`
   PROJDIR=`crab remake --task=$TASKTOTRACK --instance=$REST_Instance --proxy=$PROXY| grep 'Finished remaking project directory' | awk '{print $6}'`
