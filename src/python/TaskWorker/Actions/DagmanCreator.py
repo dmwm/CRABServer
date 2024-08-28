@@ -980,7 +980,7 @@ class DagmanCreator(TaskAction):
                        (len(blocksWithBannedLocations), len(allblocks)))
                 msg += "not-whitelisted, and/or non-accelerator sites."
                 msg += getBlacklistMsg()
-            raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
+            raise SubmissionRefusedException(msg)
         msg = "Some blocks from dataset '%s' were skipped " % (kwargs['task']['tm_input_dataset'])
         if blocksWithNoLocations:
             msgBlocklist = sorted(list(blocksWithNoLocations)[:5]) + ['...']
