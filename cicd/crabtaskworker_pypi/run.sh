@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 # The entrypoint script to execute actual script base on $SERVICE.
 #

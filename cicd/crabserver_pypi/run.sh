@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 # Container main process.
 
 set -euo pipefail

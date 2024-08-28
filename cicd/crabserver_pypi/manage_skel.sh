@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 # This is skeleton file for each service that have different env vars
 # and different ways of handle the main process. The arguments are passing

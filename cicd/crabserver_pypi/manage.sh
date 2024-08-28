@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 # manage.sh for crab rest
 
 set -euo pipefail
