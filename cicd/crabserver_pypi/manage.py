@@ -7,10 +7,10 @@ import argparse
 import os
 
 
-class EnvDefault(argparse.Action):
+class EnvDefault(argparse.Action): # pylint: disable=too-few-public-methods
     """
     # copy from https://stackoverflow.com/a/10551190
-    # to be able to read from env if args not provided.
+    # to make arg able to read from env if not provided.
     """
     def __init__(self, envvar, required=True, default=None, **kwargs):
         if envvar:
@@ -23,9 +23,9 @@ class EnvDefault(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, self.dest, values)
 
-parser = argparse.ArgumentParser(description='crab service process controller')
+myparser = argparse.ArgumentParser(description='crab service process controller')
 
-subparsers = parser.add_subparsers(dest='command', required=True, help='command to run')
+subparsers = myparser.add_subparsers(dest='command', required=True, help='command to run')
 parserStart = subparsers.add_parser('start',
                                     help='start the service')
 groupModeStart = parserStart.add_mutually_exclusive_group(required=True)
@@ -40,7 +40,7 @@ parserStart.add_argument('-d', dest='debug', action='store_const', const='t',
 parserStart.add_argument('-s', dest='service', action=EnvDefault, envvar='SERVICE',
                          help='Name of the service to run: REST/TaskWorker*/Publisher*')
 parserStop = subparsers.add_parser('stop',
-                                    help='show service status (exit non-zero if service does not start)')
+                                   help='show service status (exit non-zero if service does not start)')
 parserStatus = subparsers.add_parser('status',
                                     help='start the service')
 parserEnv = subparsers.add_parser('env',
@@ -51,7 +51,7 @@ groupModeEnv.add_argument('-c', dest='mode', action='store_const', const='curren
 groupModeEnv.add_argument('-g', dest='mode', action='store_const', const='fromGH',
                             help='export PYTHONPATH from /data/repos directory')
 
-args = parser.parse_args()
+args = myparser.parse_args()
 
 env = os.environ.copy()
 # always provides env vars

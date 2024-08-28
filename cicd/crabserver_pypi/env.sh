@@ -1,6 +1,6 @@
 #! /bin/bash
-# This script is for `source` only!
-# This script wrap `./manage.py env -c` which only print the export command using
+# This script is for sourcing only!
+# The script wrap `./manage.py env -c` which only print the export command using
 # eval. Simply run `. env.sh` and your shell will have the same environment
 # variables as the services that run with command `./manange.py start -c -s <service>`.
 #

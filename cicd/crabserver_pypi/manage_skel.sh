@@ -1,8 +1,8 @@
 #! /bin/bash
 
 # This is skeleton file for each service that have different env vars
-# and different ways on how to handle the main process.
-# The manage.sh does not accept any argument envvar
+# and different ways of handle the main process. The arguments are passing
+# to manage.sh via envvars.
 
 set -euo pipefail
 
@@ -30,6 +30,7 @@ start_srv() {
 }
 
 stop_srv() {
+    # stop_srv need to be idempotent because start always do stop then start.
     >&2 echo "This is stop_srv"
 }
 
@@ -49,25 +50,25 @@ env_eval() {
 
 # Main routine, perform action requested on command line.
 case ${COMMAND:-} in
-  start | restart )
-    stop_srv
-    start_srv
-    ;;
+    start )
+        stop_srv
+        start_srv
+        ;;
 
-  status )
-    status_srv
-    ;;
+    status )
+        status_srv
+        ;;
 
-  stop )
-    stop_srv
-    ;;
+    stop )
+        stop_srv
+        ;;
 
-  help )
-    usage
-    ;;
+    help )
+        usage
+        ;;
 
-  * )
-    echo "Error: unknown command '$COMMAND'"
-    exit 1
-    ;;
+    * )
+        echo "Error: unknown command '$COMMAND'"
+        exit 1
+        ;;
 esac

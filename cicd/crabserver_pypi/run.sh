@@ -14,8 +14,8 @@ mkfifo /data/srv/state/crabserver/crabserver-fifo
 # to pipe. It is safe because only single process can read from pipe at the time
 cat /data/srv/state/crabserver/crabserver-fifo &
 
-#start the service
-#export CRYPTOGRAPHY_ALLOW_OPENSSL_102=true
+# start the service
+# manage.py required service name, anything is fine because we never use it.
 ./manage.py start -c -s REST
 
 # cat fifo forever to read logs

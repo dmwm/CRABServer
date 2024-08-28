@@ -59,7 +59,6 @@ script_env() {
 stop_srv() {
     # TW is given checkTimes*timeout seconds to stop, if it is still running after
     # this period, TW and all its slaves are killed by sending SIGKILL signal.
-    # Note that stop need to be idempotent because start always
     echo 'Stopping TaskWorker...'
     checkTimes=12
     timeout=15 #that will give 12*15=180 seconds (3min) for the TW to finish work
