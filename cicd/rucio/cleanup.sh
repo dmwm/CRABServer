@@ -1,11 +1,13 @@
-#! /bin/bash
+#!/bin/bash
 
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-voms-proxy-init --rfc --voms cms -valid 192:00
-voms-proxy-info
+if ! voms-proxy-info; then
+    voms-proxy-init --rfc --voms cms -valid 192:00
+fi
 
+export RUCIO_ACCOUNT=${RUCIO_ACCOUNT:-crabint1}
 source /cvmfs/cms.cern.ch/rucio/setup-py3.sh
 rucio whoami
 
-export DRY_RUN=${DRY_RUN:-false}
+export DRY_RUN=${DRY_RUN:-true}
 python3 "${SCRIPT_DIR}"/cleanup.py

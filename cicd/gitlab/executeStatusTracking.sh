@@ -29,7 +29,7 @@ TEST_RESULT='FAILED'
 if [ ! -s "./result" ]; then
 	MESSAGE='Something went wrong. Investigate manually.'
    	ERR=true
-elif grep "SUBMITFAILED" ./result; then
+elif grep -E "(SUBMITFAILED|SUBMITREFUSED)" ./result; then
     MESSAGE='Task(s) has "SUBMITFAILED" status. Investigate manually.'
    	ERR=true
 elif grep "TestRunning" result || grep "TestResubmitted" result; then
