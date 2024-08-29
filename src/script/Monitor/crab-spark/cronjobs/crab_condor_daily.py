@@ -228,6 +228,9 @@ def process_single_day(day):
         start = sent
         end = start + batch if start + batch < docs_rows else docs_rows
         docs_tmp = docs.iloc[start:end]
+        # the following line requires a lot of RAM, better do it 50_000
+        # items at a time only. Keep in mind that the pandas datafram usually
+        # contains about 1_000_000 rows
         docs_tmp = docs_tmp.to_dict('records')
         no_of_fail_saved = client.send(idx, docs_tmp, metadata=None, batch_size=10000, drop_nulls=False)
         sent = end
