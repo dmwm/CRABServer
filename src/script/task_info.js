@@ -854,6 +854,13 @@ $(document).ready(function() {
                 transferInfo = "https://" + document.domain + "/crabserver/devthree/fileusertransfers?subresource=getTransferStatus&taskname="
                 docInfo = "https://" + document.domain + "/crabserver/devthree/fileusertransfers?subresource=getById&id="
                 break;
+            case "devfour":
+                taskInfoUrl = "https://" + document.domain + "/crabserver/devfour/task?subresource=search&workflow=";
+                taskStatusUrl = "https://" + document.domain + "/crabserver/devfour/workflow?workflow=";
+                webDirProxyApiUrl = "https://" + document.domain + "/crabserver/devfour/task?subresource=webdirprx&workflow="
+                transferInfo = "https://" + document.domain + "/crabserver/devfour/fileusertransfers?subresource=getTransferStatus&taskname="
+                docInfo = "https://" + document.domain + "/crabserver/devfour/fileusertransfers?subresource=getById&id="
+                break;
             default:
                 break;
         }
