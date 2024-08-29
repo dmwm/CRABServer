@@ -80,8 +80,8 @@ class DagmanResubmitter(TaskAction):
                   'CRAB_SiteBlacklist' : 'site_blacklist',
                   'CRAB_SiteWhitelist' : 'site_whitelist',
                   'MaxWallTimeMinsRun' : 'maxjobruntime',
-                  'RequestMemory'      : 'maxmemory',
-                  'RequestCpus'        : 'numcores',
+                  'CRAB_RequestedMemory'      : 'maxmemory',
+                  'CRAB_RequestedCpus'        : 'numcores',
                   'JobPrio'            : 'priority'
                  }
         for taskparam in params.values():
