@@ -28,19 +28,22 @@ do
     esac
 done
 
-if [ -z "${TW_VERSION}" ] || [ -z "${SERVICE}" ]; then
-  echo "Make sure to set both -v and -s variables."; helpFunction; exit 1
-fi
 # define vars but set initial value to empty strgin to prevent unbound error
+TW_VERSION=${TW_VERSION:-}
+SERVICE=${SERVICE:-}
 TW_REPO=${TW_REPO:-}
 COMMAND=${COMMAND:-}
 LOGUUID=${LOGUUID:-}
+
+if [ -z "${TW_VERSION}" ] || [ -z "${SERVICE}" ]; then
+  echo "Make sure to set both -v and -s variables."; helpFunction; exit 1
+fi
 
 #list of directories that should exist on the host machine before container start
 dir=("/data/container/${SERVICE}/cfg" "/data/container/${SERVICE}/logs")
 
 case $SERVICE in
-  TaskWorker_monit_*)
+  TaskWorker_monit*)
     DIRECTORY='monit'
     ;;
   TaskWorker*)
@@ -100,29 +103,25 @@ if [[ "$OS_Version" = "7" ]]; then
     DOCKER_VOL="${DOCKER_VOL} -v /var/run/nscd/socket:/var/run/nscd/socket"
 fi
 
-DOCKER_OPT="-e SERVICE=${SERVICE} -w /data/srv/${DIRECTORY} "
+DOCKER_OPT="-d -e SERVICE=${SERVICE} -w /data/srv/${DIRECTORY} "
 
-DOCKER_IMAGE=${TW_REPO:-registry.cern.ch/cmscrab}/crabtaskworker:${TW_VERSION}
-
-if [[ "${SERVICE}" == TaskWorker_monit_*  ]]; then
-  echo "TaskWorker_monit_* detected"
-  # # the following two bind mounts are necessary to write to eos. it has been superseded by sending data to opensearch
-  # DOCKER_OPT="${DOCKER_OPT} -v /eos/project-c/cmsweb/www/CRAB/:/data/eos "
-  # DOCKER_OPT="${DOCKER_OPT} -v /tmp/krb5cc_1000:/tmp/krb5cc_1000 "
-
-  # - monit script does not work with `-di` option inside crontab.
-  # - in order to get the exit code of the command run inside docker container,
-  #   remove the `-d` option for monit crontabs
+if [[ "${SERVICE}" == TaskWorker_monit*  ]]; then
+  DOCKER_IMAGE=${TW_REPO:-registry.cern.ch/cmscrab}/crabtwmonit:${TW_VERSION}
 else
-  # start docker container in background when you run TW and Published, not monitoring scripts.
-  DOCKER_OPT="${DOCKER_OPT} -d"
+  DOCKER_IMAGE=${TW_REPO:-registry.cern.ch/cmscrab}/crabtaskworker:${TW_VERSION}
 fi
 
 docker run --name ${SERVICE} -t --net host --privileged $DOCKER_OPT $DOCKER_VOL $DOCKER_IMAGE $COMMAND > $tmpfile
-if [ $? -eq 0 ]; then
-  # if the crontab does not fail, remove the log file
-  rm -f $tmpfile
+if [[ "${SERVICE}" == TaskWorker_monit_*  ]]; then
+  echo "TaskWorker_monit_* detected, waiting for it to finish..."
+  docker_wait_return=$(docker wait ${SERVICE})
+  docker logs $SERVICE > $tmpfile
+  if [ $docker_wait_return -eq 0 ]; then
+    # if the crontab does not fail, remove the log file
+    rm -f $tmpfile
+  fi
 fi
+
 
 echo -e "Sleeping for 3 seconds.\nRunning containers:"
 sleep 3 && docker ps

@@ -327,7 +327,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             schedd, dummyAddress = loc.getScheddObjNew(task['tm_schedd'])
             self.logger.debug("Got schedd obj for %s ", task['tm_schedd'])
 
-            rootConst = f'TaskType =?= "ROOT" && CRAB_ReqName =?= {classad.quote(workflow)}' \
+            rootConst = f'CRAB_DAGType =?= "BASE" && CRAB_ReqName =?= {classad.quote(workflow)}' \
                         '&& (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)'
 
             self.logger.debug("Duplicate check is querying the schedd: %s", rootConst)
@@ -532,7 +532,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         with open('subdag.jdl', 'w', encoding='utf-8') as fd:
             print(subdag, file=fd)
 
-        jobJDL["+TaskType"] = classad.quote("ROOT")  # we want the ad value to be "ROOT", not ROOT
+        jobJDL["+CRAB_DAGType"] = classad.quote("BASE")  # we want the ad value to be "BASE", not BASE
         jobJDL["output"] = os.path.join(info['scratch'], "request.out")
         jobJDL["error"] = os.path.join(info['scratch'], "request.err")
         jobJDL["Cmd"] = cmd

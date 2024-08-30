@@ -521,8 +521,8 @@ class PreJob:
             filename=prejob_log_file_name,
             encoding='utf-8',
             level=logging.DEBUG,
-            format='%(asctime)s:%(levelname)s:%(module)s %(message)s", \
-                                      datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)"'
+            format="%(asctime)s:%(levelname)s:%(module)s %(message)s", \
+                                      datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)"
         )
 
         ## Redirect stdout and stderr to the pre-job log file.

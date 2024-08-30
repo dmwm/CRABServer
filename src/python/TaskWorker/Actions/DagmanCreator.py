@@ -101,7 +101,7 @@ CRAB_Id = $(count)
 +CRAB_OutLFNDir = "%(output_dest)s"
 +CRAB_oneEventMode = %(oneEventMode)s
 +CRAB_PrimaryDataset = %(primarydataset)s
-+TaskType = "Job"
++CRAB_DAGType = "Job"
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
 +CRAB_SubmitterIpAddr = %(submitter_ip_addr)s
@@ -980,7 +980,7 @@ class DagmanCreator(TaskAction):
                        (len(blocksWithBannedLocations), len(allblocks)))
                 msg += "not-whitelisted, and/or non-accelerator sites."
                 msg += getBlacklistMsg()
-            raise TaskWorker.WorkerExceptions.NoAvailableSite(msg)
+            raise SubmissionRefusedException(msg)
         msg = "Some blocks from dataset '%s' were skipped " % (kwargs['task']['tm_input_dataset'])
         if blocksWithNoLocations:
             msgBlocklist = sorted(list(blocksWithNoLocations)[:5]) + ['...']
