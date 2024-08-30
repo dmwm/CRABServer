@@ -265,7 +265,7 @@ class MasterWorker(object):
             # Organize tasks by user
             tasks_by_user = {}
             for task in waiting_tasks:
-                user = task['user']
+                user = task['tm_username']
                 if user not in tasks_by_user:
                     tasks_by_user[user] = []
                 tasks_by_user[user].append(task)
@@ -310,7 +310,7 @@ class MasterWorker(object):
         try:
             # Update the status of each selected task to 'NEW'
             for task in selected_tasks:
-                task_name = task['taskName']
+                task_name = task['tm_taskname']
                 updateTaskStatus(crabserver=self.crabserver, taskName=task_name, status='NEW', logger=self.logger)
                 self.logger.info(f"Task {task_name} status updated to 'NEW'.")
 
