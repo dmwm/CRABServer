@@ -278,7 +278,7 @@ class PreJob:
         maxmemory     = None
         numcores      = None
         priority      = None
-        if not use_resubmit_info:
+        if not use_resubmit_info:  # means thad we resubmit with new params from crab resubmit
             #if 'MaxWallTimeMins_RAW' in self.task_ad:
             #    if self.task_ad['MaxWallTimeMins_RAW'] != 1315:
             #        maxjobruntime = self.task_ad.lookup('MaxWallTimeMins_RAW')
@@ -297,7 +297,7 @@ class PreJob:
                 priority = int(str(self.task_ad['JobPrio']))
             if str(self.job_id) == '0': #jobids can be like 1-1 for subjobs
                 priority = 20 #the maximum for splitting jobs
-        else:
+        else:   # means we resubmit with same params as previous try
             inkey = str(crab_retry) if crab_retry == 0 else str(crab_retry - 1)
             while inkey not in self.resubmit_info and int(inkey) > 0:
                 inkey = str(int(inkey) -  1)
