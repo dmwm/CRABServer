@@ -321,13 +321,13 @@ class MasterWorker(object):
             self._reportQueueStatus()
 
         except HTTPException as hte:
-            msg = "HTTP Error during _lockWork: %s\n" % str(hte)
+            msg = "HTTP Error during _selectWork: %s\n" % str(hte)
             msg += "HTTP Headers are %s: " % hte.headers
             self.logger.error(msg)
             return False
 
         except Exception: #pylint: disable=broad-except
-            self.logger.exception("Server could not process the _lockWork request (prameters are %s)", configreq)
+            self.logger.exception("Server could not process the _selectWork request)
             return False
 
         return True
