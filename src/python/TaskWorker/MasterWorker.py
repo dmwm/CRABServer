@@ -312,7 +312,7 @@ class MasterWorker(object):
             for task in selected_tasks:
                 task_name = task['tm_taskname']
                 updateTaskStatus(crabserver=self.crabserver, taskName=task_name, status='NEW', logger=self.logger)
-                self.logger.info(f"Task {task_name} status updated to 'NEW'.")
+                self.logger.info("Task %s status updated to 'NEW'.", task_name)
 
             # Prune the task queue if necessary
             self._pruneTaskQueue()
