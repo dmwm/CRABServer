@@ -327,7 +327,7 @@ class MasterWorker(object):
             return False
 
         except Exception: #pylint: disable=broad-except
-            self.logger.exception("Server could not process the _selectWork request)
+            self.logger.exception("Server could not process the _selectWork request.")
             return False
 
         return True
