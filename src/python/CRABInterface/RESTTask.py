@@ -76,6 +76,72 @@ class RESTTask(RESTEntity):
         rows = self.api.query(None, None, self.Task.TASKSUMMARY_sql)
         return rows
 
+    # short status summary for the UI MAIN tab
+    def status(self, **kwargs):
+        """
+        retrieves all columns for a task via the "search" subresources, then format for that the UI wants
+        """
+        # this retuns so called "compact JSON format" a dictionary of the form
+        # {'desc':{'columns':[list of column names]}, 'result':[list of column values]}
+        # taskInfo = getattr(RESTTask, 'search')(self, **kwargs)
+        # NOPE this only returns the list of values, the name of the columns is handled inside
+        # https://github.com/dmwm/WMCore/blob/707fcee02c264805ac2968ffc32c677d39731997/src/python/WMCore/REST/Server.py#L2143
+        # need to repeat the SQL query used in old code in
+        # https://github.com/dmwm/CRABServer/blob/5c7777045b33302fb97128ed29d4627141e009ec/src/python/CRABInterface/HTCondorDataWorkflow.py#L170
+        # with the two steps:
+        # 1. retrieve the values
+        # 2. assign them to a name ntuple so to be able to address them
+
+        row = self.api.query(None, None, self.Task.ID_sql, taskname = kwargs['workflow'])  # step 1. get values
+        try:
+            #just one row is picked up by the previous query
+            row = self.Task.ID_tuple(*next(row))  # step 2. assign name to values
+        except StopIteration:
+            raise ExecutionError("Impossible to find task %s in the database." % workflow)
+
+        # now pick code from old implementation in
+        # https://github.com/dmwm/CRABServer/blob/5c7777045b33302fb97128ed29d4627141e009ec/src/python/CRABInterface/HTCondorDataWorkflow.py#L170
+
+        #Empty results, only fields for which a non NULL value was retrieved from DB will be filled
+        result = {"status"           : '',
+                  "command"          : '',
+                  "taskFailureMsg"   : '',
+                  "taskWarningMsg"   : [],
+                  "submissionTime"   : 0,
+                  "schedd"           : '',
+                  "splitting"        : '',
+                  "taskWorker"       : '',
+                  "webdirPath"       : '',
+                  "username"         : ''}
+
+        result['submissionTime'] = str(row.start_time)  # convert from datetime object to readable string
+        result['status'] = row.task_status
+        if row.task_command:
+            result['command'] = row.task_command
+        if row.task_failure is not None:
+            if isinstance(row.task_failure, str):
+                result['taskFailureMsg'] = row.task_failure
+            else:
+                result['taskFailureMsg'] = row.task_failure.read()
+        # Stefano does not know why taskWarningMsg is handled differently from taskFailureMsg, quite possibly
+        # the simplest form above works alwasy in a PY3 world
+        if row.task_warnings is not None:
+            taskWarnings = literal_eval(row.task_warnings if isinstance(row.task_warnings, str) else row.task_warnings.read())
+            result["taskWarningMsg"] = taskWarnings.decode("utf8") if isinstance(taskWarnings, bytes) else taskWarnings
+        if row.schedd:
+            result['schedd'] = row.schedd
+        if row.split_algo:
+            result['splitting'] = row.split_algo
+        if row.twname:
+            result['taskWorker'] = row.twname
+        if row.user_webdir:
+            result['webdirPath'] =  '/'.join(['/home/grid']+row.user_webdir.split('/')[-2:])
+        if row.username:
+            result['username'] = row.username
+
+        print(result)
+        return [result]
+
 
     #Quick search api
     def search(self, **kwargs):
