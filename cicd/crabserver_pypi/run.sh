@@ -15,8 +15,7 @@ mkfifo /data/srv/state/crabserver/crabserver-fifo
 cat /data/srv/state/crabserver/crabserver-fifo &
 
 # start the service
-# manage.py required service name, anything is fine because we never use it.
-./manage.py start -c -s REST
+./manage.py start -c
 
 # cat fifo forever to read logs
 while true;
