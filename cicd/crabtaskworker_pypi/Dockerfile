@@ -1,5 +1,5 @@
 # caching wmcore src, need for building TaskManagerRun.tar.gz
-FROM python:3.8 as wmcore-src
+FROM python:3.8 AS wmcore-src
 SHELL ["/bin/bash", "-c"]
 # Use the "magic" requirements.txt from crabserver pypi
 COPY cicd/crabserver_pypi/ .
@@ -10,7 +10,7 @@ RUN wmcore_repo="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f1)" \
     && echo "${wmcore_version}" > /wmcore_version
 
 # create data files ./data
-FROM python:3.8 as build-data
+FROM python:3.8 AS build-data
 SHELL ["/bin/bash", "-c"]
 RUN mkdir /build \
     && apt-get update \
@@ -28,7 +28,7 @@ RUN WMCOREDIR=./WMCore \
     bash buildDatafiles.sh
 
 # gfal, wmcore only has gfal lib but not cli
-FROM registry.cern.ch/cmsweb/gfal:latest as wmcore-gfal
+FROM registry.cern.ch/cmsweb/gfal:latest AS wmcore-gfal
 SHELL ["/bin/bash", "-c"]
 RUN pushd /data/miniconda \
     && git clone https://gitlab.cern.ch/dmc/gfal2-util -b v1.8.0 \
@@ -38,7 +38,7 @@ RUN pushd /data/miniconda \
     && rm -rf gfal2-util
 
 # cern ldap config
-FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 as cern-cc7
+FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 AS cern-cc7
 
 # start image
 FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
@@ -122,21 +122,28 @@ RUN install -d -o ${USER} -g ${USER} ${WDIR}/srv/Publisher/current \
 
 # copy process executor scripts
 ## TaskWorker
-COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/TaskWorker/start.sh \
-     cicd/crabtaskworker_pypi/TaskWorker/env.sh \
-     cicd/crabtaskworker_pypi/TaskWorker/stop.sh \
-     cicd/crabtaskworker_pypi/TaskWorker/manage.sh \
+COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/TaskWorker/manage.sh \
      cicd/crabtaskworker_pypi/updateDatafiles.sh \
      ${WDIR}/srv/TaskManager/
-
-COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/bin/crab-taskworker cicd/crabtaskworker_pypi/bin/crab-publisher /usr/local/bin/
-
-## publisher
-COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/Publisher/start.sh \
-     cicd/crabtaskworker_pypi/Publisher/env.sh \
-     cicd/crabtaskworker_pypi/Publisher/stop.sh \
-     cicd/crabtaskworker_pypi/Publisher/manage.sh \
+## Publisher
+COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/Publisher/manage.sh \
      ${WDIR}/srv/Publisher/
+
+## common script
+COPY --chown=${USER}:${USER} cicd/crabserver_pypi/start.sh \
+     cicd/crabserver_pypi/env.sh \
+     cicd/crabserver_pypi/stop.sh \
+     cicd/crabserver_pypi/manage.py \
+     ${WDIR}/srv/TaskManager/
+
+COPY --chown=${USER}:${USER} cicd/crabserver_pypi/start.sh \
+     cicd/crabserver_pypi/env.sh \
+     cicd/crabserver_pypi/stop.sh \
+     cicd/crabserver_pypi/manage.py \
+     ${WDIR}/srv/Publisher/
+
+## binary
+COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/bin/crab-taskworker cicd/crabtaskworker_pypi/bin/crab-publisher /usr/local/bin/
 
 ## entrypoint
 COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/run.sh /data/

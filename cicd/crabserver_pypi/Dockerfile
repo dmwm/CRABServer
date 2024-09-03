@@ -23,10 +23,10 @@ RUN ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
 # Copy CERN tnsnames.ora
 COPY --from=cmsweb /etc/tnsnames.ora /etc/tnsnames.ora
 # Copy process exporter
-COPY --from=cmsweb /data/cmsweb/bin/process_monitor.sh \
-     /data/cmsweb/bin/process_exporter \
+COPY --from=cmsweb ${WDIR}/cmsweb/bin/process_monitor.sh \
+     ${WDIR}/cmsweb/bin/process_exporter \
      /usr/local/bin
-COPY cicd/crabserver_pypi/monitor.sh /data/monitor.sh
+COPY --chown=${USER}:${USER} cicd/crabserver_pypi/monitor.sh ${WDIR}/monitor.sh
 
 RUN mkdir /build
 WORKDIR /build
@@ -40,40 +40,42 @@ RUN wmcore_version="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f2)" 
     && pip install --no-deps WMCore==${wmcore_version}
 
 # Install CRAB.
-COPY src/python/ /data/srv/current/lib/python/site-packages
-COPY src/script/ /data/srv/current/data/script/
-COPY src/html/ /data/srv/current/data/html/
-COPY src/css/ /data/srv/current/data/css/
+COPY --chown=${USER}:${USER} src/python/ ${WDIR}/srv/current/lib/python/site-packages
+COPY --chown=${USER}:${USER} src/script/ ${WDIR}/srv/current/data/script
+COPY --chown=${USER}:${USER} src/html/ ${WDIR}/srv/current/data/html
+COPY --chown=${USER}:${USER} src/css/ ${WDIR}/srv/current/data/css
 
-# add github repos
-COPY cicd/crabserver_pypi/addGH.sh .
-RUN bash addGH.sh
+WORKDIR ${WDIR}
 
+# cleanup build dir
 RUN rm -rf /build
 
-WORKDIR /data
+# add github repos
+COPY --chown=${USER}:${USER} cicd/crabserver_pypi/addGH.sh .
+USER ${USER}
+RUN bash addGH.sh
+USER root
 
 # create mandatory directory
-RUN ls /data/srv/current/ \
-    && install -d -o ${USER} -g ${USER} /data/srv/logs/crabserver \
-    && install -d -o ${USER} -g ${USER} /data/srv/state/crabserver \
-    && install -d -o ${USER} -g ${USER} /data/srv/current/auth/crabserver \
-    && install -d -o ${USER} -g ${USER} /data/srv/current/config/crabserver
+RUN ls ${WDIR}/srv/current/ \
+    && install -d -o ${USER} -g ${USER} ${WDIR}/srv/logs/crabserver \
+    && install -d -o ${USER} -g ${USER} ${WDIR}/srv/state/crabserver \
+    && install -d -o ${USER} -g ${USER} ${WDIR}/srv/current/auth/crabserver \
+    && install -d -o ${USER} -g ${USER} ${WDIR}/srv/current/config/crabserver
 
 # remove unuse /data/manage come from baseimage to prevent confusion
-RUN rm /data/manage
+RUN rm ${WDIR}/manage
 
 # copy running script files
-COPY cicd/crabserver_pypi/run.sh \
+COPY --chown=${USER}:${USER} cicd/crabserver_pypi/run.sh \
      cicd/crabserver_pypi/manage.sh \
+     cicd/crabserver_pypi/manage.py \
      cicd/crabserver_pypi/entrypoint.sh \
      cicd/crabserver_pypi/env.sh \
      cicd/crabserver_pypi/start.sh \
      cicd/crabserver_pypi/stop.sh \
-     /data/
-
-# make sure all files is the same user/group as running user
-RUN chown -R 1000:1000 /data && chmod +x /data/*.sh
+     /data
 
 USER ${USER}
-CMD /data/run.sh
+
+CMD ${WDIR}/run.sh

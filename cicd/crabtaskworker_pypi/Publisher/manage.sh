@@ -1,21 +1,7 @@
-#! /bin/bash
+#!/bin/bash
 
 # Start the Publisher service.
 
-##H Usage: manage.sh ACTION
-##H
-##H Available actions:
-##H   help        show this help
-##H   version     get current version of the service
-##H   restart     (re)start the service
-##H   start       (re)start the service
-##H   stop        stop the service
-##H
-##H This script needs following environment variables for start action:
-##H   - DEBUG:      if `true`, setup debug mode environment.
-##H   - PYTHONPATH: inherit from ./start.sh
-##H   - SERVICE:    inherit from container environment
-##H                 (e.g., `-e SERVICE=Publisher_schedd` when do `docker run`)
 set -euo pipefail
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 if [[ -n ${TRACE+x} ]]; then
@@ -23,12 +9,17 @@ if [[ -n ${TRACE+x} ]]; then
     export TRACE
 fi
 
-# some variable use in start_srv
-CONFIG="${SCRIPT_DIR}"/current/PublisherConfig.py
+# sanity check
+if [[ -z ${COMMAND+x} || -z ${MODE+x} || -z ${DEBUG+x} || -z ${SERVICE+x} ]]; then
+    >&2 echo "Error: Not all envvars are set!"
+    exit 1
+fi
 
-helpFunction() {
-    grep "^##H" "${0}" | sed -r "s/##H(| )//g"
-}
+# Check if SERVICE is specified
+if [[ ! ${SERVICE} =~ ^(Publisher_schedd|Publisher_rucio)$ ]]; then
+    >&2 echo "Error: Unknown SERVICE: ${SERVICE}."
+    exit 1
+fi
 
 _getPublisherPid() {
     pid=$(pgrep -f 'crab-publisher' | grep -v grep | head -1 ) || true
@@ -64,28 +55,31 @@ _isPublisherBusy(){
     fi
 }
 
+script_env() {
+    # config
+    CONFIG="${SCRIPT_DIR}"/current/PublisherConfig.py
+    # path where we install crab code
+    APP_PATH="${APP_PATH:-/data/srv/current/lib/python/site-packages/}"
+    # PYTHONPATH
+    if [[ $MODE = 'fromGH' ]]; then
+        PYTHONPATH=/data/repos/CRABServer/src/python:/data/repos/WMCore/src/python:${PYTHONPATH:-}
+    else
+        PYTHONPATH="${APP_PATH}":${PYTHONPATH:-}
+    fi
+    export PYTHONPATH
+}
 
 start_srv() {
-    # Check require env
-    # shellcheck disable=SC2269
-    SERVICE="${SERVICE}"
-    # shellcheck disable=SC2269
-    DEBUG="${DEBUG}"
-    export PYTHONPATH="${PYTHONPATH}"
-
-    # hardcode APP_DIR, but if debug mode, APP_DIR can be override
-    if [[ "${DEBUG}" = 'true' ]]; then
+    script_env
+    if [[ -n ${DEBUG} ]]; then
         crab-publisher --config "${CONFIG}" --service "${SERVICE}" --logDebug --pdb
     else
-        crab-publisher --config "${CONFIG}" --service "${SERVICE}" --logDebug &
+        nohup crab-publisher --config "${CONFIG}" --service "${SERVICE}" --logDebug &> logs/nohup.out
     fi
     echo "Started Publisher with Publisher pid $(_getPublisherPid)"
-
 }
 
 stop_srv() {
-    # This part is copy directly from https://github.com/dmwm/CRABServer/blob/3af9d658271a101db02194f48c5cecaf5fab7725/src/script/Deployment/Publisher/stop.sh
-
   nIter=1
   # check if publisher is still processing by look at the pb logs
   while _isPublisherBusy;  do
@@ -115,24 +109,37 @@ stop_srv() {
 
 }
 
-# Main routine, perform action requested on command line.
-case ${1:-help} in
-  start | restart )
-    stop_srv
-    start_srv
-    ;;
-
-  stop )
-    stop_srv
-    ;;
-
-  help )
-    helpFunction
-    exit 0
-    ;;
-
-  * )
-    echo "$0: unknown action '$1', please try '$0 help' or documentation." 1>&2
+status_srv() {
+    >&2 echo "Error: Not implemented."
     exit 1
-    ;;
+}
+
+
+env_eval() {
+    script_env
+    echo "export PYTHONPATH=${PYTHONPATH}"
+}
+
+# Main routine, perform action requested on command line.
+case ${COMMAND:-help} in
+    start )
+        stop_srv
+        start_srv
+        ;;
+
+    stop )
+        stop_srv
+        ;;
+
+    status )
+        status_srv
+        ;;
+
+    env )
+        env_eval
+        ;;
+    * )
+        echo "$0: unknown action '$1', please try '$0 help' or documentation." 1>&2
+        exit 1
+        ;;
 esac

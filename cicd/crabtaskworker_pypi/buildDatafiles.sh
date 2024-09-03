@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 # Build data files of TaskWorker.
 # This script needs
 #   - RUNTIME_WORKDIR:   Working directory to build tar files

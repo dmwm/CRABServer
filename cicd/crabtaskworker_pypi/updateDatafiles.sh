@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 # This script mean to run inside crabtaskworker image.
 # Hardcoded the DATAFILES_WORKDIR, RUNTIME_WORKDIR, WMCOREDIR, CRABSERVERDIR,
 # and DATA_DIR to TaskWorker's deployment convention
