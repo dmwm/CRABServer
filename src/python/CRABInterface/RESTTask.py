@@ -104,17 +104,17 @@ class RESTTask(RESTEntity):
 
         # now pick code from old implementation
         # Empty results, only fields for which a non NULL value was retrieved from DB will be filled
-        result = {"status"           : '',
+        result = {"submissionTime"   : '',
+                  "username"         : '',
+                  "status"           : '',
                   "command"          : '',
                   "taskFailureMsg"   : '',
                   "taskWarningMsg"   : [],
-                  "submissionTime"   : '',
-                  "schedd"           : '',
                   "splitting"        : '',
+                  "schedd"           : '',
                   "taskWorker"       : '',
                   "webdirPath"       : '',
-                  "clusterid"        : '',
-                  "username"         : ''}
+                  "clusterid"        : ''}
 
         result['submissionTime'] = str(row.start_time)  # convert from datetime object to readable string
         result['status'] = row.task_status
