@@ -1,5 +1,9 @@
-# WMCore dependecies here
-from Utils.Utilities import decodeBytesToUnicode
+""" handles HTTP queries to crabserver/instance/task?...  """
+
+import re
+import logging
+from ast import literal_eval
+
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_strlist
 from WMCore.REST.Error import InvalidParameter, ExecutionError, NotAcceptable
@@ -9,11 +13,6 @@ from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match, a
 from CRABInterface.Regexps import RX_MANYLINES_SHORT, RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME,\
     RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE, RX_DATASET, RX_ANYTHING_10K
 from ServerUtilities import getUsernameFromTaskname
-
-# external dependecies here
-import re
-import logging
-from ast import literal_eval
 
 
 class RESTTask(RESTEntity):
@@ -64,11 +63,9 @@ class RESTTask(RESTEntity):
         rows = self.api.query(None, None, self.Task.ALLUSER_sql)
         return rows
 
-
     def allinfo(self, **kwargs):
         rows = self.api.query(None, None, self.Task.IDAll_sql, taskname=kwargs['workflow'])
         return rows
-
 
 	#INSERTED BY ERIC SUMMER STUDENT
     def summary(self, **kwargs):
@@ -102,8 +99,8 @@ class RESTTask(RESTEntity):
             row = self.api.query(None, None, self.Task.ID_sql, taskname = taskName)  # step 1. get values
             #just one row is picked up by the previous query
             row = self.Task.ID_tuple(*next(row))  # step 2. assign name to values
-        except StopIteration:
-            raise ExecutionError("Impossible to find task %s in the database." % taskName)
+        except StopIteration as e:
+            raise ExecutionError("Impossible to find task %s in the database." % taskName) from e
 
         # now pick code from old implementation
         # Empty results, only fields for which a non NULL value was retrieved from DB will be filled
@@ -144,9 +141,7 @@ class RESTTask(RESTEntity):
             result['username'] = row.username
         if row.clusterid:
             result['clusterid'] = row.clusterid
-
         return [result]
-
 
     #Quick search api
     def search(self, **kwargs):
@@ -160,27 +155,24 @@ class RESTTask(RESTEntity):
 
         try:
             row = next(self.api.query(None, None, self.Task.QuickSearch_sql, taskname=kwargs["workflow"]))
-        except StopIteration:
-            raise ExecutionError("Impossible to find task %s in the database." % kwargs["workflow"])
+        except StopIteration as e:
+            raise ExecutionError("Impossible to find task %s in the database." % kwargs["workflow"]) from e
 
         def getval(col):
             """ Some columns in oracle can be CLOB and we need to call read on them.
             """
-            #TODO move the function in ServerUtils and use it when required (e.g.: mysql LONGTEXT does not need read())
+            # should move this function in ServerUtils and use it when required (e.g.: mysql LONGTEXT does not need read())
             try:
                 return str(col)
-            except Exception as ex:  # pylint: disable=unused-variable
+            except Exception:  # pylint: disable=broad-except
                 return col.read()
         return [getval(col) for col in row]
-
 
     #Get all jobs with a specified status
     def taskbystatus(self, **kwargs):
         """Retrieves all jobs of the specified user with the specified status"""
         rows = self.api.query(None, None, self.Task.TaskByStatus_sql, username_=kwargs["username"], taskstatus=kwargs["taskstatus"])
-
         return rows
-
 
     #Get all tasks with a specified ddmreqid
     def taskbyddmreqid(self, **kwargs):
@@ -188,25 +180,23 @@ class RESTTask(RESTEntity):
         rows = self.api.query(None, None, self.Task.TaskByDdmReqid_sql, ddmreqid=kwargs["ddmreqid"])
         return rows
 
-
     def webdir(self, **kwargs):
         if 'workflow' not in kwargs or not kwargs['workflow']:
             raise InvalidParameter("Task name not found in the input parameters")
         workflow = kwargs['workflow']
         try:
             row = self.Task.ID_tuple(*next(self.api.query(None, None, self.Task.ID_sql, taskname=workflow)))
-        except StopIteration:
-            raise ExecutionError("Impossible to find task %s in the database." % kwargs["workflow"])
+        except StopIteration as e:
+            raise ExecutionError("Impossible to find task %s in the database." % kwargs["workflow"]) from e
         yield row.user_webdir
-
 
     def getpublishurl(self, **kwargs):
         if 'workflow' not in kwargs or not kwargs['workflow']:
             raise InvalidParameter("Task name not found in the input parameters")
         try:
             row = next(self.api.query(None, None, self.Task.GetPublishUrl_sql, taskname=kwargs['workflow']))
-        except StopIteration:
-            raise ExecutionError("Impossible to find task %s in the database." % kwargs['workflow'])
+        except StopIteration as e:
+            raise ExecutionError("Impossible to find task %s in the database." % kwargs['workflow']) from e
         yield row
 
     @conn_handler(services=['centralconfig'])
@@ -223,8 +213,8 @@ class RESTTask(RESTEntity):
 
         try:
             row = self.Task.ID_tuple(*next(self.api.query(None, None, self.Task.ID_sql, taskname=workflow)))
-        except StopIteration:
-            raise ExecutionError("Impossible to find task %s in the database." % kwargs["workflow"])
+        except StopIteration as e:
+            raise ExecutionError("Impossible to find task %s in the database." % kwargs["workflow"]) from e
 
         if row.user_webdir:
             #extract /cms1425/taskname from the user webdir
@@ -254,7 +244,6 @@ class RESTTask(RESTEntity):
                 yield proxiedurlbase + suffix
         else:
             self.logger.info("Could not determine proxied url for task %s", workflow)
-
 
     def counttasksbystatus(self, **kwargs):
         """Retrieves all jobs of the specified user with the specified status
@@ -290,13 +279,11 @@ class RESTTask(RESTEntity):
         for row in rows:
             yield [row[0], row[1], row[2].read()]
 
-
     @restcall
     def post(self, subresource, **kwargs):
         """ Updates task information """
 
         return getattr(RESTTask, subresource)(self, **kwargs)
-
 
     def addwarning(self, **kwargs):
         """ Add a warning to the warning column in the database. Can be tested with:
@@ -332,7 +319,6 @@ class RESTTask(RESTEntity):
 
         return []
 
-
     def deletewarnings(self, **kwargs):
         """ Deleet warnings from the warning column in the database. Can be tested with:
             curl -X POST https://mmascher-poc.cern.ch/crabserver/dev/task -k --key /tmp/x509up_u8440 --cert /tmp/x509up_u8440 \
@@ -361,7 +347,6 @@ class RESTTask(RESTEntity):
 
         return []
 
-
     def updateschedd(self, **kwargs):
         """ Change scheduler for task submission.
             curl -X POST https://balcas-crab.cern.ch/crabserver/dev/task -ks --key $X509_USER_PROXY --cert $X509_USER_PROXY --cacert $X509_USER_PROXY \
@@ -379,7 +364,6 @@ class RESTTask(RESTEntity):
 
         return []
 
-
     def updatepublicationtime(self, **kwargs):
         """ Change last publication time for task.
             curl -X POST 'https://mmascher-gwms.cern.ch/crabserver/dev/task' -ks --key $X509_USER_PROXY --cert $X509_USER_PROXY --cacert $X509_USER_PROXY \
@@ -394,7 +378,6 @@ class RESTTask(RESTEntity):
         self.api.modify(self.Task.UpdatePublicationTime_sql, workflow=[workflow])
 
         return []
-
 
     def addwebdir(self, **kwargs):
         """ Add web directory to web_dir column in the database. Can be tested with:
@@ -414,7 +397,6 @@ class RESTTask(RESTEntity):
 
         return []
 
-
     def addoutputdatasets(self, **kwargs):
         if 'outputdatasets' not in kwargs or not kwargs['outputdatasets']:
             raise InvalidParameter("Output datasets not found in the input parameters")
@@ -429,7 +411,6 @@ class RESTTask(RESTEntity):
         outputdatasets = str(list(set(outputdatasets + literal_eval(str(kwargs['outputdatasets'])))))
 
         self.api.modify(self.Task.SetUpdateOutDataset_sql, tm_output_dataset=[outputdatasets], tm_taskname=[workflow])
-
         return []
 
     def addddmreqid(self, **kwargs):
@@ -447,7 +428,6 @@ class RESTTask(RESTEntity):
         authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
 
         self.api.modify(self.Task.UpdateDDMReqId_sql, taskstatus=[kwargs['taskstatus']], ddmreqid=[kwargs['ddmreqid']], workflow=[workflow])
-
         return []
 
     def addrucioasoinfo(self, **kwargs):
