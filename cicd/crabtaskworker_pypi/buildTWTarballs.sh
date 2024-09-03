@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 # Simplify version of htcondor_make_runtime.sh to build TaskManagerRun.tar.gz/CMSRunAnalysis.tar.gz
 # https://github.com/novicecpp/CRABServer/blob/5dd0a31c9545e5e16a395aba0b1b955f1bf37b23/bin/htcondor_make_runtime.sh
 # This script needs

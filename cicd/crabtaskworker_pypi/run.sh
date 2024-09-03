@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 # The entrypoint script to execute actual script base on $SERVICE.
 #
@@ -49,7 +49,7 @@ done
 pushd "${WORKDIR}"
 
 # execute
-./start.sh -c
+./manage.py start -c
 
 while true; do
     sleep 3600
