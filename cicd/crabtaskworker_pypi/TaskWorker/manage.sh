@@ -11,7 +11,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 # sanity check
 if [[ -z ${COMMAND+x} || -z ${MODE+x} || -z ${DEBUG+x} || -z ${SERVICE+x} ]]; then
-    >&2 echo "All envvars are not set!."
+    >&2 echo "Error: Not all envvars are set!"
     exit 1
 fi
 
