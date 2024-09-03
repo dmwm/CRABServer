@@ -279,6 +279,17 @@ class MasterWorker(object):
                 user_tasks = tasks_by_user[user]
                 selected_tasks.extend(user_tasks[:limit // len(users)])
 
+            task_count = {}
+            for task in selected_tasks:
+                username = task['tm_username']
+                if username in task_count:
+                    task_count[username] += 1
+                else:
+                    task_count[username] = 1
+
+            for username, count in task_count.items():
+                self.logger.info('%d tasks for %s were selected during task scheduling.', count, username)
+
             return selected_tasks
 
         except Exception as e:
