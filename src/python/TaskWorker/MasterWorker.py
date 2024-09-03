@@ -286,9 +286,10 @@ class MasterWorker(object):
                     task_count[username] += 1
                 else:
                     task_count[username] = 1
-
-            for username, count in task_count.items():
-                self.logger.info('%d tasks for %s were selected during task scheduling.', count, username)
+            
+            if self.config.Adhoc.dry_run:
+                for username, count in task_count.items():
+                    self.logger.info('%d tasks for %s were selected during task scheduling.', count, username)
 
             return selected_tasks
 

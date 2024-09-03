@@ -73,6 +73,7 @@ def main():
     configuration = loadConfigurationFile(os.path.abspath(options.config))
     configuration.section_('Adhoc')
     configuration.Adhoc.selection_limit = 10
+    configuration.Adhoc.dry_run= True
     status, msg = validateConfig(configuration)
     if not status:
         raise ConfigException(msg)
