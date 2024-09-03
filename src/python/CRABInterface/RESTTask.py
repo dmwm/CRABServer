@@ -95,12 +95,15 @@ class RESTTask(RESTEntity):
         # 1. retrieve the values
         # 2. assign them to a name ntuple so to be able to address them
 
-        row = self.api.query(None, None, self.Task.ID_sql, taskname = kwargs['workflow'])  # step 1. get values
+        if 'workflow' not in kwargs or not kwargs['workflow']:
+            raise InvalidParameter("Task name not found in the input parameters")
+        taskName =  kwargs['workflow']
         try:
+            row = self.api.query(None, None, self.Task.ID_sql, taskname = taskName)  # step 1. get values
             #just one row is picked up by the previous query
             row = self.Task.ID_tuple(*next(row))  # step 2. assign name to values
         except StopIteration:
-            raise ExecutionError("Impossible to find task %s in the database." % workflow)
+            raise ExecutionError("Impossible to find task %s in the database." % taskName)
 
         # now pick code from old implementation
         # Empty results, only fields for which a non NULL value was retrieved from DB will be filled
@@ -120,16 +123,15 @@ class RESTTask(RESTEntity):
         result['status'] = row.task_status
         if row.task_command:
             result['command'] = row.task_command
-        if row.task_failure is not None:
+        if row.task_failure:
             if isinstance(row.task_failure, str):
                 result['taskFailureMsg'] = row.task_failure
             else:
                 result['taskFailureMsg'] = row.task_failure.read()
-        # Stefano does not know why taskWarningMsg is handled differently from taskFailureMsg, quite possibly
-        # the simplest form above works alwasy in a PY3 world
-        if row.task_warnings is not None:
+        # Need to use literal_eval because task_warnings is a list of strings stored as a CLOB in the DB
+        if row.task_warnings:
             taskWarnings = literal_eval(row.task_warnings if isinstance(row.task_warnings, str) else row.task_warnings.read())
-            result["taskWarningMsg"] = taskWarnings.decode("utf8") if isinstance(taskWarnings, bytes) else taskWarnings
+            result["taskWarningMsg"] = taskWarnings
         if row.schedd:
             result['schedd'] = row.schedd
         if row.split_algo:
