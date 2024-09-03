@@ -31,7 +31,8 @@ script_env() {
     # If REST really use X509_USER_PROXY, I need to confirmed that somehow
     # WMCore keep reread the file when it use.
     #
-    # X509_USER_PROXY already set in setup.sh, the script that run before execute this file
+    # X509_USER_PROXY already set in entrypoint.sh, the script that run before
+    # execute this file
     export X509_USER_PROXY=${X509_USER_PROXY:-/etc/proxy/proxy}
     export X509_USER_CERT=${X509_USER_CERT:-/data/srv/current/auth/crabserver/dmwm-service-cert.pem}
     export X509_USER_KEY=${X509_USER_KEY:-/data/srv/current/auth/crabserver/dmwm-service-key.pem}
