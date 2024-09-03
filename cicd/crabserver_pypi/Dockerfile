@@ -31,13 +31,18 @@ COPY --chown=${USER}:${USER} cicd/crabserver_pypi/monitor.sh ${WDIR}/monitor.sh
 RUN mkdir /build
 WORKDIR /build
 
-COPY cicd/crabserver_pypi/requirements.txt cicd/crabserver_pypi/wmcore_requirements.txt .
-# Install wmcore/crab dependencies
+COPY cicd/crabserver_pypi/requirements.txt .
+# Install dependencies
 RUN pip install -r requirements.txt
-# Getting the version number from wmcore_requirements.txt and install it with `--no-deps`.
-# When reading from file, `grep -v '^\s*#'` to ignore all comment lines, including the ones with leading whitespace ('\s' to match whitespace).
-RUN wmcore_version="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f2)" \
-    && pip install --no-deps WMCore==${wmcore_version}
+
+# create install dir
+RUN install -d -o ${USER} -g ${USER} ${WDIR}/srv/current/lib/python/site-packages
+
+# Install wmcore
+COPY cicd/crabserver_pypi/wmcore_requirements.txt \
+     cicd/crabserver_pypi/installWMCore.sh \
+     ./
+RUN ./installWMCore.sh wmcore_requirements.txt ${WDIR}/srv/current/lib/python/site-packages
 
 # Install CRAB.
 COPY --chown=${USER}:${USER} src/python/ ${WDIR}/srv/current/lib/python/site-packages

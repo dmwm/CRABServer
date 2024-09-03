@@ -1,14 +1,3 @@
-# caching wmcore src, need for building TaskManagerRun.tar.gz
-FROM python:3.8 AS wmcore-src
-SHELL ["/bin/bash", "-c"]
-# Use the "magic" requirements.txt from crabserver pypi
-COPY cicd/crabserver_pypi/ .
-RUN wmcore_repo="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f1)" \
-    && wmcore_version="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f2)" \
-    && git clone ${wmcore_repo} -b "${wmcore_version}" /WMCore \
-    && ( cd /WMCore; git status ) \
-    && echo "${wmcore_version}" > /wmcore_version
-
 # create data files ./data
 FROM python:3.8 AS build-data
 SHELL ["/bin/bash", "-c"]
@@ -17,11 +6,17 @@ RUN mkdir /build \
     && apt-get install -y curl zip git \
     && apt-get clean all
 WORKDIR /build
-COPY cicd/crabtaskworker_pypi/buildTWTarballs.sh cicd/crabtaskworker_pypi/buildDatafiles.sh /build/
+COPY cicd/crabtaskworker_pypi/buildTWTarballs.sh \
+     cicd/crabtaskworker_pypi/buildDatafiles.sh \
+     cicd/crabserver_pypi/wmcore_requirements.txt /build/
 COPY setup.py /build
 COPY src /build/src
 COPY scripts /build/scripts
-COPY --from=wmcore-src /WMCore /build/WMCore
+
+RUN wmcore_repo="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f1)" \
+    && wmcore_version="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f2)" \
+    && git clone  --depth 1 ${wmcore_repo} -b "${wmcore_version}" /build/WMCore \
+    && ( cd /build/WMCore; git status )
 RUN WMCOREDIR=./WMCore \
     CRABSERVERDIR=./ \
     DATAFILES_WORKDIR=./data_files\
@@ -46,6 +41,10 @@ SHELL ["/bin/bash", "-c"]
 ENV USER=crab3
 ENV WDIR=/data
 
+# add new user
+RUN useradd -m ${USER} \
+    && install -o ${USER} -d ${WDIR}
+
 # install gfal
 # symlink to workaround calling gfal from absolute path
 COPY --chown=${USER}:${USER} --from=wmcore-gfal ${WDIR}/miniconda ${WDIR}/miniconda/
@@ -68,21 +67,29 @@ RUN mkdir /build
 WORKDIR /build
 
 # install dependencies
-COPY --chown=${USER}:${USER} --from=wmcore-src /wmcore_version ./
-COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/requirements.txt ./
+COPY cicd/crabtaskworker_pypi/requirements.txt ./
 RUN pip install -r requirements.txt \
-    && pip install --no-deps wmcore==$(cat wmcore_version) \
     && pip cache purge
+
+# create install dir
+RUN install -d -o ${USER} -g ${USER} ${WDIR}/srv/current/lib/python/site-packages
+
+# install wmcore
+COPY cicd/crabserver_pypi/wmcore_requirements.txt \
+     cicd/crabserver_pypi/installWMCore.sh \
+     ./
+RUN ./installWMCore.sh wmcore_requirements.txt ${WDIR}/srv/current/lib/python/site-packages
+
+# install crabserver
+# will replace with pip later
+COPY --chown=${USER}:${USER} src/python/ ${WDIR}/srv/current/lib/python/site-packages
+
+# copy TaskManagerRun.tar.gz
+COPY --chown=${USER}:${USER} --from=build-data /build/data_files/data ${WDIR}/srv/current/lib/python/site-packages/data/
 
 # copy htcondor config
 RUN mkdir /etc/condor
 COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/condor_config /etc/condor/
-
-# install crabserver
-# will replace with pip later
-COPY --chown=${USER}:${USER} src/python/ ${WDIR}/srv/current/lib/python/site-packages/
-# copy TaskManagerRun.tar.gz
-COPY --chown=${USER}:${USER} --from=build-data /build/data_files/data ${WDIR}/srv/current/lib/python/site-packages/data/
 
 # copy cern openldap config
 COPY --chown=${USER}:${USER} --from=cern-cc7 /etc/openldap /etc/openldap/
@@ -98,10 +105,6 @@ RUN bash addGH.sh
 # clean up
 WORKDIR ${WDIR}
 RUN rm -rf /build
-
-# add new user and switch to user
-RUN useradd -m ${USER} \
-    && install -o ${USER} -d ${WDIR}
 
 # create working directory
 RUN install -d -o ${USER} -g ${USER} ${WDIR}/srv/tmp
