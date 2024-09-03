@@ -71,6 +71,8 @@ def main():
         raise ConfigException("Configuration not found")
 
     configuration = loadConfigurationFile(os.path.abspath(options.config))
+    configuration.section_('Adhoc')
+    configuration.Adhoc.selection_limit = 10
     status, msg = validateConfig(configuration)
     if not status:
         raise ConfigException(msg)

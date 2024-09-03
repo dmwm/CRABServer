@@ -482,7 +482,7 @@ class MasterWorker(object):
         self.restartQueuedTasks()
         self.logger.debug("Master Worker Starting Main Cycle.")
         while not self.STOP:
-            selection_limit = 10 #TBD what should be the value
+            selection_limit = self.config.Adhoc.selection_limit
             if not self._selectWork(limit=selection_limit):
                 self.logger.warning("Selection of work failed.")
             else:
