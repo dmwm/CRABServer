@@ -12,7 +12,7 @@ class EnvDefault(argparse.Action): # pylint: disable=too-few-public-methods
     # copy from https://stackoverflow.com/a/10551190
     # to make arg able to read from env if not provided.
     """
-    def __init__(self, envvar, required=True, default=None, **kwargs):
+    def __init__(self, envvar, required=False, default=None, **kwargs):
         if envvar:
             if envvar in os.environ:
                 default = os.environ[envvar]
@@ -38,7 +38,7 @@ parserStart.add_argument('-d', dest='debug', action='store_const', const='t',
                          help='Enable debug mode (foreground)')
 # env $SERVICE
 parserStart.add_argument('-s', dest='service', action=EnvDefault, envvar='SERVICE',
-                         help='Name of the service to run: REST/TaskWorker*/Publisher*')
+                         help='Name of the service to run. Only use in Publisher (Publisher_schedd, Publisher_rucio)')
 parserStop = subparsers.add_parser('stop',
                                    help='show service status (exit non-zero if service does not start)')
 parserStatus = subparsers.add_parser('status',

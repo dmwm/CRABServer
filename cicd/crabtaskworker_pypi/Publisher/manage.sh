@@ -15,6 +15,12 @@ if [[ -z ${COMMAND+x} || -z ${MODE+x} || -z ${DEBUG+x} || -z ${SERVICE+x} ]]; th
     exit 1
 fi
 
+# Check if SERVICE is specified
+if [[ ! ${SERVICE} =~ ^(Publisher_schedd|Publisher_rucio)$ ]]; then
+    >&2 echo "Error: Unknown SERVICE: ${SERVICE}."
+    exit 1
+fi
+
 _getPublisherPid() {
     pid=$(pgrep -f 'crab-publisher' | grep -v grep | head -1 ) || true
     echo "${pid}"
