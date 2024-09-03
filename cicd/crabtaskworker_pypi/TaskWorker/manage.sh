@@ -34,7 +34,7 @@ start_srv() {
     if [[ -n ${DEBUG} ]]; then
         crab-taskworker --config "${CONFIG}" --logDebug --pdb
     else
-        nohup crab-taskworker --config "${CONFIG}" --logDebug &> logs/nohup.out
+        nohup crab-taskworker --config "${CONFIG}" --logDebug &> logs/nohup.out &
     fi
     echo "Started TaskWorker with MasterWorker pid $(_getMasterWorkerPid)"
 }
