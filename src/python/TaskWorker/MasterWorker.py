@@ -293,12 +293,7 @@ class MasterWorker(object):
 
 
     def _selectWork(self, limit):
-        """Presently this always returns true, because we do not want the worker to die if
-           the server endpoint is not available.
-           Prints a log entry if answer is greater than 400:
-            * the server call succeeded or
-            * the server could not find anything to update or
-            * the server has an internal error"""
+        """This function calls external scheduling and updates task status for the selected tasks"""
         self.logger.info("Starting work selection process.")
 
         # Call the external scheduling method
@@ -488,7 +483,10 @@ class MasterWorker(object):
         self.logger.debug("Master Worker Starting Main Cycle.")
         while not self.STOP:
             selection_limit = 10 #TBD what should be the value
-            self._selectWork(limit=selection_limit)
+            if not self._selectWork(limit=selection_limit):
+                self.logger.warning("Selection of work failed.")
+            else:
+                self.logger.info("Work selected successfully.")
             limit = self.slaves.queueableTasks()
             if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
                 time.sleep(self.config.TaskWorker.polling)
