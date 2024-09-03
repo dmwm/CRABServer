@@ -6,6 +6,8 @@ class Task(object):
     """
     """
     #ID
+    # NOTE ID_tuple must contain the names of all columns retrieved by ID_sql, in same order !
+    # names are used in RESP API's to address individual variables and must not be changed
     ID_tuple = namedtuple("ID", ["taskname", "task_status", "task_command", "user_role", "user_group", \
              "task_failure", "split_algo", "split_args", "save_logs", "username", \
              "user_dn", "arguments", "input_dataset", "dbs_url", "task_warnings", "publication", "user_webdir", \

@@ -34,10 +34,11 @@ groupModeStart.add_argument('-c', dest='mode', action='store_const', const='curr
 groupModeStart.add_argument('-g', dest='mode', action='store_const', const='fromGH',
                             help='start service from /data/repos directory')
 parserStart.add_argument('-d', dest='debug', action='store_const', const='t',
-                         default='f',
+                         default='',
                          help='Enable debug mode (foreground)')
 # env $SERVICE
 parserStart.add_argument('-s', dest='service', action=EnvDefault, envvar='SERVICE',
+                         default='',
                          help='Name of the service to run. Only use in Publisher (Publisher_schedd, Publisher_rucio)')
 parserStop = subparsers.add_parser('stop',
                                    help='show service status (exit non-zero if service does not start)')
@@ -56,9 +57,9 @@ args = myparser.parse_args()
 env = os.environ.copy()
 # always provides env vars
 env['COMMAND'] = args.command
-env['MODE'] = getattr(args, 'mode', 'current')
-env['DEBUG'] = getattr(args, 'debug', '')
-env['SERVICE'] = getattr(args, 'service', '')
+env['MODE'] = args.mode
+env['DEBUG'] = args.debug
+env['SERVICE'] = args.service
 
 # re exec the ./manage.sh
 # os.execle(filepath, arg0, arg1, ..., argN, env_dict)
