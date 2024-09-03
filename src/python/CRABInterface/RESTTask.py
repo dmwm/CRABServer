@@ -79,14 +79,17 @@ class RESTTask(RESTEntity):
     # short status summary for the UI MAIN tab
     def status(self, **kwargs):
         """
-        retrieves all columns for a task via the "search" subresources, then format for that the UI wants
+         The API is (only?) used in the monitor for operator.
+           curl -X GET 'https://mmascher-dev6.cern.ch/crabserver/dev/task?subresource=statush&workflow=150224_230633:mmascher_crab_testecmmascher-dev6_3' \
+                        -k --key /tmp/x509up_u8440 --cert /tmp/x509up_u8440 -v
+        to be used in the CRABServer UI to display a summary of Task status
+        moved here from RESTWorkflow to have it together with the "search" below
+        after the deprecation of old worfklow/status API which was calling HTCondor inside
         """
-        # this retuns so called "compact JSON format" a dictionary of the form
+        # this retuns a JSON "ready to be displayed" of the form {key:value,...}
+        # different from the format of many REST API
         # {'desc':{'columns':[list of column names]}, 'result':[list of column values]}
-        # taskInfo = getattr(RESTTask, 'search')(self, **kwargs)
-        # NOPE this only returns the list of values, the name of the columns is handled inside
-        # https://github.com/dmwm/WMCore/blob/707fcee02c264805ac2968ffc32c677d39731997/src/python/WMCore/REST/Server.py#L2143
-        # need to repeat the SQL query used in old code in
+        # wo we need to repeat the SQL query used in old code in
         # https://github.com/dmwm/CRABServer/blob/5c7777045b33302fb97128ed29d4627141e009ec/src/python/CRABInterface/HTCondorDataWorkflow.py#L170
         # with the two steps:
         # 1. retrieve the values
@@ -99,19 +102,18 @@ class RESTTask(RESTEntity):
         except StopIteration:
             raise ExecutionError("Impossible to find task %s in the database." % workflow)
 
-        # now pick code from old implementation in
-        # https://github.com/dmwm/CRABServer/blob/5c7777045b33302fb97128ed29d4627141e009ec/src/python/CRABInterface/HTCondorDataWorkflow.py#L170
-
-        #Empty results, only fields for which a non NULL value was retrieved from DB will be filled
+        # now pick code from old implementation
+        # Empty results, only fields for which a non NULL value was retrieved from DB will be filled
         result = {"status"           : '',
                   "command"          : '',
                   "taskFailureMsg"   : '',
                   "taskWarningMsg"   : [],
-                  "submissionTime"   : 0,
+                  "submissionTime"   : '',
                   "schedd"           : '',
                   "splitting"        : '',
                   "taskWorker"       : '',
                   "webdirPath"       : '',
+                  "clusterid"        : '',
                   "username"         : ''}
 
         result['submissionTime'] = str(row.start_time)  # convert from datetime object to readable string
@@ -138,8 +140,9 @@ class RESTTask(RESTEntity):
             result['webdirPath'] =  '/'.join(['/home/grid']+row.user_webdir.split('/')[-2:])
         if row.username:
             result['username'] = row.username
+        if row.clusterid:
+            result['clusterid'] = row.clusterid
 
-        print(result)
         return [result]
 
 
