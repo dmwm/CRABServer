@@ -252,7 +252,7 @@ class MasterWorker(object):
         External scheduling method using round-robin algorithm to get tasks
         in waiting status and consider resource utilization for fair share.
         """
-        self.logger.info("Starting external scheduling with round-robin algorithm.")
+        self.logger.info("Starting external scheduling.")
 
         try:
             # Retrieve tasks with 'WAITING' status
@@ -287,11 +287,13 @@ class MasterWorker(object):
                 else:
                     task_count[username] = 1
             
-            if self.config.Adhoc.dry_run:
-                for username, count in task_count.items():
-                    self.logger.info('%d tasks for %s were selected during task scheduling.', count, username)
+            for username, count in task_count.items():
+                self.logger.info('%d tasks for %s would have been selected if you had used task scheduling (Available in dry_run).', count, username)
 
-            return selected_tasks
+            if self.config.Adhoc.dry_run:
+                return selected_tasks #dry_run True (with Task Scheduling)
+            else:
+                return waiting_tasks  #dry_run False (without Task Scheduling)
 
         except Exception as e:
             self.logger.exception("Exception occurred during external scheduling: %s", str(e))
