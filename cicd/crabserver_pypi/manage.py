@@ -46,6 +46,8 @@ parserStatus = subparsers.add_parser('status',
                                     help='start the service')
 parserEnv = subparsers.add_parser('env',
                                   help='print environment variable for sourcing it locally.')
+# Wa: it actually the same as groupModeStart but I do not know how to reuse it
+# in another parser.
 groupModeEnv = parserEnv.add_mutually_exclusive_group(required=True)
 groupModeEnv.add_argument('-c', dest='mode', action='store_const', const='current',
                             help='export PYTHONPATH from installed directory')
@@ -57,10 +59,16 @@ args = myparser.parse_args()
 env = os.environ.copy()
 # always provides env vars
 env['COMMAND'] = args.command
-env['MODE'] = args.mode
-env['DEBUG'] = args.debug
-env['SERVICE'] = args.service
+env['MODE'] = args.mode if hasattr(args, 'mode') else ''
+env['DEBUG'] = args.debug if hasattr(args, 'debug') else ''
+env['SERVICE'] = args.service if hasattr(args, 'service') else ''
 
-# re exec the ./manage.sh
+# debug
+#print(args)
+#print(env)
+#import sys
+#sys.exit(0)
+
+# re exec the ./manage.sh, equivalent to `exec ./manage.sh` in shell script
 # os.execle(filepath, arg0, arg1, ..., argN, env_dict)
 os.execle('./manage.sh','./manage.sh', env)
