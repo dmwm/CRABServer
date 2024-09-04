@@ -1,4 +1,14 @@
 #!/bin/bash
+# This script is select proper source of WMCore according wmcore_requirements.txt
+# which has format:
+# <repo> <tag>
+# If <repo> is match "github.com/dmwm/WMCore",
+# then it will install wmcore from pip via pip.
+# Otherwise, clone tag and copy content from WMCore/src/python to install
+# directory.
+# In case the new tag is not available in PyPI, please clone tag into your
+# private repo and change wmcore_requirements.txt point to it.
+
 set -euo pipefail
 
 if [[ $# -ne 2 ]]; then
@@ -15,9 +25,11 @@ if [[ ! -d "${installpath}" ]]; then
     exit 1
 fi
 
+# Note for regex: "Match line start with zero whitespace or more , following by
+# '#' character" (the '\s' is the whitespace character).
 wmcore_repo="$(grep -v '^\s*#' "${reqfile}" | cut -d' ' -f1)"
 wmcore_version="$(grep -v '^\s*#' "${reqfile}" | cut -d' ' -f2)"
-if [[ ${wmcore_repo} =~ /github.com\/dmwm\/WMCore ]]; then
+if [[ ${wmcore_repo} =~ github.com\/dmwm\/WMCore ]]; then
     echo "Installing WMCore ${wmcore_version} from official repository via pip..."
     pip install --no-deps "wmcore==${wmcore_version}"
 else
