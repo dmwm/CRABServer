@@ -53,7 +53,9 @@ def updateTaskStatus(crabserver=None, taskName=None, status=None, logger=None):
     """ change task status in the DB """
     msg = f"Will set to {status} task {taskName}"
     logger.info(msg)
-    if status == 'NEW':
+    if status == 'WAITING':
+        command = 'SUBMIT'
+    elif status == 'NEW':
         command = 'SUBMIT'
     elif status == 'SUBMITREFUSED':
         command = 'SUBMIT'
