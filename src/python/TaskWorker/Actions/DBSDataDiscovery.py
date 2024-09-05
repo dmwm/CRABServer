@@ -200,7 +200,7 @@ class DBSDataDiscovery(DataDiscovery):
         self.logger.info(f"Input Dataset: {inputDataset}")
         if secondaryDataset:
             self.checkDatasetStatus(secondaryDataset, kwargs)
-            self.logger.info("Secondary Dataset: %s", secondaryDataset)
+            self.logger.info(f"Secondary Dataset: {secondaryDataset}")
 
         try:
             # Get the list of blocks for the locations.
