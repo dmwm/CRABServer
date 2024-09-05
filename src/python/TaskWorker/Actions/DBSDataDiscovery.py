@@ -197,7 +197,7 @@ class DBSDataDiscovery(DataDiscovery):
         isUserDataset = isDatasetUserDataset(inputDataset, self.dbsInstance)
 
         self.checkDatasetStatus(inputDataset, kwargs)
-        self.logger.info("Input Dataset: %s", inputDataset)
+        self.logger.info(f"Input Dataset: {inputDataset}")
         if secondaryDataset:
             self.checkDatasetStatus(secondaryDataset, kwargs)
             self.logger.info("Secondary Dataset: %s", secondaryDataset)
