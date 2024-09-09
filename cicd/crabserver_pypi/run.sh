@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 # Container main process.
 
 set -euo pipefail
@@ -14,9 +14,8 @@ mkfifo /data/srv/state/crabserver/crabserver-fifo
 # to pipe. It is safe because only single process can read from pipe at the time
 cat /data/srv/state/crabserver/crabserver-fifo &
 
-#start the service
-#export CRYPTOGRAPHY_ALLOW_OPENSSL_102=true
-/data/start.sh -c
+# start the service
+./manage.py start -c
 
 # cat fifo forever to read logs
 while true;

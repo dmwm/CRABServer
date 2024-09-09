@@ -1,19 +1,6 @@
-#! /bin/bash
+#!/bin/bash
 
 # Start the TaskWorker service.
-
-##H Usage: manage.sh ACTION
-##H
-##H Available actions:
-##H   help        show this help
-##H   version     get current version of the service
-##H   restart     (re)start the service
-##H   start       (re)start the service
-##H   stop        stop the service
-##H
-##H This script needs following environment variables for start action:
-##H   - DEBUG:      if `true`, setup debug mode environment.
-##H   - PYTHONPATH: inherit from ./start.sh
 
 set -euo pipefail
 if [[ -n ${TRACE+x} ]]; then
@@ -22,18 +9,11 @@ if [[ -n ${TRACE+x} ]]; then
 fi
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-## some variable use in start_srv
-CONFIG="${SCRIPT_DIR}"/current/TaskWorkerConfig.py
-# path where we install crab code
-APP_PATH="${APP_PATH:-/data/srv/current/lib/python/site-packages/}"
-
-# CRABTASKWORKER_ROOT is a mandatory variable for getting data directory in `DagmanCreator.getLocation()`
-# Hardcoded the path and use new_updateTMRuntime.sh to build it from source and copy to this path.
-export CRABTASKWORKER_ROOT="${APP_PATH}"
-
-helpFunction() {
-    grep "^##H" "${0}" | sed -r "s/##H(| )//g"
-}
+# sanity check
+if [[ -z ${COMMAND+x} || -z ${MODE+x} || -z ${DEBUG+x} || -z ${SERVICE+x} ]]; then
+    >&2 echo "Error: Not all envvars are set!"
+    exit 1
+fi
 
 _getMasterWorkerPid() {
     pid=$(pgrep -f 'crab-taskworker' | grep -v grep | head -1 ) || true
@@ -41,19 +21,42 @@ _getMasterWorkerPid() {
 }
 
 start_srv() {
-    # Check require env
-    export PYTHONPATH
+    script_env
     echo "Starting TaskWorker..."
-    if [[ $DEBUG ]]; then
+    markmodify_path=/data/srv/current/data_files_modified
+    if [[ ${MODE} = "fromGH" ]]; then
+        touch ${markmodify_path}
+        ./updateDatafiles.sh
+    elif [[ -f ${markmodify_path} ]]; then
+        echo "Error: ${markmodify_path} exists."
+    fi
+
+    if [[ -n ${DEBUG} ]]; then
         crab-taskworker --config "${CONFIG}" --logDebug --pdb
     else
-        crab-taskworker --config "${CONFIG}" --logDebug &
+        nohup crab-taskworker --config "${CONFIG}" --logDebug &> logs/nohup.out &
     fi
     echo "Started TaskWorker with MasterWorker pid $(_getMasterWorkerPid)"
 }
 
+script_env() {
+    # config
+    CONFIG="${SCRIPT_DIR}"/current/TaskWorkerConfig.py
+    # path where we install crab code
+    APP_PATH="${APP_PATH:-/data/srv/current/lib/python/site-packages/}"
+
+    # $CRABTASKWORKER_ROOT is a mandatory for getting data directory in `DagmanCreator.getLocation()`
+    export CRABTASKWORKER_ROOT="${APP_PATH}"
+    # PYTHONPATH
+    if [[ $MODE = 'fromGH' ]]; then
+        PYTHONPATH=/data/repos/CRABServer/src/python:/data/repos/WMCore/src/python:${PYTHONPATH:-}
+    else
+        PYTHONPATH="${APP_PATH}":"${PYTHONPATH:-}"
+    fi
+    export PYTHONPATH
+}
+
 stop_srv() {
-    # This part is copy from https://github.com/dmwm/CRABServer/blob/3af9d658271a101db02194f48c5cecaf5fab7725/src/script/Deployment/TaskWorker/stop.sh
     # TW is given checkTimes*timeout seconds to stop, if it is still running after
     # this period, TW and all its slaves are killed by sending SIGKILL signal.
     echo 'Stopping TaskWorker...'
@@ -92,24 +95,37 @@ stop_srv() {
     fi
 }
 
-# Main routine, perform action requested on command line.
-case ${1:-help} in
-  start | restart )
-    stop_srv
-    start_srv
-    ;;
-
-  stop )
-    stop_srv
-    ;;
-
-  help )
-    helpFunction
-    exit 0
-    ;;
-
-  * )
-    echo "$0: unknown action '$1', please try '$0 help' or documentation." 1>&2
+status_srv() {
+    >&2 echo "Error: Not implemented."
     exit 1
-    ;;
+}
+
+env_eval() {
+    script_env
+    echo "export CRABTASKWORKER_ROOT=${CRABTASKWORKER_ROOT}"
+    echo "export PYTHONPATH=${PYTHONPATH}"
+}
+
+# Main routine, perform action requested on command line.
+case ${COMMAND:-help} in
+    start )
+        stop_srv
+        start_srv
+        ;;
+
+    stop )
+        stop_srv
+        ;;
+
+    status )
+        status_srv
+        ;;
+
+    env )
+        env_eval
+        ;;
+    * )
+        echo "Error: Unknown command: $COMMAND"
+        exit 1
+        ;;
 esac

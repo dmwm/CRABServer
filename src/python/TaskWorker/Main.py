@@ -71,6 +71,9 @@ def main():
         raise ConfigException("Configuration not found")
 
     configuration = loadConfigurationFile(os.path.abspath(options.config))
+    configuration.section_('TaskScheduling')
+    configuration.TaskScheduling.selection_limit = 10
+    configuration.TaskScheduling.dry_run= True
     status, msg = validateConfig(configuration)
     if not status:
         raise ConfigException(msg)

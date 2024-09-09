@@ -22,3 +22,6 @@ test/Playbook/ASORucio/*
 !test/Playbook/ASORucio/inventory
 !test/Playbook/ASORucio/playbook.yml
 !test/Playbook/ASORucio/README.md
+
+# optional file that up to dev to create
+cicd/trigger-ci/env

@@ -821,38 +821,45 @@ $(document).ready(function() {
         switch (dbVersion) {
             case "prod":
                 taskInfoUrl = "https://" + document.domain + "/crabserver/prod/task?subresource=search&workflow=";
-                taskStatusUrl = "https://" + document.domain + "/crabserver/prod/workflow?workflow=";
+                taskStatusUrl = "https://" + document.domain + "/crabserver/prod/task?subresource=status&workflow=";
                 webDirProxyApiUrl = "https://" + document.domain + "/crabserver/prod/task?subresource=webdirprx&workflow="
                 transferInfo = "https://" + document.domain + "/crabserver/prod/fileusertransfers?subresource=getTransferStatus&taskname="
                 docInfo = "https://" + document.domain + "/crabserver/prod/fileusertransfers?subresource=getById&id="
                 break;
             case "preprod":
                 taskInfoUrl = "https://" + document.domain + "/crabserver/preprod/task?subresource=search&workflow=";
-                taskStatusUrl = "https://" + document.domain + "/crabserver/preprod/workflow?workflow=";
+                taskStatusUrl = "https://" + document.domain + "/crabserver/preprod/task?subresource=status&workflow=";
                 webDirProxyApiUrl = "https://" + document.domain + "/crabserver/preprod/task?subresource=webdirprx&workflow="
                 transferInfo = "https://" + document.domain + "/crabserver/preprod/fileusertransfers?subresource=getTransferStatus&taskname="
                 docInfo = "https://" + document.domain + "/crabserver/preprod/fileusertransfers?subresource=getById&id="
                 break;
             case "dev":
                 taskInfoUrl = "https://" + document.domain + "/crabserver/dev/task?subresource=search&workflow=";
-                taskStatusUrl = "https://" + document.domain + "/crabserver/dev/workflow?workflow=";
+                taskStatusUrl = "https://" + document.domain + "/crabserver/dev/task?subresource=status&workflow=";
                 webDirProxyApiUrl = "https://" + document.domain + "/crabserver/dev/task?subresource=webdirprx&workflow="
                 transferInfo = "https://" + document.domain + "/crabserver/dev/fileusertransfers?subresource=getTransferStatus&taskname="
                 docInfo = "https://" + document.domain + "/crabserver/dev/fileusertransfers?subresource=getById&id="
                 break;
             case "devtwo":
                 taskInfoUrl = "https://" + document.domain + "/crabserver/devtwo/task?subresource=search&workflow=";
-                taskStatusUrl = "https://" + document.domain + "/crabserver/devtwo/workflow?workflow=";
+                taskStatusUrl = "https://" + document.domain + "/crabserver/devtwo/task?subresource=status&workflow=";
                 webDirProxyApiUrl = "https://" + document.domain + "/crabserver/devtwo/task?subresource=webdirprx&workflow="
                 transferInfo = "https://" + document.domain + "/crabserver/devtwo/fileusertransfers?subresource=getTransferStatus&taskname="
                 docInfo = "https://" + document.domain + "/crabserver/devtwo/fileusertransfers?subresource=getById&id="
                 break;
             case "devthree":
                 taskInfoUrl = "https://" + document.domain + "/crabserver/devthree/task?subresource=search&workflow=";
-                taskStatusUrl = "https://" + document.domain + "/crabserver/devthree/workflow?workflow=";
+                taskStatusUrl = "https://" + document.domain + "/crabserver/devthree/task?subresource=status&workflow=";
                 webDirProxyApiUrl = "https://" + document.domain + "/crabserver/devthree/task?subresource=webdirprx&workflow="
                 transferInfo = "https://" + document.domain + "/crabserver/devthree/fileusertransfers?subresource=getTransferStatus&taskname="
                 docInfo = "https://" + document.domain + "/crabserver/devthree/fileusertransfers?subresource=getById&id="
+                break;
+            case "devfour":
+                taskInfoUrl = "https://" + document.domain + "/crabserver/devfour/task?subresource=search&workflow=";
+                taskStatusUrl = "https://" + document.domain + "/crabserver/devfour/task?subresource=status&workflow=";
+                webDirProxyApiUrl = "https://" + document.domain + "/crabserver/devfour/task?subresource=webdirprx&workflow="
+                transferInfo = "https://" + document.domain + "/crabserver/devfour/fileusertransfers?subresource=getTransferStatus&taskname="
+                docInfo = "https://" + document.domain + "/crabserver/devfour/fileusertransfers?subresource=getById&id="
                 break;
             default:
                 break;

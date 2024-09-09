@@ -1,127 +1,104 @@
 #!/bin/bash
-# This scripts originate from dmwm-base/manage
-# https://github.com/dmwm/CMSKubernetes/blob/2b0454f9205cb8f97fecb91bf6661b59e4b31424/docker/pypi/dmwm-base/manage
-# However, scripts is heavily edited to suit new CRAB PyPI.
-# 2 things that we may need to keep up with original scripts:
-#   - Deployment Convention: WMCore/REST app (CRAB REST) read necessary files from.
-#   - `wmc-httpd` line.
-# This script needs following environment variables:
-#   - DEBUG:   if `true`, setup debug mode environment .
-#   - PYTHONPATH: inherit from ./start.sh
-
+# manage.sh for crab rest
 
 set -euo pipefail
-
-##H Usage: manage.sh ACTION [ATTRIBUTE] [SECURITY-STRING]
-##H
-##H Available actions:
-##H   help        show this help
-##H   version     get current version of the service
-##H   status      show current service's status
-##H   restart     (re)start the service
-##H   start       (re)start the service
-##H   stop        stop the service
-
-# common settings to prettify output
-echo_e=-e
-COLOR_OK="\\033[0;32m"
-COLOR_WARN="\\033[0;31m"
-COLOR_NORMAL="\\033[0;39m"
-
-## hardcode service name
-srv=crabserver
-
-## service settings
-#LOGDIR=/data/srv/logs/$srv # we write logs to fifo instead of logdir
-AUTHDIR=/data/srv/current/auth/$srv
-STATEDIR=/data/srv/state/$srv
-CFGDIR=/data/srv/current/config/$srv
-CFGFILE=$CFGDIR/config.py
-
-# necessary env settings for all WM services
-## app path. Inherit PYTHONPATH from parent process.
-PYTHONPATH=${PYTHONPATH:-/data/srv/current/lib/python/site-packages}
-## config
-PYTHONPATH=/data/srv/current/config/$srv:${PYTHONPATH}
-## secrets
-PYTHONPATH=/data/srv/current/auth/$srv:${PYTHONPATH}
-# finally export PYTHONPATH
-export PYTHONPATH
-## wmc-httpd path
-# export PATH manually to WMCore/bin directory in case you have custom wmc-httpd
-export PATH=/data/srv/current/bin:$PATH
-
-## service creds
-export X509_USER_CERT=${X509_USER_CERT:-${AUTHDIR}/dmwm-service-cert.pem}
-export X509_USER_KEY=${X509_USER_KEY:-${AUTHDIR}/dmwm-service-key.pem}
-
-## debug mode
-if [[ "${DEBUG:-}" == true ]]; then
-  # this will direct WMCore/REST/Main.py to run in the foreground rather than as a demon
-  # allowing among other things to insert pdb calls in the crabserver code and debug interactively
-  export DONT_DAEMONIZE_REST=True
-  # this will start crabserver with only one thread (default is 25) to make it easier to run pdb
-  export CRABSERVER_THREAD_POOL=1
+if [[ -n ${TRACE+x} ]]; then
+    set -x
+    export TRACE
 fi
 
-usage()
-{
-    cat $0 | grep "^##H" | sed -e "s,##H,,g"
+# sanity check
+if [[ -z ${COMMAND+x} || -z ${MODE+x} || -z ${DEBUG+x} || -z ${SERVICE+x} ]]; then
+    >&2 echo "Error: Not all envvars are set!"
+    exit 1
+fi
+
+script_env() {
+    # app path
+    PYTHONPATH=${PYTHONPATH:-/data/srv/current/lib/python/site-packages}
+    # secrets
+    PYTHONPATH=/data/srv/current/auth/crabserver:${PYTHONPATH}
+    # export PYTHONPATH
+    export PYTHONPATH
+
+    # cert and proxy
+    # Wa: I am not 100% sure between X509_USER_PROXY (mount to /etc/proxy/proxy)
+    # and X509_USER_CERT (mount to /data/srv/current/auth/crabserver/dmwm-service-key.pem),
+    # which file REST should use. AFAIK, for current (v3.240809) prod, we use
+    # X509_USER_PROXY which export via https://github.com/dmwm/CRABServer/blob/f5687adbf5fddeb21526c33b623b2f5025e17945/cicd/crabserver_pypi/entrypoint.sh#L28
+    # This is confirmed by put a wrong X509_USER_CERT path and unset
+    # X509_USER_PROXY which make REST unable to start.
+    # If REST really use X509_USER_PROXY, I need to confirmed that somehow
+    # WMCore keep reread the file when it use.
+    #
+    # X509_USER_PROXY already set in entrypoint.sh, the script that run before
+    # execute this file
+    export X509_USER_PROXY=${X509_USER_PROXY:-/etc/proxy/proxy}
+    export X509_USER_CERT=${X509_USER_CERT:-/data/srv/current/auth/crabserver/dmwm-service-cert.pem}
+    export X509_USER_KEY=${X509_USER_KEY:-/data/srv/current/auth/crabserver/dmwm-service-key.pem}
+
+    if [[ "${DEBUG:-}" == true ]]; then
+        # this will direct WMCore/REST/Main.py to run in the foreground rather than as a demon
+        # allowing among other things to insert pdb calls in the crabserver code and debug interactively
+        export DONT_DAEMONIZE_REST=True
+        # this will start crabserver with only one thread (default is 25) to make it easier to run pdb
+        export CRABSERVER_THREAD_POOL=1
+    fi
+
+    # non exported vars
+    CFGFILE=/data/srv/current/config/crabserver/config.py
+    STATEDIR=/data/srv/state/crabserver
 }
-start_srv()
-{
-    # Wa: originally from dmwm-base
-    #wmc-httpd -r -d $STATEDIR -l "|rotatelogs $LOGDIR/$srv-%Y%m%d-`hostname -s`.log 86400" $CFGFILE
+
+# Good thing is REST/Main.py already handled signal and has start/stop/status
+# flag and ready to use.
+start_srv() {
+    script_env
     wmc-httpd -r -d $STATEDIR -l "$STATEDIR/crabserver-fifo" $CFGFILE
 }
 
-stop_srv()
-{
-    local pid=$(ps auxwww | egrep "wmc-httpd" | grep -v grep | awk 'BEGIN{ORS=" "} {print $2}') || true
-    if [[ -n "${pid}" ]]; then
-        echo "Stop $srv service... ${pid}"
-        kill -9 ${pid}
-    else
-        echo "No $srv service process running."
-    fi
+stop_srv() {
+    script_env
+    wmc-httpd -k -d $STATEDIR $CFGFILE
 }
 
-status_srv()
-{
-    local pid=`ps auxwww | egrep "wmc-httpd" | grep -v grep | awk 'BEGIN{ORS=" "} {print $2}'`
-    if  [ -z "${pid}" ]; then
-        echo "$srv service is not running"
-        return
-    fi
-    if [ ! -z "${pid}" ]; then
-        echo $echo_e "$srv service is ${COLOR_OK}RUNNING${COLOR_NORMAL}, PID=${pid}"
-        ps -f -wwww -p ${pid}
-    else
-        echo $echo_e "$srv service is ${COLOR_WARN}NOT RUNNING${COLOR_NORMAL}"
-    fi
+status_srv() {
+    script_env
+    wmc-httpd -s -d $STATEDIR $CFGFILE
+}
+
+env_eval() {
+    script_env
+    echo "export PYTHONPATH=${PYTHONPATH}"
+    echo "export X509_USER_CERT=${X509_USER_CERT}"
+    echo "export X509_USER_KEY=${X509_USER_KEY}"
 }
 
 # Main routine, perform action requested on command line.
-case ${1:-status} in
-  start | restart )
-    stop_srv
-    start_srv
-    ;;
+case ${COMMAND:-} in
+    start | restart )
+        # no need to stop then start.
+        start_srv
+        ;;
 
-  status )
-    status_srv
-    ;;
+    status )
+        status_srv
+        ;;
 
-  stop )
-    stop_srv
-    ;;
+    stop )
+        stop_srv
+        ;;
 
-  help )
-    usage
-    ;;
+    env )
+        env_eval
+        ;;
 
-  * )
-    echo "$0: unknown action '$1', please try '$0 help' or documentation." 1>&2
-    exit 1
-    ;;
+    help )
+        usage
+        ;;
+
+    * )
+        echo "Error: unknown command '$COMMAND'"
+        exit 1
+        ;;
 esac

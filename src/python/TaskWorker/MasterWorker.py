@@ -23,6 +23,8 @@ from TaskWorker.Worker import Worker, setProcessLogger
 from TaskWorker.WorkerExceptions import ConfigException
 from TaskWorker.Actions.Recurring.BaseRecurringAction import handleRecurring
 from TaskWorker.Actions.Handler import handleResubmit, handleNewTask, handleKill
+from CRABUtils.TaskUtils import getTasks, updateTaskStatus
+import random
 
 ## NOW placing this here, then to be verified if going into Action.Handler, or TSM
 ## The meaning of the elements in the 3-tuples are as follows:
@@ -245,6 +247,123 @@ class MasterWorker(object):
         return getattr(mod, actionName)(self.config.TaskWorker.logsDir)
 
 
+    def _externalScheduling(self, limit):
+        """
+        External scheduling method using round-robin algorithm to get tasks
+        in waiting status and consider resource utilization for fair share.
+        """
+        self.logger.info("Starting external scheduling.")
+
+        try:
+            # Retrieve tasks with 'WAITING' status
+            waiting_tasks = getTasks(crabserver=self.crabserver, status='WAITING', logger=self.logger, limit=limit)
+
+            if not waiting_tasks:
+                self.logger.info("No tasks in 'WAITING' status found.")
+                return []
+
+            # Organize tasks by user
+            tasks_by_user = {}
+            for task in waiting_tasks:
+                user = task['tm_username']
+                if user not in tasks_by_user:
+                    tasks_by_user[user] = []
+                tasks_by_user[user].append(task)
+
+            # Perform round-robin selection among users
+            users = list(tasks_by_user.keys())
+            random.shuffle(users)  # To ensure fair round-robin each time
+            selected_tasks = []
+
+            for user in users:
+                user_tasks = tasks_by_user[user]
+                selected_tasks.extend(user_tasks[:limit // len(users)])
+
+            # Create and populate task_count dictionary
+            task_count = {'selected': {}, 'waiting': {}}
+
+            for status, tasks in [('selected', selected_tasks), ('waiting', waiting_tasks)]:
+                for task in tasks:
+                    username = task['tm_username']
+                    task_count[status][username] = task_count[status].get(username, 0) + 1
+
+            # Prepare table headers and rows
+            headers = ['Username', 'Waiting', 'Selected']
+            rows = []
+
+            # Collect all usernames to ensure every user appears in the table
+            all_usernames = set(task_count['selected'].keys()).union(task_count['waiting'].keys())
+
+            for username in all_usernames:
+                waiting_count = task_count['waiting'].get(username, 0)
+                selected_count = task_count['selected'].get(username, 0)
+                rows.append([username, waiting_count, selected_count])
+
+            # Determine the width of each column for formatting
+            widths = [max(len(header) for header in headers)] + [max(len(str(row[i])) for row in rows) for i in range(1, len(headers))]
+
+            # Prepare formatted table string
+            table_header = ' | '.join(f'{header:<{width}}' for header, width in zip(headers, widths))
+            table_separator = '-|-'.join('-' * width for width in widths)
+            table_rows = '\n'.join(' | '.join(f'{str(cell):<{width}}' for cell, width in zip(row, widths)) for row in rows)
+
+            # Combine header, separator, and rows into one string
+            table = f"{table_header}\n{table_separator}\n{table_rows}"
+
+            # Log the formatted table
+            self.logger.info('\n%s', table)
+
+            if self.config.TaskScheduling.dry_run:
+                return selected_tasks #dry_run True (with Task Scheduling)
+            else:
+                return waiting_tasks  #dry_run False (without Task Scheduling)
+
+        except Exception as e:
+            self.logger.exception("Exception occurred during external scheduling: %s", str(e))
+            return []
+
+    def _pruneTaskQueue(self):
+        self.logger.info("Pruning the queue if required...logic tbd")
+
+    def _reportQueueStatus(self):
+        self.logger.info("Report Queue status... logic tbd")
+
+
+    def _selectWork(self, limit):
+        """This function calls external scheduling and updates task status for the selected tasks"""
+        self.logger.info("Starting work selection process.")
+
+        # Call the external scheduling method
+        selected_tasks = self._externalScheduling(limit)
+
+        if not selected_tasks:
+            return False
+
+        try:
+            # Update the status of each selected task to 'NEW'
+            for task in selected_tasks:
+                task_name = task['tm_taskname']
+                updateTaskStatus(crabserver=self.crabserver, taskName=task_name, status='NEW', logger=self.logger)
+                self.logger.info("Task %s status updated to 'NEW'.", task_name)
+
+            # Prune the task queue if necessary
+            self._pruneTaskQueue()
+
+            # Report queue status
+            self._reportQueueStatus()
+
+        except HTTPException as hte:
+            msg = "HTTP Error during _selectWork: %s\n" % str(hte)
+            msg += "HTTP Headers are %s: " % hte.headers
+            self.logger.error(msg)
+            return False
+
+        except Exception: #pylint: disable=broad-except
+            self.logger.exception("Server could not process the _selectWork request.")
+            return False
+
+        return True
+
     def _lockWork(self, limit, getstatus, setstatus):
         """Today this is always returning true, because we do not want the worker to die if
            the server endpoint is not avaialable.
@@ -400,6 +519,11 @@ class MasterWorker(object):
         self.restartQueuedTasks()
         self.logger.debug("Master Worker Starting Main Cycle.")
         while not self.STOP:
+            selection_limit = self.config.TaskScheduling.selection_limit
+            if not self._selectWork(limit=selection_limit):
+                self.logger.warning("Selection of work failed.")
+            else:
+                self.logger.info("Work selected successfully.")
             limit = self.slaves.queueableTasks()
             if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
                 time.sleep(self.config.TaskWorker.polling)
