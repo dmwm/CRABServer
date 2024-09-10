@@ -273,8 +273,8 @@ writeValidationScript(testName=name, validationScript=validationScript)
 name = 'sendVenvFolder'
 changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
 confChangesList = [changeDict]
-python3 -m venv "${workDir}/${CMSSW_release}/venv"
 testSubmitScript = """
+python3 -m venv "${workDir}/${CMSSW_release}/venv"
 lookInTarFor "^venv/" ${workDir}/inputs/*default.tgz
 """
 validationScript = """
