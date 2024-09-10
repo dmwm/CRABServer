@@ -133,9 +133,12 @@ def main():
 
         status_dict = {'dir': remake_dir}
         status_command_output = crab_cmd({'cmd': 'status', 'args': status_dict})
-        status_command_output.update({'taskName': task.rstrip()})
-        status_command_output['workdir'] = remake_dir
-        listOfTasks.append(status_command_output)
+        if status_command_output is not None:
+            status_command_output.update({'taskName': task.rstrip()})
+            status_command_output['workdir'] = remake_dir
+            listOfTasks.append(status_command_output)
+        else:
+            print("status_command_output is None for", task)
 
     summary = parse_result(listOfTasks,checkPublication)
 
