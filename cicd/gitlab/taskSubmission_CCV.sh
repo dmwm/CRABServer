@@ -23,6 +23,42 @@ echo "(debug) Task_Submission_Status_Tracking=${Task_Submission_Status_Tracking}
 # init crabclient
 source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
 
+mkdir -p "${WORK_DIR}/artifacts"
+cat <<EOF > "${WORK_DIR}/artifacts/submitted_tasks_CCV"
+240904_190936:cmsbot_crab_transferOutputs
+240904_190939:cmsbot_crab_transferLogs
+240904_190941:cmsbot_crab_activity
+240904_190944:cmsbot_crab_inputFiles
+240904_190947:cmsbot_crab_disableAutomaticOutputCollection
+240904_190949:cmsbot_crab_outputFiles
+240904_190952:cmsbot_crab_allowUndistributedCMSSW
+240904_190954:cmsbot_crab_maxMemoryMB
+240904_190957:cmsbot_crab_maxJobRuntimeMin
+240904_190959:cmsbot_crab_numCores
+240904_191002:cmsbot_crab_scriptExe
+240904_191004:cmsbot_crab_scriptArgs
+240904_191007:cmsbot_crab_sendVenvFolder
+240904_191010:cmsbot_crab_sendExternalFolder
+240904_191012:cmsbot_crab_inputDBS
+240904_191015:cmsbot_crab_useParent
+240904_191017:cmsbot_crab_secondaryInputDataset
+240904_191020:cmsbot_crab_lumiMaskFile
+240904_191023:cmsbot_crab_lumiMaskUrl
+240904_191026:cmsbot_crab_outLFNDirBase
+240904_191029:cmsbot_crab_runRange
+240904_191031:cmsbot_crab_ignoreLocality
+240904_191034:cmsbot_crab_userInputFiles
+240904_191036:cmsbot_crab_whitelist
+240904_191039:cmsbot_crab_blacklist
+240904_191041:cmsbot_crab_ignoreGlobalBlacklist
+240904_191044:cmsbot_crab_voRole
+240904_191046:cmsbot_crab_voGroup
+240904_191048:cmsbot_crab_scheddName
+240904_191051:cmsbot_crab_collector
+240904_191053:cmsbot_crab_extraJDL
+EOF
+
+
 submitTasks() {
 #Submit tasks and based on the exit code add task name / file name respectively to submitted_tasks or failed_tasks file
 
@@ -37,7 +73,7 @@ submitTasks() {
           echo ${file_name} >> "${WORK_DIR}"/failed_tasks
           #killAfterFailure
       else
-          echo ${output} | grep -oP '(?<=Task name:\s)[^\s]*(?=)' >> "${WORK_DIR}"/submitted_tasks_${2}
+          echo ${output} | grep -oP '(?<=Task name:\s)[^\s]*(?=)' >> "${WORK_DIR}"/artifacts/submitted_tasks_${2}
           echo ${output} | grep -oP '(?<=Project dir:\s)[^\s]*(?=)' >> "${WORK_DIR}"/project_directories
       fi
   done
@@ -89,7 +125,7 @@ if [ "${Client_Configuration_Validation}" = true ]; then
    python3 "${ROOT_DIR}/test/makeTests.py"
    filesToSubmit=`find . -maxdepth 1 -type f -name '*.py' ! -name '*PSET*'`
    submitTasks "${filesToSubmit}" "CCV"
-   tasksToCheck=`cat ${WORK_DIR}/submitted_tasks_CCV`
+   tasksToCheck=`cat ${WORK_DIR}/artifacts/submitted_tasks_CCV`
    immediateCheck "${tasksToCheck}"
    cd ${WORK_DIR}
 fi
