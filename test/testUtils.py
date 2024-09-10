@@ -220,8 +220,15 @@ def writeConfigFile(testName=None, listOfDicts=None):
         value = d['value']
         section = d['section']
         conf = changeInConf(configuration=conf, paramName=param, paramValue=value, configSection=section)
+
+    import shutil
+    import os
+    working_area = '/tmp/crabTestConfig'
+    # Delete and recreate the working area directory
+    shutil.rmtree(working_area, ignore_errors=True)
+    os.makedirs(working_area, exist_ok=True)
+
     # also set the requestName (do it now to avoid confusing changeInConf)
-    rm -rf '/tmp/crabTestConfig' && mkdir -p '/tmp/crabTestConfig'
     conf = conf.replace('REQUESTNAME', '"'+testName+'"')
     with open(testName + '.py', 'w') as fp:
         fp.write(conf)
