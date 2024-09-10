@@ -273,13 +273,6 @@ writeValidationScript(testName=name, validationScript=validationScript)
 name = 'sendVenvFolder'
 changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
 confChangesList = [changeDict]
-
-import os
-import venv
-venv_path = os.path.join(workDir, CMSSW_release, "venv")
-os.makedirs(os.path.dirname(venv_path), exist_ok=True)
-venv.create(venv_path, with_pip=True) 
-
 testSubmitScript = """
 lookInTarFor "^venv/" ${workDir}/inputs/*default.tgz
 """
