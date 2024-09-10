@@ -221,7 +221,7 @@ def writeConfigFile(testName=None, listOfDicts=None):
         section = d['section']
         conf = changeInConf(configuration=conf, paramName=param, paramValue=value, configSection=section)
     # also set the requestName (do it now to avoid confusing changeInConf)
-    conf = conf.replace('REQUESTNAME', '"'+testName+'"')
+    conf = conf.replace('REQUESTNAME', '"'+testName+'_1'+'"')
     with open(testName + '.py', 'w') as fp:
         fp.write(conf)
     return
