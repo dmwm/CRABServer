@@ -62,7 +62,7 @@ dummyTestScript = "\nexit 0\n"  #  a test which always returns success
 #=============================
 
 # transferOutputs
-name = 'transferOutputs'
+name = 'transferOutputs_1'
 changeDict = {'param': name, 'value': 'False', 'section': 'General'}  # default is True
 confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
