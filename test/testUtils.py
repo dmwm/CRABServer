@@ -91,7 +91,6 @@ config = Configuration()
 
 config.section_('General')
 config.General.instance = 'REST_Instance'
-rm -rf /tmp/crabTestConfig && mkdir -p /tmp/crabTestConfig
 config.General.workArea = '/tmp/crabTestConfig'
 config.General.requestName = REQUESTNAME
 
@@ -222,6 +221,7 @@ def writeConfigFile(testName=None, listOfDicts=None):
         section = d['section']
         conf = changeInConf(configuration=conf, paramName=param, paramValue=value, configSection=section)
     # also set the requestName (do it now to avoid confusing changeInConf)
+    rm -rf '/tmp/crabTestConfig' && mkdir -p '/tmp/crabTestConfig'
     conf = conf.replace('REQUESTNAME', '"'+testName+'"')
     with open(testName + '.py', 'w') as fp:
         fp.write(conf)
