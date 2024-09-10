@@ -58,11 +58,7 @@ cat <<EOF > "${WORK_DIR}/artifacts/submitted_tasks_CCV"
 240904_191053:cmsbot_crab_extraJDL
 EOF
 
-import os
-import venv
-venv_path = os.path.join(${WORK_DIR}, ${CMSSW_release}, "venv")
-os.makedirs(os.path.dirname(venv_path), exist_ok=True)
-venv.create(venv_path, with_pip=True) 
+mkdir -p "${WORK_DIR}/${CMSSW_release}/venv" 
 
 submitTasks() {
 #Submit tasks and based on the exit code add task name / file name respectively to submitted_tasks or failed_tasks file
