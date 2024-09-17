@@ -114,13 +114,15 @@ def getRuleQuota(rucioClient=None, ruleId=None):
     size = sum(file['bytes'] for file in files)
     return size
 
-
 def getTapeRecallUsage(rucioClient=None, account=None):
-    """ size of ongoing tape recalls for this account """
+    """ size of ongoing tape recalls for this account (if provided) or by activity """
     activity = 'Analysis TapeRecall'
-    rucioAccount = account
-    rules = rucioClient.list_replication_rules(
-        filters={'account': rucioAccount, 'activity': activity})
+    filters = {'activity': activity}
+    
+    if account is not None:
+        filters['account'] = account
+    
+    rules = rucioClient.list_replication_rules(filters=filters)
     usage = sum(getRuleQuota(rucioClient, rule['id']) for rule in rules\
                 if rule['state'] in ['REPLICATING', 'STUCK', 'SUSPENDED'])  # in Bytes
     return usage

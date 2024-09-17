@@ -10,6 +10,7 @@ import datetime
 
 import requests
 from requests.auth import HTTPBasicAuth
+from python.RucioUtils import getTapeRecallUsage
 
 FMT = "%Y-%m-%dT%H:%M:%S%z"
 WORKDIR = '/data/srv/monit/'
@@ -29,18 +30,11 @@ MONITURL, MONITUSER, MONITPWD = readpwd()
 def createQuotaReport(rucioClient=None, account=None):
     """
     create a dictionary with the quota report to be sent to MONIT
-    even if we do not report usage at single RSE's now, let's collect that info as well
-    returns {'rse1':bytes, 'rse':bytes,..., 'totalTB':TBypte}
+    we do not report usage at single RSE's now, we don't collect that info either
+    returns {'totalTB':TBypte}
     """
-
-    usageGenerator = rucioClient.get_local_account_usage(account=account)
-    totalBytes = 0
+    totalBytes = getTapeRecallUsage(rucioClient=rucioClient,account=None)
     report = {}
-    for usage in usageGenerator:
-        rse = usage['rse']
-        used = usage['bytes']
-        report[rse] = used // 1e12
-        totalBytes += used
     totalTB = totalBytes // 1e12
     report['totalTB'] = totalTB
     return report
