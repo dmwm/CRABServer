@@ -22,7 +22,7 @@ def readpwd():
     """
     Reads password from disk
     """
-    with open(f"/data/certs/monit.d/MONIT-CRAB.json", encoding='utf-8') as f:
+    with open("/data/certs/monit.d/MONIT-CRAB.json", encoding='utf-8') as f:
         credentials = json.load(f)
     return credentials["url"], credentials["username"], credentials["password"]
 MONITURL, MONITUSER, MONITPWD = readpwd()
@@ -30,7 +30,6 @@ MONITURL, MONITUSER, MONITPWD = readpwd()
 def createQuotaReport(rucioClient=None, account=None):
     """
     create a dictionary with the quota report to be sent to MONIT
-    we do not report usage at single RSE's now, we don't collect that info either
     returns {'totalTB':TBypte}
     """
     totalBytes = getTapeRecallUsage(rucioClient=rucioClient,account=None)
@@ -68,13 +67,13 @@ def send_and_check(document, should_fail=False):
     assert ((response.status_code in [200]) != should_fail), \
         msg
 
-def main(logger):
+def main(log):
     from rucio.client import Client
     rucioClient = Client(
         creds={"client_cert": "/data/certs/robotcert.pem", "client_key": "/data/certs/robotkey.pem"},
         auth_type='x509',
     )
-    logger.info("rucio client initialized: %s %s", rucioClient.ping(), rucioClient.whoami() )
+    log.info("rucio client initialized: %s %s", rucioClient.ping(), rucioClient.whoami() )
 
     # prepare a JSON to be sent to MONIT
     jsonDoc = {'producer': MONITUSER, 'type': 'reportrecallquota', 'hostname': gethostname()}
