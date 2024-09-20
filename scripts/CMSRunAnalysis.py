@@ -1,8 +1,6 @@
-
 """
 CMSRunAnalysis.py - the runtime python portions to launch a CRAB3 / cmsRun job.
 """
-from __future__ import print_function
 
 import os
 import os.path
@@ -12,14 +10,13 @@ import stat
 import time
 import json
 import shutil
-# import pickle
 import signal
 import logging
 import subprocess
 import traceback
 from xml.etree import ElementTree
 from ast import literal_eval
-from optparse import OptionParser, BadOptionError, AmbiguousOptionError
+from optparse import OptionParser, BadOptionError, AmbiguousOptionError  # pylint: disable=deprecated-module
 
 from TweakPSet import prepareTweakingScript
 
