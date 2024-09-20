@@ -393,11 +393,6 @@ def extractUserSandbox(sandbox, cmsswVersion):
     print(subprocess.getoutput(f"tar xfm {os.path.join('..', sandbox)}"))
     os.chdir('..')
 
-    # the cmsRun command will be executed from the job working directory, so we move "up"
-    # the PSet which is also in the user sandbox
-    os.rename(f"{cmsswVersion}/PSet.py", './PSet.py')
-    os.rename(f"{cmsswVersion}/PSet.pkl", './PSet.pkl')
-
     print(f"==== Sandbox untarring FINISHED at {UTCNow()} ====")
 
 
