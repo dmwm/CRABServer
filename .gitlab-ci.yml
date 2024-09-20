@@ -55,6 +55,7 @@ get_env:
 
 set_version_name:
   rules:
+    - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: prepare_release
   image:
@@ -62,9 +63,9 @@ set_version_name:
     entrypoint: [""]
   script:
     - |
-        echo -e "\n__version__ = \"${CI_COMMIT_TAG}\" #Automatically added during build process" >> src/python/TaskWorker/__init__.py;
+        echo -e "\n__version__ = \"${CI_COMMIT_TAG}\" #Automatically added during build process\n" >> src/python/TaskWorker/__init__.py;
     - |
-        echo -e "\n__version__ = \"${CI_COMMIT_TAG}\" #Automatically added during build process" >> src/python/CRABInterface/__init__.py;
+        echo -e "\n__version__ = \"${CI_COMMIT_TAG}\" #Automatically added during build process\n" >> src/python/CRABInterface/__init__.py;
   cache:
     - key: $CI_PIPELINE_ID
       paths:
