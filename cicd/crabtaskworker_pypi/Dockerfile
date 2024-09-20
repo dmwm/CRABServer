@@ -100,7 +100,9 @@ COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/rucio.cfg /opt/rucio/etc/
 
 # add github repos, reuse script in crabserver_pypi
 COPY --chown=${USER}:${USER} cicd/crabserver_pypi/addGH.sh ./
+USER ${USER}
 RUN bash addGH.sh
+USER root
 
 # clean up
 WORKDIR ${WDIR}
