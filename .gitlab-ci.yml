@@ -6,6 +6,7 @@ default:
 
 variables:
   IMAGE_TAG: "${CI_COMMIT_REF_SLUG}"  # to distinct it from commit tag and final image tag
+  RELEASE_IMAGE_TAG: "${CI_COMMIT_TAG}-stable" # final tag name, e.g., v3.240904-stable
   # The `DOCKER_TLS_CERTDIR` variables is needed to run Docker-in-Docker, `DOCKER_BUILDKIT` is to make sure the docker build use the new BuildKit.
   # https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#docker-in-docker-with-tls-enabled-in-the-docker-executor
   # Creating a docker context is required to be able to cache to the registry using Buildkit.
@@ -155,7 +156,7 @@ build_crabtwfilebeat_image:
     - source .env
     - docker context create mycontext
     - docker buildx create mycontext --use --name mybuilder --bootstrap
-    - docker buildx build --push --build-arg="BASE_TAG=${IMAGE_TAG}" -f "${CI_PROJECT_DIR}/cicd/filebeat/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabtwfilebeat:pypi-${REST_Instance}-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabtwfilebeat:pypi-${REST_Instance}-cache" -t "registry.cern.ch/cmscrab/crabtwfilebeat:${IMAGE_TAG}" .
+    - docker buildx build --push --build-arg="BASE_TAG=${IMAGE_TAG}" -f "${CI_PROJECT_DIR}/cicd/filebeat/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabtwfilebeat:pypi-${REST_Instance}-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabtwfilebeat:pypi-${REST_Instance}-cache" -t "registry.cern.ch/cmscrab/crabtwfilebeat:${IMAGE_TAG}" -t "registry.cern.ch/cmscrab/crabtwmonit:v3.latest" .
   cache:
     - key: $CI_PIPELINE_ID
       paths:
@@ -176,7 +177,7 @@ build_spark_image:
     - source .env
     - docker context create mycontext
     - docker buildx create mycontext --use --name mybuilder --bootstrap
-    - docker buildx build --push --build-arg="BASE_TAG=${IMAGE_TAG}" -f "${CI_PROJECT_DIR}/cicd/monit_spark/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabspark:pypi-${REST_Instance}-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabspark:pypi-${REST_Instance}-cache" -t "registry.cern.ch/cmscrab/crabspark:${IMAGE_TAG}" -t "registry.cern.ch/cmscrab/crabspark:latest" .
+    - docker buildx build --push --build-arg="BASE_TAG=${IMAGE_TAG}" -f "${CI_PROJECT_DIR}/cicd/monit_spark/Dockerfile" --cache-to=type=registry,ref="registry.cern.ch/cmscrab/crabspark:pypi-${REST_Instance}-cache",image-manifest=true,mode=max --cache-from=type=registry,ref="registry.cern.ch/cmscrab/crabspark:pypi-${REST_Instance}-cache" -t "registry.cern.ch/cmscrab/crabspark:${IMAGE_TAG}" -t "registry.cern.ch/cmscrab/crabspark:v3.latest" .
 
 
 deploy_server:
@@ -302,34 +303,14 @@ release_stable:
   variables:
     GIT_STRATEGY: none
   script:
-    - export RELEASE_IMAGE_TAG=${CI_COMMIT_TAG}-stable
     - crane auth login -u ${CMSCRAB_REGISTRY_USER} -p ${CMSCRAB_REGISTRY_PASSWORD} ${CMSCRAB_REGISTRY_URL}
+    # rest
     - crane cp registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG} registry.cern.ch/cmscrab/crabserver:${RELEASE_IMAGE_TAG}
+    # tw
     - crane cp registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG} registry.cern.ch/cmscrab/crabtaskworker:${RELEASE_IMAGE_TAG}
-
-# if release, then tag monit image with `v3.latest.monit`
-tag_monit_latest:
-  rules:
-    - !reference [.default_rules, release]
-  stage: tagging_release
-  image:
-    name: registry.cern.ch/cmscrab/buildtools
-    entrypoint: [""]
-  variables:
-    GIT_STRATEGY: none
-  script:
-    - crane auth login -u ${CMSCRAB_REGISTRY_USER} -p ${CMSCRAB_REGISTRY_PASSWORD} ${CMSCRAB_REGISTRY_URL}
-    - crane cp registry.cern.ch/cmscrab/crabtaskworker:${IMAGE_TAG}.monit registry.cern.ch/cmscrab/crabtaskworker:v3.latest.monit
-
-tag_filebeat_latest:
-  rules:
-    - !reference [.default_rules, release]
-  stage: tagging_release
-  image:
-    name: registry.cern.ch/cmscrab/buildtools
-    entrypoint: [""]
-  variables:
-    GIT_STRATEGY: none
-  script:
-    - crane auth login -u ${CMSCRAB_REGISTRY_USER} -p ${CMSCRAB_REGISTRY_PASSWORD} ${CMSCRAB_REGISTRY_URL}
-    - crane cp registry.cern.ch/cmscrab/crabtwfilebeat:${IMAGE_TAG} registry.cern.ch/cmscrab/crabfilebeat:v3.latest
+    # monit
+    - crane cp registry.cern.ch/cmscrab/crabtwmonit:${IMAGE_TAG} registry.cern.ch/cmscrab/crabtwmonit:${RELEASE_IMAGE_TAG}
+    # filebeat
+    - crane cp registry.cern.ch/cmscrab/crabtwfilebeat:${IMAGE_TAG} registry.cern.ch/cmscrab/crabtwfilebeat:${RELEASE_IMAGE_TAG}
+    # spark
+    - crane cp registry.cern.ch/cmscrab/crabspark:${IMAGE_TAG} registry.cern.ch/cmscrab/crabspark:${RELEASE_IMAGE_TAG}
