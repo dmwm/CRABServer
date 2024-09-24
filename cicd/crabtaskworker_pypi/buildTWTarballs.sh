@@ -80,7 +80,7 @@ cp "${CRABSERVERDIR}/src/python"/{ServerUtilities.py,RucioUtils.py,CMSGroupMappe
 echo "Making TaskManagerRun tarball"
 tar zcf "${RUNTIME_WORKDIR}/TaskManagerRun.tar.gz" CRAB3.zip task_process ServerUtilities.py RucioUtils.py CMSGroupMapper.py RESTInteractions.py || exit 4
 echo "Making CMSRunAnalysis tarball"
-tar zcf "${RUNTIME_WORKDIR}/CMSRunAnalysis.tar.gz" WMCore.zip TweakPSet.py CMSRunAnalysis.py ServerUtilities.py CMSGroupMapper.py RESTInteractions.py || exit 4
+tar zcf "${RUNTIME_WORKDIR}/CMSRunAnalysis.tar.gz" WMCore.zip TweakPSet.py CMSRunAnalysis.py || exit 4
 
 # cleanup.
 # current directory ($RUNTIME_WORKDIR) should only have TaskManagerRun.tar.gz and CMSRunAnalysis.tar.gz
