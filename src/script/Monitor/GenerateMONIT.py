@@ -229,7 +229,7 @@ class CRAB3CreateJson:
         twStatus = self.getCountTasksByStatus()
 
         statesFilter = ['SUBMITTED', 'FAILED', 'QUEUED', 'NEW', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED',
-                         'SUBMITFAILED', 'SUBMITREFUSED', 'TAPERECALL']
+                         'SUBMITFAILED', 'SUBMITREFUSED', 'TAPERECALL', 'WAITING']
         if len(twStatus) > 0:
             for state in twStatus.keys():
                 if state in statesFilter:
@@ -239,7 +239,7 @@ class CRAB3CreateJson:
         twStatus = self.getCountTasksByStatusAbs()
 
         statesFilter = ['KILL', 'RESUBMIT', 'NEW', 'QUEUED', 'KILLFAILED', 'RESUBMITFAILED', 'SUBMITFAILED',
-                         'SUBMITREFUSED', 'UPLOADED', 'TAPERECALL']
+                         'SUBMITREFUSED', 'UPLOADED', 'TAPERECALL', 'WAITING']
         if len(twStatus) > 0:
             for state in statesFilter:
                 self.jsonDoc['abs_task_states'].update({str(state): 0})
