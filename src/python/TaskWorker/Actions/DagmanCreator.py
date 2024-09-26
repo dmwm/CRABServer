@@ -579,7 +579,7 @@ class DagmanCreator(TaskAction):
         return prescriptDeferString
 
 
-    def makeDagSpecs(self, task, iteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, parent=None, stage='conventional'):
+    def makeDagSpecs(self, task, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, parent=None, stage='conventional'):
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)

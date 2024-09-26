@@ -150,8 +150,7 @@ def getGlob(ad, normal, automatic):
     """
     if ad.get('CRAB_SplitAlgo') == 'Automatic':
         return glob.glob(automatic)
-    else:
-        return [normal]
+    return [normal]
 
 
 def adjustMaxRetries(adjustJobIds, ad):
@@ -486,4 +485,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
