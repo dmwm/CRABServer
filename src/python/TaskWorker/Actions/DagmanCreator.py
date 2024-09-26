@@ -579,7 +579,7 @@ class DagmanCreator(TaskAction):
         return prescriptDeferString
 
 
-    def makeDagSpecs(self, task, sitead, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, parent=None, stage='conventional'):
+    def makeDagSpecs(self, task, iteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, parent=None, stage='conventional'):
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
@@ -622,7 +622,6 @@ class DagmanCreator(TaskAction):
                 count = str(i)
             else:
                 count = '{parent}-{i}'.format(parent=parent, i=i)
-            sitead['Job{0}'.format(count)] = list(availablesites)
             siteinfo[count] = groupid
             remoteOutputFiles = []
             localOutputFiles = []
@@ -809,11 +808,6 @@ class DagmanCreator(TaskAction):
                 siteinfo = json.load(fd)
         else:
             siteinfo = {'group_sites': {}, 'group_datasites': {}}
-        if os.path.exists("site.ad"):
-            with open("site.ad", encoding='utf-8') as fd:
-                sitead = classad.parseOne(fd)
-        else:
-            sitead = classad.ClassAd()
 
         blocksWithNoLocations = set()
         blocksWithBannedLocations = set()
@@ -949,7 +943,7 @@ class DagmanCreator(TaskAction):
                 msg += " This is expected to result in DESIRED_SITES = %s" % (list(available))
                 self.logger.debug(msg)
 
-            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], sitead, siteinfo,
+            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], siteinfo,
                                                              jobgroup, list(jgblocks)[0], availablesites,
                                                              datasites, outfiles, startjobid, parent=parent, stage=stage)
             dagSpecs += jobgroupDagSpecs
@@ -1083,9 +1077,6 @@ class DagmanCreator(TaskAction):
             name = "RunJobs{0}.subdag".format(parent)
 
         ## Cache site information
-        with open("site.ad", "w", encoding='utf-8') as fd:
-            fd.write(str(sitead))
-
         with open("site.ad.json", "w", encoding='utf-8') as fd:
             json.dump(siteinfo, fd)
 
@@ -1231,7 +1222,7 @@ class DagmanCreator(TaskAction):
         params = {}
 
         inputFiles = ['gWMS-CMSRunAnalysis.sh', 'submit_env.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'cmscp.sh', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh',
-                      'AdjustSites.py', 'site.ad', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.pkl', 'taskworkerconfig.pkl',
+                      'AdjustSites.py', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.pkl', 'taskworkerconfig.pkl',
                       'run_and_lumis.tar.gz', 'input_files.tar.gz']
 
         self.extractMonitorFiles(inputFiles, **kw)
