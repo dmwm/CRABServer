@@ -128,6 +128,7 @@ class RucioAction():
                     allRses += "&(country=US)"  # Brasil is on that side too, but not reliable enough
                 else:
                     # Rucio wants the set complement operator \
+                    # see https://rucio.cern.ch/documentation/started/concepts/rse_expressions/#operators
                     allRses += r"\country=US\country=BR"  # pylint: disable=anomalous-backslash-in-string
                     # avoid fragile sites, see #7400
                     allRses += r"\country=RU\country=UA"  # pylint: disable=anomalous-backslash-in-string
