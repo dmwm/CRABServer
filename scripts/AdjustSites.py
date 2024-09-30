@@ -150,8 +150,7 @@ def getGlob(ad, normal, automatic):
     """
     if ad.get('CRAB_SplitAlgo') == 'Automatic':
         return glob.glob(automatic)
-    else:
-        return [normal]
+    return [normal]
 
 
 def adjustMaxRetries(adjustJobIds, ad):
@@ -234,7 +233,7 @@ def makeWebDir(ad):
                        "RunJobs.dag", "RunJobs.dag.dagman.out", "RunJobs.dag.nodes.log",
                        "input_files.tar.gz", "run_and_lumis.tar.gz",
                        "input_dataset_lumis.json", "input_dataset_duplicate_lumis.json",
-                       "aso_status.json", "error_summary.json",
+                       "aso_status.json", "error_summary.json", "site.ad.json"
                       ]
         for source in sourceLinks:
             link = source
@@ -242,7 +241,6 @@ def makeWebDir(ad):
         ## Symlinks with a different link name than source name. (I would prefer to keep the source names.)
         os.symlink(os.path.abspath(os.path.join(".", "job_log")), os.path.join(path, "jobs_log.txt"))
         os.symlink(os.path.abspath(os.path.join(".", "node_state")), os.path.join(path, "node_state.txt"))
-        os.symlink(os.path.abspath(os.path.join(".", "site.ad")), os.path.join(path, "site_ad.txt"))
         os.symlink(os.path.abspath(os.path.join(".", ".job.ad")), os.path.join(path, "job_ad.txt"))
         os.symlink(os.path.abspath(os.path.join(".", "task_process/status_cache.txt")), os.path.join(path, "status_cache"))
         os.symlink(os.path.abspath(os.path.join(".", "task_process/status_cache.pkl")), os.path.join(path, "status_cache.pkl"))
@@ -478,14 +476,6 @@ def main():
         ## in adjustedJobIds correspond only to failed jobs.
         adjustMaxRetries(adjustedJobIds, ad)
 
-    if 'CRAB_SiteAdUpdate' in ad:
-        newSiteAd = ad['CRAB_SiteAdUpdate']
-        with open("site.ad", 'r', encoding='utf-8') as fd:
-            siteAd = classad.parseOne(fd)
-        siteAd.update(newSiteAd)
-        with open("site.ad", "w", encoding='utf-8') as fd:
-            fd.write(str(siteAd))
-
     if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
         printLog("Releasing processing and tail DAGs")
         schedd.edit(tailconst, "HoldKillSig", 'SIGUSR1')
@@ -495,4 +485,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
