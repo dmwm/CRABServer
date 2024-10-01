@@ -17,7 +17,7 @@ import traceback
 if os.path.exists("WMCore.zip") and "WMCore.zip" not in sys.path:
     sys.path.append("WMCore.zip")
 
-from ServerUtilities import cmd_exist, parseJobAd
+from CMSRunAnalysis import parseAd
 
 if 'http_proxy' in os.environ and not os.environ['http_proxy'].startswith("http://"):
     os.environ['http_proxy'] = "http://%s" % (os.environ['http_proxy'])
@@ -798,7 +798,7 @@ def main():
         return exit_info
     global G_JOB_AD
     try:
-        G_JOB_AD = parseJobAd(os.environ['_CONDOR_JOB_AD'])
+        G_JOB_AD = parseAd()
     except Exception:
         msg  = "WARNING: Unable to parse job's HTCondor ClassAd."
         msg += "\n%s" % (traceback.format_exc())
@@ -1254,11 +1254,9 @@ def main():
     ## This stageout implementation will be used for all direct stageout
     ## attempts (for the user logs archive file and the user output files).
     direct_stageout_impl = None
-    direct_stageout_command = "srmv2-lcg"
+    direct_stageout_command = "gfal2"
+    print('Will use gfal2 commands for direct stageout.')
     direct_stageout_protocol = "srmv2"
-    if cmd_exist("gfal-copy"):
-        print('Will use gfal2 commands for direct stageout.')
-        direct_stageout_command = "gfal2"
     condition = ('remote' in stageout_policy and condition_stageout)
     if skip['init_direct_stageout_impl']:
         msg  = "WARNING: Internal wrapper flag skip['init_direct_stageout_impl'] is True."
