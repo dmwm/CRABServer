@@ -313,10 +313,10 @@ class MasterWorker(object):
             # Log the formatted table
             self.logger.info('\n%s', table)
 
-            if self.config.TaskScheduling.dry_run:
-                return selected_tasks #dry_run True (with Task Scheduling)
+            if self.config.TaskWorker.task_scheduling_dry_run:
+                return waiting_tasks 
             else:
-                return waiting_tasks  #dry_run False (without Task Scheduling)
+                return selected_tasks
 
         except Exception as e:
             self.logger.exception("Exception occurred during external scheduling: %s", str(e))
@@ -519,7 +519,7 @@ class MasterWorker(object):
         self.restartQueuedTasks()
         self.logger.debug("Master Worker Starting Main Cycle.")
         while not self.STOP:
-            selection_limit = self.config.TaskScheduling.selection_limit
+            selection_limit = self.config.TaskWorker.task_scheduling_limit
             if not self._selectWork(limit=selection_limit):
                 self.logger.warning("Selection of work failed.")
             else:
