@@ -12,7 +12,10 @@ echo "(DEBUG) CRABClient_version=${CRABClient_version}"
 
 #0. Prepare environment
 export ROOT_DIR="${PWD}"
-export WORK_DIR="${PWD}"/workdir
+export WORK_DIR="${PWD}/workdir"
+if [ ! -d "$WORK_DIR" ]; then
+  mkdir -p "$WORK_DIR"
+fi
 pushd "${WORK_DIR}"
 
 #1.2. Run tests

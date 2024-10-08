@@ -91,7 +91,7 @@ config = Configuration()
 
 config.section_('General')
 config.General.instance = 'REST_Instance'
-config.General.workArea = '/tmp/crabTestConfig'
+config.General.workArea = 'ROOT_DIR'
 config.General.requestName = REQUESTNAME
 
 config.section_('JobType')
@@ -220,6 +220,7 @@ def writeConfigFile(testName=None, listOfDicts=None):
         value = d['value']
         section = d['section']
         conf = changeInConf(configuration=conf, paramName=param, paramValue=value, configSection=section)
+
     # also set the requestName (do it now to avoid confusing changeInConf)
     conf = conf.replace('REQUESTNAME', '"'+testName+'"')
     with open(testName + '.py', 'w') as fp:
