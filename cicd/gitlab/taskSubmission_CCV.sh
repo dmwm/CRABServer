@@ -72,7 +72,7 @@ submitTasks() {
       echo ${output}
       if [ $submitExitCode != 0 ]; then
           echo ${file_name} >> "${WORK_DIR}"/failed_tasks
-          #killAfterFailure
+          killAfterFailure
       else
           echo ${output} | grep -oP '(?<=Task name:\s)[^\s]*(?=)' >> "${WORK_DIR}"/artifacts/submitted_tasks_${2}
           echo ${output} | grep -oP '(?<=Project dir:\s)[^\s]*(?=)' >> "${WORK_DIR}"/project_directories
@@ -80,23 +80,23 @@ submitTasks() {
   done
 }
 
-# killAfterFailure(){
-# #In case at least one task submission failed, kill all succesfully submitted tasks
-#  if [ -e "${WORK_DIR}/artifacts/project_directories" ]; then
-#    echo -e "\nTask submission failed. Killing submitted tasks.\n"
-#    while read task ; do
-#        echo "Killing task: ${task}"
-#        crab kill --dir=${task} --proxy=${PROXY}
-#        killExitCode=$?
-#        if [ $killExitCode != 0 ]; then
-#            echo -e "Failed to kill: ${task}" >> ${WORK_DIR}/artifacts/killed_tasks
-#        else
-#            echo -e "Successfully killed: ${task}" >> ${WORK_DIR}/artifacts/killed_tasks
-#        fi
-#    done <${WORK_DIR}/artifacts/project_directories
-#  fi
-#  exit 1
-# }
+killAfterFailure(){
+#In case at least one task submission failed, kill all succesfully submitted tasks
+ if [ -e "${WORK_DIR}/artifacts/project_directories" ]; then
+   echo -e "\nTask submission failed. Killing submitted tasks.\n"
+   while read task ; do
+       echo "Killing task: ${task}"
+       crab kill --dir=${task} --proxy=${PROXY}
+       killExitCode=$?
+       if [ $killExitCode != 0 ]; then
+           echo -e "Failed to kill: ${task}" >> ${WORK_DIR}/artifacts/killed_tasks
+       else
+           echo -e "Successfully killed: ${task}" >> ${WORK_DIR}/artifacts/killed_tasks
+       fi
+   done <${WORK_DIR}/artifacts/project_directories
+ fi
+ exit 1
+}
 
 immediateCheck(){
 #Run immediate check on tasks submitted for Client_Configuration_Validation testing
