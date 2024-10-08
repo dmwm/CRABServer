@@ -319,7 +319,7 @@ class MasterWorker(object):
             except:
                 return selected_tasks
 
-        except Exception as e:
+        except Exception as e: # pylint: disable=W0718
             self.logger.exception("Exception occurred during external scheduling: %s", str(e))
             return []
 
