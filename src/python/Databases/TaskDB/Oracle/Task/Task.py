@@ -42,6 +42,8 @@ class Task(object):
     LastFailures = "SELECT tm_username, tm_taskname, tm_task_failure from tasks WHERE tm_start_time > SYS_EXTRACT_UTC(SYSTIMESTAMP) - (:minutes/1440) and (tm_task_status='FAILED' \
                     OR tm_task_status='SUBMITFAILED' OR tm_task_status='KILLFAILED' OR tm_task_status='RESUBMITFAILED') \
                     AND tm_task_failure IS NOT NULL ORDER BY tm_username"
+    #get all tasks with SUBMITREFUSED status
+    LastRefused = "SELECT tm_username, tm_taskname, tm_task_warnings from tasks WHERE tm_task_status='SUBMITREFUSED' AND tm_start_time > SYS_EXTRACT_UTC(SYSTIMESTAMP) - (:minutes/1440) ORDER BY tm_username"
 
     #New
     New_sql = "INSERT INTO tasks ( \

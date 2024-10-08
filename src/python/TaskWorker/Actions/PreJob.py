@@ -412,16 +412,11 @@ class PreJob:
         else:
             new_submit_text += '+CRAB_SiteWhitelist = {}\n'
         ## Get the list of available sites (the sites where this job could run).
-        if os.path.exists("site.ad.json"):
-            with open("site.ad.json", 'r', encoding='utf-8') as fd:
-                site_info = json.load(fd)
-            group = site_info[self.job_id]
-            available = set(site_info['group_sites'][str(group)])
-            datasites = set(site_info['group_datasites'][str(group)])
-        else:
-            with open("site.ad", 'r', encoding='utf-8') as fd:
-                site_ad = classad.parseOne(fd)
-            available = set(site_ad['Job%s' % (self.job_id)])
+        with open("site.ad.json", 'r', encoding='utf-8') as fd:
+            site_info = json.load(fd)
+        group = site_info[self.job_id]
+        available = set(site_info['group_sites'][str(group)])
+        datasites = set(site_info['group_datasites'][str(group)])
         ## Take the intersection between the available sites and the site whitelist.
         ## This is the new set of available sites.
         if sitewhitelist:

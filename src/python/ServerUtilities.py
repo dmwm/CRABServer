@@ -424,33 +424,6 @@ def isFailurePermanent(reason, gridJob=False):
     return False, "", None
 
 
-def parseJobAd(filename):
-    """ Parse the jobad file provided as argument and return a dict representing it
-        SB: why do we have this ? the classAd object returned by classad.parse has
-            the semantic of a dictionary ! Currently it is only used in cmscp.py
-            and in job wrapper we are not sure to have HTCondor available.
-            Note that we also have a parseAd() method inside CMSRunAnalysis.py which should
-            do finely also in cmscp.py
-    """
-    jobAd = {}
-    with open(filename, 'r', encoding='utf-8') as fd:
-        for adline in fd.readlines():
-            info = adline.split(' = ', 1)
-            if len(info) != 2:
-                continue
-            if info[1].startswith('undefined'):
-                val = info[1].strip()
-            elif info[1].startswith('"'):
-                val = info[1].strip().replace('"', '')
-            else:
-                try:
-                    val = int(info[1].strip())
-                except ValueError:
-                    continue
-            jobAd[info[0]] = val
-    return jobAd
-
-
 def mostCommon(lst, default=0):
     """ Return the most common error among the list
     """

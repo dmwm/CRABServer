@@ -1,5 +1,5 @@
 """ handles HTTP queries to crabserver/instance/task?...  """
-
+# pylint: disable=unused-argument
 import re
 import logging
 from ast import literal_eval
@@ -278,6 +278,23 @@ class RESTTask(RESTEntity):
 
         for row in rows:
             yield [row[0], row[1], row[2].read()]
+
+    def lastrefused(self, **kwargs):
+        """Retrieves all tasks with SUBMITREFUSED status
+        curl -X GET 'https://mmascher-dev6.cern.ch/crabserver/dev/task?subresource=lastrefused&minutes=100'\
+                        -k --key /tmp/x509up_u8440 --cert /tmp/x509up_u8440 -v
+        """
+        # Check if 'minutes' parameter is provided
+        if 'minutes' not in kwargs:
+            raise InvalidParameter("The parameter minutes is mandatory for the lastrefused api")
+
+        # Call LastRefused to fetch tasks with status SUBMITREFUSED
+        rows = self.api.query(None, None, self.Task.LastRefused, minutes=kwargs["minutes"])
+
+        # Iterate over the result and fetch tm_task_warnings in row[2]
+        for row in rows:
+            yield [row[0], row[1], row[2].read()]
+
 
     @restcall
     def post(self, subresource, **kwargs):

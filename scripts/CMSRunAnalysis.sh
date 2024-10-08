@@ -32,7 +32,7 @@ setup_cmsset
 # from ./submit_env.sh
 setup_python_comp
 
-echo "==== Make sure $HOME is defined ===="
+echo "==== Make sure \$HOME is defined ===="
 export HOME=${HOME:-$PWD}
 
 echo "======== Current environment dump STARTING ========"
@@ -54,7 +54,7 @@ if [[ "X$CRAB3_RUNTIME_DEBUG" == "X" ]]; then
 else
     echo "I am in runtime debug mode. I will not extract the sandbox"
 fi
-export PYTHONPATH=`pwd`/CRAB3.zip:`pwd`/WMCore.zip:$PYTHONPATH
+export PYTHONPATH=`pwd`/WMCore.zip:$PYTHONPATH
 set +x
 echo "======== Tarball initialization FINISHING at $(TZ=GMT date) ========"
 echo "==== Local directory contents dump STARTING ===="

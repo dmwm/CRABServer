@@ -1,8 +1,6 @@
-
 """
 CMSRunAnalysis.py - the runtime python portions to launch a CRAB3 / cmsRun job.
 """
-from __future__ import print_function
 
 import os
 import os.path
@@ -12,14 +10,13 @@ import stat
 import time
 import json
 import shutil
-# import pickle
 import signal
 import logging
 import subprocess
 import traceback
 from xml.etree import ElementTree
 from ast import literal_eval
-from optparse import OptionParser, BadOptionError, AmbiguousOptionError
+from optparse import OptionParser, BadOptionError, AmbiguousOptionError  # pylint: disable=deprecated-module
 
 from TweakPSet import prepareTweakingScript
 
@@ -372,33 +369,31 @@ def parseArgs():
     return opts
 
 
-def prepSandbox(opts):
+def extractUserSandbox(sandbox, cmsswVersion):
     print(f"==== Sandbox untarring STARTING at {UTCNow()} ====")
-
     # The user sandbox.tar.gz has to be unpacked no matter what (even in DEBUG mode)
-    print(f"expanding {opts.archiveJob} in {os.getcwd()}")
-    print(subprocess.getoutput(f"tar xfm {opts.archiveJob}"))
+    # this guarantees that job starting directrly contains all files listed in
+    # submission configuration file as config.JobType.inputFiles
+    print(f"expanding {sandbox} in {os.getcwd()}")
+    print(subprocess.getoutput(f"tar xfm {sandbox}"))
     # if the sandbox contains tar files, expand them
-    files = subprocess.getoutput(f"tar tf {opts.archiveJob}").split('\n')
+    files = subprocess.getoutput(f"tar tf {sandbox}").split('\n')
     for file in files:
         if ('.tar.' in file) or file.endswith('.tar') or\
                 file.endswith('.tgz') or file.endswith('.tbz'):
             print(f"expanding {file} in {os.getcwd()}")
             print(subprocess.getoutput(f"tar xfm {file}"))
 
-    print(f"==== Sandbox untarring FINISHED at {UTCNow()} ====")
-
-
-def extractUserSandbox(archiveJob, cmsswVersion):
-    # the user sandbox contains the user scram directory files and thus
-    # is unpacked in the local CMSSW_X_Y_X dir, but the cmsRun command
-    # will be executed from the job working directory, so we move "up"
-    # the PSet which is also in the user sandbox
+    # the user sandbox contains also the user scram directory files and thus
+    # is unpacked in the local CMSSW_X_Y_X dir
+    # the following 4 lines will not be needed anymore after we change CRABClient
+    # to put $CMSSW_BASE files inside cmsswVersion directory inside the sandbox
     os.chdir(cmsswVersion)
-    print(subprocess.getoutput(f"tar xfm {os.path.join('..', archiveJob)}"))
-    os.rename('PSet.py', '../PSet.py')
-    os.rename('PSet.pkl', '../PSet.pkl')
+    print(f"expanding {sandbox} in {os.getcwd()}")
+    print(subprocess.getoutput(f"tar xfm {os.path.join('..', sandbox)}"))
     os.chdir('..')
+
+    print(f"==== Sandbox untarring FINISHED at {UTCNow()} ====")
 
 
 def getProv(filename='', scramTool=None):
@@ -632,7 +627,6 @@ if __name__ == "__main__":
     # Note that we may fail in the imports
     try:
         options = parseArgs()
-        prepSandbox(options)
         from WMCore.WMRuntime.Bootstrap import setupLogging
         from WMCore.FwkJobReport.Report import Report
         from WMCore.FwkJobReport.Report import FwkJobReportException
@@ -670,9 +664,10 @@ if __name__ == "__main__":
             handleException("FAILED", EC_CMSMissingSoftware, f"Error setting CMSSW environment: {dgn}")
             mintime()
             sys.exit(EC_CMSMissingSoftware)
+        print(f"==== {options.cmsswVersion} release directory created ====")
         print(f"==== SCRAM Obj INITIALIZED at {UTCNow()} ====")
 
-        print("==== Extract user sandbox in CMSSW directory ====")
+        print("==== Extract user sandbox in top and CMSSW directory ====")
         extractUserSandbox(options.archiveJob, options.cmsswVersion)
 
         # tweaking of the PSet is needed both for CMSSWStack and ScriptEXE
