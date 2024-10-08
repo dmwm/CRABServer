@@ -313,9 +313,10 @@ class MasterWorker(object):
             # Log the formatted table
             self.logger.info('\n%s', table)
 
-            if self.config.TaskWorker.task_scheduling_dry_run:
-                return waiting_tasks 
-            else:
+            try:
+                if self.config.TaskWorker.task_scheduling_dry_run:
+                    return waiting_tasks
+            except:
                 return selected_tasks
 
         except Exception as e:
