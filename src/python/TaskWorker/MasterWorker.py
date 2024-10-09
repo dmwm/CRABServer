@@ -313,14 +313,18 @@ class MasterWorker(object):
             # Log the formatted table
             self.logger.info('\n%s', table)
 
-            try:
-                if self.config.TaskWorker.task_scheduling_dry_run:
-                    return waiting_tasks
-            except:
-                return selected_tasks
+            if getattr(self.config.TaskWorker, 'task_scheduling_dry_run', False):
+                return waiting_tasks
+            return selected_tasks
 
-        except Exception as e: # pylint: disable=W0718
-            self.logger.exception("Exception occurred during external scheduling: %s", str(e))
+        except HTTPException as hte:
+            msg = "HTTP Error during external scheduling: %s\n" % str(hte)
+            msg += "HTTP Headers are %s: " % hte.headers
+            self.logger.error(msg)
+            return []
+
+        except Exception as e: #pylint: disable=broad-except
+            self.logger.exception("Unknown Exception occurred during external scheduling: %s", str(e))
             return []
 
     def _pruneTaskQueue(self):
