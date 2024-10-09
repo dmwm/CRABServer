@@ -10,8 +10,8 @@ tmp/runtime/*
 # python virtualenv
 .venv/
 # ci directory
-build/
-workdir/
+/build/
+/workdir/
 # direnv
 .envrc
 # pylint config
