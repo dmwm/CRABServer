@@ -9,8 +9,8 @@ It process the python's argparse and pass the argument to spark script via
 environment variable.
 
 For examples:
-- To extract data from September 2024
-    ./run.py --secretpath secret.txt --start 2024-09-01 --end 2024-01-01 crab_taskdb.ipynb
+- To extract data from the whole September 2024
+    ./run.py --secretpath secret.txt --start 2024-09-01 --end 2024-10-01 crab_taskdb.ipynb
 
 - To extract data from n days ago (in case you need to wait until data settle)
   For example, today is 2024-10-01 but you want to process data on 2024-09-30
