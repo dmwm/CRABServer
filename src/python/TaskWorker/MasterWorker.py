@@ -313,13 +313,18 @@ class MasterWorker(object):
             # Log the formatted table
             self.logger.info('\n%s', table)
 
-            if self.config.TaskScheduling.dry_run:
-                return selected_tasks #dry_run True (with Task Scheduling)
-            else:
-                return waiting_tasks  #dry_run False (without Task Scheduling)
+            if getattr(self.config.TaskWorker, 'task_scheduling_dry_run', False):
+                return waiting_tasks
+            return selected_tasks
 
-        except Exception as e:
-            self.logger.exception("Exception occurred during external scheduling: %s", str(e))
+        except HTTPException as hte:
+            msg = "HTTP Error during external scheduling: %s\n" % str(hte)
+            msg += "HTTP Headers are %s: " % hte.headers
+            self.logger.error(msg)
+            return []
+
+        except Exception as e: #pylint: disable=broad-except
+            self.logger.exception("Unknown Exception occurred during external scheduling: %s", str(e))
             return []
 
     def _pruneTaskQueue(self):
@@ -519,7 +524,7 @@ class MasterWorker(object):
         self.restartQueuedTasks()
         self.logger.debug("Master Worker Starting Main Cycle.")
         while not self.STOP:
-            selection_limit = self.config.TaskScheduling.selection_limit
+            selection_limit = self.config.TaskWorker.task_scheduling_limit
             if not self._selectWork(limit=selection_limit):
                 self.logger.warning("Selection of work failed.")
             else:
