@@ -6,6 +6,7 @@ import cherrypy
 import boto3
 from botocore.exceptions import ClientError
 
+from WMCore.Algorithms.Permissions import owner_readonly
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str
@@ -13,7 +14,8 @@ from WMCore.REST.Error import MissingParameter, ExecutionError
 
 # CRABServer dependecies here
 from CRABInterface.RESTExtensions import authz_login_valid, authz_operator
-from CRABInterface.Regexps import RX_SUBRES_CACHE, RX_CACHE_OBJECTTYPE, RX_TASKNAME, RX_USERNAME, RX_TARBALLNAME
+from CRABInterface.Regexps import (RX_SUBRES_CACHE, RX_CACHE_OBJECTTYPE, RX_TASKNAME,
+                                   RX_USERNAME, RX_TARBALLNAME, RX_PRESIGNED_CLIENT_METHOD)
 from ServerUtilities import getUsernameFromTaskname, MeasureTime
 
 
@@ -90,7 +92,7 @@ class RESTCache(RESTEntity):
         self.s3_client = boto3.client('s3', endpoint_url=endpoint, aws_access_key_id=access_key,
                                       aws_secret_access_key=secret_key)
 
-    def validate(self, apiobj, method, api, param, safe):
+    def validate(self, apiobj, method, api, param, safe):  # pylint: disable=unused-argument
         """Validating all the input parameter as enforced by the WMCore.REST module"""
         authz_login_valid()
         if method in ['GET']:
@@ -99,11 +101,14 @@ class RESTCache(RESTEntity):
             validate_str('taskname', param, safe, RX_TASKNAME, optional=True)
             validate_str('username', param, safe, RX_USERNAME, optional=True)
             validate_str('tarballname', param, safe, RX_TARBALLNAME, optional=True)
+            validate_str('clientmethod', param, safe, RX_PRESIGNED_CLIENT_METHOD, optional=True)
 
     @restcall
-    def get(self, subresource, objecttype, taskname, username, tarballname):  # pylint: disable=redefined-builtin
+    def get(self, subresource, objecttype, taskname, username, tarballname, clientmethod):  # pylint: disable=redefined-builtin
         """
            :arg str subresource: the specific information to be accessed;
+           :arg str clientmethod: get_object (to retrieve content) (default) or head_object (to check existence)
+                                  only meaningful when subresource is 'upload'
         """
         authenticatedUserName = cherrypy.request.user['login']  # the username of who's calling
         # a bit of code common to 3 subresource's: validate args and prepare the s3_objectKey inside the bucket
@@ -113,7 +118,10 @@ class RESTCache(RESTEntity):
             if objecttype == 'sandbox':
                 if not tarballname:
                     raise MissingParameter("tarballname is missing")
-                ownerName = authenticatedUserName if subresource == 'upload' else username
+                if subresource == 'upload' or (subresource == 'download' and  clientmethod == 'head_object'):
+                    ownerName = authenticatedUserName
+                else:
+                    ownerName = username
                 if not ownerName:
                     raise MissingParameter("username is missing")
                 # sandbox goes in bucket/username/sandboxes/
@@ -165,6 +173,8 @@ class RESTCache(RESTEntity):
             authz_operator(username=ownerName, group='crab3', role='operator')
             if subresource == 'sandbox' and not username:
                 raise MissingParameter("username is missing")
+            if not clientmethod:
+                clientmethod = 'get_object'
             # returns a PreSignedUrl to download the file within the expiration time
             expiration = 60 * 60  # 1 hour default is good for retries and debugging
             if objecttype in ['debugfiles', 'clientlog', 'twlog']:
@@ -172,7 +182,7 @@ class RESTCache(RESTEntity):
             try:
                 with MeasureTime(self.logger, modulename=__name__, label="get.download.generate_presigned_post") as _:
                     response = self.s3_client.generate_presigned_url(
-                        'get_object', Params={'Bucket': self.s3_bucket, 'Key': s3_objectKey},
+                        clientmethod, Params={'Bucket': self.s3_bucket, 'Key': s3_objectKey},
                         ExpiresIn=expiration)
                 preSignedUrl = response
             except ClientError as e:
@@ -188,7 +198,7 @@ class RESTCache(RESTEntity):
                     self.s3_client.download_file(self.s3_bucket, s3_objectKey, tempFile)
             except ClientError as e:
                 raise ExecutionError(f"Connection to s3.cern.ch failed:\n{str(e)}") from e
-            with open(tempFile) as f:
+            with open(tempFile, 'r', encoding='utf-8') as f:
                 txt = f.read()
             os.remove(tempFile)
             return txt
