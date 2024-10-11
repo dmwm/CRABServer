@@ -6,6 +6,7 @@ We can even convert shell script in to python to increase code maintainability.
 import argparse
 import os
 
+MANAGE_SH_PATH = os.path.join(__file__, 'manage.sh')
 
 class EnvDefault(argparse.Action): # pylint: disable=too-few-public-methods
     """
@@ -71,4 +72,9 @@ env['SERVICE'] = args.service if hasattr(args, 'service') else ''
 
 # re exec the ./manage.sh, equivalent to `exec ./manage.sh` in shell script
 # os.execle(filepath, arg0, arg1, ..., argN, env_dict)
-os.execle('./manage.sh','./manage.sh', env)
+# arg0 is usually the exec path or simply the exec name. For example,
+# The path to the Python interpreter
+#   path = "/usr/bin/python3"
+# Arguments: the first is `arg0`, the rest are passed to the new program
+# os.execle(path, "python3", "-c", "print('CRAB!')", {"HOME": "/home/run"})
+os.execle(MANAGE_SH_PATH, MANAGE_SH_PATH, env)
