@@ -37,7 +37,7 @@ script_env() {
     export X509_USER_CERT=${X509_USER_CERT:-/data/srv/current/auth/crabserver/dmwm-service-cert.pem}
     export X509_USER_KEY=${X509_USER_KEY:-/data/srv/current/auth/crabserver/dmwm-service-key.pem}
 
-    if [[ "${DEBUG:-}" == true ]]; then
+    if [[ -n "${DEBUG:-}" ]]; then
         # this will direct WMCore/REST/Main.py to run in the foreground rather than as a demon
         # allowing among other things to insert pdb calls in the crabserver code and debug interactively
         export DONT_DAEMONIZE_REST=True
