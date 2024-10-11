@@ -26,8 +26,13 @@ class EnvDefault(argparse.Action): # pylint: disable=too-few-public-methods
         setattr(namespace, self.dest, values)
 
 myparser = argparse.ArgumentParser(description='crab service process controller')
+# SERVICE, for taskworker
+myparser.add_argument('-s', dest='service', action=EnvDefault, envvar='SERVICE',
+                         default='',
+                         help='Name of the service to run. Only use in Publisher (Publisher_schedd, Publisher_rucio)')
 
 subparsers = myparser.add_subparsers(dest='command', required=True, help='command to run')
+
 parserStart = subparsers.add_parser('start',
                                     help='start the service')
 groupModeStart = parserStart.add_mutually_exclusive_group(required=True)
@@ -38,14 +43,10 @@ groupModeStart.add_argument('-g', dest='mode', action='store_const', const='from
 parserStart.add_argument('-d', dest='debug', action='store_const', const='t',
                          default='',
                          help='Enable debug mode (foreground)')
-# env $SERVICE
-parserStart.add_argument('-s', dest='service', action=EnvDefault, envvar='SERVICE',
-                         default='',
-                         help='Name of the service to run. Only use in Publisher (Publisher_schedd, Publisher_rucio)')
 parserStop = subparsers.add_parser('stop',
                                    help='show service status (exit non-zero if service does not start)')
 parserStatus = subparsers.add_parser('status',
-                                    help='start the service')
+                                    help='status of the service (pid, value of PYTHONPATH)')
 parserEnv = subparsers.add_parser('env',
                                   help='print environment variable for sourcing it locally.')
 # Wa: it actually the same as groupModeStart but I do not know how to reuse it
