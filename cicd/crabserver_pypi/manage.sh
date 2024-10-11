@@ -14,9 +14,14 @@ if [[ -z ${COMMAND+x} || -z ${MODE+x} || -z ${DEBUG+x} || -z ${SERVICE+x} ]]; th
 fi
 
 script_env() {
-    # app path
-    PYTHONPATH=${PYTHONPATH:-/data/srv/current/lib/python/site-packages}
-    # secrets
+    # path where we install crab code
+    APP_PATH="${APP_PATH:-/data/srv/current/lib/python/site-packages/}"
+    if [[ $MODE = 'fromGH' ]]; then
+        PYTHONPATH=/data/repos/CRABServer/src/python:/data/repos/WMCore/src/python:${PYTHONPATH:-}
+    else
+        PYTHONPATH="${APP_PATH}":"${PYTHONPATH:-}"
+    fi
+    # secrets CRABServerAuth.py
     PYTHONPATH=/data/srv/current/auth/crabserver:${PYTHONPATH}
     # export PYTHONPATH
     export PYTHONPATH
@@ -64,7 +69,17 @@ stop_srv() {
 
 status_srv() {
     script_env
-    wmc-httpd -s -d $STATEDIR $CFGFILE
+    # 'crabserver is NOT RUNNING'
+    # 'crabserver is NOT RUNNING'
+    rc=0
+    out="$(wmc-httpd -s -d $STATEDIR $CFGFILE)" || rc=$?
+    echo "${out}"
+    pgid=$(echo "${out}" | awk '{print $NF}')
+    if [[ "${pgid}" =~ ^[0-9]+$ ]]; then
+        pid=$(pgrep -g "${pgid}" | head -n1)
+        cat /proc/"${pid}"/environ | tr '\0' '\n' | grep PYTHONPATH
+    fi
+    exit "${rc}"
 }
 
 env_eval() {
@@ -72,6 +87,8 @@ env_eval() {
     echo "export PYTHONPATH=${PYTHONPATH}"
     echo "export X509_USER_CERT=${X509_USER_CERT}"
     echo "export X509_USER_KEY=${X509_USER_KEY}"
+    echo "DONT_DAEMONIZE_REST=${DONT_DAEMONIZE_REST:-False}"
+    echo "CRABSERVER_THREAD_POOL=${CRABSERVER_THREAD_POOL:-1}"
 }
 
 # Main routine, perform action requested on command line.
