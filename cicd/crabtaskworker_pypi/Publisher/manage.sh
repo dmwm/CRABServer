@@ -110,8 +110,14 @@ stop_srv() {
 }
 
 status_srv() {
-    >&2 echo "Error: Not implemented."
-    exit 1
+    pid=$(_getMasterWorkerPid)
+    if [[ -z ${pid} ]]; then
+        echo "Publisher's Master process is not running."
+        exit 1
+    fi
+    echo "Publisher's Master process is running with PID ${pid}"
+    cat /proc/"${pid}"/environ | tr '\0' '\n' | grep PYTHONPATH
+    exit 0
 }
 
 

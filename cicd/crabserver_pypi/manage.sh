@@ -68,9 +68,12 @@ stop_srv() {
 }
 
 status_srv() {
+    # The `wmc-httpd -s` output when there is process running,
+    #   crabserver is RUNNING, PID 85298
+    # Otherwise (with exit 1)
+    #   crabserver is NOT RUNNING
+    # Note that PID is actually PGID.
     script_env
-    # 'crabserver is NOT RUNNING'
-    # 'crabserver is NOT RUNNING'
     rc=0
     out="$(wmc-httpd -s -d $STATEDIR $CFGFILE)" || rc=$?
     echo "${out}"
