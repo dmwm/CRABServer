@@ -90,8 +90,6 @@ env_eval() {
     echo "export PYTHONPATH=${PYTHONPATH}"
     echo "export X509_USER_CERT=${X509_USER_CERT}"
     echo "export X509_USER_KEY=${X509_USER_KEY}"
-    echo "DONT_DAEMONIZE_REST=${DONT_DAEMONIZE_REST:-False}"
-    echo "CRABSERVER_THREAD_POOL=${CRABSERVER_THREAD_POOL:-1}"
 }
 
 # Main routine, perform action requested on command line.
