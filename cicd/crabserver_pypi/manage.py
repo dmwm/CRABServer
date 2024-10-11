@@ -5,8 +5,9 @@ We can even convert shell script in to python to increase code maintainability.
 """
 import argparse
 import os
+from pathlib import Path
 
-MANAGE_SH_PATH = os.path.join(__file__, 'manage.sh')
+MANAGE_SH_PATH = Path(__file__).parent / Path('manage.sh')
 
 class EnvDefault(argparse.Action): # pylint: disable=too-few-public-methods
     """
