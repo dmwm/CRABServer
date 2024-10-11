@@ -11,7 +11,10 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 if [[ ${1} == '-g' ]]; then
-    eval "$("${SCRIPT_DIR}"/manage.py env -g)"
+    out="$("${SCRIPT_DIR}"/manage.py env -g)"
 else
-    eval "$("${SCRIPT_DIR}"/manage.py env -c)"
+    out="$("${SCRIPT_DIR}"/manage.py env -c)"
 fi
+echo "will source these variables: "
+echo "${out}"
+eval "${out}"
