@@ -81,11 +81,16 @@ start_srv() {
 
 stop_srv() {
   nIter=1
+  maxIter=60 # 600 secs => 10 mins
   # check if publisher is still processing by look at the pb logs
   while _isPublisherBusy;  do
       # exit loop if publisher process is gone
       if [[ -z $(_getPublisherPid) ]]; then
          break;
+      elif [[ $nIter -gt $maxIter ]]; then
+          echo "Error: execeed maximum waiting time (10 mins)"
+          echo "crab-publisher is still running ${stillrunpid}"
+          exit 1
       fi
       [[ $nIter = 1 ]] && echo "Waiting for MasterPublisher to complete cycle: ."
       nIter=$((nIter+1))
@@ -110,7 +115,7 @@ stop_srv() {
 }
 
 status_srv() {
-    pid=$(_getMasterWorkerPid)
+    pid=$(_getPublisherPid)
     if [[ -z ${pid} ]]; then
         echo "Publisher's Master process is not running."
         exit 1
