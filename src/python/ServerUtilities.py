@@ -1073,17 +1073,18 @@ def isEnoughRucioQuota(rucioClient, site, account=''):
     }
     if not account:
         account = rucioClient.account
-    quotas = list(rucioClient.get_local_account_usage(account, site))
-    if quotas:
-        ret['hasQuota'] = True
-        quota = quotas[0]
-        ret['total'] = quota['bytes_limit'] / 2 ** (10 * 3)  # GiB
-        ret['used'] = quota['bytes'] / 2 ** (10 * 3)  # GiB
-        ret['free'] = quota['bytes_remaining'] / 2 ** (10 * 3)  # GiB
-        if ret['free'] > RUCIO_QUOTA_MINIMUM_GB:
-            ret['isEnough'] = True
-            if ret['free'] <= RUCIO_QUOTA_WARNING_GB:
-                ret['isQuotaWarning'] = True
+    quotas = rucioClient.get_local_account_usage(account, site)
+    for quota in quotas:
+        if quota['rse'] == site:
+            ret['hasQuota'] = True
+            ret['total'] = quota['bytes_limit'] / 2 ** (10 * 3)  # GiB
+            ret['used'] = quota['bytes'] / 2 ** (10 * 3)  # GiB
+            ret['free'] = quota['bytes_remaining'] / 2 ** (10 * 3)  # GiB
+            if ret['free'] > RUCIO_QUOTA_MINIMUM_GB:
+                ret['isEnough'] = True
+                if ret['free'] <= RUCIO_QUOTA_WARNING_GB:
+                    ret['isQuotaWarning'] = True
+            break
     return ret
 
 
