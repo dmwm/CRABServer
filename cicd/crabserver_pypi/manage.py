@@ -70,11 +70,9 @@ env['SERVICE'] = args.service if hasattr(args, 'service') else ''
 #import sys
 #sys.exit(0)
 
-# re exec the ./manage.sh, equivalent to `exec ./manage.sh` in shell script
+# re exec the ./manage.sh, equivalent to `exec ./manage.sh` in shell script.
 # os.execle(filepath, arg0, arg1, ..., argN, env_dict)
 # arg0 is usually the exec path or simply the exec name. For example,
-# The path to the Python interpreter
 #   path = "/usr/bin/python3"
-# Arguments: the first is `arg0`, the rest are passed to the new program
-# os.execle(path, "python3", "-c", "print('CRAB!')", {"HOME": "/home/run"})
+#   os.execle(path, "python3", "-c", "print('CRAB!')", {"HOME": "/home/run"})
 os.execle(MANAGE_SH_PATH, MANAGE_SH_PATH, env)
