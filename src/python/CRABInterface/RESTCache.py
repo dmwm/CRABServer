@@ -1,3 +1,11 @@
+""" REST entity to deal with CRAB Cache on S3 """
+# for some variables we prefer S3 naming even if not our standard camelCase
+# pylint: disable=invalid-name
+# yes, we need all those branches
+# pylint: disable=too-many-branches
+# need to use http GET for many things, so return has to differ
+# pylint: disable=inconsistent-return-statements
+
 from __future__ import division
 import os
 import uuid
@@ -6,7 +14,6 @@ import cherrypy
 import boto3
 from botocore.exceptions import ClientError
 
-from WMCore.Algorithms.Permissions import owner_readonly
 # WMCore dependecies here
 from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str

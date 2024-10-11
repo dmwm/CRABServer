@@ -839,7 +839,7 @@ def uploadToS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
         try:
             checkS3Object(crabserver=crabserver, objecttype=objecttype,
                       username=username, tarballname=tarballname, logger=logger)
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             if waitTime > 10 :
                 raise Exception("Object not available in S3 after 10 minutes. Something badly wrong")
             waitStep = 2 * waitStep
