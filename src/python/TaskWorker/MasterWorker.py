@@ -526,7 +526,7 @@ class MasterWorker(object):
         while not self.STOP:
             selection_limit = self.config.TaskWorker.task_scheduling_limit
             if not self._selectWork(limit=selection_limit):
-                self.logger.warning("Selection of work failed.")
+                self.logger.warning("No tasks selected.")
             else:
                 self.logger.info("Work selected successfully.")
             limit = self.slaves.queueableTasks()
