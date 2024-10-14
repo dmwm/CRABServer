@@ -124,5 +124,5 @@ def getTapeRecallUsage(rucioClient=None, account=None):
     
     rules = rucioClient.list_replication_rules(filters=filters)
     usage = sum(getRuleQuota(rucioClient, rule['id']) for rule in rules\
-                if rule['state'] in ['REPLICATING', 'STUCK', 'SUSPENDED'])  # in Bytes
+                if rule['state'] in ['OK', 'REPLICATING', 'STUCK', 'SUSPENDED', 'INJECT', 'WAITING_APPROVAL'])  # in Bytes
     return usage
