@@ -1,10 +1,13 @@
-""" This script is called by dag_bootstrap_startup.sh when the job is (re)submitted and:
+"""
+This script is called by dag_bootstrap_startup.sh when the job is (re)submitted.
+It not only does adjusting sites (blacklist/whitelist) but also:
+    - It downloads sandbox from S3 (if not exist).
     - It creates the webdir if necessary
     - It updates both the webdir ant the proxied version of it on the REST task db
     - For resubmission: adjust the exit codes of the PJ in the RunJobs.dag.nodes.log files and
       the max retries in the RunJobs.dag files
 """
-# this is full of snake_case variables from old times, which we do not casre to change
+# this is full of snake_case variables from old times, which we do not care to change
 # pylint: disable=invalid-name
 
 from __future__ import print_function
@@ -16,13 +19,14 @@ import sys
 import time
 import glob
 import shutil
+import logging
 from urllib.parse import urlencode
 import traceback
 from datetime import datetime
 from http.client import HTTPException
 
 from RESTInteractions import CRABRest
-from ServerUtilities import getProxiedWebDir, getColumn
+from ServerUtilities import getProxiedWebDir, getColumn, downloadFromS3
 
 if 'useHtcV2' in os.environ:
     import htcondor2 as htcondor
@@ -36,6 +40,22 @@ def printLog(msg):
         with anything (e.g.: logging.info if we decided to set up a logger here)
     """
     print("%s: %s" % (datetime.utcnow(), msg))
+
+
+def setupStreamLogger():
+    """
+    Setup logger object with stream handler. Needed by `downloadFromS3()`.
+    :returns: stream logger object
+    :rtype: logging.Logger
+    """
+    logHandler = logging.StreamHandler()
+    logFormatter = logging.Formatter(
+        "%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
+    logHandler.setFormatter(logFormatter)
+    logger = logging.getLogger('AdjustSites') # hardcode
+    logger.addHandler(logHandler)
+    logger.setLevel(logging.DEBUG)
+    return logger
 
 
 def adjustPostScriptExitStatus(resubmitJobIds, filename):
@@ -350,28 +370,24 @@ def setupLog():
     os.close(logfd)
 
 
-def checkTaskInfo(crabserver, ad):
+def checkTaskInfo(taskDict, ad):
     """
-    Function checks that given task is registered in the database with status SUBMITTED and with the
-    same clusterId and schedd name in the database as in the condor ads where it is currently running.
+    Function checks that given task is registered in the database with status
+    SUBMITTED and with the same clusterId and schedd name in the database as in
+    the condor ads where it is currently running.
     In case above condition is not met, script immediately terminates
+
+    :param taskDict: task info return from REST.
+    :type taskDict: dict
+    :param ad: kv classad
+    :type ad: HTC classad.ClassAd (which has the semantics of a dictionarty)
     """
 
-    task = ad['CRAB_ReqName']
     clusterIdOnSchedd = ad['ClusterId']
-    data = {'subresource': 'search', 'workflow': task}
 
-    try:
-        dictresult, _, _ = crabserver.get(api='task', data=data)
-    except HTTPException as hte:
-        printLog(traceback.format_exc())
-        printLog(hte.headers)
-        printLog(hte.result)
-        sys.exit(2)
-
-    taskStatusOnDB = getColumn(dictresult, 'tm_task_status')
-    clusteridOnDB = getColumn(dictresult, 'clusterid')
-    scheddOnDB = getColumn(dictresult, 'tm_schedd')
+    taskStatusOnDB = getColumn(taskDict, 'tm_task_status')
+    clusteridOnDB = getColumn(taskDict, 'clusterid')
+    scheddOnDB = getColumn(taskDict, 'tm_schedd')
 
     scheddName = os.environ['schedd_name']
 
@@ -381,6 +397,41 @@ def checkTaskInfo(crabserver, ad):
     if not (taskStatusOnDB == 'SUBMITTED' and scheddOnDB == scheddName and clusteridOnDB == str(clusterIdOnSchedd)):
         printLog('Exiting AdjustSites because this dagman does not match task information in TASKS DB')
         sys.exit(3)
+
+def getSandbox(taskDict, crabserver):
+    """
+    Getting user sandbox (sandbox.tar.gz) from S3. It will not redownload
+    sandbox if file exists.
+    This function contains side effect where sandbox.tar.gz(_tmp) are created in
+    current directory.
+    :param taskDict: task info return from REST.
+    :type taskDict: dict
+    :param crabserver: CRABRest object to talk with RESTCache API
+    :type crabserver: RESTInteractions.CRABRest
+    """
+    sandboxTarBall = 'sandbox.tar.gz'
+    sandboxTarBallTmp = sandboxTarBall + '_tmp'
+    if os.path.exists(sandboxTarBall):
+        printLog('sandbox.tar.gz already exist. Do nothing.')
+        return
+
+    # init logger require by downloadFromS3
+    logger = setupStreamLogger()
+
+    # get info
+    username = getColumn(taskDict, 'tm_username')
+    sandboxName = getColumn(taskDict, 'tm_user_sandbox')
+
+    # download
+    try:
+        downloadFromS3(crabserver=crabserver, objecttype='sandbox', username=username,
+                       tarballname=sandboxName, filepath=sandboxTarBallTmp, logger=logger)
+        shutil.move(sandboxTarBallTmp, sandboxTarBall)
+    except Exception as ex:
+        logger.exception("The CRAB server backend could not download the input sandbox with your code " + \
+                         "from S3.\nThis could be a temporary glitch; please try to submit a new task later " + \
+                         "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex))
+        sys.exit(4)
 
 
 def main():
@@ -397,8 +448,7 @@ def main():
 
     with open(os.environ['_CONDOR_JOB_AD'], 'r', encoding='utf-8') as fd:
         ad = classad.parseOne(fd)
-    printLog("Parsed ad: %s" % ad)
-
+    printLog("Parsed ad: %s\n" % ad)
 
     # instantiate a server object to talk with crabserver
     host = ad['CRAB_RestHost']
@@ -407,8 +457,24 @@ def main():
     crabserver = CRABRest(host, cert, cert, retry=3, userAgent='CRABSchedd')
     crabserver.setDbInstance(dbInstance)
 
+    printLog("Sleeping 60 seconds to give TW time to update taskDB")
     time.sleep(60)  # give TW time to update taskDB #8411
-    checkTaskInfo(crabserver, ad)
+
+    # get task info
+    task = ad['CRAB_ReqName']
+    data = {'subresource': 'search', 'workflow': task}
+    try:
+        dictresult, _, _ = crabserver.get(api='task', data=data)
+    except HTTPException as hte:
+        printLog(traceback.format_exc())
+        printLog(hte.headers)
+        printLog(hte.result)
+        sys.exit(2)
+
+    # check task status
+    checkTaskInfo(taskDict=dictresult, ad=ad)
+    # get sandbox
+    getSandbox(taskDict=dictresult, crabserver=crabserver)
 
     # is this the first time this script runs for this task ? (it runs at each resubmit as well !)
     if not os.path.exists('WEB_DIR'):
