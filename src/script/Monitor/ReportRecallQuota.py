@@ -10,7 +10,7 @@ import datetime
 
 import requests
 from requests.auth import HTTPBasicAuth
-from python.RucioUtils import getTapeRecallUsage
+from RucioUtils import getTapeRecallUsage
 
 FMT = "%Y-%m-%dT%H:%M:%S%z"
 WORKDIR = '/data/srv/monit/'
