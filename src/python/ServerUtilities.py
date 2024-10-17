@@ -723,7 +723,7 @@ def downloadFromS3(crabserver=None, filepath=None, objecttype=None, taskname=Non
     downloadFromS3ViaPSU(filepath=filepath, preSignedUrl=preSignedUrl, logger=logger)
 
 def checkS3Object(crabserver=None, objecttype=None, username=None, tarballname=None,
-                 logger=None):
+                 taskname=None, logger=None):
     """
     Check if file exist in S3.
 
@@ -735,12 +735,14 @@ def checkS3Object(crabserver=None, objecttype=None, username=None, tarballname=N
     :type username: str
     :param tarballname: for sandbox, taskname is not used but tarballname is needed
     :type tarballname: str
+    :param taskname: for e.g. logfiles, taskanem is needed
+    :type taskname: str
 
     :return: None, but raise exception if wget is exit with non-zero.
     """
     preSignedUrl = getDownloadUrlFromS3(crabserver=crabserver, objecttype=objecttype,
                                         username=username, tarballname=tarballname,
-                                        clientmethod='head_object',
+                                        taskname=taskname, clientmethod='head_object',
                                         logger=logger)
     downloadCommand = ''
     if os.getenv('CRAB_useGoCurl'):
@@ -837,7 +839,7 @@ def uploadToS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
         time.sleep(waitStep)
         waitTime += waitStep / 60.  # minutes
         try:
-            checkS3Object(crabserver=crabserver, objecttype=objecttype,
+            checkS3Object(crabserver=crabserver, objecttype=objecttype, taskname=taskname,
                       username=username, tarballname=tarballname, logger=logger)
         except Exception:  # pylint: disable=broad-except
             if waitTime > 10 :
