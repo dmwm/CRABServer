@@ -51,7 +51,7 @@ class ReportRecallQuota(BaseRecurringAction):
         for account in accounts:
             if account['name']=='crab_tape_recall':
                 activity='Analysis TapeRecall'
-            else if account['name']=='crab_input':
+            elif account['name']=='crab_input':
                 activity='Analysis Input'
             report = self.createQuotaReport(config=config, account=account['name'], activity=activity)
             jsonDoc[account['tag']] = report['totalTB']
