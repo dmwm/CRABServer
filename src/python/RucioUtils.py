@@ -118,7 +118,7 @@ def getTapeRecallUsage(rucioClient=None, account=None, activity = 'Analysis Tape
     """ size of ongoing tape recalls for this account (if provided) or by activity """
     filters = {'activity': activity}
     
-    if account is not None:
+    if account is not None and account != 'crab_tape_recall':
         filters['account'] = account
     
     rules = rucioClient.list_replication_rules(filters=filters)
