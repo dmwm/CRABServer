@@ -82,9 +82,9 @@ def main(log):
                 {'name': 'crab_input',       'tag': 'crab_input_total_TB'}]
     for account in accounts:
         if account['name']=='crab_tape_recall':
-                activity='Analysis TapeRecall'
+            activity='Analysis TapeRecall'
         elif account['name']=='crab_input':
-                activity='Analysis Input'
+            activity='Analysis Input'
         report = createQuotaReport(rucioClient=rucioClient, account=account['name'], activity=activity)
         jsonDoc[account['tag']] = report['totalTB']
     send_and_check(jsonDoc)
