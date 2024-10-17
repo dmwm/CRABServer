@@ -14,9 +14,14 @@ if [[ -z ${COMMAND+x} || -z ${MODE+x} || -z ${DEBUG+x} || -z ${SERVICE+x} ]]; th
 fi
 
 script_env() {
-    # app path
-    PYTHONPATH=${PYTHONPATH:-/data/srv/current/lib/python/site-packages}
-    # secrets
+    # path where we install crab code
+    APP_PATH="${APP_PATH:-/data/srv/current/lib/python/site-packages/}"
+    if [[ $MODE = 'fromGH' ]]; then
+        PYTHONPATH=/data/repos/CRABServer/src/python:/data/repos/WMCore/src/python:${PYTHONPATH:-}
+    else
+        PYTHONPATH="${APP_PATH}":"${PYTHONPATH:-}"
+    fi
+    # secrets CRABServerAuth.py
     PYTHONPATH=/data/srv/current/auth/crabserver:${PYTHONPATH}
     # export PYTHONPATH
     export PYTHONPATH
@@ -37,7 +42,7 @@ script_env() {
     export X509_USER_CERT=${X509_USER_CERT:-/data/srv/current/auth/crabserver/dmwm-service-cert.pem}
     export X509_USER_KEY=${X509_USER_KEY:-/data/srv/current/auth/crabserver/dmwm-service-key.pem}
 
-    if [[ "${DEBUG:-}" == true ]]; then
+    if [[ -n "${DEBUG:-}" ]]; then
         # this will direct WMCore/REST/Main.py to run in the foreground rather than as a demon
         # allowing among other things to insert pdb calls in the crabserver code and debug interactively
         export DONT_DAEMONIZE_REST=True
@@ -63,8 +68,21 @@ stop_srv() {
 }
 
 status_srv() {
+    # The `wmc-httpd -s` output when there is process running,
+    #   crabserver is RUNNING, PID 85298
+    # Otherwise (with exit 1)
+    #   crabserver is NOT RUNNING
+    # Note that PID is actually PGID.
     script_env
-    wmc-httpd -s -d $STATEDIR $CFGFILE
+    rc=0
+    out="$(wmc-httpd -s -d $STATEDIR $CFGFILE)" || rc=$?
+    echo "${out}"
+    pgid=$(echo "${out}" | awk '{print $NF}')
+    if [[ "${pgid}" =~ ^[0-9]+$ ]]; then
+        pid=$(pgrep -g "${pgid}" | head -n1)
+        cat /proc/"${pid}"/environ | tr '\0' '\n' | grep PYTHONPATH
+    fi
+    exit "${rc}"
 }
 
 env_eval() {
