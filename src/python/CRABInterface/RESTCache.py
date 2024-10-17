@@ -123,14 +123,17 @@ class RESTCache(RESTEntity):
             if not objecttype:
                 raise MissingParameter("objecttype is missing")
             if objecttype == 'sandbox':
+                # sandboxes can be reused across tasks, so are user, but not task, specific
+                # object path in the S3 container is: username/sandboxes/tarballname
+                # username indicates the user who owns the sandbox which may be different from
+                # the user who is making the REST call (authenticatedUserName).
+                # We rely on client to provide correct username.
+                # But when uploading from CRABClient, username is not known to the caller code
+                # for historical reasons so we settle for the authenticatedUserName.
+                # Having a special condition here is ugly but easier than fixing CRABClient
                 if not tarballname:
                     raise MissingParameter("tarballname is missing")
-                if subresource == 'upload' or (subresource == 'download' and  clientmethod == 'head_object'):
-                    ownerName = authenticatedUserName
-                else:
-                    ownerName = username
-                if not ownerName:
-                    raise MissingParameter("username is missing")
+                ownerName = username if username else authenticatedUserName
                 # sandbox goes in bucket/username/sandboxes/
                 objectPath = ownerName + '/sandboxes/' + tarballname
             else:
