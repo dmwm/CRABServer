@@ -1,11 +1,16 @@
-""" This script is called by dag_bootstrap_startup.sh when the job is (re)submitted and:
+"""
+This script is called by dag_bootstrap_startup.sh when the job is (re)submitted.
+It not only does adjusting sites (blacklist/whitelist) but also:
+    - It downloads sandbox from S3 (if not exist).
     - It creates the webdir if necessary
     - It updates both the webdir ant the proxied version of it on the REST task db
     - For resubmission: adjust the exit codes of the PJ in the RunJobs.dag.nodes.log files and
       the max retries in the RunJobs.dag files
 """
-# this is full of snake_case variables from old times, which we do not casre to change
+# this is full of snake_case variables from old times, which we do not care to change
 # pylint: disable=invalid-name
+# and yes, it is long and old but it may get simpler when we rewrite resubmission
+# pylint: disable=too-many-branches
 
 from __future__ import print_function
 
@@ -16,13 +21,14 @@ import sys
 import time
 import glob
 import shutil
+import logging
 from urllib.parse import urlencode
 import traceback
 from datetime import datetime
 from http.client import HTTPException
 
 from RESTInteractions import CRABRest
-from ServerUtilities import getProxiedWebDir, getColumn
+from ServerUtilities import getProxiedWebDir, getColumn, downloadFromS3
 
 if 'useHtcV2' in os.environ:
     import htcondor2 as htcondor
@@ -35,7 +41,23 @@ def printLog(msg):
     """ Utility function to print the timestamp in the log. Can be replaced
         with anything (e.g.: logging.info if we decided to set up a logger here)
     """
-    print("%s: %s" % (datetime.utcnow(), msg))
+    print(f"{datetime.utcnow()}: {msg}")
+
+
+def setupStreamLogger():
+    """
+    Setup logger object with stream handler. Needed by `downloadFromS3()`.
+    :returns: stream logger object
+    :rtype: logging.Logger
+    """
+    logHandler = logging.StreamHandler()
+    logFormatter = logging.Formatter(
+        "%(asctime)s:%(levelname)s:%(module)s,%(lineno)d:%(message)s")
+    logHandler.setFormatter(logFormatter)
+    logger = logging.getLogger('AdjustSites') # hardcode
+    logger.addHandler(logHandler)
+    logger.setLevel(logging.DEBUG)
+    return logger
 
 
 def adjustPostScriptExitStatus(resubmitJobIds, filename):
@@ -63,7 +85,7 @@ def adjustPostScriptExitStatus(resubmitJobIds, filename):
     """
     if not resubmitJobIds:
         return []
-    printLog("Looking for resubmitJobIds {0} in {1}".format(resubmitJobIds, filename))
+    printLog(f"Looking for resubmitJobIds {resubmitJobIds} in {filename}")
     resubmitAllFailed = (resubmitJobIds is True)
     terminator_re = re.compile(r"^\.\.\.$")
     # date field has two different format, this is for condor up to version 8.8.8
@@ -108,9 +130,9 @@ def adjustPostScriptExitStatus(resubmitJobIds, filename):
                 ra_buffer = []
         elif len(ra_buffer) == 3:
             m = node_re.search(line)
-            printLog("Matching the line '{0}' to groups: {1}".format(line.strip(), m.groups()))
+            printLog(f"Matching the line '{line.strip()}' to groups: {m.groups()}")
             if m and (resubmitAllFailed or (m.groups()[0] in resubmitJobIds)):
-                printLog("Successful match: {0}, adjusting status and appending to adjustedJobIds".format(m.groups()[0]))
+                printLog(f"Successful match: {m.groups()[0]}, adjusting status and appending to adjustedJobIds")
                 adjustedJobIds.append(m.groups()[0])
                 for l in ra_buffer:
                     output += l
@@ -134,13 +156,11 @@ def adjustPostScriptExitStatus(resubmitJobIds, filename):
     # best we can do given the constraints.  Note that we don't race with the
     # shadow as we have a write lock on the file itself.
     tmpfilename = filename + ".tmp"
-    output_fd = open(tmpfilename, "w", encoding='utf-8')
-    output_fd.write(output)
-    output_fd.close()
+    with  open(tmpfilename, "w", encoding='utf-8') as output_fd:
+        output_fd.write(output)
     os.unlink(tmpfilename)
-    output_fd = open(filename, "w", encoding='utf-8')
-    output_fd.write(output)
-    output_fd.close()
+    with open(filename, "w", encoding='utf-8') as output_fd:
+        output_fd.write(output)
     return adjustedJobIds
 
 
@@ -160,7 +180,7 @@ def adjustMaxRetries(adjustJobIds, ad):
     (or for all jobs if jobIds = True). Incrementing the maximum allowed number of
     retries is a necessary condition for a job to be resubmitted.
     """
-    printLog("Adjusting retries for job ids: {0}".format(adjustJobIds))
+    printLog(f"Adjusting retries for job ids: {adjustJobIds}")
     if not adjustJobIds:
         return
     if not os.path.exists("RunJobs.dag"):
@@ -203,8 +223,8 @@ def adjustMaxRetries(adjustJobIds, ad):
                                 maxRetries = int(match_retry_re.groups()[1]) + (1 + numAutomJobRetries)
                             except ValueError:
                                 maxRetries = numAutomJobRetries
-                        printLog("Adjusted maxRetries for {0} to {1}".format(jobId, maxRetries))
-                        line = retry_re.sub(r'RETRY Job%s %d ' % (jobId, maxRetries), line)
+                        printLog(f"Adjusted maxRetries for {jobId} to {maxRetries}")
+                        line = retry_re.sub(r'RETRY Job%s %d ' % (jobId, maxRetries), line)  # pylint: disable=consider-using-f-string
                 output += line
         with open(fn, 'w', encoding='utf-8') as fd:
             fd.write(output)
@@ -215,9 +235,9 @@ def makeWebDir(ad):
     Need a doc string here.
     """
     if 'AuthTokenId' in ad:
-        path = os.path.expanduser("/home/grid/%s/%s" % (ad['CRAB_UserHN'], ad['CRAB_ReqName']))
+        path = os.path.expanduser(f"/home/grid/{ad['CRAB_UserHN']}/{ad['CRAB_ReqName']}")
     else:
-        path = os.path.expanduser("~/%s" % ad['CRAB_ReqName'])
+        path = os.path.expanduser(f"~/{ad['CRAB_ReqName']}")
     try:
         ## Create the web directory.
         os.makedirs(path)
@@ -254,7 +274,7 @@ def makeWebDir(ad):
         os.symlink(path, os.path.abspath(os.path.join(".", "WEB_DIR")))
     except Exception as ex: #pylint: disable=broad-except
         #Should we just catch OSError and IOError? Is that enough?
-        printLog("Failed to copy/symlink files in the user web directory: %s" % str(ex))
+        printLog(f"Failed to copy/symlink files in the user web directory: {ex}")
 
     # prepare a startup cache_info file with time info for client to have something useful to print
     # in crab status while waiting for task_process to fill with actual jobs info. Do it in two ways
@@ -266,7 +286,7 @@ def makeWebDir(ad):
         pickle.dump(startInfo, fp)
     # old way: a file with multiple lines and print-like output
     startInfo = "# Task bootstrapped at " + datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC") + "\n"
-    startInfo += "%d\n" % (int(time.time()))  # machines will like seconds from Epoch more
+    startInfo += f"{int(time.time())}\n"  # machines will like seconds from Epoch more
     # prepare fake status_cache info to please current (v3.210127) CRAB Client
     fakeInfo = startInfo + "{"
     fakeInfo += "'DagStatus': {'SubDagStatus': {}, 'Timestamp': 0L, 'NodesTotal': 1L, 'SubDags': {}, 'DagStatus': 1L}"
@@ -293,7 +313,7 @@ def uploadWebDir(crabserver, ad):
     data['webdirurl'] = ad['CRAB_localWebDirURL']
 
     try:
-        printLog("Uploading webdir %s to the REST" % data['webdirurl'])
+        printLog(f"Uploading webdir {data['webdirurl']} to the REST")
         crabserver.post(api='task', data=urlencode(data))
         return 0
     except HTTPException as hte:
@@ -334,7 +354,7 @@ def clearAutomaticBlacklist():
         try:
             os.unlink(filename)
         except Exception as e:  # pylint: disable=broad-except
-            printLog("ERROR when clearing statistics: %s" % str(e))
+            printLog(f"ERROR when clearing statistics: {e}")
 
 
 def setupLog():
@@ -342,7 +362,7 @@ def setupLog():
         is set)
     """
     newstdout = "adjust_out.txt"
-    printLog("Redirecting output to %s" % newstdout)
+    printLog(f"Redirecting output to {newstdout}")
     logfd = os.open(newstdout, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
     if not os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
         os.dup2(logfd, 1)
@@ -350,37 +370,69 @@ def setupLog():
     os.close(logfd)
 
 
-def checkTaskInfo(crabserver, ad):
+def checkTaskInfo(taskDict, ad):
     """
-    Function checks that given task is registered in the database with status SUBMITTED and with the
-    same clusterId and schedd name in the database as in the condor ads where it is currently running.
+    Function checks that given task is registered in the database with status
+    SUBMITTED and with the same clusterId and schedd name in the database as in
+    the condor ads where it is currently running.
     In case above condition is not met, script immediately terminates
+
+    :param taskDict: task info return from REST.
+    :type taskDict: dict
+    :param ad: kv classad
+    :type ad: HTC classad.ClassAd (which has the semantics of a dictionarty)
     """
 
-    task = ad['CRAB_ReqName']
     clusterIdOnSchedd = ad['ClusterId']
-    data = {'subresource': 'search', 'workflow': task}
 
-    try:
-        dictresult, _, _ = crabserver.get(api='task', data=data)
-    except HTTPException as hte:
-        printLog(traceback.format_exc())
-        printLog(hte.headers)
-        printLog(hte.result)
-        sys.exit(2)
-
-    taskStatusOnDB = getColumn(dictresult, 'tm_task_status')
-    clusteridOnDB = getColumn(dictresult, 'clusterid')
-    scheddOnDB = getColumn(dictresult, 'tm_schedd')
+    taskStatusOnDB = getColumn(taskDict, 'tm_task_status')
+    clusteridOnDB = getColumn(taskDict, 'clusterid')
+    scheddOnDB = getColumn(taskDict, 'tm_schedd')
 
     scheddName = os.environ['schedd_name']
 
-    printLog('Task status on DB: %s, clusterID on DB: %s, schedd name on DB: %s; \nclusterID on condor ads: %s, schedd name on condor ads: %s '
-             % (taskStatusOnDB, clusteridOnDB, scheddOnDB, clusterIdOnSchedd, scheddName))
+    msg = f"Task status on DB: {taskStatusOnDB}, clusterID on DB: {clusterIdOnSchedd}, schedd name on DB: {scheddOnDB}; "
+    msg += f"\nclusterID on condor ads: {clusterIdOnSchedd}, schedd name on condor ads: {scheddName} "
+    printLog(msg)
 
     if not (taskStatusOnDB == 'SUBMITTED' and scheddOnDB == scheddName and clusteridOnDB == str(clusterIdOnSchedd)):
         printLog('Exiting AdjustSites because this dagman does not match task information in TASKS DB')
         sys.exit(3)
+
+def getSandbox(taskDict, crabserver):
+    """
+    Getting user sandbox (sandbox.tar.gz) from S3. It will not redownload
+    sandbox if file exists.
+    This function contains side effect where sandbox.tar.gz(_tmp) are created in
+    current directory.
+    :param taskDict: task info return from REST.
+    :type taskDict: dict
+    :param crabserver: CRABRest object to talk with RESTCache API
+    :type crabserver: RESTInteractions.CRABRest
+    """
+    sandboxTarBall = 'sandbox.tar.gz'
+    sandboxTarBallTmp = sandboxTarBall + '_tmp'
+    if os.path.exists(sandboxTarBall):
+        printLog('sandbox.tar.gz already exist. Do nothing.')
+        return
+
+    # init logger require by downloadFromS3
+    logger = setupStreamLogger()
+
+    # get info
+    username = getColumn(taskDict, 'tm_username')
+    sandboxName = getColumn(taskDict, 'tm_user_sandbox')
+
+    # download
+    try:
+        downloadFromS3(crabserver=crabserver, objecttype='sandbox', username=username,
+                       tarballname=sandboxName, filepath=sandboxTarBallTmp, logger=logger)
+        shutil.move(sandboxTarBallTmp, sandboxTarBall)
+    except Exception as ex:  # pylint: disable=broad-except
+        logger.exception("The CRAB server backend could not download the input sandbox with your code " + \
+                         "from S3.\nThis could be a temporary glitch; please try to submit a new task later " + \
+                         "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s", str(ex))
+        sys.exit(4)
 
 
 def main():
@@ -393,12 +445,11 @@ def main():
         printLog("Exiting AdjustSites since _CONDOR_JOB_AD is not in the environment or does not exist")
         sys.exit(0)
 
-    printLog("Starting AdjustSites with _CONDOR_JOB_AD=%s" % os.environ['_CONDOR_JOB_AD'])
+    printLog(f"Starting AdjustSites with _CONDOR_JOB_AD={os.environ['_CONDOR_JOB_AD']}")
 
     with open(os.environ['_CONDOR_JOB_AD'], 'r', encoding='utf-8') as fd:
         ad = classad.parseOne(fd)
-    printLog("Parsed ad: %s" % ad)
-
+    printLog(f"Parsed ad:\n{ad}\n")
 
     # instantiate a server object to talk with crabserver
     host = ad['CRAB_RestHost']
@@ -407,8 +458,24 @@ def main():
     crabserver = CRABRest(host, cert, cert, retry=3, userAgent='CRABSchedd')
     crabserver.setDbInstance(dbInstance)
 
+    printLog("Sleeping 60 seconds to give TW time to update taskDB")
     time.sleep(60)  # give TW time to update taskDB #8411
-    checkTaskInfo(crabserver, ad)
+
+    # get task info
+    task = ad['CRAB_ReqName']
+    data = {'subresource': 'search', 'workflow': task}
+    try:
+        dictresult, _, _ = crabserver.get(api='task', data=data)
+    except HTTPException as hte:
+        printLog(traceback.format_exc())
+        printLog(hte.headers)
+        printLog(hte.result)
+        sys.exit(2)
+
+    # check task status
+    checkTaskInfo(taskDict=dictresult, ad=ad)
+    # get sandbox
+    getSandbox(taskDict=dictresult, crabserver=crabserver)
 
     # is this the first time this script runs for this task ? (it runs at each resubmit as well !)
     if not os.path.exists('WEB_DIR'):
@@ -424,9 +491,9 @@ def main():
                 time.sleep(retries * 20)
             retries += 1
         if exitCode != 0:
-            printLog("Exiting AdjustSites because the webdir upload failed %d times." % maxRetries)
+            printLog(f"Exiting AdjustSites because the webdir upload failed {maxRetries} times.")
             sys.exit(1)
-        printLog("Webdir URL has been uploaded, exit code is %s. Setting the classad for the proxied webdir" % exitCode)
+        printLog(f"Webdir URL has been uploaded, exit code is {exitCode}. Setting the classad for the proxied webdir")
 
         saveProxiedWebdir(crabserver, ad)
         printLog("Proxied webdir saved")
