@@ -1117,43 +1117,6 @@ class DagmanCreator(TaskAction):
 
         return info, splitterResult, subdags, dagSpecs
 
-
-    def extractMonitorFiles(self, inputFiles, **kw):
-        """
-        Ops mon needs access to some files from the debug_files.tar.gz or sandbox.tar.gz.
-        tarball.
-        If an older client is used, the files are in the sandbox, the newer client (3.3.1607)
-        separates them into a debug_file tarball to allow sandbox recycling and not break the ops mon.
-        The files are extracted here to the debug folder to be later sent to the schedd.
-
-        Modifies inputFiles list by appending the debug folder if the extraction succeeds.
-        """
-
-        tarFileName = 'sandbox.tar.gz' if not os.path.isfile('debug_files.tar.gz') else 'debug_files.tar.gz'
-        try:
-            debugTar = tarfile.open(tarFileName)
-            debugTar.extract('debug/crabConfig.py')
-            debugTar.extract('debug/originalPSet.py')
-            scriptExeName = kw['task'].get('tm_scriptexe')
-            if scriptExeName != None:
-                debugTar.extract(scriptExeName)
-                shutil.copy(scriptExeName, 'debug/' + scriptExeName)
-            debugTar.close()
-
-            inputFiles.append('debug')
-
-            # Change permissions of extracted files to allow Ops mon to read them.
-            for _, _, filenames in os.walk('debug'):
-                for f in filenames:
-                    os.chmod('debug/' + f, 0o644)
-        except Exception as ex:  # pylint: disable=broad-except
-            self.logger.exception(ex)
-            self.uploadWarning("Extracting files from %s failed, ops monitor will not work." % tarFileName, \
-                    kw['task']['user_proxy'], kw['task']['tm_taskname'])
-
-        return
-
-
     def getHighPrioUsers(self, userProxy, workflow, egroups):
         # Import needed because the DagmanCreator module is also imported in the schedd,
         # where there is no ldap available. This function however is only called
@@ -1193,16 +1156,14 @@ class DagmanCreator(TaskAction):
         shutil.copy(bootstrap_location, '.')
         shutil.copy(adjust_location, '.')
 
-        # amke sure we have InputSandBox and debug files
+        # make sure we have InputSandBox
         sandboxTarBall = 'sandbox.tar.gz'
-        debugTarBall = 'debug_files.tar.gz'
 
         # Bootstrap the ISB if we are running in the TW
         if self.crabserver:
             username = kw['task']['tm_username']
             taskname = kw['task']['tm_taskname']
             sandboxName = kw['task']['tm_user_sandbox']
-            dbgFilesName = kw['task']['tm_debug_files']
             self.logger.debug(f"Checking if sandbox file is available: {sandboxName}")
             try:
                 checkS3Object(crabserver=self.crabserver, objecttype='sandbox', taskname=taskname,
@@ -1213,12 +1174,6 @@ class DagmanCreator(TaskAction):
                                   "from S3.\nThis could be a temporary glitch; please try to submit a new task later " + \
                                   "(resubmit will not work) and contact the experts if the error persists." + \
                                   f"\nError reason: {ex}") from ex
-            # still need this download, until we change AdjustSites.py to do it there
-            try:
-                downloadFromS3(crabserver=self.crabserver, objecttype='sandbox', username=username,
-                               tarballname=dbgFilesName, filepath=debugTarBall, logger=self.logger)
-            except Exception as ex:  # pylint: disable=broad-except
-                self.logger.exception(ex)
 
         # Bootstrap the runtime if it is available.
         job_runtime = getLocation('CMSRunAnalysis.tar.gz', 'CRABServer/')
@@ -1234,8 +1189,6 @@ class DagmanCreator(TaskAction):
                       'AdjustSites.py', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.pkl', 'taskworkerconfig.pkl',
                       'run_and_lumis.tar.gz', 'input_files.tar.gz']
 
-        self.extractMonitorFiles(inputFiles, **kw)
-
         if os.path.exists("CMSRunAnalysis.tar.gz"):
             inputFiles.append("CMSRunAnalysis.tar.gz")
         if os.path.exists("TaskManagerRun.tar.gz"):
@@ -1243,8 +1196,6 @@ class DagmanCreator(TaskAction):
         if kw['task']['tm_input_dataset']:
             inputFiles.append("input_dataset_lumis.json")
             inputFiles.append("input_dataset_duplicate_lumis.json")
-        if kw['task']['tm_debug_files']:
-            inputFiles.append("debug_files.tar.gz")
 
         info, splitterResult, subdags, dagSpecs = self.createSubdag(*args, **kw)
 
