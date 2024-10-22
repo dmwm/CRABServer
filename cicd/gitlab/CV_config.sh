@@ -26,6 +26,7 @@ singularity="$(echo "${SCRAM_ARCH}" | cut -d"_" -f 1 | tail -c 2)"
 export SCRAM_ARCH inputDataset singularity
 
 # Start tests
+chmod +x ${ROOT_DIR}/cicd/gitlab/clientValidation.sh
 if [[ "$singularity" == "6" || "$singularity" == "7" || "$singularity" == "8" ]]; then
     echo "Starting singularity ${singularity} container."
     if [ "X${singularity}" == X6 ] ; then export TEST_LIST=SL6_TESTS; fi

@@ -25,6 +25,7 @@ inputDataset="$(echo "${CONFIG_LINE}" | tr ';' '\n' | grep inputDataset | sed 's
 singularity="$(echo "${SCRAM_ARCH}" | cut -d"_" -f 1 | tail -c 2)"
 export SCRAM_ARCH inputDataset singularity
 
+chmod +x ${ROOT_DIR}/cicd/gitlab/clientConfigurationValidation.sh
 if [ "X${singularity}" == X6 ] || [ "X${singularity}" == X7 ] || [ "X${singularity}" == X8 ]; then
     echo "Starting singularity ${singularity} container."
     if [ "X${singularity}" == X6 ]; then scramprefix=cc${singularity}; fi
