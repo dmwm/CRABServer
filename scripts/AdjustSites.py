@@ -22,6 +22,7 @@ import time
 import glob
 import shutil
 import logging
+import tarfile
 from urllib.parse import urlencode
 import traceback
 from datetime import datetime
@@ -399,7 +400,7 @@ def checkTaskInfo(taskDict, ad):
         printLog('Exiting AdjustSites because this dagman does not match task information in TASKS DB')
         sys.exit(3)
 
-def getSandbox(taskDict, crabserver):
+def getSandbox(taskDict, crabserver, logger):
     """
     Getting user sandbox (sandbox.tar.gz) from S3. It will not redownload
     sandbox if file exists.
@@ -409,15 +410,14 @@ def getSandbox(taskDict, crabserver):
     :type taskDict: dict
     :param crabserver: CRABRest object to talk with RESTCache API
     :type crabserver: RESTInteractions.CRABRest
+    :param logger: downloadFromS3 requires a logger !
+    :type logger: logging.logger object
     """
     sandboxTarBall = 'sandbox.tar.gz'
     sandboxTarBallTmp = sandboxTarBall + '_tmp'
     if os.path.exists(sandboxTarBall):
         printLog('sandbox.tar.gz already exist. Do nothing.')
         return
-
-    # init logger require by downloadFromS3
-    logger = setupStreamLogger()
 
     # get info
     username = getColumn(taskDict, 'tm_username')
@@ -433,6 +433,54 @@ def getSandbox(taskDict, crabserver):
                          "from S3.\nThis could be a temporary glitch; please try to submit a new task later " + \
                          "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s", str(ex))
         sys.exit(4)
+
+def getDebugFiles(taskDict, crabserver, logger):
+    """
+    Ops mon  (crabserver/ui) needs access to files from the debug_files.tar.gz
+    Retrieve and expand debug_files.tar.gz from S3 in here for http access.
+    It will not redownload tarball if file exists.
+    This function contains side effect: debug_files.tar.gz(_tmp) and debug directory
+    are created in current directory.
+    :param taskDict: task info return from REST.
+    :type taskDict: dict
+    :param crabserver: CRABRest object to talk with RESTCache API
+    :type crabserver: RESTInteractions.CRABRest
+    :param logger: downloadFromS3 requires a logger !
+    :type logger: logging.logger object
+    """
+    debugTarball = 'debug_files.tar.gz'
+    if os.path.exists(debugTarball):
+        printLog('sandbox.tar.gz already exist. Do nothing.')
+        return
+
+    # get info
+    username = getColumn(taskDict, 'tm_username')
+    sandboxName = getColumn(taskDict, 'tm_debug_files')
+
+    # download
+    debugTarballTmp = debugTarball + '_tmp'
+    try:
+        downloadFromS3(crabserver=crabserver, objecttype='sandbox', username=username,
+                       tarballname=sandboxName, filepath=debugTarballTmp, logger=logger)
+        shutil.move(debugTarballTmp, debugTarball)
+    except Exception as ex:  # pylint: disable=broad-except
+        logger.exception("CRAB server backend could not download the tarball with debug files " + \
+                         "from S3, ops monitor will not work. Exception:\n %s", str(ex))
+        return
+
+    # extract files
+    try:
+        with tarfile.open(name=debugTarball, mode='r') as debugTar:
+            debugTar.extractall()
+    except Exception as ex:  # pylint: disable=broad-except
+        logger.exception("CRAB server backend could expand the tarball with debug files, " + \
+                         "ops monitor will not work. Exception:\n %s", str(ex))
+        return
+
+    # Change permissions of extracted files to allow Ops mon to read them.
+    for _, _, filenames in os.walk('debug'):
+        for f in filenames:
+            os.chmod('debug/' + f, 0o644)
 
 
 def main():
@@ -474,8 +522,11 @@ def main():
 
     # check task status
     checkTaskInfo(taskDict=dictresult, ad=ad)
-    # get sandbox
-    getSandbox(taskDict=dictresult, crabserver=crabserver)
+    # init logger required by downloadFromS3
+    logger = setupStreamLogger()
+    # get sandboxes
+    getSandbox(taskDict=dictresult, crabserver=crabserver, logger=logger)
+    getDebugFiles(taskDict=dictresult, crabserver=crabserver, logger=logger)
 
     # is this the first time this script runs for this task ? (it runs at each resubmit as well !)
     if not os.path.exists('WEB_DIR'):
