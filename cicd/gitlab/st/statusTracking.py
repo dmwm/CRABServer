@@ -120,8 +120,9 @@ def main():
     print("Check_Publication_Status is : ", Check_Publication_Status )
     checkPublication = True if Check_Publication_Status == 'Yes' else False
 
-    with open('%s/submitted_tasks_TS' %work_dir) as fp:
-        tasks = fp.readlines()
+    # Read all tasks from the specified files into a single list
+    tasks = [line for file_name in ['submitted_tasks_TS', 'submitted_tasks_CCV', 'submitted_tasks_CV']
+            for line in open(f'{work_dir}/{file_name}').readlines()]
 
     for task in tasks:
         # when testing it helps to reuse already made directories

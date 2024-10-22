@@ -184,10 +184,8 @@ source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
   ##################################################
   # START CHECKING SUBMITTED TASK'S STATUS
   ##################################################
-  mkdir -p "${WORK_DIR}/artifacts"
-  echo "240812_144237:cmsbot_crab_20240812_164235" > "${WORK_DIR}/artifacts/submitted_tasks"
 
-  TASKTOTRACK=`cat ${WORK_DIR}/artifacts/submitted_tasks`
+  TASKTOTRACK=`cat ${WORK_DIR}/submitted_tasks_CV`
   PROJDIR=`crab remake --task=$TASKTOTRACK --instance=$REST_Instance --proxy=$PROXY| grep 'Finished remaking project directory' | awk '{print $6}'`
 
   ### 5. test crab preparelocal --proxy=PROXY --dir=PROJDIR

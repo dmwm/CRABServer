@@ -233,6 +233,44 @@ deploy_publisher_rucio:
   variables:
     SERVICE: Publisher_rucio
 
+task_submission:
+  rules:
+    - if: $SUBMIT_STATUS_TRACKING || $CLIENT_VALIDATION_SUITE || $CLIENT_CONFIGURATION_VALIDATION
+    - !reference [.default_rules, skip_all_base]
+    - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
+  stage: run_testsuite
+  tags:
+    - crab3-shell
+  script:
+    - source .env
+    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
+    - export CRABClient_version  # from .env
+    - export REST_Instance  # from .env
+    - export ROOT_DIR
+    - export CMSSW_release=CMSSW_13_0_2
+    - export Task_Submission_Status_Tracking
+    - export Client_Configuration_Validation
+    - export Client_Validation_Suite
+    - bash -x cicd/gitlab/executeTests.sh
+  cache:
+    - key: $CI_PIPELINE_ID
+      paths:
+        - workdir
+      policy: push
+    - key: submitted_tasks_TS_latest
+      paths:
+        - workdir/submitted_tasks_TS
+      policy: push
+    - key: submitted_tasks_CV_latest
+      paths:
+        - workdir/submitted_tasks_CV_dir
+      policy: push
+    - key: submitted_tasks_CCV_latest
+      paths:
+        - workdir/submitted_tasks_CCV_dir
+      policy: push
+
 client_validation_suite:
   rules:
     - if: $MANUAL_CI_PIPELINE_ID
@@ -253,46 +291,18 @@ client_validation_suite:
     - export ROOT_DIR
     - export CMSSW_release=CMSSW_13_0_2
     - export Client_Validation_Suite=true
-    - bash -x cicd/gitlab/clientValidation.sh
+    - bash -x cicd/gitlab/CV_config.sh
   cache:
     - key: $CI_PIPELINE_ID
       paths:
-        - workdir/submitted_tasks_CV_dir
-      policy: push
+        - workdir
+      policy: pull
     - key: submitted_tasks_CV_latest
       paths:
         - workdir/submitted_tasks_CV_dir
-      policy: push
+      policy: pull
 
-task_submission_status_tracking:
-  rules:
-    - if: $SUBMIT_STATUS_TRACKING
-    - !reference [.default_rules, skip_all_base]
-    - !reference [.default_rules, default]
-    - !reference [.default_rules, release]
-  stage: run_testsuite
-  tags:
-    - crab3-shell
-  script:
-    - source .env
-    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
-    - export CRABClient_version  # from .env
-    - export REST_Instance  # from .env
-    - export ROOT_DIR
-    - export CMSSW_release=CMSSW_13_0_2
-    - export Task_Submission_Status_Tracking=true
-    - bash -x cicd/gitlab/executeTests.sh
-  cache:
-    - key: $CI_PIPELINE_ID
-      paths:
-        - workdir/submitted_tasks_TS_dir
-      policy: push
-    - key: submitted_tasks_TS_latest
-      paths:
-        - workdir/submitted_tasks_TS_dir
-      policy: push
-
-task_submission_client_configuration_validation:
+client_configuration_validation:
   rules:
     - if: $MANUAL_CI_PIPELINE_ID
       when: never
@@ -312,20 +322,20 @@ task_submission_client_configuration_validation:
     - export ROOT_DIR
     - export CMSSW_release=CMSSW_13_0_2
     - export Client_Configuration_Validation=true
-    - bash -x cicd/gitlab/executeTests_CCV.sh
+    - bash -x cicd/gitlab/CCV_config.sh
   cache:
     - key: $CI_PIPELINE_ID
       paths:
-        - workdir/submitted_tasks_CCV_dir
-      policy: push
+        - workdir
+      policy: pull
     - key: submitted_tasks_CCV_latest
       paths:
         - workdir/submitted_tasks_CCV_dir
-      policy: push
+      policy: pull
 
 check_test_result:
   rules:
-    - if: $MANUAL_CI_PIPELINE_ID || $SUBMIT_STATUS_TRACKING
+    - if: $MANUAL_CI_PIPELINE_ID || $SUBMIT_STATUS_TRACKING || $CLIENT_VALIDATION_SUITE || $CLIENT_CONFIGURATION_VALIDATION
     - !reference [.default_rules, skip_all_base]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -345,7 +355,9 @@ check_test_result:
     # manual task name
     - |
         if [[ -n "${MANUAL_TASKNAME:-}" ]]; then
-            echo "${MANUAL_TASKNAME}" > workdir/submitted_tasks_TS_dir
+            echo "${MANUAL_TASKNAME}" > workdir/submitted_tasks_TS
+            echo "${MANUAL_TASKNAME}" > workdir/submitted_tasks_CV
+            echo "${MANUAL_TASKNAME}" > workdir/submitted_tasks_CCV
         fi
     - cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
   cache:
@@ -353,44 +365,10 @@ check_test_result:
       fallback_keys:
         - $CI_PIPELINE_ID
         - submitted_tasks_TS_latest
-      paths:
-        - workdir/submitted_tasks_TS_dir
-      policy: pull
-
-check_test_result_CCV:
-  rules:
-    - if: $CLIENT_CONFIGURATION_VALIDATION
-    - if: $MANUAL_CI_PIPELINE_ID
-    - if: $SKIP_DEPLOY || $FORCE_RELEASE
-      when: never
-    - !reference [.default_rules, default]
-    - !reference [.default_rules, release]
-  stage: check_testsuite
-  tags:
-    - crab3-shell
-  script:
-    - source .env
-    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
-    - export REST_Instance  # from .env
-    - export CRABClient_version  # from .env
-    - export ROOT_DIR
-    - export CMSSW_release=CMSSW_13_0_2
-    - export SCRAM_ARCH=el8_amd64_gcc11
-    - export Check_Publication_Status=Yes
-    - echo ${MANUAL_CI_PIPELINE_ID}
-    # manual task name
-    - |
-        if [[ -n "${MANUAL_TASKNAME:-}" ]]; then
-            echo "${MANUAL_TASKNAME}" > workdir/submitted_tasks_CCV_dir
-        fi
-    - cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
-  cache:
-    - key: $MANUAL_CI_PIPELINE_ID
-      fallback_keys:
-        - $CI_PIPELINE_ID
         - submitted_tasks_CCV_latest
+        - submitted_tasks_CV_latest
       paths:
-        - workdir/submitted_tasks_CCV_dir
+        - workdir
       policy: pull
 
 # if test is pass, retag with `*-stable`
