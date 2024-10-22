@@ -695,6 +695,7 @@ class tempSetLogLevel():
 #  downloadFromS3        to retrieve an object into a file
 #  retrieveFromS3        to retrieve an object as JSON to use in the code
 #  uploadToS3            to upload a file into an S3 object
+#  checkS3Object         to check if an object is present in S3
 #  getDownloadUrlFromS3  to obtain a PreSigned URL to access an existing object in S3
 #    this can be used e.g. to share access to logs
 # Common signature is: (crabserver, filepath, objecttype, taskname, username, tarballname, logger)
@@ -721,6 +722,42 @@ def downloadFromS3(crabserver=None, filepath=None, objecttype=None, taskname=Non
                                         tarballname=tarballname, logger=logger)
     downloadFromS3ViaPSU(filepath=filepath, preSignedUrl=preSignedUrl, logger=logger)
 
+def checkS3Object(crabserver=None, objecttype=None, username=None, tarballname=None,
+                 taskname=None, logger=None):
+    """
+    Check if file exist in S3.
+
+    :param crabserver: CRABRest object, points to CRAB Server to use
+    :type crabserver: RESTInteractions.CRABRest
+    :param objecttype: the kind of object to dowbload: clientlog|twlog|sandbox|debugfiles|runtimefiles
+    :type objecttype: str
+    :param username: the username this sandbox belongs to, in case objecttype=sandbox
+    :type username: str
+    :param tarballname: for sandbox, taskname is not used but tarballname is needed
+    :type tarballname: str
+    :param taskname: for e.g. logfiles, taskanem is needed
+    :type taskname: str
+
+    :return: None, but raise exception if wget is exit with non-zero.
+    """
+    preSignedUrl = getDownloadUrlFromS3(crabserver=crabserver, objecttype=objecttype,
+                                        username=username, tarballname=tarballname,
+                                        taskname=taskname, clientmethod='head_object',
+                                        logger=logger)
+    downloadCommand = ''
+    if os.getenv('CRAB_useGoCurl'):
+        raise NotImplementedError('HEAD with gocurl is not implemented')
+    downloadCommand += ' wget -Sq -O /dev/null --method=HEAD'
+    downloadCommand += ' "%s"' % preSignedUrl
+
+    with subprocess.Popen(downloadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True) as downloadProcess:
+        logger.debug("Will execute:\n%s", downloadCommand)
+        stdout, stderr = downloadProcess.communicate()
+        exitcode = downloadProcess.returncode
+        logger.debug('exitcode: %s\nstdout: %s', exitcode, stdout)
+
+    if exitcode != 0:
+        raise Exception('Download command %s failed. stderr is:\n%s' % (downloadCommand, stderr))
 
 def retrieveFromS3(crabserver=None, objecttype=None, taskname=None,
                    username=None, tarballname=None, logger=None):
@@ -794,11 +831,29 @@ def uploadToS3(crabserver=None, filepath=None, objecttype=None, taskname=None,
         uploadToS3ViaPSU(filepath=filepath, preSignedUrlFields=preSignedUrl, logger=logger)
     except Exception as e:
         raise Exception('Upload to S3 failed\n%s' % str(e))
+    logger.debug('upload to S3 of %s %s completed', objecttype, filepath)
+    logger.debug('make sure that object is ready for retrieve')  # for large files it may take up to minutes
+    waitTime = 0.
+    waitStep = 1  # seconds
+    while True:
+        time.sleep(waitStep)
+        waitTime += waitStep / 60.  # minutes
+        try:
+            checkS3Object(crabserver=crabserver, objecttype=objecttype, taskname=taskname,
+                      username=username, tarballname=tarballname, logger=logger)
+        except Exception:  # pylint: disable=broad-except
+            if waitTime > 10 :
+                raise Exception("Object not available in S3 after 10 minutes. Something badly wrong")
+            waitStep = 2 * waitStep
+            logger.debug('not ready yet, wait another %s seconds', waitStep)
+            continue
+        break
     logger.debug('%s %s successfully uploaded to S3', objecttype, filepath)
 
 
 def getDownloadUrlFromS3(crabserver=None, objecttype=None, taskname=None,
-                         username=None, tarballname=None, logger=None):
+                         username=None, tarballname=None, clientmethod=None,
+                         logger=None):
     """
     obtains a PreSigned URL to access an existing object in S3
     :param crabserver: a RESTInteraction/CRABRest object : points to CRAB Server to use
@@ -816,6 +871,8 @@ def getDownloadUrlFromS3(crabserver=None, objecttype=None, taskname=None,
         dataDict['username'] = username
     if tarballname:
         dataDict['tarballname'] = tarballname
+    if clientmethod:
+        dataDict['clientmethod'] = clientmethod
     data = encodeRequest(dataDict)
     try:
         # calls to restServer alway return a 3-ple ({'result':a-list}, HTTPcode, HTTPreason)

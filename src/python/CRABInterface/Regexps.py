@@ -16,8 +16,8 @@ RX_ANYTHING_10K = re.compile(r"^.{0,10000}$")
 #       (this probably requires to adapt something on Lexicon)
 pNameRE      = r"(?=.{0,400}$)[a-zA-Z0-9\-_.]+"
 lfnParts.update( {'publishname' : pNameRE,
-                  'psethash'    : '[a-f0-9]+',
-                  'filename'    : '[a-zA-Z0-9\-_\.]'}
+                  'psethash'    : r'[a-f0-9]+',
+                  'filename'    : r'[a-zA-Z0-9\-_\.]'}
 )
 ## Although the taskname column in the TaskDB accepts tasknames of up to 255
 ## characters, we limit the taskname to something less than that in order to
@@ -93,6 +93,7 @@ RX_SUBRES_TASK = re.compile(r"^(allinfo|allusers|summary|search|status|taskbysta
 #subresources of Cache resource
 RX_SUBRES_CACHE = re.compile(r"^(upload|download|retrieve|list|used)$")
 RX_CACHE_OBJECTTYPE = re.compile(r"^(clientlog|twlog|sandbox|debugfiles|runtimefiles)$")
+RX_PRESIGNED_CLIENT_METHOD = re.compile(r"^(get_object|head_object)$")
 
 #worker workflow
 RX_WORKER_NAME = re.compile(r"^[A-Za-z0-9\-\._%]{1,100}$")

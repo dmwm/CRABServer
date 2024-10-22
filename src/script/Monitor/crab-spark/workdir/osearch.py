@@ -98,7 +98,7 @@ class OpenSearchInterface(object):
             self.handle = OpenSearch(
                 [url],
                 http_compress=True,
-                verify_certs=False,
+                verify_certs=True,
                 use_ssl=True,
                 ca_certs='/etc/pki/tls/certs/ca-bundle.trust.crt',
             )
