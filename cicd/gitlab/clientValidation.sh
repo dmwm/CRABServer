@@ -17,7 +17,7 @@ echo "(debug) X509_USER_PROXY=${X509_USER_PROXY}"
 echo "(debug) Client_Validation_Suite=${Client_Validation_Suite}"
 echo "(debug) CMSSW_release: ${CMSSW_release}"
 
-source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
+source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
 
 {
  

@@ -15,8 +15,8 @@ echo "(debug) X509_USER_PROXY=${X509_USER_PROXY}"
 #Script is used in Jenkins job CRABServer_ClientConfigurationValidation.
 
 #setup CRABClient
-source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
-python ${WORK_DIR}/CRABServer/test/makeTests.py
+source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
+python ${ROOT_DIR}/test/makeTests.py
 
 while read task ; do
   echo "$task"
