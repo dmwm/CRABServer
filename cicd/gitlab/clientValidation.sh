@@ -4,9 +4,8 @@ set -x
 set -euo pipefail
 
 # always run inside ./workdir
-export ROOT_DIR=$PWD
-export WORK_DIR=$PWD/workdir
-mkdir -p workdir
+export ROOT_DIR=$(dirname "$PWD")
+export WORK_DIR=$PWD
 pushd "${WORK_DIR}"
 
 # validate env var
@@ -26,7 +25,7 @@ source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
   PROXY=$(voms-proxy-info -path 2>&1)
   OUTPUTDIR="$PWD/logdir"
   TASK_TO_SUBMIT="crabConfiguration.py"
-  TASK_DIR="${WORK_DIR}/CRABServer/test/clientValidationTasks"
+  TASK_DIR="${ROOT_DIR}/test/clientValidationTasks"
 
   #list of commands to execute for full testing (sl7/8)
   FULL_TEST=(createmyproxy checkusername checkwrite tasks preparelocal status report getlog getoutput)
