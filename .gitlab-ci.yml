@@ -246,7 +246,7 @@ task_submission:
   script:
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
-    - export CRABClient_version  # from .env
+    - export CRABClient_version=v3.241025  # from .env
     - export REST_Instance  # from .env
     - export ROOT_DIR
     - export CMSSW_release=CMSSW_13_0_2
@@ -291,7 +291,7 @@ client_validation_suite:
     - sleep 1200 
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
-    - export CRABClient_version  # from .env
+    - export CRABClient_version=v3.241025  # from .env
     - export REST_Instance  # from .env
     - export ROOT_DIR
     - export CMSSW_release=CMSSW_13_0_2
@@ -325,7 +325,7 @@ client_configuration_validation:
     - sleep 1200 
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
-    - export CRABClient_version  # from .env
+    - export CRABClient_version=v3.241025  # from .env
     - export REST_Instance  # from .env
     - export ROOT_DIR
     - export CMSSW_release=CMSSW_13_0_2
@@ -355,7 +355,7 @@ check_test_result:
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
     - export REST_Instance  # from .env
-    - export CRABClient_version  # from .env
+    - export CRABClient_version=v3.241025  # from .env
     - export ROOT_DIR
     - export CMSSW_release=CMSSW_13_0_2
     - export SCRAM_ARCH=el8_amd64_gcc11
