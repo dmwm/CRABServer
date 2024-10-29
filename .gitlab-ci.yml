@@ -267,11 +267,11 @@ task_submission:
       policy: push
     - key: submitted_tasks_CV_latest
       paths:
-        - workdir/submitted_tasks_CV_dir
+        - workdir/submitted_tasks_CV
       policy: push
     - key: submitted_tasks_CCV_latest
       paths:
-        - workdir/submitted_tasks_CCV_dir
+        - workdir/submitted_tasks_CCV
       policy: push
 
 client_validation_suite:
@@ -303,8 +303,9 @@ client_validation_suite:
       policy: pull
     - key: submitted_tasks_CV_latest
       paths:
-        - workdir/submitted_tasks_CV_dir
-      policy: push
+        - workdir/submitted_tasks_CV
+      policy: pull
+  start_in: "20 minutes"
 
 client_configuration_validation:
   rules:
@@ -335,8 +336,9 @@ client_configuration_validation:
       policy: pull
     - key: submitted_tasks_CCV_latest
       paths:
-        - workdir/submitted_tasks_CCV_dir
-      policy: push
+        - workdir/submitted_tasks_CCV
+      policy: pull
+  start_in: "20 minutes"
 
 check_test_result:
   rules:

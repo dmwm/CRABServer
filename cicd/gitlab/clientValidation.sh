@@ -171,7 +171,7 @@ source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
   ### 4. test crab tasks --days=3 --status=PARAMS --proxy=PROXY
   USETHISPARMS=()
   INITPARMS="--days --status --proxy --instance"
-  PARAMS=(NEW HOLDING QUEUED SUBMITTED SUBMITFAILED KILLED KILLFAILED RESUBMITFAILED FAILED)
+  PARAMS=(NEW WAITING HOLDING QUEUED SUBMITTED SUBMITFAILED KILLED KILLFAILED RESUBMITFAILED FAILED)
   for st in "${PARAMS[@]}"; do
     feedParms "1 $st $PROXY $REST_Instance"
   done
