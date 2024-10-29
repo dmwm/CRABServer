@@ -239,7 +239,7 @@ task_submission:
     - !reference [.default_rules, skip_all_base]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
-  stage: run_testsuite
+  stage: submit_testsuite
   tags:
     - crab3-shell
   script:
