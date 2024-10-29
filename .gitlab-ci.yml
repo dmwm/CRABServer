@@ -255,9 +255,9 @@ task_submission:
     - bash -x cicd/gitlab/executeTests.sh
   artifacts:
     paths:
-      -workdir/submitted_tasks_CV
-      -workdir/submitted_tasks_CCV
-      -workdir/submitted_tasks_TS
+      - workdir/submitted_tasks_CV
+      - workdir/submitted_tasks_CCV
+      - workdir/submitted_tasks_TS
   cache:
     - key: $CI_PIPELINE_ID
       paths:
