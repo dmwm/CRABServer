@@ -47,6 +47,9 @@ immediateCheck(){
 #Save results to failed_tests and successful_tests files
 
  project_dir="/tmp/crabTestConfig"
+ mkdir -p "${project_dir}"  # Ensure project_dir exists
+ touch "${WORK_DIR}/artifacts/successful_tests"
+ touch "${WORK_DIR}/artifacts/failed_tests"
  for task in ${tasksToCheck};
  do
      echo -e "\nRunning immediate test on task: ${task}"
