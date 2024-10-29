@@ -42,6 +42,22 @@ submitTasks() {
   done
 }
 
+immediateCheck(){
+#Run immediate check on tasks submitted for Client_Configuration_Validation testing
+#Save results to failed_tests and successful_tests files
+
+ project_dir="/tmp/crabTestConfig"
+ for task in ${tasksToCheck};
+ do
+     echo -e "\nRunning immediate test on task: ${task}"
+     test_to_execute=`echo "${task}" | grep -oP '(?<=_crab_).*(?=)'`
+     task_dir=${project_dir}/crab_${test_to_execute}
+     bash -x ${test_to_execute}-testSubmit.sh ${task_dir} && \
+       echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> ${WORK_DIR}/artifacts/successful_tests || \
+       echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> ${WORK_DIR}/artifacts/failed_tests
+ done
+}
+
 killAfterFailure(){
 #In case at least one task submission failed, kill all succesfully submitted tasks
  if [ -e "${WORK_DIR}/project_directories" ]; then
