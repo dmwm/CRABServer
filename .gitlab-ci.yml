@@ -253,6 +253,11 @@ task_submission:
     - export Client_Configuration_Validation
     - export Client_Validation_Suite
     - bash -x cicd/gitlab/executeTests.sh
+  artifacts:
+    paths:
+      -workdir/submitted_tasks_CV
+      -workdir/submitted_tasks_CCV
+      -workdir/submitted_tasks_TS
   cache:
     - key: $CI_PIPELINE_ID
       paths:
@@ -291,7 +296,10 @@ client_validation_suite:
     - export ROOT_DIR
     - export CMSSW_release=CMSSW_13_0_2
     - export Client_Validation_Suite=true
+    - ls workdir/submitted_tasks_CV
     - bash -x cicd/gitlab/CV_config.sh
+  dependencies:
+    - task_submission
   cache:
     - key: $CI_PIPELINE_ID
       paths:
@@ -300,7 +308,7 @@ client_validation_suite:
     - key: submitted_tasks_CV_latest
       paths:
         - workdir/submitted_tasks_CV_dir
-      policy: pull
+      policy: push
 
 client_configuration_validation:
   rules:
@@ -322,7 +330,10 @@ client_configuration_validation:
     - export ROOT_DIR
     - export CMSSW_release=CMSSW_13_0_2
     - export Client_Configuration_Validation=true
+    - ls workdir/submitted_tasks_CCV
     - bash -x cicd/gitlab/CCV_config.sh
+  dependencies:
+    - task_submission
   cache:
     - key: $CI_PIPELINE_ID
       paths:
@@ -331,7 +342,7 @@ client_configuration_validation:
     - key: submitted_tasks_CCV_latest
       paths:
         - workdir/submitted_tasks_CCV_dir
-      policy: pull
+      policy: push
 
 check_test_result:
   rules:
