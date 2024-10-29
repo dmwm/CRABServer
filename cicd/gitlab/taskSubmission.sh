@@ -44,20 +44,20 @@ submitTasks() {
 
 immediateCheck(){
 #Run immediate check on tasks submitted for Client_Configuration_Validation testing
-#Save results to failed_tests and successful_tests files
+#Save results to failed_CCV_tests and successful_CCV_tests files
 
  project_dir="/tmp/crabTestConfig"
  mkdir -p "${project_dir}"  # Ensure project_dir exists
- touch "${WORK_DIR}/artifacts/successful_tests"
- touch "${WORK_DIR}/artifacts/failed_tests"
+ touch "${WORK_DIR}/successful_CCV_tests"
+ touch "${WORK_DIR}/failed_CCV_tests"
  for task in ${tasksToCheck};
  do
      echo -e "\nRunning immediate test on task: ${task}"
      test_to_execute=`echo "${task}" | grep -oP '(?<=_crab_).*(?=)'`
      task_dir=${project_dir}/crab_${test_to_execute}
      bash -x ${test_to_execute}-testSubmit.sh ${task_dir} && \
-       echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> ${WORK_DIR}/artifacts/successful_tests || \
-       echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> ${WORK_DIR}/artifacts/failed_tests
+       echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> ${WORK_DIR}/successful_CCV_tests || \
+       echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> ${WORK_DIR}/failed_CCV_tests
  done
 }
 
