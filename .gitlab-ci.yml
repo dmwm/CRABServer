@@ -287,6 +287,8 @@ client_validation_suite:
   tags:
     - crab3-shell
   script:
+    - echo "Waiting for 20 minutes after task submission..."
+    - sleep 1200 
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
     - export CRABClient_version  # from .env
@@ -305,7 +307,6 @@ client_validation_suite:
       paths:
         - workdir/submitted_tasks_CV
       policy: pull
-  start_in: "20 minutes"
 
 client_configuration_validation:
   rules:
@@ -320,6 +321,8 @@ client_configuration_validation:
   tags:
     - crab3-shell
   script:
+    - echo "Waiting for 20 minutes after task submission..."
+    - sleep 1200 
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
     - export CRABClient_version  # from .env
@@ -338,7 +341,6 @@ client_configuration_validation:
       paths:
         - workdir/submitted_tasks_CCV
       policy: pull
-  start_in: "20 minutes"
 
 check_test_result:
   rules:
