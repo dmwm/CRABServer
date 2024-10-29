@@ -31,6 +31,7 @@ stages:
   - prepare_release
   - build_docker
   - deploy
+  - submit_testsuite
   - run_testsuite
   - check_testsuite
   - tagging_release
