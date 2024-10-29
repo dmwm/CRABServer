@@ -249,9 +249,9 @@ task_submission:
     - export REST_Instance  # from .env
     - export ROOT_DIR
     - export CMSSW_release=CMSSW_13_0_2
-    - export Task_Submission_Status_Tracking
-    - export Client_Configuration_Validation
-    - export Client_Validation_Suite
+    - export Task_Submission_Status_Tracking=true
+    - export Client_Configuration_Validation=true
+    - export Client_Validation_Suite=true
     - bash -x cicd/gitlab/executeTests.sh
   cache:
     - key: $CI_PIPELINE_ID
