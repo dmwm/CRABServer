@@ -98,7 +98,7 @@ class RucioAction():
                     ruleId = rule['id']
                     break
             if not ruleId:
-                msg = "Failed to creaed Rucio rule to recall data. Rucio DuplicateException raised "
+                msg = "Failed to create Rucio rule to recall data. Rucio DuplicateException raised "
                 msg += "but a rule for this account was not found in the list"
                 raise TaskWorkerException(msg) from DuplicateRule
             # extend rule lifetime
