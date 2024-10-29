@@ -32,7 +32,7 @@ if [ -f "${WORK_DIR}/submitted_tasks_CCV" ]; then
     else
         echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/failed_tests
     fi
-  done <$"{WORK_DIR}/submitted_tasks_CCV"
+  done <"${WORK_DIR}/submitted_tasks_CCV"
 else echo "Error: ${WORK_DIR}/submitted_tasks_CCV is not a file"
   exit 1
 fi
