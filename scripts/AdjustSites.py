@@ -473,7 +473,7 @@ def getDebugFiles(taskDict, crabserver, logger):
         with tarfile.open(name=debugTarball, mode='r') as debugTar:
             debugTar.extractall()
     except Exception as ex:  # pylint: disable=broad-except
-        logger.exception("CRAB server backend could expand the tarball with debug files, " + \
+        logger.exception("CRAB server backend could not expand the tarball with debug files, " + \
                          "ops monitor will not work. Exception:\n %s", str(ex))
         return
 
