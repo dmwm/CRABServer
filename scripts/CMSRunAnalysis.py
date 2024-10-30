@@ -384,15 +384,6 @@ def extractUserSandbox(sandbox, cmsswVersion):
             print(f"expanding {file} in {os.getcwd()}")
             print(subprocess.getoutput(f"tar xfm {file}"))
 
-    # the user sandbox contains also the user scram directory files and thus
-    # is unpacked in the local CMSSW_X_Y_X dir
-    # the following 4 lines will not be needed anymore after we change CRABClient
-    # to put $CMSSW_BASE files inside cmsswVersion directory inside the sandbox
-    os.chdir(cmsswVersion)
-    print(f"expanding {sandbox} in {os.getcwd()}")
-    print(subprocess.getoutput(f"tar xfm {os.path.join('..', sandbox)}"))
-    os.chdir('..')
-
     print(f"==== Sandbox untarring FINISHED at {UTCNow()} ====")
 
 
