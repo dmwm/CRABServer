@@ -53,6 +53,7 @@ MESSAGE='Test failed. Investigate manually'
 if [ -s "successful_tests" ] && [ ! -s "failed_tests" ]; then
 	TEST_RESULT='SUCCEEDED'
     MESSAGE='Test is done.'
+	ERR=false
 fi
 
 # Define an associative array to hold the test results
@@ -65,10 +66,10 @@ for result in "${!results[@]}"; do
 
 		# Handle retry logic
 		if [ "${results[$result]}" == "retry_tests" ]; then
-        	ERR=true
             TEST_RESULT='FULL-STATUS-UNKNOWN'
             if [ $RETRY -ge $MAX_RETRY ]; then
 				MESSAGE='Exceeded configured retries. If needed restart manually.'
+				ERR=true
     		else
     			MESSAGE='Will run again.'
     		fi

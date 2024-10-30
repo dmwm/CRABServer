@@ -58,6 +58,7 @@ if [[ -s "result_failed" ]]; then
 elif [[ -s "result_OK" ]]; then
     echo "All commands were executed successfully." >> message_CVResult_interim
     TEST_RESULT='SUCCEEDED'
+    ERR=false
 else
     echo "Something went wrong. Investigate manually." >> message_CVResult_interim
     ERR=true
