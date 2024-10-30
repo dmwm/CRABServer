@@ -49,13 +49,6 @@ export MAX_RETRY=${CI_PIPELINE_MAX_RETRIES:-4}
 TEST_RESULT='FAILED'
 MESSAGE='Test failed. Investigate manually'
 
-# Check if the tests passed or failed
-if [ -s "successful_tests" ] && [ ! -s "failed_tests" ]; then
-	TEST_RESULT='SUCCEEDED'
-    MESSAGE='Test is done.'
-	ERR=false
-fi
-
 # Define an associative array to hold the test results
 declare -A results=( ["SUCCESSFUL"]="successful_tests" ["FAILED"]="failed_tests" ["RETRY"]="retry_tests")
 
@@ -78,6 +71,13 @@ for result in "${!results[@]}"; do
 		echo -e "\n${result} TESTS:\n none" >> message_CCVResult_interim
 	fi
 done
+
+# Check if the tests passed or failed
+if [ -s "successful_tests" ] && [ ! -s "failed_tests" ] && [ ! -s "retry_tests"]; then
+	TEST_RESULT='SUCCEEDED'
+    MESSAGE='Test is done.'
+	ERR=false
+fi
 
 # Create the final result message
 echo -e "**Test:** Client configuration validation\n\
