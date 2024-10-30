@@ -369,10 +369,10 @@ def parseArgs():
     return opts
 
 
-def extractUserSandbox(sandbox, cmsswVersion):
+def extractUserSandbox(sandbox):
     print(f"==== Sandbox untarring STARTING at {UTCNow()} ====")
     # The user sandbox.tar.gz has to be unpacked no matter what (even in DEBUG mode)
-    # this guarantees that job starting directrly contains all files listed in
+    # this guarantees that job starting directory contains all files listed in
     # submission configuration file as config.JobType.inputFiles
     print(f"expanding {sandbox} in {os.getcwd()}")
     print(subprocess.getoutput(f"tar xfm {sandbox}"))
@@ -659,7 +659,7 @@ if __name__ == "__main__":
         print(f"==== SCRAM Obj INITIALIZED at {UTCNow()} ====")
 
         print("==== Extract user sandbox in top and CMSSW directory ====")
-        extractUserSandbox(options.archiveJob, options.cmsswVersion)
+        extractUserSandbox(options.archiveJob)
 
         # tweaking of the PSet is needed both for CMSSWStack and ScriptEXE
         print(f"==== Tweak PSet at {UTCNow()} ====")
