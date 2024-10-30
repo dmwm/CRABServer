@@ -73,7 +73,7 @@ for result in "${!results[@]}"; do
 done
 
 # Check if the tests passed or failed
-if [ -s "successful_tests" ] && ( [ ! -s "failed_tests" ] || grep -q 'none' "failed_tests" ) && ( [ ! -s "retry_tests" ] || grep -q 'none' "retry_tests" ); then
+if [ -s "successful_tests" ] && [ ! -s "failed_tests" ]; then
     TEST_RESULT='SUCCEEDED'
     MESSAGE='Test is done.'
     ERR=false
