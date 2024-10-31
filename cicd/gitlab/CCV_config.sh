@@ -50,7 +50,14 @@ TEST_RESULT='FAILED'
 MESSAGE='Test failed. Investigate manually'
 
 # Define an associative array to hold the test results
-declare -A results=( ["SUCCESSFUL"]="successful_tests" ["FAILED"]="failed_tests" ["RETRY"]="retry_tests")
+declare -A results=( ["SUCCESSFUL"]="successful_tests" ["FAILED"]="failed_tests" ["RETRY"]="retry_tests" )
+
+# Check if the tests passed or failed
+if [ -s "successful_tests" ] && { [ ! -e "failed_tests" ] || [[ $(<failed_tests) == *none* ]]; }; then
+    TEST_RESULT='SUCCEEDED'
+    MESSAGE='Test is done.'
+    ERR=false
+fi
 
 for result in "${!results[@]}"; do
 	if [ -s "${results[$result]}" ]; then
@@ -60,24 +67,17 @@ for result in "${!results[@]}"; do
 		# Handle retry logic
 		if [ "${results[$result]}" == "retry_tests" ]; then
             TEST_RESULT='FULL-STATUS-UNKNOWN'
-            if [ $RETRY -ge $MAX_RETRY ]; then
-				MESSAGE='Exceeded configured retries. If needed restart manually.'
-				ERR=true
-    		else
-    			MESSAGE='Will run again.'
-    		fi
+            if [ "$RETRY" -ge "$MAX_RETRY" ]; then
+                MESSAGE='Exceeded configured retries. If needed restart manually.'
+                ERR=true
+            else
+                MESSAGE='Will run again.'
+            fi
         fi
 	else
 		echo -e "\n${result} TESTS:\n none" >> message_CCVResult_interim
 	fi
 done
-
-# Check if the tests passed or failed
-if [ -s "successful_tests" ] && [ ! -s "failed_tests" ]; then
-    TEST_RESULT='SUCCEEDED'
-    MESSAGE='Test is done.'
-    ERR=false
-fi
 
 # Create the final result message
 echo -e "**Test:** Client configuration validation\n\
