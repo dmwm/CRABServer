@@ -32,7 +32,8 @@ stages:
   - build_docker
   - deploy
   - submit_testsuite
-  - run_testsuite
+  - run_testsuite_CCV
+  - run_testsuite_CV
   - check_testsuite
   - tagging_release
 
@@ -274,40 +275,6 @@ task_submission:
         - workdir/submitted_tasks_CCV
       policy: push
 
-client_validation_suite:
-  rules:
-    - if: $MANUAL_CI_PIPELINE_ID
-      when: never
-    - if: $CLIENT_VALIDATION_SUITE
-    - if: $SKIP_DEPLOY || $FORCE_RELEASE
-      when: never
-    - !reference [.default_rules, default]
-    - !reference [.default_rules, release]
-  stage: run_testsuite
-  tags:
-    - crab3-shell
-  script:
-    - echo "Waiting for 20 minutes after task submission..."
-    - sleep 1200 
-    - source .env
-    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
-    - export CRABClient_version  # from .env
-    - export REST_Instance  # from .env
-    - export ROOT_DIR
-    - export CMSSW_release=CMSSW_13_0_2
-    - export Client_Validation_Suite=true
-    - ls workdir/submitted_tasks_CV
-    - bash -x cicd/gitlab/CV_config.sh
-  cache:
-    - key: $CI_PIPELINE_ID
-      paths:
-        - workdir/submitted_tasks_CV
-      policy: pull
-    - key: submitted_tasks_CV_latest
-      paths:
-        - workdir/submitted_tasks_CV
-      policy: pull
-
 client_configuration_validation:
   rules:
     - if: $MANUAL_CI_PIPELINE_ID
@@ -317,12 +284,12 @@ client_configuration_validation:
       when: never
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
-  stage: run_testsuite
+  stage: run_testsuite_CCV
   tags:
     - crab3-shell
   script:
-    - echo "Waiting for 20 minutes after task submission..."
-    - sleep 1200 
+    # - echo "Waiting for 20 minutes after task submission..."
+    # - sleep 1200 
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
     - export CRABClient_version  # from .env
@@ -340,6 +307,40 @@ client_configuration_validation:
     - key: submitted_tasks_CCV_latest
       paths:
         - workdir/submitted_tasks_CCV
+      policy: pull
+
+client_validation_suite:
+  rules:
+    - if: $MANUAL_CI_PIPELINE_ID
+      when: never
+    - if: $CLIENT_VALIDATION_SUITE
+    - if: $SKIP_DEPLOY || $FORCE_RELEASE
+      when: never
+    - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
+  stage: run_testsuite_CV
+  tags:
+    - crab3-shell
+  script:
+    # - echo "Waiting for 20 minutes after task submission..."
+    # - sleep 1200 
+    - source .env
+    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
+    - export CRABClient_version  # from .env
+    - export REST_Instance  # from .env
+    - export ROOT_DIR
+    - export CMSSW_release=CMSSW_13_0_2
+    - export Client_Validation_Suite=true
+    - ls workdir/submitted_tasks_CV
+    - bash -x cicd/gitlab/CV_config.sh
+  cache:
+    - key: $CI_PIPELINE_ID
+      paths:
+        - workdir/submitted_tasks_CV
+      policy: pull
+    - key: submitted_tasks_CV_latest
+      paths:
+        - workdir/submitted_tasks_CV
       policy: pull
 
 check_test_result:
