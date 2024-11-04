@@ -56,7 +56,6 @@ declare -A results=( ["SUCCESSFUL"]="successful_tests" ["FAILED"]="failed_tests"
 if [ -s "successful_tests" ] && { [ ! -e "failed_tests" ] || [[ $(<failed_tests) == *none* ]]; }; then
     TEST_RESULT='SUCCEEDED'
     MESSAGE='Test is done.'
-    ERR=false
 fi
 
 for result in "${!results[@]}"; do
@@ -69,7 +68,6 @@ for result in "${!results[@]}"; do
             TEST_RESULT='FULL-STATUS-UNKNOWN'
             if [ "$RETRY" -ge "$MAX_RETRY" ]; then
                 MESSAGE='Exceeded configured retries. If needed restart manually.'
-                ERR=true
             else
                 MESSAGE='Will run again.'
             fi
@@ -89,7 +87,10 @@ echo -e "**Test:** Client configuration validation\n\
 # Append interim result to the final message
 echo -e "\`\`\`$(cat message_CCVResult_interim)\n\`\`\`"  >> message_CCVResult
 
-# Exit if there were errors
-if [ $ERR ]; then
-	exit 1
+if [[ ${TEST_RESULT} == 'FULL-STATUS-UNKNOWN' ]]; then
+    exit 4
+elif [[ ${TEST_RESULT} == 'SUCCEEDED' ]]; then
+    exit 0
+elif [[ ${TEST_RESULT} == 'FAILED' ]]; then
+    exit 1
 fi
