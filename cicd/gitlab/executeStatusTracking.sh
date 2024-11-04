@@ -31,16 +31,13 @@ ERR=false
 TEST_RESULT='FAILED'
 if [ ! -s "./result" ]; then
 	MESSAGE='Something went wrong. Investigate manually.'
-   	ERR=true
 elif grep -E "(SUBMITFAILED|SUBMITREFUSED)" ./result; then
     MESSAGE='Task(s) has "SUBMITFAILED" status. Investigate manually.'
-   	ERR=true
-elif grep "TestRunning" result || grep "TestResubmitted" result; then
+elif grep "TestFailed" ./result ; then
+	MESSAGE='Test failed. Investigate manually'
+elif grep "TestRunning" result || grep "TestResubmitted" ./result; then
     MESSAGE='Will run again.'
    	TEST_RESULT='FULL-STATUS-UNKNOWN'
-elif grep "TestFailed" result ; then
-	MESSAGE='Test failed. Investigate manually'
-    ERR=true
 else
 	MESSAGE='Test is done.'
    	TEST_RESULT='SUCCEEDED'
@@ -56,9 +53,10 @@ echo -e "\`\`\`\n`cat result`\n\`\`\`" || true
 
 popd
 
-if $ERR ; then
-	exit 1
-fi
 if [[ ${TEST_RESULT} == 'FULL-STATUS-UNKNOWN' ]]; then
     exit 4
+elif [[ ${TEST_RESULT} == 'SUCCEEDED' ]]; then
+    exit 0
+elif [[ ${TEST_RESULT} == 'FAILED' ]]; then
+    exit 1
 fi
