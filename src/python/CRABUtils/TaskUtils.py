@@ -57,6 +57,8 @@ def updateTaskStatus(crabserver=None, taskName=None, status=None, logger=None):
         command = 'SUBMIT'
     elif status == 'NEW':
         command = 'SUBMIT'
+    elif status == 'UPLOADED':
+        command = 'SUBMIT'
     elif status == 'SUBMITREFUSED':
         command = 'SUBMIT'
     elif status == 'KILLED':

@@ -16,7 +16,6 @@ from TaskWorker.Actions.DagmanKiller import DagmanKiller
 from TaskWorker.Actions.MyProxyLogon import MyProxyLogon
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
 from TaskWorker.Actions.StageoutCheck import StageoutCheck
-from TaskWorker.Actions.DryRunUploader import DryRunUploader
 from TaskWorker.Actions.MakeFakeFileSet import MakeFakeFileSet
 from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
 from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
@@ -201,7 +200,8 @@ def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
     handler.addWork(Splitter(config=config, crabserver=crabserver, procnum=procnum))
     handler.addWork(DagmanCreator(config=config, crabserver=crabserver, procnum=procnum, rucioClient=rucioClient))
     if task['tm_dry_run'] == 'T':
-        handler.addWork(DryRunUploader(config=config, crabserver=crabserver, procnum=procnum))
+        # stop here and wait for user to be satisfied with what's been uploaded
+        pass
     else:
         handler.addWork(DagmanSubmitter(config=config, crabserver=crabserver, procnum=procnum))
 
