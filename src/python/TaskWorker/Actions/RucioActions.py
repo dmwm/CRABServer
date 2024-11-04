@@ -63,9 +63,9 @@ class RucioAction():
                                rseExpression='', comment='', lifetime=0):
         """ if Rucio reports duplicate rule exception, reuse existing one """
         # Some RSE_EXPR for testing
-        # rseExpression = 'ddm_quota>0&(tier=1|tier=2)&rse_type=DISK'
+        # rseExpression = 'dm_weight>0&(tier=1|tier=2)&rse_type=DISK'
         # rseExpression = 'T3_IT_Trieste' # for testing
-        weight = 'ddm_quota'  # only makes sense for rules which trigger replicas
+        weight = 'dm_weight'  # only makes sense for rules which trigger replicas
         # weight = None # for testing
         if activity == "Analysis TapeRecall":
             askApproval = True
@@ -115,8 +115,9 @@ class RucioAction():
     def whereToRecall(self, tapeLocations=None, teraBytesToRecall=0):
         """ decide which RSE's to use """
         # make RSEs lists
-        # asking for ddm_quota>0 gets rid also of Temp and Test RSE's
-        allRses = "ddm_quota>0&(tier=1|tier=2)&rse_type=DISK"
+        # and make sure to skip Temp and Test RSE's. Rucio uses set complement operator "\"
+        # see https://rucio.cern.ch/documentation/started/concepts/rse_expressions/#operators
+        allRses = r"(tier=1|tier=2)&rse_type=DISK\cms_type=test\cms_type=temp"
         # tune list according to where tapes are, we expect a single location
         # if there are more... let Rucio deal with them to find best route
         if tapeLocations:
@@ -127,11 +128,9 @@ class RucioAction():
                 if 'US' in list(tapeLocations)[0]:
                     allRses += "&(country=US)"  # Brasil is on that side too, but not reliable enough
                 else:
-                    # Rucio wants the set complement operator \
-                    # see https://rucio.cern.ch/documentation/started/concepts/rse_expressions/#operators
-                    allRses += r"\country=US\country=BR"  # pylint: disable=anomalous-backslash-in-string
+                    allRses += r"\country=US\country=BR"
                     # avoid fragile sites, see #7400
-                    allRses += r"\country=RU\country=UA"  # pylint: disable=anomalous-backslash-in-string
+                    allRses += r"\country=RU\country=UA"
         rses = self.rucioClient.list_rses(allRses)
         rseNames = [r['rse'] for r in rses]
         largeRSEs = []  # a list of largish (i.e. solid) RSEs
