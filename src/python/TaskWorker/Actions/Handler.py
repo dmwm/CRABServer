@@ -19,6 +19,7 @@ from TaskWorker.Actions.StageoutCheck import StageoutCheck
 from TaskWorker.Actions.MakeFakeFileSet import MakeFakeFileSet
 from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
 from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
+from TaskWorker.Actions.Uploader import Uploader
 from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
 from TaskWorker.Actions.RucioDataDiscovery import RucioDataDiscovery
 from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
@@ -199,6 +200,7 @@ def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
         handler.addWork(MakeFakeFileSet(config=config, crabserver=crabserver, procnum=procnum))
     handler.addWork(Splitter(config=config, crabserver=crabserver, procnum=procnum))
     handler.addWork(DagmanCreator(config=config, crabserver=crabserver, procnum=procnum, rucioClient=rucioClient))
+    handler.addWork(Uploader(config=config, crabserver=crabserver, procnum=procnum))
     if task['tm_dry_run'] == 'T':
         # stop here and wait for user to be satisfied with what's been uploaded
         pass

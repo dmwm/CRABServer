@@ -21,9 +21,8 @@ import tempfile
 from ast import literal_eval
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import getLock, checkS3Object, uploadToS3
+from ServerUtilities import getLock, checkS3Object
 
-from CRABUtils.TaskUtils import updateTaskStatus
 import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.Actions.Splitter import SplittingSummary
@@ -730,13 +729,6 @@ class DagmanCreator(TaskAction):
         with tarfile.open('InputFiles.tar.gz', mode='w:gz') as tf:
             for ifname in inputFiles + subdags + ['input_args.json']:
                 tf.add(ifname)
-        # also upload InputFiles.tar.gz to s3
-        task = kw['task']['tm_taskname']
-        uploadToS3(crabserver=self.crabserver, filepath='InputFiles.tar.gz',
-                   objecttype='runtimefiles', taskname=task,
-                   logger=self.logger)
-        # report that all tarballs are now in S3
-        updateTaskStatus(crabserver=self.crabserver, taskName=task, status='UPLOADED', logger=self.logger)
 
     def createSubdag(self, splitterResult, **kwargs):
         """ beware the "Sub" in the name ! This is used also for Main DAG """
