@@ -146,14 +146,14 @@ class SplittingSummary():
 
     def addJobs(self, jobs):
         """
-        populate the summary, argument is a job created by the splitter factory
+        populate the summary, argument is a list of jobs in a jobgroup created by the splitter factory
         i.e. it is meant to be used like this:
         for jobgroup in factory:
             jobs = jobgroup.getJobs()
             splittingSummary.addJobs(jobs)
         where factory is the first return argument of the execute method in the above Splitter class
         """
-        if self.algo == 'FileBased':
+        if self.algo in ['FileBased', 'Automatic']:  # Automatic splitting uses FileBased inside TW
             self.lumisPerJob += [sum([x.get('lumiCount', 0) for x in job['input_files']]) for job in jobs]
             self.eventsPerJob += [sum([x['events'] for x in job['input_files']]) for job in jobs]
             self.filesPerJob += [len(job['input_files']) for job in jobs]
