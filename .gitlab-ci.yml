@@ -346,7 +346,8 @@ client_configuration_validation:
 
 check_test_result:
   rules:
-    - if: '$CHECK_TEST_RESULT == "true"'
+    - if: '$CHECK_TEST_RESULT == "false"'
+      when: never
     - !reference [.default_rules, skip_all_base]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
