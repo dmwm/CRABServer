@@ -21,8 +21,10 @@ def crab_cmd(configuration):
         return output
     except HTTPException as hte:
         print('Failed', configuration['cmd'], 'of the task: %s' % (hte.headers))
+        return None
     except ClientException as cle:
         print('Failed', configuration['cmd'], 'of the task: %s' % (cle))
+        return None
 
 
 def parse_result(listOfTasks, checkPublication=False):
@@ -88,11 +90,13 @@ def parse_result(listOfTasks, checkPublication=False):
         else:
             needToResubmit = True
         if needToResubmit:
-            crab_cmd({'cmd': 'resubmit', 'args': {'dir': task['workdir']}})
+            resubmit = crab_cmd({'cmd': 'resubmit', 'args': {'dir': task['workdir']}})
             result = 'TestResubmitted'
+            print(resubmit)
         if needToResubmitPublication:
-            crab_cmd({'cmd': 'resubmit', 'args': {'dir': task['workdir'], 'publication': True}})
+            resubmit = crab_cmd({'cmd': 'resubmit', 'args': {'dir': task['workdir'], 'publication': True}})
             result = 'TestResubmitted'
+            print(resubmit)
 
         testResult.append({'TN': task['taskName'], 'testResult': result, 'dbStatus': task['dbStatus'],
                            'combinedStatus': task['status'], 'jobsPerStatus': task['jobsPerStatus'],

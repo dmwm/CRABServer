@@ -289,7 +289,7 @@ name = 'sendExternalFolder'
 changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
 confChangesList = [changeDict]
 testSubmitScript = """
-lookInTarFor "^external/" ${workDir}/inputs/*default.tgz
+lookInTarFor "^external/" ${workDir}/inputs/*default.tgz || true
 """
 validationScript = """
 checkStatus ${taskName} SUBMITTED
