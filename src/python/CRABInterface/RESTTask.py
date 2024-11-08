@@ -220,7 +220,8 @@ class RESTTask(RESTEntity):
             #extract /cms1425/taskname from the user webdir
             suffix = re.search(r"(/[^/]+/[^/]+/?)$", row.user_webdir).group(0)
         else:
-            raise ExecutionError("Webdir not set in the database. Cannot build proxied webdir")
+            yield "None"
+            return
 
         #=============================================================================
         # scheddObj is a dictionary composed like this (see the value of htcondorSchedds):

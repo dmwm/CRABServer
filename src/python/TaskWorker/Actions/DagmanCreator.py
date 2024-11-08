@@ -21,10 +21,11 @@ import tempfile
 from ast import literal_eval
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import getLock, checkS3Object, uploadToS3
+from ServerUtilities import getLock, checkS3Object
 
 import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
+from TaskWorker.Actions.Splitter import SplittingSummary
 from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedException
 from RucioUtils import getWritePFN
 from CMSGroupMapper import get_egroup_users
@@ -728,14 +729,9 @@ class DagmanCreator(TaskAction):
         with tarfile.open('InputFiles.tar.gz', mode='w:gz') as tf:
             for ifname in inputFiles + subdags + ['input_args.json']:
                 tf.add(ifname)
-        # also upload InputFiles.tar.gz to s3
-        task = kw['task']['tm_taskname']
-        uploadToS3(crabserver=self.crabserver, filepath='InputFiles.tar.gz',
-                   objecttype='runtimefiles', taskname=task,
-                   logger=self.logger)
 
     def createSubdag(self, splitterResult, **kwargs):
-        """ main DAG is also dealt with here """
+        """ beware the "Sub" in the name ! This is used also for Main DAG """
 
         startjobid = kwargs.get('startjobid', 0)
         parent = kwargs.get('parent', None)
@@ -1197,6 +1193,15 @@ class DagmanCreator(TaskAction):
             inputFiles.append("input_dataset_duplicate_lumis.json")
 
         info, splitterResult, subdags, dagSpecs = self.createSubdag(*args, **kw)
+
+        # as splitter summary is useful for dryrun, let's add it to the InputFiles tarball
+        jobGroups = splitterResult[0]  # the first returned value of Splitter action is the splitterFactory output
+        splittingSummary = SplittingSummary(kw['task']['tm_split_algo'])
+        for jobgroup in jobGroups:
+            jobs = jobgroup.getJobs()
+            splittingSummary.addJobs(jobs)
+        splittingSummary.dump('splitting-summary.json')
+        inputFiles.append('splitting-summary.json')
 
         self.prepareLocal(dagSpecs, info, kw, inputFiles, subdags)
 
