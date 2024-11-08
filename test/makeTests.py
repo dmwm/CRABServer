@@ -270,18 +270,18 @@ writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # sendVenvFolder
-# name = 'sendVenvFolder'
-# changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
-# confChangesList = [changeDict]
-# testSubmitScript = """
-# lookInTarFor "^venv/" ${workDir}/inputs/*default.tgz
-# """
-# validationScript = """
-# checkStatus ${taskName} SUBMITTED
-# """
-# writeConfigFile(testName=name, listOfDicts=confChangesList)
-# writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
-# writeValidationScript(testName=name, validationScript=validationScript)
+name = 'sendVenvFolder'
+changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
+confChangesList = [changeDict]
+testSubmitScript = """
+lookInTarFor "^venv/" ${workDir}/inputs/*default.tgz
+"""
+validationScript = """
+checkStatus ${taskName} SUBMITTED
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
 
 
 # sendExternalFolder

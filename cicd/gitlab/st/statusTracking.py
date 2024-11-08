@@ -5,6 +5,7 @@ from __future__ import division
 
 import os
 import subprocess
+import ast
 try:
     from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
 except:  # pylint: disable=bare-except
@@ -39,6 +40,7 @@ def parse_result(listOfTasks, checkPublication=False):
                     task['jobsPerStatus']['failed'] -= 1
             total_jobs = sum(task['jobsPerStatus'].values())
             finished_jobs = task['jobsPerStatus']['finished'] if 'finished' in task['jobsPerStatus'] else 0
+            print(finished_jobs)
             published_in_transfersdb = task['publication']['done'] if 'done' in task['publication'] else 0
             failedPublications = task['publication']['failed'] if 'failed' in task['publication'] else 0
             # deal with absurd format (output of a print command !) of outdatasets
@@ -46,14 +48,14 @@ def parse_result(listOfTasks, checkPublication=False):
             # with string first character being '['
             # beware that soon after submission this is not defined.
             # reference: https://github.com/dmwm/CRABClient/blob/549c4e3b6158e8344315437d1d128f2288551d47/src/python/CRABClient/Commands/status.py#L1059
-            outdataset = eval(task['outdatasets'])[0] if task['outdatasets'] else None
+            outdataset = ast.literal_eval(task['outdatasets'])[0] if task['outdatasets'] else None
             if task['outdatasets'] == 'None':
                 outdataset = None
             if outdataset:
                 cmd = "/cvmfs/cms.cern.ch/common/dasgoclient --query"
                 cmd += " 'file dataset=%s instance=prod/phys03' | wc -l" % outdataset
                 ret = subprocess.check_output(cmd, shell=True)
-                published_in_dbs = eval(ret)  # dirty trick from b'999\n' to 999 (e.g.)
+                published_in_dbs = int(ret.decode().strip()) if isinstance(ret, bytes) else int(ret.strip()) # dirty trick from b'999\n' to 999 (e.g.)
             else:
                 published_in_dbs = 0
 
@@ -86,10 +88,10 @@ def parse_result(listOfTasks, checkPublication=False):
         else:
             needToResubmit = True
         if needToResubmit:
-            resubmit = crab_cmd({'cmd': 'resubmit', 'args': {'dir': task['workdir']}})
+            crab_cmd({'cmd': 'resubmit', 'args': {'dir': task['workdir']}})
             result = 'TestResubmitted'
         if needToResubmitPublication:
-            resubmit = crab_cmd({'cmd': 'resubmit', 'args': {'dir': task['workdir'], 'publication': True}})
+            crab_cmd({'cmd': 'resubmit', 'args': {'dir': task['workdir'], 'publication': True}})
             result = 'TestResubmitted'
 
         testResult.append({'TN': task['taskName'], 'testResult': result, 'dbStatus': task['dbStatus'],
@@ -111,7 +113,6 @@ def main():
     if TestFailed is present" declare the test FAILED
     """
     import json
-    import os
     print(json.dumps(dict(os.environ), indent=4))
     listOfTasks = []
     instance = os.getenv('REST_Instance', 'preprod')
@@ -121,8 +122,12 @@ def main():
     checkPublication = True if Check_Publication_Status == 'Yes' else False
 
     # Read all tasks from the specified files into a single list
-    tasks = [line for file_name in ['submitted_tasks_TS', 'submitted_tasks_CCV', 'submitted_tasks_CV']
-            for line in open(f'{work_dir}/{file_name}').readlines()]
+    tasks = [
+    line 
+    for file_name in ['submitted_tasks_TS', 'submitted_tasks_CCV', 'submitted_tasks_CV']
+    for line in open(f'{work_dir}/{file_name}', encoding='utf-8').readlines()
+    ]
+
 
     for task in tasks:
         # when testing it helps to reuse already made directories
@@ -143,7 +148,7 @@ def main():
 
     summary = parse_result(listOfTasks,checkPublication)
 
-    with open('%s/result' %work_dir, 'w') as fp:
+    with open('%s/result' %work_dir, 'w', encoding='utf-8') as fp:
         for result in summary:
             fp.write("%s\n" % result)
 

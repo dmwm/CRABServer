@@ -13,6 +13,7 @@ variables:
   # https://docs.docker.com/build/cache/backends/
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
+  CHECK_TEST_RESULT: "false"
 
 # This key define variables which are later used in `!reference` tag in `rules`.
 # Ref https://docs.gitlab.com/ee/ci/jobs/index.html#hide-jobs
@@ -345,7 +346,7 @@ client_configuration_validation:
 
 check_test_result:
   rules:
-    - if: $MANUAL_CI_PIPELINE_ID || $SUBMIT_STATUS_TRACKING || $CLIENT_VALIDATION_SUITE || $CLIENT_CONFIGURATION_VALIDATION
+    - if: '$CHECK_TEST_RESULT == "true"'
     - !reference [.default_rules, skip_all_base]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
