@@ -129,7 +129,7 @@ def main():
     tasks = [
     line 
     for file_name in ['submitted_tasks_TS', 'submitted_tasks_CCV', 'submitted_tasks_CV']
-    for line in open(f'{work_dir}/{file_name}', encoding='utf-8').readlines()
+    for line in open(f'{work_dir}/{file_name}').readlines()
     ]
 
 
@@ -152,7 +152,7 @@ def main():
 
     summary = parse_result(listOfTasks,checkPublication)
 
-    with open('%s/result' %work_dir, 'w', encoding='utf-8') as fp:
+    with open('%s/result' %work_dir, 'w') as fp:
         for result in summary:
             fp.write("%s\n" % result)
 
