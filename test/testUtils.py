@@ -2,7 +2,6 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import io
 
 commonBashFunctions = """#!/bin/bash
 # a few utility functions for submission and check scripts
@@ -156,7 +155,7 @@ commonBashFunctions = commonBashFunctions.replace('REST_Instance', restInstance)
 standardConfig = standardConfig.replace('REST_Instance', restInstance)
 
 def writePset():
-    with io.open('PSET.py', 'w', encoding='utf-8') as fp:
+    with open('PSET.py', 'w') as fp:
         fp.write(psetFileContent)
     return
 
@@ -169,19 +168,19 @@ def writePset8cores():
             break
     if existingLine:
         pset8c = psetFileContent.replace(existingLine, existingLine+newLine)
-    with io.open('PSET-8cores.py', 'w', encoding='utf-8') as fp:
+    with open('PSET-8cores.py', 'w') as fp:
         fp.write(pset8c)
     return
 
 def writeScriptExe():
-    with io.open('SIMPLE-SCRIPT.sh', 'w', encoding='utf-8') as fp:
+    with open('SIMPLE-SCRIPT.sh', 'w') as fp:
         fp.write(simpleScriptExe)
     os.chmod('SIMPLE-SCRIPT.sh', 0o744)  # script needs to be executable
     return
 
 def writeLumiMask():
     lumiMaskForMC = '{"1": [[1,10],[20,25]]}'
-    with io.open('lumiMask.json', 'w', encoding='utf-8') as fp:
+    with open('lumiMask.json', 'w') as fp:
         fp.write(lumiMaskForMC)
     return
 
@@ -224,19 +223,19 @@ def writeConfigFile(testName=None, listOfDicts=None):
 
     # also set the requestName (do it now to avoid confusing changeInConf)
     conf = conf.replace('REQUESTNAME', '"'+testName+'"')
-    with io.open(testName + '.py', 'w', encoding='utf-8') as fp:
+    with open(testName + '.py', 'w') as fp:
         fp.write(conf)
     return
 
 def writeValidationScript(testName=None, validationScript=None):
-    with io.open(testName + '-check.sh', 'w', encoding='utf-8') as fp:
+    with open(testName + '-check.sh', 'w') as fp:
         fp.write(commonBashFunctions)
         fp.write('taskName="$1"\n\n')
         fp.write(validationScript)
     return
 
 def writeTestSubmitScript(testName=None, testSubmitScript=None):
-    with io.open(testName + '-testSubmit.sh', 'w', encoding='utf-8') as fp:
+    with open(testName + '-testSubmit.sh', 'w') as fp:
         fp.write(commonBashFunctions)
         fp.write('workDir="$1"\n\n')
         fp.write(testSubmitScript)
