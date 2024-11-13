@@ -477,7 +477,7 @@ class RetryJob():
                 reportLocation += 'corrupted/new/'
             if suspiciousFile:
                 # there can be so many that we better split by task
-                reportLocation += f'suspicious/new/{self.reqname}'
+                reportLocation += f'suspicious/new/{self.reqname}/'
 
             destination = reportLocation + reportFileName
             cmd = f'gfal-copy -vp -t 60 {reportFileName} {destination}'
