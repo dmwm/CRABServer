@@ -464,7 +464,7 @@ class RetryJob():
             errorLines.append(f"stdout: {stdoutUrl}")
             errorLines.append(f"postjob: {postJobUrl}")
             # note things  down
-            reportFileName = f'{self.reqname}.job.{self.job_id}.{self.crab_retry}.json'
+            reportFileName = f'Badfile.job.{self.job_id}.{self.crab_retry}.json'
             corruptionMessage = {'DID': f'cms:{inputFileName}', 'RSE': RSE,
                                  'exitCode': exitCode, 'message': errorLines}
             with open(reportFileName, 'w', encoding='utf-8') as fp:
@@ -473,10 +473,10 @@ class RetryJob():
             proxy = os.getenv('X509_USER_PROXY')
             self.logger.info(f"X509_USER_PROXY = {proxy}")
             reportLocation = 'davs://eoscms.cern.ch:443/eos/cms/store/temp/user/BadInputFiles/'
+            # there can be so many that we better split by task
             if corruptedFile:
-                reportLocation += 'corrupted/new/'
+                reportLocation += f'corrupted/new/{self.reqname}/'
             if suspiciousFile:
-                # there can be so many that we better split by task
                 reportLocation += f'suspicious/new/{self.reqname}/'
 
             destination = reportLocation + reportFileName
