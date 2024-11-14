@@ -5,6 +5,7 @@ from __future__ import division
 
 import os
 import subprocess
+
 try:
     from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
 except:  # pylint: disable=bare-except
@@ -20,8 +21,10 @@ def crab_cmd(configuration):
         return output
     except HTTPException as hte:
         print('Failed', configuration['cmd'], 'of the task: %s' % (hte.headers))
+        return None
     except ClientException as cle:
         print('Failed', configuration['cmd'], 'of the task: %s' % (cle))
+        return None
 
 
 def parse_result(listOfTasks, checkPublication=False):
@@ -39,6 +42,7 @@ def parse_result(listOfTasks, checkPublication=False):
                     task['jobsPerStatus']['failed'] -= 1
             total_jobs = sum(task['jobsPerStatus'].values())
             finished_jobs = task['jobsPerStatus']['finished'] if 'finished' in task['jobsPerStatus'] else 0
+            print(finished_jobs)
             published_in_transfersdb = task['publication']['done'] if 'done' in task['publication'] else 0
             failedPublications = task['publication']['failed'] if 'failed' in task['publication'] else 0
             # deal with absurd format (output of a print command !) of outdatasets
@@ -53,7 +57,7 @@ def parse_result(listOfTasks, checkPublication=False):
                 cmd = "/cvmfs/cms.cern.ch/common/dasgoclient --query"
                 cmd += " 'file dataset=%s instance=prod/phys03' | wc -l" % outdataset
                 ret = subprocess.check_output(cmd, shell=True)
-                published_in_dbs = eval(ret)  # dirty trick from b'999\n' to 999 (e.g.)
+                published_in_dbs = int(ret.decode().strip()) if isinstance(ret, bytes) else int(ret.strip()) # dirty trick from b'999\n' to 999 (e.g.)
             else:
                 published_in_dbs = 0
 
@@ -88,9 +92,11 @@ def parse_result(listOfTasks, checkPublication=False):
         if needToResubmit:
             resubmit = crab_cmd({'cmd': 'resubmit', 'args': {'dir': task['workdir']}})
             result = 'TestResubmitted'
+            print(resubmit)
         if needToResubmitPublication:
             resubmit = crab_cmd({'cmd': 'resubmit', 'args': {'dir': task['workdir'], 'publication': True}})
             result = 'TestResubmitted'
+            print(resubmit)
 
         testResult.append({'TN': task['taskName'], 'testResult': result, 'dbStatus': task['dbStatus'],
                            'combinedStatus': task['status'], 'jobsPerStatus': task['jobsPerStatus'],
@@ -111,7 +117,6 @@ def main():
     if TestFailed is present" declare the test FAILED
     """
     import json
-    import os
     print(json.dumps(dict(os.environ), indent=4))
     listOfTasks = []
     instance = os.getenv('REST_Instance', 'preprod')
@@ -120,8 +125,13 @@ def main():
     print("Check_Publication_Status is : ", Check_Publication_Status )
     checkPublication = True if Check_Publication_Status == 'Yes' else False
 
-    with open('%s/submitted_tasks_TS' %work_dir) as fp:
-        tasks = fp.readlines()
+    # Read all tasks from the specified files into a single list
+    tasks = [
+    line 
+    for file_name in ['submitted_tasks_TS', 'submitted_tasks_CCV', 'submitted_tasks_CV']
+    for line in open(f'{work_dir}/{file_name}').readlines()
+    ]
+
 
     for task in tasks:
         # when testing it helps to reuse already made directories
@@ -133,9 +143,12 @@ def main():
 
         status_dict = {'dir': remake_dir}
         status_command_output = crab_cmd({'cmd': 'status', 'args': status_dict})
-        status_command_output.update({'taskName': task.rstrip()})
-        status_command_output['workdir'] = remake_dir
-        listOfTasks.append(status_command_output)
+        if status_command_output:
+            status_command_output.update({'taskName': task.rstrip()})
+            status_command_output['workdir'] = remake_dir
+            listOfTasks.append(status_command_output)
+        else:
+            print("status_command_output is None for", task)
 
     summary = parse_result(listOfTasks,checkPublication)
 

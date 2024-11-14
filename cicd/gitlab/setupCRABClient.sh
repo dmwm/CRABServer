@@ -21,6 +21,8 @@ cd ${CMSSW_release}/src
 eval "$(scramv1 runtime -sh)"
 scram build
 
+mkdir ../venv
+
 if echo ${CMSSW_release} | grep -q CMSSW_7; then
   # when using CMSSW_7, need to force latest curl
   if echo $SCRAM_ARCH | grep -q slc6; then
