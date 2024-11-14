@@ -313,8 +313,6 @@ class MasterWorker(object):
             # Log the formatted table
             self.logger.info('\n%s', table)
 
-            if getattr(self.config.TaskWorker, 'task_scheduling_dry_run', False):
-                return waiting_tasks
             return selected_tasks
 
         except HTTPException as hte:
