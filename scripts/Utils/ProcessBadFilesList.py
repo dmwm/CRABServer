@@ -14,8 +14,8 @@ import json
 import datetime
 import time
 import shutil
+import subprocess
 import pandas as pd
-
 
 ERROR_KINDS = [
     'not a ROOT file',
@@ -33,19 +33,31 @@ def main():
 
     totals = []
     for problemType in ('corrupted', 'suspicious'):
-        doneFiles = []
+        doneTasks = []
         myDir = f"{topDir}/{problemType}"
         newFilesDir = myDir + '/new'
         doneFilesDir = myDir + '/done'
-        newFiles = os.listdir(newFilesDir)
-        for aFile in newFiles:
-            filePath = f"{newFilesDir}/{aFile}"
-            result = parse(filePath)
-            accumulate(totals, result)
-            doneFiles.append(filePath)
+        troubledTasks = os.listdir(newFilesDir)
+        for task in troubledTasks:
+            taskDir = os.path.join(newFilesDir, task)
+            if os.path.isfile(taskDir):  # old format, ignore
+                shutil.move(taskDir, doneFilesDir)
+                continue
+            result = subprocess.run(f"eos ls {taskDir} |wc -l",shell=True, stdout=subprocess.PIPE, check=False)
+            nBadFileReports = int(result.stdout.decode('utf-8'))
+            if nBadFileReports > 100:
+                # likely code, not files, can't fix whole datasets
+                shutil.move(taskDir, doneFilesDir)
+                continue
+            newFiles = os.listdir(taskDir)
+            for aFile in newFiles:
+                filePath = f"{taskDir}/{aFile}"
+                result = parse(filePath)
+                accumulate(totals, result)
+            doneTasks.append(taskDir)
 
-        for file in doneFiles:
-            shutil.move(file, doneFilesDir)
+        for taskDir in doneTasks:
+            shutil.move(taskDir, doneFilesDir)
 
     if not totals:
         print("No Bad File Report found. Exit")
@@ -56,8 +68,8 @@ def main():
     summaryDir = f"{topDir}/summaries/"
     addToDailyLog(logDir=summaryDir, totals=totals)
 
-    all = getListOfBadDIDsAsDataFrame(summaryDir, days=DAYS)
-    truncated, rest = selectDataFrameByErrorKind(all, 'truncated')
+    everything = getListOfBadDIDsAsDataFrame(summaryDir, days=DAYS)
+    truncated, rest = selectDataFrameByErrorKind(everything, 'truncated')
     notRoot, rest = selectDataFrameByErrorKind(rest, 'not a ROOT file')
     unknown, rest = selectDataFrameByErrorKind(rest, 'unknown')
     misc = rest
@@ -129,7 +141,7 @@ def parse(file=None):
     try:
         with open(file, 'r', encoding='utf8') as fp:
             info = json.load(fp)
-    except:
+    except Exception:  # pylint: disable=broad-except
         print(f"Failed to parse {file}")
         return result
     if '/store/group' in info['DID'] or '/store/user' in info['DID'] and \
@@ -227,7 +239,6 @@ def addTotals(tot1, tot2):
     by combining same DID into a single record
     returns the new list
     """
-    result=[]
     listOfNewDicts = []
     # combine when possible
     for dict1 in tot1:
