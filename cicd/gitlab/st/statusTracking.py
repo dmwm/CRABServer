@@ -5,7 +5,7 @@ from __future__ import division
 
 import os
 import subprocess
-import ast
+
 try:
     from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
 except:  # pylint: disable=bare-except
@@ -50,7 +50,7 @@ def parse_result(listOfTasks, checkPublication=False):
             # with string first character being '['
             # beware that soon after submission this is not defined.
             # reference: https://github.com/dmwm/CRABClient/blob/549c4e3b6158e8344315437d1d128f2288551d47/src/python/CRABClient/Commands/status.py#L1059
-            outdataset = ast.literal_eval(task['outdatasets'])[0] if task['outdatasets'] else None
+            outdataset = eval(task['outdatasets'])[0] if task['outdatasets'] else None
             if task['outdatasets'] == 'None':
                 outdataset = None
             if outdataset:
@@ -143,7 +143,7 @@ def main():
 
         status_dict = {'dir': remake_dir}
         status_command_output = crab_cmd({'cmd': 'status', 'args': status_dict})
-        if status_command_output is not None:
+        if status_command_output:
             status_command_output.update({'taskName': task.rstrip()})
             status_command_output['workdir'] = remake_dir
             listOfTasks.append(status_command_output)
