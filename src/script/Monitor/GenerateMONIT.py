@@ -287,9 +287,10 @@ class CRAB3CreateJson:
                 # if one schedd does not answer, go on and try the others
                 try:
                     scheddAdd = self.coll.locate(htcondor.DaemonTypes.Schedd, scheddName)
-                except Exception:
+                    schedd = htcondor.Schedd(scheddAdd)
+                except Exception as e:
+                    print(f"faild to contact {scheddName}:\n{e}")
                     continue
-                schedd = htcondor.Schedd(scheddAdd)
                 try:
                     idleDags = schedd.query(pickSchedulerIdle)
                 except Exception:
