@@ -35,12 +35,13 @@ def parse_result(listOfTasks, checkPublication=False):
         task['pubSummary'] = 'None'  # make sure this is initialized
         needToResubmit = False
         needToResubmitPublication = False
+        automaticSubmit = '0-1' in task['jobs'].keys()  # if there are probe jobs
         if task['dbStatus'] == 'SUBMITTED':
-            # remove failed probe jobs (job id of X-Y kind) if any from count
-            for job in task['jobs'].keys():
-                if '-' in job and task['jobs'][job]['State'] == 'failed':
-                    task['jobsPerStatus']['failed'] -= 1
-            total_jobs = sum(task['jobsPerStatus'].values())
+            if automaticSubmit:
+                handle_automatic_split_jobs(task)
+            probe_jobs = task['jobsPerStatus']['probe'] if 'probe' in task['jobsPerStatus'] else 0
+            rescheduled_jobs = task['jobsPerStatus']['rescheduled'] if 'rescheduled' in task['jobsPerStatus'] else 0
+            total_jobs = sum(task['jobsPerStatus'].values()) - probe_jobs - rescheduled_jobs
             finished_jobs = task['jobsPerStatus']['finished'] if 'finished' in task['jobsPerStatus'] else 0
             print(finished_jobs)
             published_in_transfersdb = task['publication']['done'] if 'done' in task['publication'] else 0
@@ -63,7 +64,7 @@ def parse_result(listOfTasks, checkPublication=False):
 
             task['pubSummary'] = '%d/%d/%d' % (failedPublications, published_in_transfersdb, published_in_dbs)
 
-            if ('finished', total_jobs) in task['jobsPerStatus'].items():
+            if total_jobs > 0 and ('finished', total_jobs) in task['jobsPerStatus'].items():
                 if task['status'] == 'COMPLETED':
                     result = 'TestPassed'
                 else:
@@ -89,7 +90,7 @@ def parse_result(listOfTasks, checkPublication=False):
             result = 'TestRunning'
         else:
             needToResubmit = True
-        if needToResubmit:
+        if needToResubmit and not automaticSubmit:
             resubmit = crab_cmd({'cmd': 'resubmit', 'args': {'dir': task['workdir']}})
             result = 'TestResubmitted'
             print(resubmit)
@@ -104,6 +105,24 @@ def parse_result(listOfTasks, checkPublication=False):
 
     return testResult
 
+
+def  handle_automatic_split_jobs(task):
+    """ modify accounting in task dictionary to deal with automatic splitting probes and tails """
+    task['jobsPerStatus']['probe'] = 0  # prepare a new counter
+    task['jobsPerStatus']['rescheduled'] = 0  # prepare a new counter
+    for job in task['jobs'].keys():
+        if '0-' in job:
+            # ignore completed probe jobs, OK or not
+            task['jobsPerStatus']['probe'] += 1
+            if task['jobs'][job]['State'] == 'finished':
+                task['jobsPerStatus']['finished'] -= 1
+            if task['jobs'][job]['State'] == 'failed':
+                task['jobsPerStatus']['failed'] -= 1
+            task['jobs'][job]['State'] = 'probe'
+        if not '-' in job and task['jobs'][job]['State'] == 'failed':
+            task['jobs'][job]['State'] = 'rescheduled'  # failed processing jobs will run as tail
+            task['jobsPerStatus']['failed'] -= 1        # ignore their failures
+            task['jobsPerStatus']['rescheduled'] +=1
 
 def main():
     """
