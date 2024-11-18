@@ -454,10 +454,13 @@ class RetryJob():
                         self.logger.info("RootFatalError does not contain file info")
                     break
         if corruptedFile or suspiciousFile:
+            # do not report HammerCloud
+            username = self.reqname.split(':')[1].split('_')[0]
+            if username == 'sciaba':
+                return corruptedFile
             # add pointers to logs
             schedHostname = socket.gethostname().split('.')[0]
             schedId = schedHostname.removeprefix('vocms')  # vomcs059 -> 059, vocms0106 -> 0106 etc,
-            username = self.reqname.split(':')[1].split('_')[0]
             webDirUrl = f"https://cmsweb.cern.ch:8443/scheddmon/{schedId}/{username}/{self.reqname}"
             stdoutUrl = f"{webDirUrl}/job_out.{self.job_id}.{self.crab_retry}.txt"
             postJobUrl = f"{webDirUrl}/postjob.{self.job_id}.{self.crab_retry}.txt"
