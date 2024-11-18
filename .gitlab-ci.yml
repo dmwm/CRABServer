@@ -17,7 +17,7 @@ variables:
   SUBMIT_STATUS_TRACKING: "true"
   CLIENT_CONFIGURATION_VALIDATION: "true"
   CLIENT_VALIDATION_SUITE: "true"
-  MANUAL_CI_PIPELINE_ID: "true" #Setting this to true will enable you to skip build and deploy steps and only do testing
+  MANUAL_CI_PIPELINE_ID: "false" #Setting this to true will enable you to skip build and deploy steps and only do testing
 
 # This key define variables which are later used in `!reference` tag in `rules`.
 # Ref https://docs.gitlab.com/ee/ci/jobs/index.html#hide-jobs
