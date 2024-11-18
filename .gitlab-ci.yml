@@ -281,7 +281,8 @@ task_submission:
 
 client_validation_suite:
   rules:
-    - if: '$CLIENT_VALIDATION_SUITE == "true"'
+    - if: '$CLIENT_VALIDATION_SUITE == "false"'
+      when: never
     - if: $SKIP_DEPLOY || $FORCE_RELEASE
       when: never
     - !reference [.default_rules, default]
@@ -313,7 +314,8 @@ client_validation_suite:
 
 client_configuration_validation:
   rules:
-    - if: '$CLIENT_CONFIGURATION_VALIDATION == "true"'
+    - if: '$CLIENT_CONFIGURATION_VALIDATION == "false"'
+      when: never
     - if: $SKIP_DEPLOY || $FORCE_RELEASE
       when: never
     - !reference [.default_rules, default]
