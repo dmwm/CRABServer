@@ -17,6 +17,7 @@ variables:
   SUBMIT_STATUS_TRACKING: "true"
   CLIENT_CONFIGURATION_VALIDATION: "true"
   CLIENT_VALIDATION_SUITE: "true"
+  MANUAL_CI_PIPELINE_ID: "true" #Setting this to true will enable you to skip build and deploy steps and only do testing
 
 # This key define variables which are later used in `!reference` tag in `rules`.
 # Ref https://docs.gitlab.com/ee/ci/jobs/index.html#hide-jobs
@@ -130,6 +131,7 @@ build_tw_image:
 build_monit_image:
   rules:
     - if: $BUILD
+    - !reference [.default_rules, skip_all_base]
     - !reference [.default_rules, release]
   stage: build_docker
   needs: ["build_tw_image", "get_env"]
@@ -152,6 +154,7 @@ build_monit_image:
 build_crabtwfilebeat_image:
   rules:
     - if: $BUILD
+    - !reference [.default_rules, skip_all_base]
     - !reference [.default_rules, release]
   stage: build_docker
   image:
@@ -173,6 +176,7 @@ build_crabtwfilebeat_image:
 build_spark_image:
   rules:
     - if: $BUILD
+    - !reference [.default_rules, skip_all_base]
     - !reference [.default_rules, release]
   stage: build_docker
   image:
@@ -242,7 +246,6 @@ deploy_publisher_rucio:
 task_submission:
   rules:
     - if: $SUBMIT_STATUS_TRACKING || $CLIENT_VALIDATION_SUITE || $CLIENT_CONFIGURATION_VALIDATION
-    - !reference [.default_rules, skip_all_base]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: submit_testsuite
