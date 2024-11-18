@@ -18,7 +18,8 @@ variables:
   CLIENT_CONFIGURATION_VALIDATION: "false"
   CLIENT_VALIDATION_SUITE: "false"
   SKIP_BUILD: "false"
-  SKIP_DEPLOY: "false" 
+  SKIP_DEPLOY: "false"
+  SKIP_SUBMIT: "true" 
 
 # This key define variables which are later used in `!reference` tag in `rules`.
 # Ref https://docs.gitlab.com/ee/ci/jobs/index.html#hide-jobs
@@ -33,6 +34,9 @@ variables:
       when: never                             # helper var
   skip_deploy:
     - if: '$SKIP_DEPLOY == "true"'
+      when: never 
+  skip_submit:
+    - if: '$SKIP_SUBMIT == "true"'
       when: never 
 
 stages:
@@ -250,6 +254,7 @@ deploy_publisher_rucio:
 task_submission:
   rules:
     - if: '$SUBMIT_STATUS_TRACKING == "true" || $CLIENT_VALIDATION_SUITE == "true" || $CLIENT_CONFIGURATION_VALIDATION == "true"'
+    - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: submit_testsuite
