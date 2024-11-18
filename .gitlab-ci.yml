@@ -284,8 +284,6 @@ task_submission:
 
 client_validation_suite:
   rules:
-    - if: $MANUAL_CI_PIPELINE_ID
-      when: never
     - if: $CLIENT_VALIDATION_SUITE
     - if: $SKIP_DEPLOY || $FORCE_RELEASE
       when: never
@@ -318,8 +316,6 @@ client_validation_suite:
 
 client_configuration_validation:
   rules:
-    - if: $MANUAL_CI_PIPELINE_ID
-      when: never
     - if: $CLIENT_CONFIGURATION_VALIDATION
     - if: $SKIP_DEPLOY || $FORCE_RELEASE
       when: never
