@@ -28,7 +28,7 @@ variables:
   release:
     - if: $CI_COMMIT_TAG =~ /v3\.[0-9]{6}.*/  # match tag: v3.240101
   skip_all_base:
-    - if: $MANUAL_CI_PIPELINE_ID
+    - if: '$MANUAL_CI_PIPELINE_ID == "true"'
       when: never                             # helper var
 
 stages:
