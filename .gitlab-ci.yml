@@ -14,12 +14,12 @@ variables:
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
   CHECK_TEST_RESULT: "false"
-  SUBMIT_STATUS_TRACKING: "false"
-  CLIENT_CONFIGURATION_VALIDATION: "false"
-  CLIENT_VALIDATION_SUITE: "false"
+  SUBMIT_STATUS_TRACKING: "true"
+  CLIENT_CONFIGURATION_VALIDATION: "true"
+  CLIENT_VALIDATION_SUITE: "true"
   SKIP_BUILD: "false"
   SKIP_DEPLOY: "false"
-  SKIP_SUBMIT: "true" 
+  SKIP_SUBMIT: "false" 
 
 # This key define variables which are later used in `!reference` tag in `rules`.
 # Ref https://docs.gitlab.com/ee/ci/jobs/index.html#hide-jobs
