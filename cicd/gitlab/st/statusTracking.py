@@ -148,6 +148,7 @@ def main():
     tasks = [
     line 
     for file_name in ['submitted_tasks_TS', 'submitted_tasks_CCV', 'submitted_tasks_CV']
+    if os.path.exists(f'{work_dir}/{file_name}')
     for line in open(f'{work_dir}/{file_name}').readlines()
     ]
 

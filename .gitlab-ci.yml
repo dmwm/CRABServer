@@ -14,6 +14,9 @@ variables:
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
   CHECK_TEST_RESULT: "false"
+  SUBMIT_STATUS_TRACKING: "false"
+  CLIENT_CONFIGURATION_VALIDATION: "true"
+  CLIENT_VALIDATION_SUITE: "true"
 
 # This key define variables which are later used in `!reference` tag in `rules`.
 # Ref https://docs.gitlab.com/ee/ci/jobs/index.html#hide-jobs
@@ -252,9 +255,9 @@ task_submission:
     - export REST_Instance  # from .env
     - export ROOT_DIR
     - export CMSSW_release=CMSSW_13_0_2
-    - export Task_Submission_Status_Tracking=true
-    - export Client_Configuration_Validation=true
-    - export Client_Validation_Suite=true
+    - export Task_Submission_Status_Tracking=$SUBMIT_STATUS_TRACKING
+    - export Client_Configuration_Validation=$CLIENT_CONFIGURATION_VALIDATION
+    - export Client_Validation_Suite=$CLIENT_VALIDATION_SUITE
     - bash -x cicd/gitlab/executeTests.sh
   cache:
     - key: $CI_PIPELINE_ID
