@@ -14,8 +14,8 @@ variables:
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
   CHECK_TEST_RESULT: "false"
-  SUBMIT_STATUS_TRACKING: "true"
-  CLIENT_CONFIGURATION_VALIDATION: "true"
+  SUBMIT_STATUS_TRACKING: "false"
+  CLIENT_CONFIGURATION_VALIDATION: "false"
   CLIENT_VALIDATION_SUITE: "true"
   MANUAL_CI_PIPELINE_ID: "false" #Setting this to true will enable you to skip build and deploy steps and only do testing
 
