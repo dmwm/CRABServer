@@ -14,6 +14,12 @@ variables:
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
   CHECK_TEST_RESULT: "false"
+  SUBMIT_STATUS_TRACKING: "true"
+  CLIENT_CONFIGURATION_VALIDATION: "true"
+  CLIENT_VALIDATION_SUITE: "true"
+  SKIP_BUILD: "false"
+  SKIP_DEPLOY: "false"
+  SKIP_SUBMIT: "false" 
 
 # This key define variables which are later used in `!reference` tag in `rules`.
 # Ref https://docs.gitlab.com/ee/ci/jobs/index.html#hide-jobs
@@ -23,9 +29,15 @@ variables:
     - if: $CI_COMMIT_TAG =~ /pypi-.*/         # match tag: pypi-(prod|preprod|test*)-1714418922
   release:
     - if: $CI_COMMIT_TAG =~ /v3\.[0-9]{6}.*/  # match tag: v3.240101
-  skip_all_base:
-    - if: $BUILD || $BUILD_DEPLOY || $ONLY_BUILD_RELEASE || $SUBMIT_STATUS_TRACKING || $MANUAL_CI_PIPELINE_ID
+  skip_build:
+    - if: '$SKIP_BUILD == "true"'
       when: never                             # helper var
+  skip_deploy:
+    - if: '$SKIP_DEPLOY == "true"'
+      when: never 
+  skip_submit:
+    - if: '$SKIP_SUBMIT == "true"'
+      when: never 
 
 stages:
   - prepare_env
@@ -79,7 +91,7 @@ set_version_name:
 build_rest_image:
   rules:
     - if: $BUILD || $BUILD_DEPLOY || $ONLY_BUILD_RELEASE
-    - !reference [.default_rules, skip_all_base]
+    - !reference [.default_rules, skip_build]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: build_docker
@@ -104,7 +116,7 @@ build_rest_image:
 build_tw_image:
   rules:
     - if: $BUILD || $BUILD_DEPLOY || $ONLY_BUILD_RELEASE
-    - !reference [.default_rules, skip_all_base]
+    - !reference [.default_rules, skip_build]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: build_docker
@@ -127,6 +139,7 @@ build_tw_image:
 build_monit_image:
   rules:
     - if: $BUILD
+    - !reference [.default_rules, skip_build]
     - !reference [.default_rules, release]
   stage: build_docker
   needs: ["build_tw_image", "get_env"]
@@ -149,6 +162,7 @@ build_monit_image:
 build_crabtwfilebeat_image:
   rules:
     - if: $BUILD
+    - !reference [.default_rules, skip_build]
     - !reference [.default_rules, release]
   stage: build_docker
   image:
@@ -170,6 +184,7 @@ build_crabtwfilebeat_image:
 build_spark_image:
   rules:
     - if: $BUILD
+    - !reference [.default_rules, skip_build]
     - !reference [.default_rules, release]
   stage: build_docker
   image:
@@ -187,7 +202,7 @@ build_spark_image:
 deploy_server:
   rules:
     - if: $BUILD_DEPLOY
-    - !reference [.default_rules, skip_all_base]
+    - !reference [.default_rules, skip_deploy]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: deploy
@@ -206,7 +221,7 @@ deploy_server:
 .deploy_tw_template:
   rules:
     - if: $BUILD_DEPLOY
-    - !reference [.default_rules, skip_all_base]
+    - !reference [.default_rules, skip_deploy]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: deploy
@@ -238,8 +253,8 @@ deploy_publisher_rucio:
 
 task_submission:
   rules:
-    - if: $SUBMIT_STATUS_TRACKING || $CLIENT_VALIDATION_SUITE || $CLIENT_CONFIGURATION_VALIDATION
-    - !reference [.default_rules, skip_all_base]
+    - if: '$SUBMIT_STATUS_TRACKING == "true" || $CLIENT_VALIDATION_SUITE == "true" || $CLIENT_CONFIGURATION_VALIDATION == "true"'
+    - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: submit_testsuite
@@ -252,9 +267,9 @@ task_submission:
     - export REST_Instance  # from .env
     - export ROOT_DIR
     - export CMSSW_release=CMSSW_13_0_2
-    - export Task_Submission_Status_Tracking=true
-    - export Client_Configuration_Validation=true
-    - export Client_Validation_Suite=true
+    - export Task_Submission_Status_Tracking=$SUBMIT_STATUS_TRACKING
+    - export Client_Configuration_Validation=$CLIENT_CONFIGURATION_VALIDATION
+    - export Client_Validation_Suite=$CLIENT_VALIDATION_SUITE
     - bash -x cicd/gitlab/executeTests.sh
   cache:
     - key: $CI_PIPELINE_ID
@@ -278,10 +293,7 @@ task_submission:
 
 client_validation_suite:
   rules:
-    - if: $MANUAL_CI_PIPELINE_ID
-      when: never
-    - if: $CLIENT_VALIDATION_SUITE
-    - if: $SKIP_DEPLOY || $FORCE_RELEASE
+    - if: '$CLIENT_VALIDATION_SUITE == "false"'
       when: never
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -312,10 +324,7 @@ client_validation_suite:
 
 client_configuration_validation:
   rules:
-    - if: $MANUAL_CI_PIPELINE_ID
-      when: never
-    - if: $CLIENT_CONFIGURATION_VALIDATION
-    - if: $SKIP_DEPLOY || $FORCE_RELEASE
+    - if: '$CLIENT_CONFIGURATION_VALIDATION == "false"'
       when: never
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -348,7 +357,6 @@ check_test_result:
   rules:
     - if: '$CHECK_TEST_RESULT == "false"'
       when: never
-    - !reference [.default_rules, skip_all_base]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: check_testsuite
