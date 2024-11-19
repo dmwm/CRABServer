@@ -29,8 +29,8 @@ else:
     import classad
 
 ## These are the CRAB attributes that we want to add to the job class ad when
-## using the submitDirect() method.
-# SB: do we really need all of this ? Most of them are in Job.submit created by
+## using the submitDirect() method. I.e. to submit the dagman boostrap job to the scheduler (AP)
+# We do not need all of this anymore !! Most of them are in Job.submit created by
 # DagmanCreator and are not needed to submit/run the DagMan.
 SUBMIT_INFO = [ \
     ('+CRAB_ReqName', 'requestname'),
@@ -93,21 +93,6 @@ def addCRABInfoToJobJDL(jdl, info):
     for adName, dictName in SUBMIT_INFO:
         if dictName in info and info[dictName] is not None:
             jdl[adName] = str(info[dictName])
-    # extra_jdl and accelerator_jdl are not listed in SUBMIT_INFO
-    # and need ad-hoc handling, those are a string of `\n` separated k=v elements
-    if 'extra_jdl' in info and info['extra_jdl']:
-        for keyValue in info['extra_jdl'].split('\n'):
-            adName, adVal = keyValue.split(sep='=', maxsplit=1)
-            # remove any user-inserted spaces which would break schedd.submit #8420
-            adName = adName.strip()
-            adVal = adVal.strip()
-            jdl[adName] = adVal
-    if 'accelerator_jdl' in info and info['accelerator_jdl']:
-        for keyValue in info['accelerator_jdl'].split('\n'):
-            adName, adVal = keyValue.split(sep='=', maxsplit=1)
-            # these are built in our code w/o extra spaces
-            jdl[adName] = adVal
-
 
 class ScheddStats(dict):
     """ collect statistics of submission success/failure at various schedulers """

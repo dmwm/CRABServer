@@ -4,6 +4,10 @@ Create a set of files for a DAG submission.
 Generates the condor submit files and the master DAG.
 """
 # pylint:  disable=invalid-name  # have a lot of snake_case varaibles here from "old times"
+# also.. yeah.. this is a long and somehow complex file, but we are not going to break it now
+# pylint: disable=too-many-locals, too-many-branches, too-many-statements, too-many-lines, too-many-arguments
+# there just one very long line in the HTCondor JDL template
+# pylint: disable=line-too-long
 
 import os
 import re
@@ -17,15 +21,17 @@ import tempfile
 from ast import literal_eval
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import getLock, downloadFromS3
+from ServerUtilities import getLock, checkS3Object
 
 import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
+from TaskWorker.Actions.Splitter import SplittingSummary
 from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedException
 from RucioUtils import getWritePFN
 from CMSGroupMapper import get_egroup_users
 
 import WMCore.WMSpec.WMTask
+from WMCore import Lexicon
 from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS, SCRAM_TO_ARCH
 
@@ -128,7 +134,8 @@ job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite, Rem
 WhenToTransferOutput = ON_EXIT_OR_EVICT
 +SpoolOnEvict = false
 
-# Keep job in the queue upon completion long enough for the postJob to run, allowing the monitoring script to fetch the postJob status and job exit-code updated by the postJob
+# Keep job in the queue upon completion long enough for the postJob to run,
+# allowing the monitoring script to fetch the postJob status and job exit-code updated by the postJob
 LeaveJobInQueue = ifThenElse((JobStatus=?=4 || JobStatus=?=3) && (time() - EnteredCurrentStatus < 30 * 60*60), true, false)
 
 universe = vanilla
@@ -189,12 +196,16 @@ SPLIT_ARG_MAP = {"Automatic": "minutes_per_job",
 
 
 def getCreateTimestamp(taskname):
+    """ name says it all """
     return "_".join(taskname.split(":")[:1])
 
 
 def makeLFNPrefixes(task):
-    ## Once we don't care anymore about backward compatibility with crab server < 3.3.1511
-    ## we can uncomment the 1st line below and remove the next 6 lines.
+    """
+    create LFN's for output files both on /store/temp and on final destination
+    Once we don't care anymore about backward compatibility with crab server < 3.3.1511
+    we can uncomment the 1st line below and remove the next 6 lines.
+    """
     #primaryds = task['tm_primary_dataset']
     if task['tm_primary_dataset']:
         primaryds = task['tm_primary_dataset']
@@ -211,7 +222,7 @@ def makeLFNPrefixes(task):
     hash_input = hash_input.encode('utf-8')
     pset_hash = hashlib.sha1(hash_input).hexdigest()
     user = task['tm_username']
-    tmp_user = "%s.%s" % (user, pset_hash)
+    tmp_user = f"{user}.{pset_hash}"
     publish_info = task['tm_publish_name'].rsplit('-', 1) #publish_info[0] is the publishname or the taskname
     timestamp = getCreateTimestamp(task['tm_taskname'])
     splitlfn = lfn.split('/')
@@ -231,7 +242,6 @@ def validateLFNs(path, outputFiles):
     :param outputFiles: list of strings: the filenames to be published (w/o the jobId, i.e. out.root not out_1.root)
     :return: nothing if all OK. If LFN is not valid Lexicon raises an AssertionError exception
     """
-    from WMCore import Lexicon
     # fake values to get proper LFN length, actual numbers chance job by job
     jobId = '10000'       # current max is 10k jobs per task
     dirCounter = '0001'   # need to be same length as 'counter' used later in makeDagSpecs
@@ -239,14 +249,14 @@ def validateLFNs(path, outputFiles):
     for origFile in outputFiles:
         info = origFile.rsplit(".", 1)
         if len(info) == 2:    # filename ends with .<something>, put jobId before the dot
-            fileName = "%s_%s.%s" % (info[0], jobId, info[1])
+            fileName = f"{info[0]}_{jobId}.{info[1]}"
         else:
-            fileName = "%s_%s" % (origFile, jobId)
+            fileName = f"{origFile}_{jobId}"
         testLfn = os.path.join(path, dirCounter, fileName)
         Lexicon.lfn(testLfn)  # will raise if testLfn is not a valid lfn
         # since Lexicon does not have lenght check, do it manually here.
         if len(testLfn) > 500:
-            msg = "\nYour task specifies an output LFN %d-char long " % len(testLfn)
+            msg = f"\nYour task specifies an output LFN {len(testLfn)}-char long "
             msg += "\n which exceeds maximum length of 500"
             msg += "\n and therefore can not be handled in our DataBase"
             raise SubmissionRefusedException(msg)
@@ -258,7 +268,6 @@ def validateUserLFNs(path, outputFiles):
     :param outputFiles: list of strings: the filenames to be published (w/o the jobId, i.e. out.root not out_1.root)
     :return: nothing if all OK. If LFN is not valid Lexicon raises an AssertionError exception
     """
-    from WMCore import Lexicon
     # fake values to get proper LFN length, actual numbers chance job by job
     jobId = '10000'       # current max is 10k jobs per task
     dirCounter = '0001'   # need to be same length as 'counter' used later in makeDagSpecs
@@ -266,18 +275,17 @@ def validateUserLFNs(path, outputFiles):
     for origFile in outputFiles:
         info = origFile.rsplit(".", 1)
         if len(info) == 2:    # filename ends with .<something>, put jobId before the dot
-            fileName = "%s_%s.%s" % (info[0], jobId, info[1])
+            fileName = f"{info[0]}_{jobId}.{info[1]}"
         else:
-            fileName = "%s_%s" % (origFile, jobId)
+            fileName = f"{origFile}_{jobId}"
         testLfn = os.path.join(path, dirCounter, fileName)
         Lexicon.userLfn(testLfn)  # will raise if testLfn is not a valid lfn
         # since Lexicon does not have lenght check, do it manually here.
         if len(testLfn) > 500:
-            msg = "\nYour task specifies an output LFN %d-char long " % len(testLfn)
+            msg = f"\nYour task specifies an output LFN {len(testLfn)}-char long "
             msg += "\n which exceeds maximum length of 500"
             msg += "\n and therefore can not be handled in our DataBase"
             raise SubmissionRefusedException(msg)
-    return
 
 def transform_strings(data):
     """
@@ -293,7 +301,7 @@ def transform_strings(data):
                'required_arch', 'resthost', 'dbinstance', 'submitter_ip_addr', \
                'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
         val = data.get(var, None)
-        if val == None:
+        if val is None:
             info[var] = 'undefined'
         else:
             info[var] = json.dumps(val)
@@ -306,7 +314,7 @@ def transform_strings(data):
 
     for var in 'siteblacklist', 'sitewhitelist', 'addoutputfiles', 'tfileoutfiles', 'edmoutfiles':
         val = data[var]
-        if val == None:
+        if val is None:
             info[var] = "{}"
         else:
             info[var] = "{" + json.dumps(val)[1:-1] + "}"
@@ -332,15 +340,13 @@ def transform_strings(data):
     return info
 
 
-def getLocation(default_name, checkout_location):
+def getLocation(default_name):
     """ Get the location of the runtime code (job wrapper, postjob, anything executed on the schedd
         and on the worker node)
 
         First check if the files are present in the current working directory
         Then check if CRABTASKWORKER_ROOT is in the environment and use that location (that viariable is
             set by the taskworker init script. In the prod source script we use "export CRABTASKWORKER_ROOT")
-        Finally, check if the CRAB3_CHECKOUT variable is set. That option is interesting for developer who
-            can use this to point to their github repository. (Marco: we need to check this)
     """
     loc = default_name
     if not os.path.exists(loc):
@@ -349,9 +355,7 @@ def getLocation(default_name, checkout_location):
                 fname = os.path.join(os.environ['CRABTASKWORKER_ROOT'], path, loc)
                 if os.path.exists(fname):
                     return fname
-        if 'CRAB3_CHECKOUT' not in os.environ:
-            raise Exception("Unable to locate %s" % loc)
-        loc = os.path.join(os.environ['CRAB3_CHECKOUT'], checkout_location, loc)
+        raise Exception(f"Unable to locate {loc}")  # pylint: disable=broad-exception-raised
     loc = os.path.abspath(loc)
     return loc
 
@@ -363,17 +367,19 @@ class DagmanCreator(TaskAction):
     """
 
     def __init__(self, config, crabserver, procnum=-1, rucioClient=None):
+        """ need a comment line here """
         TaskAction.__init__(self, config, crabserver, procnum)
         self.rucioClient = rucioClient
 
     def populateGlideinMatching(self, info):
+        """ actually simply set the required arch """
         scram_arch = info['tm_job_arch']
         # Set defaults
         info['required_arch'] = "X86_64"
         # The following regex matches a scram arch into four groups
         # for example el9_amd64_gcc10 is matched as (el)(9)_(amd64)_(gcc10)
         # later, only the third group is returned, the one corresponding to the arch.
-        m = re.match("([a-z]+)(\d+)_(\w+)_(\w+)", scram_arch)
+        m = re.match(r"([a-z]+)(\d+)_(\w+)_(\w+)", scram_arch)
         if m:
             _, _, arch, _ = m.groups()
             if arch not in SCRAM_TO_ARCH:
@@ -392,12 +398,11 @@ class DagmanCreator(TaskAction):
         return task['tm_activity']
 
     def isHammerCloud(self, task):
-        if task['tm_activity'] and 'HC' in task['tm_activity'].upper():
-            return True
-        else:
-            return False
+        " name says it all "
+        return task['tm_activity'] and 'HC' in task['tm_activity'].upper()
 
     def setCMS_WMTool(self, task):
+        " for reporting to MONIT "
         if self.isHammerCloud(task):
             WMTool = 'HammerCloud'
         else:
@@ -405,6 +410,7 @@ class DagmanCreator(TaskAction):
         return WMTool
 
     def setCMS_TaskType(self, task):
+        " for reporting to MONIT "
         if self.isHammerCloud(task):
             taskType = task['tm_activity']
         else:
@@ -415,6 +421,7 @@ class DagmanCreator(TaskAction):
         return taskType
 
     def setCMS_Type(self, task):
+        " for reporting to MONIT "
         if self.isHammerCloud(task):
             cms_type = 'Test'
         else:
@@ -494,7 +501,6 @@ class DagmanCreator(TaskAction):
 
         self.populateGlideinMatching(info)
 
-        # TODO: pass through these correctly.
         info['runs'] = []
         info['lumis'] = []
         info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0 # Note: this must always be 0 for probe jobs, is taken care of in PostJob.py
@@ -539,13 +545,12 @@ class DagmanCreator(TaskAction):
             info['additional_environment_options'] += 'CRAB_RUNTIME_TARBALL=local'
             info['additional_input_file'] += ", CMSRunAnalysis.tar.gz"
         else:
-            raise TaskWorkerException("Cannot find CMSRunAnalysis.tar.gz inside the cwd: %s" % os.getcwd())
+            raise TaskWorkerException(f"Cannot find CMSRunAnalysis.tar.gz inside the cwd: {os.getcwd()}")
         if os.path.exists("TaskManagerRun.tar.gz"):
             info['additional_environment_options'] += ' CRAB_TASKMANAGER_TARBALL=local'
         else:
-            raise TaskWorkerException("Cannot find TaskManagerRun.tar.gz inside the cwd: %s" % os.getcwd())
-        if os.path.exists("sandbox.tar.gz"):
-            info['additional_input_file'] += ", sandbox.tar.gz"
+            raise TaskWorkerException(f"Cannot find TaskManagerRun.tar.gz inside the cwd: {os.getcwd()}")
+        info['additional_input_file'] += ", sandbox.tar.gz"  # it will be present on SPOOL_DIR after dab_bootstrap
         info['additional_input_file'] += ", run_and_lumis.tar.gz"
         info['additional_input_file'] += ", input_files.tar.gz"
         info['additional_input_file'] += ", submit_env.sh"
@@ -573,13 +578,14 @@ class DagmanCreator(TaskAction):
                 releaseTimeout = int(ej.split('=')[1])
 
         if slowJobRelease:
-            prescriptDeferString = 'DEFER 4 %s' % (jobid * releaseTimeout)
+            prescriptDeferString = f"DEFER 4 {jobid * releaseTimeout}"
         else:
             prescriptDeferString = ''
         return prescriptDeferString
 
 
     def makeDagSpecs(self, task, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, parent=None, stage='conventional'):
+        """ need a comment line here """
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
@@ -594,7 +600,7 @@ class DagmanCreator(TaskAction):
         except AssertionError as ex:
             msg = "\nYour task specifies an output LFN which fails validation in"
             msg += "\n WMCore/Lexicon and therefore can not be handled in our DataBase"
-            msg += "\nError detail: %s" % (str(ex))
+            msg += f"\nError detail: {ex}"
             raise SubmissionRefusedException(msg) from ex
         groupid = len(siteinfo['group_sites'])
         siteinfo['group_sites'][groupid] = list(availablesites)
@@ -621,23 +627,21 @@ class DagmanCreator(TaskAction):
             if parent is None or parent == "":
                 count = str(i)
             else:
-                count = '{parent}-{i}'.format(parent=parent, i=i)
+                count = f"{parent}-{i}"
             siteinfo[count] = groupid
             remoteOutputFiles = []
             localOutputFiles = []
             for origFile in outfiles:
                 info = origFile.rsplit(".", 1)
                 if len(info) == 2:
-                    fileName = "%s_%s.%s" % (info[0], count, info[1])
+                    fileName = f"{info[0]}_{count}.{info[1]}"
                 else:
-                    fileName = "%s_%s" % (origFile, count)
-                remoteOutputFiles.append("%s" % fileName)
-                localOutputFiles.append("%s=%s" % (origFile, fileName))
+                    fileName = f"{origFile}_{count}"
+                remoteOutputFiles.append(fileName)
+                localOutputFiles.append(f"{origFile}={fileName}")
             remoteOutputFilesStr = " ".join(remoteOutputFiles)
             localOutputFiles = ", ".join(localOutputFiles)
-            # no need to use // in the next line, thanks to integer formatting with `%d`
-            # see: https://docs.python.org/3/library/string.html#formatstrings
-            counter = "%04d" % (i / 1000)
+            counter = f"{(i // 1000):04d}"  # counter=0000 for i<999, 1 for 1000<i<1999 etc.
             tempDest = os.path.join(temp_dest, counter)
             directDest = os.path.join(dest, counter)
             if lastDirectDest != directDest:
@@ -648,8 +652,8 @@ class DagmanCreator(TaskAction):
                 lastDirectPfn = getWritePFN(self.rucioClient, siteName=task['tm_asyncdest'], lfn=directDest,
                                             operations=['write'], logger=self.logger)
                 lastDirectDest = directDest
-            pfns = ["log/cmsRun_{0}.log.tar.gz".format(count)] + remoteOutputFiles
-            pfns = ", ".join(["%s/%s" % (lastDirectPfn, pfn) for pfn in pfns])
+            pfns = [f"log/cmsRun_{count}.log.tar.gz"] + remoteOutputFiles
+            pfns = ", ".join([f"{lastDirectPfn}/{pfn}" for pfn in pfns])
             prescriptDeferString = self.getPreScriptDefer(task, i)
 
             nodeSpec = {'count': count,
@@ -696,8 +700,8 @@ class DagmanCreator(TaskAction):
         argdicts = []
         for dagspec in dagSpecs:
             argDict = {}
-            argDict['inputFiles'] = 'job_input_file_list_%s.txt' % dagspec['count'] #'job_input_file_list_1.txt'
-            argDict['runAndLumiMask'] = 'job_lumis_%s.json' % dagspec['count']
+            argDict['inputFiles'] = f"job_input_file_list_{dagspec['count']}.txt"  #'job_input_file_list_1.txt'
+            argDict['runAndLumiMask'] = f"job_lumis_{dagspec['count']}.json"
             argDict['CRAB_Id'] = dagspec['count'] #'1'
             argDict['lheInputFiles'] = dagspec['lheInputFiles'] #False
             argDict['firstEvent'] = dagspec['firstEvent'] #'None'
@@ -722,14 +726,12 @@ class DagmanCreator(TaskAction):
         with open('input_args.json', 'w', encoding='utf-8') as fd:
             json.dump(argdicts, fd)
 
-        tf = tarfile.open('InputFiles.tar.gz', mode='w:gz')
-        try:
+        with tarfile.open('InputFiles.tar.gz', mode='w:gz') as tf:
             for ifname in inputFiles + subdags + ['input_args.json']:
                 tf.add(ifname)
-        finally:
-            tf.close()
 
     def createSubdag(self, splitterResult, **kwargs):
+        """ beware the "Sub" in the name ! This is used also for Main DAG """
 
         startjobid = kwargs.get('startjobid', 0)
         parent = kwargs.get('parent', None)
@@ -819,13 +821,13 @@ class DagmanCreator(TaskAction):
         self.logger.debug("Site blacklist: %s", list(siteBlacklist))
 
         if siteWhitelist & global_blacklist:
-            msg = "The following sites from the user site whitelist are blacklisted by the CRAB server: %s." % (list(siteWhitelist & global_blacklist))
+            msg = f"The following sites from the user site whitelist are blacklisted by the CRAB server: {list(siteWhitelist & global_blacklist)}."
             msg += " Since the CRAB server blacklist has precedence, these sites are not considered in the user whitelist."
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
 
         if siteBlacklist & siteWhitelist:
-            msg = "The following sites appear in both the user site blacklist and whitelist: %s." % (list(siteBlacklist & siteWhitelist))
+            msg = f"The following sites appear in both the user site blacklist and whitelist: {list(siteBlacklist & siteWhitelist)}."
             msg += " Since the whitelist has precedence, these sites are not considered in the blacklist."
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
@@ -879,7 +881,7 @@ class DagmanCreator(TaskAction):
                         msg += " This could be a temporary Resource Catalog glitch."
                         msg += " Please try to submit a new task (resubmit will not work)"
                         msg += " and contact the experts if the error persists."
-                        msg += "\nError reason: %s" % (str(ex))
+                        msg += f"\nError reason: {ex}"
                         raise TaskWorkerException(msg) from ex
             else:
                 possiblesites = locations
@@ -940,7 +942,7 @@ class DagmanCreator(TaskAction):
 
             if siteWhitelist or siteBlacklist:
                 msg = "The site whitelist and blacklist will be applied by the pre-job."
-                msg += " This is expected to result in DESIRED_SITES = %s" % (list(available))
+                msg += f" This is expected to result in DESIRED_SITES = {list(available)}"
                 self.logger.debug(msg)
 
             jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], siteinfo,
@@ -956,44 +958,42 @@ class DagmanCreator(TaskAction):
                 tmp += f"\nGlobal blacklist contain these T1/T2: {t12} and {len(t3)} T3's\n"
                 tmp += f" Full list at {globalBlacklistUrl}\n"
             if len(siteBlacklist) != 0:
-                tmp += " User blacklist is %s.\n" % siteBlacklist
+                tmp += f" User blacklist is {siteBlacklist}.\n"
             if len(siteWhitelist) != 0:
-                tmp += " User whitelist is %s.\n" % siteWhitelist
+                tmp += f" User whitelist is {siteWhitelist}.\n"
             return tmp
 
         if not dagSpecs:
-            msg = "No jobs created for task %s." % (kwargs['task']['tm_taskname'])
+            msg = f"No jobs created for task {kwargs['task']['tm_taskname']}."
             if blocksWithNoLocations or blocksWithBannedLocations:
                 msg = "The CRAB server backend refuses to send jobs to the Grid scheduler. "
-                msg += "No locations found for dataset '%s'. " % (kwargs['task']['tm_input_dataset'])
+                msg += f"No locations found for dataset {kwargs['task']['tm_input_dataset']}. "
                 msg += "(or at least for what passed the lumi-mask and/or run-range selection).\n"
                 msg += "Use `crab checkdataset` command to find block locations\n"
                 msg += "and compare with your black/white list\n"
             if blocksWithBannedLocations:
-                msg += (" Found %s (out of %s) blocks present only at blacklisted\n" %\
-                       (len(blocksWithBannedLocations), len(allblocks)))
-                msg += "not-whitelisted, and/or non-accelerator sites."
+                msg += f" Found {len(blocksWithBannedLocations)} (out of {len(allblocks)}) blocks present\n"
+                msg += " only at blacklisted not-whitelisted, and/or non-accelerator sites."
                 msg += getBlacklistMsg()
             raise SubmissionRefusedException(msg)
-        msg = "Some blocks from dataset '%s' were skipped " % (kwargs['task']['tm_input_dataset'])
+        msg = f"Some blocks from dataset {kwargs['task']['tm_input_dataset']} were skipped"
         if blocksWithNoLocations:
             msgBlocklist = sorted(list(blocksWithNoLocations)[:5]) + ['...']
-            msg += " because they have no locations.\n List is (first 5 elements only): %s.\n" % msgBlocklist
+            msg += f" because they have no locations.\n List is (first 5 elements only): {msgBlocklist}\n"
         if blocksWithBannedLocations:
             msg += " because they are only present at blacklisted, not-whitelisted, and/or non-accelerator sites.\n"
             msgBlocklist = sorted(list(blocksWithBannedLocations)[:5]) + ['...']
-            msg += " List is (first 5 elements only): %s.\n" % (msgBlocklist)
+            msg += f" List is (first 5 elements only): {msgBlocklist}\n"
             msg += getBlacklistMsg()
         if blocksWithNoLocations or blocksWithBannedLocations:
-            msg += " Dataset processing will be incomplete because %s (out of %s) blocks" %\
-                   (len(blocksWithNoLocations) + len(blocksWithBannedLocations), len(allblocks))
+            msg += f" Dataset processing will be incomplete because {len(blocksWithNoLocations) + len(blocksWithBannedLocations)} (out of {len(allblocks)}) blocks"
             msg += " are only present at blacklisted and/or not whitelisted site(s)"
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
 
         ## Write down the DAG as needed by DAGMan.
         restHostForSchedd = kwargs['task']['resthost']
-        dag = DAG_HEADER.format(nodestate='.{0}'.format(parent) if parent else ('.0' if stage == 'processing' else ''),
+        dag = DAG_HEADER.format(nodestate=f".{parent}" if parent else ('.0' if stage == 'processing' else ''),
                                 resthost=restHostForSchedd)
         if stage == 'probe':
             dagSpecs = dagSpecs[:getattr(self.config.TaskWorker, 'numAutomaticProbes', 5)]
@@ -1014,12 +1014,14 @@ class DagmanCreator(TaskAction):
                     'completion': (len(dagSpecs) * percent) // 100
                 }
                 dag += SUBDAG_FRAGMENT.format(**subdagSpec)
-                subdag = "RunJobs{count}.subdag".format(**subdagSpec)
+                subdag = f"RunJobs{subdagSpec['count']}.subdag"
                 with open(subdag, "w", encoding='utf-8') as fd:
                     fd.write("")
                 subdags.append(subdag)
 
         ## Create a tarball with all the job lumi files.
+        # SB: I do not undderstand the "First iteration" comments here
+        #     but am wary of changing, keep it as is for now
         with getLock('splitting_data'):
             self.logger.debug("Acquired lock on run and lumi tarball")
 
@@ -1074,7 +1076,7 @@ class DagmanCreator(TaskAction):
         elif stage == 'processing':
             name = "RunJobs0.subdag"
         else:
-            name = "RunJobs{0}.subdag".format(parent)
+            name = f"RunJobs{parent}.subdag"
 
         ## Cache site information
         with open("site.ad.json", "w", encoding='utf-8') as fd:
@@ -1102,7 +1104,7 @@ class DagmanCreator(TaskAction):
             maxpost = int(max(MAX_POST_JOBS, info['jobcount']*.1))
         info['maxpost'] = maxpost
 
-        if info.get('faillimit') == None:
+        if info.get('faillimit') is None:
             info['faillimit'] = -1
             #if info['jobcount'] > 200
             #    info['faillimit'] = 100
@@ -1113,46 +1115,8 @@ class DagmanCreator(TaskAction):
 
         return info, splitterResult, subdags, dagSpecs
 
-
-    def extractMonitorFiles(self, inputFiles, **kw):
-        """
-        Ops mon needs access to some files from the debug_files.tar.gz or sandbox.tar.gz.
-        tarball.
-        If an older client is used, the files are in the sandbox, the newer client (3.3.1607)
-        separates them into a debug_file tarball to allow sandbox recycling and not break the ops mon.
-        The files are extracted here to the debug folder to be later sent to the schedd.
-
-        Modifies inputFiles list by appending the debug folder if the extraction succeeds.
-        """
-        tarFileName = 'sandbox.tar.gz' if not os.path.isfile('debug_files.tar.gz') else 'debug_files.tar.gz'
-        try:
-            debugTar = tarfile.open(tarFileName)
-            debugTar.extract('debug/crabConfig.py')
-            debugTar.extract('debug/originalPSet.py')
-            scriptExeName = kw['task'].get('tm_scriptexe')
-            if scriptExeName != None:
-                debugTar.extract(scriptExeName)
-                shutil.copy(scriptExeName, 'debug/' + scriptExeName)
-            debugTar.close()
-
-            inputFiles.append('debug')
-
-            # Change permissions of extracted files to allow Ops mon to read them.
-            for _, _, filenames in os.walk('debug'):
-                for f in filenames:
-                    os.chmod('debug/' + f, 0o644)
-        except Exception as ex:  # pylint: disable=broad-except
-            self.logger.exception(ex)
-            self.uploadWarning("Extracting files from %s failed, ops monitor will not work." % tarFileName, \
-                    kw['task']['user_proxy'], kw['task']['tm_taskname'])
-
-        return
-
-
     def getHighPrioUsers(self, userProxy, workflow, egroups):
-        # Import needed because the DagmanCreator module is also imported in the schedd,
-        # where there is no ldap available. This function however is only called
-        # in the TW (where ldap is installed) during submission.
+        """ get the list of high priority users """
 
         highPrioUsers = set()
         try:
@@ -1161,23 +1125,22 @@ class DagmanCreator(TaskAction):
         except Exception as ex:  # pylint: disable=broad-except
             msg = "Error when getting the high priority users list." \
                   " Will ignore the high priority list and continue normally." \
-                  " Error reason: %s" % str(ex)
+                  f" Error reason: {ex}"
             self.uploadWarning(msg, userProxy, workflow)
             return []
         return highPrioUsers
 
 
     def executeInternal(self, *args, **kw):
-        # So, the filename becomes http:// -- and doesn't really work.  Hardcoding the analysis wrapper.
-        #transform_location = getLocation(kw['task']['tm_transformation'], 'CAFUtilities/src/python/transformation/CMSRunAnalysis/')
-        transform_location = getLocation('CMSRunAnalysis.sh', 'CRABServer/scripts/')
-        cmscp_location = getLocation('cmscp.py', 'CRABServer/scripts/')
-        cmscpsh_location = getLocation('cmscp.sh', 'CRABServer/scripts/')
-        gwms_location = getLocation('gWMS-CMSRunAnalysis.sh', 'CRABServer/scripts/')
-        env_location = getLocation('submit_env.sh', 'CRABServer/scripts/')
-        dag_bootstrap_location = getLocation('dag_bootstrap_startup.sh', 'CRABServer/scripts/')
-        bootstrap_location = getLocation("dag_bootstrap.sh", "CRABServer/scripts/")
-        adjust_location = getLocation("AdjustSites.py", "CRABServer/scripts/")
+        """ all real work is done here """
+        transform_location = getLocation('CMSRunAnalysis.sh')
+        cmscp_location = getLocation('cmscp.py')
+        cmscpsh_location = getLocation('cmscp.sh')
+        gwms_location = getLocation('gWMS-CMSRunAnalysis.sh')
+        env_location = getLocation('submit_env.sh')
+        dag_bootstrap_location = getLocation('dag_bootstrap_startup.sh')
+        bootstrap_location = getLocation("dag_bootstrap.sh")
+        adjust_location = getLocation("AdjustSites.py")
 
         shutil.copy(transform_location, '.')
         shutil.copy(cmscp_location, '.')
@@ -1188,33 +1151,29 @@ class DagmanCreator(TaskAction):
         shutil.copy(bootstrap_location, '.')
         shutil.copy(adjust_location, '.')
 
-        # amke sure we have InputSandBox and debug files
+        # make sure we have InputSandBox
         sandboxTarBall = 'sandbox.tar.gz'
-        debugTarBall = 'debug_files.tar.gz'
 
         # Bootstrap the ISB if we are running in the TW
         if self.crabserver:
             username = kw['task']['tm_username']
+            taskname = kw['task']['tm_taskname']
             sandboxName = kw['task']['tm_user_sandbox']
-            dbgFilesName = kw['task']['tm_debug_files']
+            self.logger.debug(f"Checking if sandbox file is available: {sandboxName}")
             try:
-                downloadFromS3(crabserver=self.crabserver, objecttype='sandbox', username=username,
-                               tarballname=sandboxName, filepath=sandboxTarBall, logger=self.logger)
+                checkS3Object(crabserver=self.crabserver, objecttype='sandbox', taskname=taskname,
+                              username=username, tarballname=sandboxName, logger=self.logger)
                 kw['task']['tm_user_sandbox'] = sandboxTarBall
             except Exception as ex:
-                raise TaskWorkerException("The CRAB server backend could not download the input sandbox with your code " + \
+                raise TaskWorkerException("The CRAB server backend could not find the input sandbox with your code " + \
                                   "from S3.\nThis could be a temporary glitch; please try to submit a new task later " + \
-                                  "(resubmit will not work) and contact the experts if the error persists.\nError reason: %s" % str(ex)) from ex
-            try:
-                downloadFromS3(crabserver=self.crabserver, objecttype='sandbox', username=username,
-                               tarballname=dbgFilesName, filepath=debugTarBall, logger=self.logger)
-            except Exception as ex:   # pylint: disable=broad-except
-                self.logger.exception(ex)
+                                  "(resubmit will not work) and contact the experts if the error persists." + \
+                                  f"\nError reason: {ex}") from ex
 
         # Bootstrap the runtime if it is available.
-        job_runtime = getLocation('CMSRunAnalysis.tar.gz', 'CRABServer/')
+        job_runtime = getLocation('CMSRunAnalysis.tar.gz',)
         shutil.copy(job_runtime, '.')
-        task_runtime = getLocation('TaskManagerRun.tar.gz', 'CRABServer/')
+        task_runtime = getLocation('TaskManagerRun.tar.gz')
         shutil.copy(task_runtime, '.')
 
         kw['task']['resthost'] = self.crabserver.server['host']
@@ -1225,10 +1184,6 @@ class DagmanCreator(TaskAction):
                       'AdjustSites.py', 'site.ad.json', 'datadiscovery.pkl', 'taskinformation.pkl', 'taskworkerconfig.pkl',
                       'run_and_lumis.tar.gz', 'input_files.tar.gz']
 
-        self.extractMonitorFiles(inputFiles, **kw)
-
-        if kw['task'].get('tm_user_sandbox') == 'sandbox.tar.gz':
-            inputFiles.append('sandbox.tar.gz')
         if os.path.exists("CMSRunAnalysis.tar.gz"):
             inputFiles.append("CMSRunAnalysis.tar.gz")
         if os.path.exists("TaskManagerRun.tar.gz"):
@@ -1236,10 +1191,17 @@ class DagmanCreator(TaskAction):
         if kw['task']['tm_input_dataset']:
             inputFiles.append("input_dataset_lumis.json")
             inputFiles.append("input_dataset_duplicate_lumis.json")
-        if kw['task']['tm_debug_files']:
-            inputFiles.append("debug_files.tar.gz")
 
         info, splitterResult, subdags, dagSpecs = self.createSubdag(*args, **kw)
+
+        # as splitter summary is useful for dryrun, let's add it to the InputFiles tarball
+        jobGroups = splitterResult[0]  # the first returned value of Splitter action is the splitterFactory output
+        splittingSummary = SplittingSummary(kw['task']['tm_split_algo'])
+        for jobgroup in jobGroups:
+            jobs = jobgroup.getJobs()
+            splittingSummary.addJobs(jobs)
+        splittingSummary.dump('splitting-summary.json')
+        inputFiles.append('splitting-summary.json')
 
         self.prepareLocal(dagSpecs, info, kw, inputFiles, subdags)
 
@@ -1247,6 +1209,7 @@ class DagmanCreator(TaskAction):
 
 
     def execute(self, *args, **kw):
+        """ entry point called by Hanlder """
         cwd = os.getcwd()
         try:
             os.chdir(kw['tempDir'])

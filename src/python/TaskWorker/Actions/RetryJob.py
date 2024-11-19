@@ -456,15 +456,15 @@ class RetryJob():
         if corruptedFile or suspiciousFile:
             # add pointers to logs
             schedHostname = socket.gethostname().split('.')[0]
-            schedId = schedHostname.split('0')[1]  # vomcs059 --> 59, vocms0144 --> 144 etc,
+            schedId = schedHostname.removeprefix('vocms')  # vomcs059 -> 059, vocms0106 -> 0106 etc,
             username = self.reqname.split(':')[1].split('_')[0]
-            webDirUrl = f"https://cmsweb.cern.ch:8443/scheddmon/0{schedId}/{username}/{self.reqname}"
+            webDirUrl = f"https://cmsweb.cern.ch:8443/scheddmon/{schedId}/{username}/{self.reqname}"
             stdoutUrl = f"{webDirUrl}/job_out.{self.job_id}.{self.crab_retry}.txt"
             postJobUrl = f"{webDirUrl}/postjob.{self.job_id}.{self.crab_retry}.txt"
             errorLines.append(f"stdout: {stdoutUrl}")
             errorLines.append(f"postjob: {postJobUrl}")
             # note things  down
-            reportFileName = f'{self.reqname}.job.{self.job_id}.{self.crab_retry}.json'
+            reportFileName = f'Badfile.job.{self.job_id}.{self.crab_retry}.json'
             corruptionMessage = {'DID': f'cms:{inputFileName}', 'RSE': RSE,
                                  'exitCode': exitCode, 'message': errorLines}
             with open(reportFileName, 'w', encoding='utf-8') as fp:
@@ -472,10 +472,12 @@ class RetryJob():
             self.logger.info('corruption message prepared, gfal-copy to EOS')
             proxy = os.getenv('X509_USER_PROXY')
             self.logger.info(f"X509_USER_PROXY = {proxy}")
+            reportLocation = 'davs://eoscms.cern.ch:443/eos/cms/store/temp/user/BadInputFiles/'
+            # there can be so many that we better split by task
             if corruptedFile:
-                reportLocation = 'davs://eoscms.cern.ch:443/eos/cms/store/temp/user/BadInputFiles/corrupted/new/'
+                reportLocation += f'corrupted/new/{self.reqname}/'
             if suspiciousFile:
-                reportLocation = 'davs://eoscms.cern.ch:443/eos/cms/store/temp/user/BadInputFiles/suspicious/new/'
+                reportLocation += f'suspicious/new/{self.reqname}/'
 
             destination = reportLocation + reportFileName
             cmd = f'gfal-copy -vp -t 60 {reportFileName} {destination}'

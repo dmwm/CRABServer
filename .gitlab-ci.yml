@@ -13,6 +13,13 @@ variables:
   # https://docs.docker.com/build/cache/backends/
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
+  CHECK_TEST_RESULT: "false"
+  SUBMIT_STATUS_TRACKING: "true"
+  CLIENT_CONFIGURATION_VALIDATION: "true"
+  CLIENT_VALIDATION_SUITE: "true"
+  SKIP_BUILD: "false"
+  SKIP_DEPLOY: "false"
+  SKIP_SUBMIT: "false" 
 
 # This key define variables which are later used in `!reference` tag in `rules`.
 # Ref https://docs.gitlab.com/ee/ci/jobs/index.html#hide-jobs
@@ -22,16 +29,24 @@ variables:
     - if: $CI_COMMIT_TAG =~ /pypi-.*/         # match tag: pypi-(prod|preprod|test*)-1714418922
   release:
     - if: $CI_COMMIT_TAG =~ /v3\.[0-9]{6}.*/  # match tag: v3.240101
-  skip_all_base:
-    - if: $BUILD || $BUILD_DEPLOY || $ONLY_BUILD_RELEASE || $SUBMIT_STATUS_TRACKING || $MANUAL_CI_PIPELINE_ID
+  skip_build:
+    - if: '$SKIP_BUILD == "true"'
       when: never                             # helper var
+  skip_deploy:
+    - if: '$SKIP_DEPLOY == "true"'
+      when: never 
+  skip_submit:
+    - if: '$SKIP_SUBMIT == "true"'
+      when: never 
 
 stages:
   - prepare_env
   - prepare_release
   - build_docker
   - deploy
-  - run_testsuite
+  - submit_testsuite
+  - run_testsuite_CV
+  - run_testsuite_CCV
   - check_testsuite
   - tagging_release
 
@@ -76,7 +91,7 @@ set_version_name:
 build_rest_image:
   rules:
     - if: $BUILD || $BUILD_DEPLOY || $ONLY_BUILD_RELEASE
-    - !reference [.default_rules, skip_all_base]
+    - !reference [.default_rules, skip_build]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: build_docker
@@ -101,7 +116,7 @@ build_rest_image:
 build_tw_image:
   rules:
     - if: $BUILD || $BUILD_DEPLOY || $ONLY_BUILD_RELEASE
-    - !reference [.default_rules, skip_all_base]
+    - !reference [.default_rules, skip_build]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: build_docker
@@ -124,6 +139,7 @@ build_tw_image:
 build_monit_image:
   rules:
     - if: $BUILD
+    - !reference [.default_rules, skip_build]
     - !reference [.default_rules, release]
   stage: build_docker
   needs: ["build_tw_image", "get_env"]
@@ -146,6 +162,7 @@ build_monit_image:
 build_crabtwfilebeat_image:
   rules:
     - if: $BUILD
+    - !reference [.default_rules, skip_build]
     - !reference [.default_rules, release]
   stage: build_docker
   image:
@@ -167,6 +184,7 @@ build_crabtwfilebeat_image:
 build_spark_image:
   rules:
     - if: $BUILD
+    - !reference [.default_rules, skip_build]
     - !reference [.default_rules, release]
   stage: build_docker
   image:
@@ -184,7 +202,7 @@ build_spark_image:
 deploy_server:
   rules:
     - if: $BUILD_DEPLOY
-    - !reference [.default_rules, skip_all_base]
+    - !reference [.default_rules, skip_deploy]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: deploy
@@ -203,7 +221,7 @@ deploy_server:
 .deploy_tw_template:
   rules:
     - if: $BUILD_DEPLOY
-    - !reference [.default_rules, skip_all_base]
+    - !reference [.default_rules, skip_deploy]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: deploy
@@ -233,13 +251,13 @@ deploy_publisher_rucio:
   variables:
     SERVICE: Publisher_rucio
 
-task_submission_status_tracking:
+task_submission:
   rules:
-    - if: $SUBMIT_STATUS_TRACKING
-    - !reference [.default_rules, skip_all_base]
+    - if: '$SUBMIT_STATUS_TRACKING == "true" || $CLIENT_VALIDATION_SUITE == "true" || $CLIENT_CONFIGURATION_VALIDATION == "true"'
+    - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
-  stage: run_testsuite
+  stage: submit_testsuite
   tags:
     - crab3-shell
   script:
@@ -247,23 +265,98 @@ task_submission_status_tracking:
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
     - export CRABClient_version  # from .env
     - export REST_Instance  # from .env
+    - export ROOT_DIR
     - export CMSSW_release=CMSSW_13_0_2
-    - export Task_Submission_Status_Tracking=true
+    - export Task_Submission_Status_Tracking=$SUBMIT_STATUS_TRACKING
+    - export Client_Configuration_Validation=$CLIENT_CONFIGURATION_VALIDATION
+    - export Client_Validation_Suite=$CLIENT_VALIDATION_SUITE
     - bash -x cicd/gitlab/executeTests.sh
   cache:
     - key: $CI_PIPELINE_ID
       paths:
+        - workdir/submitted_tasks_CV
+        - workdir/submitted_tasks_CCV
         - workdir/submitted_tasks_TS
       policy: push
     - key: submitted_tasks_TS_latest
       paths:
         - workdir/submitted_tasks_TS
       policy: push
+    - key: submitted_tasks_CV_latest
+      paths:
+        - workdir/submitted_tasks_CV
+      policy: push
+    - key: submitted_tasks_CCV_latest
+      paths:
+        - workdir/submitted_tasks_CCV
+      policy: push
+
+client_validation_suite:
+  rules:
+    - if: '$CLIENT_VALIDATION_SUITE == "false"'
+      when: never
+    - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
+  stage: run_testsuite_CV
+  tags:
+    - crab3-shell
+  script:
+    - echo "Waiting for 20 minutes after task submission..."
+    - sleep 1200 
+    - source .env
+    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
+    - export CRABClient_version  # from .env
+    - export REST_Instance  # from .env
+    - export ROOT_DIR
+    - export CMSSW_release=CMSSW_13_0_2
+    - export Client_Validation_Suite=true
+    - ls workdir/submitted_tasks_CV
+    - bash -x cicd/gitlab/CV_config.sh
+  cache:
+    - key: $CI_PIPELINE_ID
+      paths:
+        - workdir/submitted_tasks_CV
+      policy: pull
+    - key: submitted_tasks_CV_latest
+      paths:
+        - workdir/submitted_tasks_CV
+      policy: pull
+
+client_configuration_validation:
+  rules:
+    - if: '$CLIENT_CONFIGURATION_VALIDATION == "false"'
+      when: never
+    - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
+  stage: run_testsuite_CCV
+  tags:
+    - crab3-shell
+  script:
+    # - echo "Waiting for 20 minutes after task submission..."
+    # - sleep 1200 
+    - source .env
+    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
+    - export CRABClient_version  # from .env
+    - export REST_Instance  # from .env
+    - export ROOT_DIR
+    - export CMSSW_release=CMSSW_13_0_2
+    - export Client_Configuration_Validation=true
+    - ls workdir/submitted_tasks_CCV
+    - cicd/gitlab/retry.sh bash -x cicd/gitlab/CCV_config.sh
+  cache:
+    - key: $CI_PIPELINE_ID
+      paths:
+        - workdir/submitted_tasks_CCV
+      policy: pull
+    - key: submitted_tasks_CCV_latest
+      paths:
+        - workdir/submitted_tasks_CCV
+      policy: pull
 
 check_test_result:
   rules:
-    - if: $MANUAL_CI_PIPELINE_ID || $SUBMIT_STATUS_TRACKING
-    - !reference [.default_rules, skip_all_base]
+    - if: '$CHECK_TEST_RESULT == "false"'
+      when: never
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: check_testsuite
@@ -274,6 +367,7 @@ check_test_result:
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
     - export REST_Instance  # from .env
     - export CRABClient_version  # from .env
+    - export ROOT_DIR
     - export CMSSW_release=CMSSW_13_0_2
     - export SCRAM_ARCH=el8_amd64_gcc11
     - export Check_Publication_Status=Yes
@@ -282,6 +376,8 @@ check_test_result:
     - |
         if [[ -n "${MANUAL_TASKNAME:-}" ]]; then
             echo "${MANUAL_TASKNAME}" > workdir/submitted_tasks_TS
+            echo "${MANUAL_TASKNAME}" > workdir/submitted_tasks_CV
+            echo "${MANUAL_TASKNAME}" > workdir/submitted_tasks_CCV
         fi
     - cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
   cache:
@@ -289,8 +385,10 @@ check_test_result:
       fallback_keys:
         - $CI_PIPELINE_ID
         - submitted_tasks_TS_latest
+        - submitted_tasks_CCV_latest
+        - submitted_tasks_CV_latest
       paths:
-        - workdir/submitted_tasks_TS
+        - workdir
       policy: pull
 
 # if test is pass, retag with `*-stable`

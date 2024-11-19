@@ -2,8 +2,12 @@
 Split a task request into a set of jobs
 """
 # pylint: disable=too-many-branches
+
+import json
+
 from WMCore.DataStructs.Workflow import Workflow
 from WMCore.DataStructs.Subscription import Subscription
+from WMCore.DataStructs.LumiList import LumiList
 from WMCore.JobSplitting.SplitterFactory import SplitterFactory
 
 from TaskWorker.DataObjects.Result import Result
@@ -127,6 +131,65 @@ def diagnoseRunMatch(runs=None, data=None):
     msg += f"\nRun list from input dataset is inside the range: {dataRange}"
     msg += f"\nThe intersection of the two lists is: {intersection}"
     return msg
+
+
+class SplittingSummary():
+    """
+    Class which calculates some summary data about the splitting results.
+    """
+
+    def __init__(self, algo):
+        self.algo = algo
+        self.lumisPerJob = []
+        self.eventsPerJob = []
+        self.filesPerJob = []
+
+    def addJobs(self, jobs):
+        """
+        populate the summary, argument is a list of jobs in a jobgroup created by the splitter factory
+        i.e. it is meant to be used like this:
+        for jobgroup in factory:
+            jobs = jobgroup.getJobs()
+            splittingSummary.addJobs(jobs)
+        where factory is the first return argument of the execute method in the above Splitter class
+        """
+        if self.algo in ['FileBased', 'Automatic']:  # Automatic splitting uses FileBased inside TW
+            self.lumisPerJob += [sum([x.get('lumiCount', 0) for x in job['input_files']]) for job in jobs]
+            self.eventsPerJob += [sum([x['events'] for x in job['input_files']]) for job in jobs]
+            self.filesPerJob += [len(job['input_files']) for job in jobs]
+        elif self.algo == 'EventBased':
+            self.lumisPerJob += [job['mask']['LastLumi'] - job['mask']['FirstLumi'] for job in jobs]
+            self.eventsPerJob += [job['mask']['LastEvent'] - job['mask']['FirstEvent'] for job in jobs]
+        else:
+            for job in jobs:
+                avgEventsPerLumi = sum([f['avgEvtsPerLumi'] for f in job['input_files']])/float(len(job['input_files']))
+                lumis = LumiList(compactList=job['mask']['runAndLumis'])
+                self.lumisPerJob.append(len(lumis.getLumis()))
+                self.eventsPerJob.append(avgEventsPerLumi * self.lumisPerJob[-1])
+
+    def dump(self, outname):
+        """
+        Save splitting summary to a json file.
+        """
+
+        summary = {'algo': self.algo,
+                   'total_jobs': len(self.lumisPerJob),
+                   'total_lumis': sum(self.lumisPerJob),
+                   'total_events': sum(self.eventsPerJob),
+                   'max_lumis': max(self.lumisPerJob),
+                   'max_events': max(self.eventsPerJob),
+                   'avg_lumis': sum(self.lumisPerJob)/float(len(self.lumisPerJob)),
+                   'avg_events': sum(self.eventsPerJob)/float(len(self.eventsPerJob)),
+                   'min_lumis': min(self.lumisPerJob),
+                   'min_events': min(self.eventsPerJob)}
+        if len(self.filesPerJob) > 0:
+            summary.update({'total_files': sum(self.filesPerJob),
+                            'max_files': max(self.filesPerJob),
+                            'avg_files': sum(self.filesPerJob)/float(len(self.filesPerJob)),
+                            'min_files': min(self.filesPerJob)})
+
+        with open(outname, 'w', encoding='utf-8') as f:
+            json.dump(summary, f)
 
 
 if __name__ == '__main__':

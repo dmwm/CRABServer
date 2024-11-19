@@ -36,7 +36,7 @@ if [ "X${singularity}" == X6 ] || [ "X${singularity}" == X7 ] || [ "X${singulari
     if [ "X${singularity}" == X6 ]; then scramprefix=cc${singularity}; fi
     if [ "X${singularity}" == X7 ]; then scramprefix=el${singularity}; fi
     if [ "X${singularity}" == X8 ]; then scramprefix=el${singularity}; fi
-    ERR=false
+    ERR=false;
     /cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- "${ROOT_DIR}"/cicd/gitlab/taskSubmission.sh || ERR=true
 else
     echo "!!! I am not prepared to run for slc${singularity}."

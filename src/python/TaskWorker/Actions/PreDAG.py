@@ -198,7 +198,7 @@ class PreDAG():
         estimates = copy.copy(unprocessed)
         self.logger.info("jobs remaining to process: %s", ", ".join(sorted(unprocessed)))
         if self.stage == 'tail' and len(estimates-set(self.failedJobs)) == 0:
-            estimates = set(self.completedJobs(stage='processing', processFailed=False))
+            estimates = set(self.completedJobs(stage='processing', processFailed=True))
         self.logger.info("jobs remaining to process: %s", ", ".join(sorted(unprocessed)))
 
         # The TaskWorker saves some files that now we are gonna read

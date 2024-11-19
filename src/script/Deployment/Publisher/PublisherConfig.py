@@ -1,3 +1,5 @@
+# Publisher_schedd example configuration file
+# original file from https://gitlab.cern.ch/ai/it-puppet-hostgroup-vocmsglidein/-/blob/bc61a79da85d72e4db90b3fbca07a369f456e9ee/code/templates/crabtaskworker/publisher/Publisher_scheddConfig.py.erb
 """
 Configuration file for CRAB standalone Publisher
 """
@@ -16,9 +18,10 @@ config.General.asoworker = 'schedd'
 #   - prod      : uses cmsweb,cern.ch production REST with production DB
 #   - other     : allows to use any restHost with andy dbInstance, those needs to be
 #                  specified in the two following parameters
-config.General.instance = 'preprod'
-#config.General.restHost = 'stefanovm.cern.ch'
-#config.General.dbInstance = 'dev'
+config.General.instance = 'test2'
+
+#config.General.restHost = ''
+#config.General.dbInstance = ''
 
 config.General.pollInterval = 1800
 config.General.block_closure_timeout = 9400
@@ -32,7 +35,17 @@ config.General.logMsgFormat = '%(asctime)s:%(levelname)s:%(module)s:%(name)s: %(
 config.General.logLevel = 'INFO'
 config.General.skipUsers = ['mickeymouse', 'donaldduck']
 
+config.section_('REST')
+config.REST.instance = 'test2'
+
+#config.REST.restHost = ''
+#config.REST.dbInstance = ''
+config.REST.cert = '/data/certs/servicecert.pem'
+config.REST.key = '/data/certs/servicekey.pem'
+
 config.section_('TaskPublisher')
 config.TaskPublisher.DBShost = 'cmsweb-prod.cern.ch'
 config.TaskPublisher.logMsgFormat = '%(asctime)s:%(levelname)s: %(message)s'
 config.TaskPublisher.dryRun = False
+config.TaskPublisher.cert = '/data/certs/servicecert.pem'
+config.TaskPublisher.key = '/data/certs/servicekey.pem'

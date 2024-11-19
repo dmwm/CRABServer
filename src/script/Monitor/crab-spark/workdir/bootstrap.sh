@@ -8,3 +8,5 @@ export PYSPARK_PYTHON=$LCG_VER/bin/python3
 
 # finish the environment
 export CRAB_KRB5_USERNAME=$(klist | grep -i Default | cut -d":" -f2 | cut -d"@" -f"1" | awk '{$1=$1};1')
+
+export PYTHONUNBUFFERED=1
