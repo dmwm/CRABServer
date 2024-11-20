@@ -10,7 +10,7 @@ from socket import gethostname
 import requests
 
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
-from RucioUtils import getNativeRucioClient, getTapeRecallUsage
+from RucioUtils import getNativeRucioClient, getRucioUsage
 
 
 class ReportRecallQuota(BaseRecurringAction):
@@ -31,7 +31,7 @@ class ReportRecallQuota(BaseRecurringAction):
         myconfig = copy.deepcopy(config)
         myconfig.Services.Rucio_account = account
         rucioClient = getNativeRucioClient(config=myconfig, logger=self.logger)
-        totalBytes = getTapeRecallUsage(rucioClient=rucioClient,account=account,activity=activity)
+        totalBytes = getRucioUsage(rucioClient=rucioClient,account=account,activity=activity)
         report = {}
         totalTB = totalBytes // 1e12
         report['totalTB'] = totalTB

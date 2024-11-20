@@ -114,8 +114,8 @@ def getRuleQuota(rucioClient=None, ruleId=None):
     size = sum(file['bytes'] for file in files)
     return size
 
-def getTapeRecallUsage(rucioClient=None, account=None, activity =None):
-    """ size of ongoing tape recalls for this account (if provided) or by activity """
+def getRucioUsage(rucioClient=None, account=None, activity =None):
+    """ size of Rucio usage for this account (if provided) or by activity """
     filters = {'activity': activity}
     
     if account is not None and account != 'crab_tape_recall':

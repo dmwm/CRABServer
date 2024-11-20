@@ -10,7 +10,7 @@ import datetime
 
 import requests
 from requests.auth import HTTPBasicAuth
-from RucioUtils import getTapeRecallUsage
+from RucioUtils import getRucioUsage
 
 FMT = "%Y-%m-%dT%H:%M:%S%z"
 WORKDIR = '/data/srv/monit/'
@@ -32,7 +32,7 @@ def createQuotaReport(rucioClient=None, account=None, activity=None):
     create a dictionary with the quota report to be sent to MONIT
     returns {'totalTB':TBypte}
     """
-    totalBytes = getTapeRecallUsage(rucioClient=rucioClient,account=account,activity=activity)
+    totalBytes = getRucioUsage(rucioClient=rucioClient,account=account,activity=activity)
     report = {}
     totalTB = totalBytes // 1e12
     report['totalTB'] = totalTB
