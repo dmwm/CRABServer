@@ -536,7 +536,7 @@ class DBSDataDiscovery(DataDiscovery):
 
         # how much this user is recalling already
         self.logger.debug("Find how much user %s is recalling already", self.username)
-        usage = getTapeRecallUsage(self.rucioClient, self.username)  # in Bytes
+        usage = getTapeRecallUsage(self.rucioClient, self.username, activity = 'Analysis TapeRecall')  # in Bytes
         usageTB = int(usage / 1e12)
         self.logger.debug("User is using %sTB.", usageTB)
         # is there room  for adding this recall ?

@@ -114,7 +114,7 @@ def getRuleQuota(rucioClient=None, ruleId=None):
     size = sum(file['bytes'] for file in files)
     return size
 
-def getTapeRecallUsage(rucioClient=None, account=None, activity = 'Analysis TapeRecall'):
+def getTapeRecallUsage(rucioClient=None, account=None, activity =None):
     """ size of ongoing tape recalls for this account (if provided) or by activity """
     filters = {'activity': activity}
     
@@ -134,5 +134,7 @@ def getTapeRecallUsage(rucioClient=None, account=None, activity = 'Analysis Tape
     # Calculate usage only if valid_states is set
     if valid_states:
         usage = sum(getRuleQuota(rucioClient, rule['id']) for rule in rules if rule['state'] in valid_states)
+    else:
+        usage = 0
 
     return usage
