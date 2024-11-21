@@ -12,7 +12,7 @@ from WMCore.Services.DBS.DBSErrors import DBSReaderError
 from WMCore.Configuration import ConfigurationEx
 from WMCore import Lexicon
 
-from RucioUtils import getNativeRucioClient, getTapeRecallUsage
+from RucioUtils import getNativeRucioClient, getRucioUsage
 
 from ServerUtilities import MAX_LUMIS_IN_BLOCK, parseDBSInstance, isDatasetUserDataset
 from TaskWorker.WorkerExceptions import TaskWorkerException, TapeDatasetException, SubmissionRefusedException
@@ -536,7 +536,7 @@ class DBSDataDiscovery(DataDiscovery):
 
         # how much this user is recalling already
         self.logger.debug("Find how much user %s is recalling already", self.username)
-        usage = getTapeRecallUsage(self.rucioClient, self.username)  # in Bytes
+        usage = getRucioUsage(self.rucioClient, self.username, activity = 'Analysis TapeRecall')  # in Bytes
         usageTB = int(usage / 1e12)
         self.logger.debug("User is using %sTB.", usageTB)
         # is there room  for adding this recall ?
