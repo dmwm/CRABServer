@@ -377,7 +377,30 @@ class MasterWorker(object):
             * the server could not find anything to update or
             * the server has an internal error"""
 
-        configreq = {'subresource': 'process', 'workername': self.config.TaskWorker.name, 'getstatus': getstatus, 'limit': limit, 'status': setstatus}
+        # Assuming the variables and methods mentioned are available:
+        if (
+            isinstance(self.config.TaskWorker.canary_name, str) and 
+            self.config.TaskWorker.canary_name.startswith('crab')
+        ):
+            # Decide whether to use canary_name based on a 5% probability.
+            use_canary = random.random() < 0.05  # Random number less than 0.05 represents 5%.
+            workername = (
+                self.config.TaskWorker.canary_name 
+                if use_canary 
+                else self.config.TaskWorker.name
+            )
+        else:
+            # Default to the standard name if conditions aren't met.
+            workername = self.config.TaskWorker.name
+
+        # Build the configreq dictionary
+        configreq = {
+            'subresource': 'process',
+            'workername': workername,
+            'getstatus': getstatus,
+            'limit': limit,
+            'status': setstatus
+        }
         try:
             #self.server.post(self.restURInoAPI + '/workflowdb', data=urlencode(configreq))
             self.crabserver.post(api='workflowdb', data=urlencode(configreq))
