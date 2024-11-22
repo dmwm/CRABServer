@@ -10,7 +10,7 @@ import datetime
 
 import requests
 from requests.auth import HTTPBasicAuth
-from RucioUtils import getTapeRecallUsage
+from RucioUtils import getRucioUsage
 
 FMT = "%Y-%m-%dT%H:%M:%S%z"
 WORKDIR = '/data/srv/monit/'
@@ -27,12 +27,12 @@ def readpwd():
     return credentials["url"], credentials["username"], credentials["password"]
 MONITURL, MONITUSER, MONITPWD = readpwd()
 
-def createQuotaReport(rucioClient=None, account=None):
+def createQuotaReport(rucioClient=None, account=None, activity=None):
     """
     create a dictionary with the quota report to be sent to MONIT
     returns {'totalTB':TBypte}
     """
-    totalBytes = getTapeRecallUsage(rucioClient=rucioClient,account=None)
+    totalBytes = getRucioUsage(rucioClient=rucioClient,account=account,activity=activity)
     report = {}
     totalTB = totalBytes // 1e12
     report['totalTB'] = totalTB
@@ -81,7 +81,11 @@ def main(log):
     accounts = [{'name': 'crab_tape_recall', 'tag': 'tape_recall_total_TB'},
                 {'name': 'crab_input',       'tag': 'crab_input_total_TB'}]
     for account in accounts:
-        report = createQuotaReport(rucioClient=rucioClient, account=account['name'])
+        if account['name']=='crab_tape_recall':
+            activity='Analysis TapeRecall'
+        elif account['name']=='crab_input':
+            activity='Analysis Input'
+        report = createQuotaReport(rucioClient=rucioClient, account=account['name'], activity=activity)
         jsonDoc[account['tag']] = report['totalTB']
     send_and_check(jsonDoc)
 

@@ -10,7 +10,7 @@ from socket import gethostname
 import requests
 
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
-from RucioUtils import getNativeRucioClient
+from RucioUtils import getNativeRucioClient, getRucioUsage
 
 
 class ReportRecallQuota(BaseRecurringAction):
@@ -21,25 +21,18 @@ class ReportRecallQuota(BaseRecurringAction):
     """
     pollingTime = 60  # minutes
 
-    def createQuotaReport(self, config=None, account=None):
+    def createQuotaReport(self, config=None, account=None, activity=None):
         """
         create a dictionary with the quota report to be sent to MONIT
-        even if we do not report usage at single RSE's now, let's collect that info as well
-        returns {'rse1':bytes, 'rse':bytes,..., 'totalTB':TBypte}
+        returns {'totalTB':TBypte}
         """
         msg = f"Looking up used quota for Rucio account: {account}"
         self.logger.info(msg)
         myconfig = copy.deepcopy(config)
         myconfig.Services.Rucio_account = account
         rucioClient = getNativeRucioClient(config=myconfig, logger=self.logger)
-        usageGenerator = rucioClient.get_local_account_usage(account=account)
-        totalBytes = 0
+        totalBytes = getRucioUsage(rucioClient=rucioClient,account=account,activity=activity)
         report = {}
-        for usage in usageGenerator:
-            rse = usage['rse']
-            used = usage['bytes']
-            report[rse] = used // 1e12
-            totalBytes += used
         totalTB = totalBytes // 1e12
         report['totalTB'] = totalTB
         return report
@@ -56,7 +49,11 @@ class ReportRecallQuota(BaseRecurringAction):
         accounts = [{'name': 'crab_tape_recall', 'tag': 'tape_recall_total_TB'},
                     {'name': 'crab_input', 'tag': 'crab_input_total_TB'}]
         for account in accounts:
-            report = self.createQuotaReport(config=config, account=account['name'])
+            if account['name']=='crab_tape_recall':
+                activity='Analysis TapeRecall'
+            elif account['name']=='crab_input':
+                activity='Analysis Input'
+            report = self.createQuotaReport(config=config, account=account['name'], activity=activity)
             jsonDoc[account['tag']] = report['totalTB']
 
         # sends this document to Elastic Search via MONIT

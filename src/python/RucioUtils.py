@@ -114,15 +114,27 @@ def getRuleQuota(rucioClient=None, ruleId=None):
     size = sum(file['bytes'] for file in files)
     return size
 
-def getTapeRecallUsage(rucioClient=None, account=None):
-    """ size of ongoing tape recalls for this account (if provided) or by activity """
-    activity = 'Analysis TapeRecall'
+def getRucioUsage(rucioClient=None, account=None, activity =None):
+    """ size of Rucio usage for this account (if provided) or by activity """
     filters = {'activity': activity}
     
-    if account is not None:
+    if account is not None and account != 'crab_tape_recall':
         filters['account'] = account
     
     rules = rucioClient.list_replication_rules(filters=filters)
-    usage = sum(getRuleQuota(rucioClient, rule['id']) for rule in rules\
-                if rule['state'] in ['REPLICATING', 'STUCK', 'SUSPENDED'])  # in Bytes
+
+    if activity == 'Analysis Input':
+        valid_states = ['OK', 'REPLICATING', 'STUCK', 'SUSPENDED']
+    elif activity == 'Analysis TapeRecall':
+        valid_states = ['REPLICATING', 'STUCK', 'SUSPENDED']  # Exclude 'OK' state
+    else:
+        print("Error: Unknown activity selected in quota report.")
+        valid_states = []
+
+    # Calculate usage only if valid_states is set
+    if valid_states:
+        usage = sum(getRuleQuota(rucioClient, rule['id']) for rule in rules if rule['state'] in valid_states)
+    else:
+        usage = 0
+
     return usage
