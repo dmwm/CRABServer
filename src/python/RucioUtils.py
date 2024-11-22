@@ -118,8 +118,8 @@ def getRucioUsage(rucioClient=None, account=None, activity =None):
     """ size of Rucio usage for this account (if provided) or by activity """
     if activity is None:
         if account is None:
-            print("Error: Account and Activity both unspecified")
             totalusage = 0
+            raise ValueError("Error: Account and Activity both unspecified")
         else:
             usageGenerator = rucioClient.get_local_account_usage(account=account)
             totalBytes = 0
@@ -141,6 +141,7 @@ def getRucioUsage(rucioClient=None, account=None, activity =None):
             valid_states = []
 
         # Calculate usage only if valid_states is set
+        # Rucio does not keep track by activity internally, so we need to find all rules and sum all files locked by each rule
         if valid_states:
             totalusage = sum(getRuleQuota(rucioClient, rule['id']) for rule in rules if rule['state'] in valid_states)
         else:
