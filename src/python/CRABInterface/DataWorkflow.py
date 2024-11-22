@@ -213,7 +213,6 @@ class DataWorkflow(object):
                             arguments       = [dbSerializer(arguments)],
                             save_logs       = ['T' if savelogsflag else 'F'],
                             tw_name         = ['NotKnownYet'],
-                            tw_canary_name  = ['NotKnownYet'],
                             user_infiles    = [dbSerializer(adduserfiles)],
                             maxjobruntime   = [maxjobruntime],
                             numcores        = [numcores],

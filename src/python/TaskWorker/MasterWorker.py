@@ -376,31 +376,8 @@ class MasterWorker(object):
             * the server call succeeded or
             * the server could not find anything to update or
             * the server has an internal error"""
+        configreq = {'subresource': 'process', 'workername': self.config.TaskWorker.name, 'getstatus': getstatus, 'limit': limit, 'status': setstatus}
 
-        # Assuming the variables and methods mentioned are available:
-        if (
-            isinstance(self.config.TaskWorker.canary_name, str) and 
-            self.config.TaskWorker.canary_name.startswith('crab')
-        ):
-            # Decide whether to use canary_name based on a 5% probability.
-            use_canary = random.random() < 0.05  # Random number less than 0.05 represents 5%.
-            workername = (
-                self.config.TaskWorker.canary_name 
-                if use_canary 
-                else self.config.TaskWorker.name
-            )
-        else:
-            # Default to the standard name if conditions aren't met.
-            workername = self.config.TaskWorker.name
-
-        # Build the configreq dictionary
-        configreq = {
-            'subresource': 'process',
-            'workername': workername,
-            'getstatus': getstatus,
-            'limit': limit,
-            'status': setstatus
-        }
         try:
             #self.server.post(self.restURInoAPI + '/workflowdb', data=urlencode(configreq))
             self.crabserver.post(api='workflowdb', data=urlencode(configreq))
@@ -411,6 +388,34 @@ class MasterWorker(object):
             return False
         except Exception: #pylint: disable=broad-except
             self.logger.exception("Server could not process the _lockWork request (prameters are %s)", configreq)
+            return False
+
+        return True
+
+    def runCanary(self):
+        # Decide whether to use canary_name based on the canary_load probability.
+        use_canary = random.random() < self.config.TaskWorker.canary_load
+        workername = (
+            self.config.TaskWorker.canary_name 
+            if use_canary 
+            else self.config.TaskWorker.name
+        )
+
+        # Build the configreq dictionary
+        configreq = {
+            'subresource': 'process',
+            'workername': workername
+        }
+
+        try:
+            self.crabserver.post(api='workflowdb', data=urlencode(configreq))
+        except HTTPException as hte:
+            msg = "HTTP Error during runCanary: %s\n" % str(hte)
+            msg += "HTTP Headers are %s: " % hte.headers
+            self.logger.error(msg)
+            return False
+        except Exception: #pylint: disable=broad-except
+            self.logger.exception("Server could not process the runCanary request (prameters are %s)", configreq)
             return False
 
         return True
@@ -547,15 +552,22 @@ class MasterWorker(object):
         self.restartQueuedTasks()
         self.logger.debug("Master Worker Starting Main Cycle.")
         while not self.STOP:
-            selection_limit = self.config.TaskWorker.task_scheduling_limit
-            if not self._selectWork(limit=selection_limit):
-                self.logger.warning("No tasks selected.")
-            else:
-                self.logger.info("Work selected successfully.")
-            limit = self.slaves.queueableTasks()
-            if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
-                time.sleep(self.config.TaskWorker.polling)
-                continue
+            is_canary = self.config.TaskWorker.am_i_canary
+            canary_name = self.config.TaskWorker.canary_name
+
+            if not is_canary:
+                selection_limit = self.config.TaskWorker.task_scheduling_limit
+                if not self._selectWork(limit=selection_limit):
+                    self.logger.warning("No tasks selected.")
+                else:
+                    self.logger.info("Work selected successfully.")
+                limit = self.slaves.queueableTasks()
+                if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
+                    time.sleep(self.config.TaskWorker.polling)
+                    continue
+                    
+            if canary_name.startswith('crab'):
+                self.runCanary()
 
             pendingwork = self.getWork(limit=limit, getstatus='HOLDING')
 
