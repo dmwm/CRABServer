@@ -116,25 +116,35 @@ def getRuleQuota(rucioClient=None, ruleId=None):
 
 def getRucioUsage(rucioClient=None, account=None, activity =None):
     """ size of Rucio usage for this account (if provided) or by activity """
-    filters = {'activity': activity}
-    
-    if account is not None and account != 'crab_tape_recall':
-        filters['account'] = account
-    
-    rules = rucioClient.list_replication_rules(filters=filters)
-
-    if activity == 'Analysis Input':
-        valid_states = ['OK', 'REPLICATING', 'STUCK', 'SUSPENDED']
-    elif activity == 'Analysis TapeRecall':
-        valid_states = ['REPLICATING', 'STUCK', 'SUSPENDED']  # Exclude 'OK' state
+    if activity is None:
+        if account is None:
+            totalusage = 0
+            raise ValueError("Error: Account and Activity both unspecified")
+        else:
+            usageGenerator = rucioClient.get_local_account_usage(account=account)
+            totalBytes = 0
+            for usage in usageGenerator:
+                used = usage['bytes']
+                totalBytes += used
+            totalusage = totalBytes
     else:
-        print("Error: Unknown activity selected in quota report.")
-        valid_states = []
+        filters = {'activity': activity}
+        if account is not None:
+            filters['account'] = account
+        rules = rucioClient.list_replication_rules(filters=filters)
+        if activity == 'Analysis Input':
+            valid_states = ['OK', 'REPLICATING', 'STUCK', 'SUSPENDED']
+        elif activity == 'Analysis TapeRecall':
+            valid_states = ['REPLICATING', 'STUCK', 'SUSPENDED']  # Exclude 'OK' state
+        else:
+            print("Error: Unknown activity selected in quota report.")
+            valid_states = []
 
-    # Calculate usage only if valid_states is set
-    if valid_states:
-        usage = sum(getRuleQuota(rucioClient, rule['id']) for rule in rules if rule['state'] in valid_states)
-    else:
-        usage = 0
+        # Calculate usage only if valid_states is set
+        # Rucio does not keep track by activity internally, so we need to find all rules and sum all files locked by each rule
+        if valid_states:
+            totalusage = sum(getRuleQuota(rucioClient, rule['id']) for rule in rules if rule['state'] in valid_states)
+        else:
+            totalusage = 0
 
-    return usage
+    return totalusage
