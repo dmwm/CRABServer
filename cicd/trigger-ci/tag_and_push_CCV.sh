@@ -7,4 +7,4 @@ ENV=test2
 echo ${ENV}
 TAG=pypi-${ENV}-$(date +"%s")
 git tag $TAG
-git push gitlab $TAG -o ci.variable="BUILD_DEPLOY=true"
+git push gitlab $TAG -o ci.variable="CLIENT_CONFIGURATION_VALIDATION=true" #Use explicit true
