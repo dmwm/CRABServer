@@ -7,4 +7,4 @@ ENV=test2
 echo ${ENV}
 TAG=pypi-${ENV}-$(date +"%s")
 git tag $TAG
-git push gitlab $TAG -o ci.variable="SUBMIT_STATUS_TRACKING=t"
+git push gitlab $TAG -o ci.variable="SUBMIT_STATUS_TRACKING=true" #Use explicit true
