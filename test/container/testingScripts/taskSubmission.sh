@@ -15,7 +15,7 @@ submitTasks(){
   for file_name in ${filesToSubmit};
   do
       echo -e "\nSubmitting file: ${file_name}"
-      output=$(crab submit -c ${file_name} --proxy=${PROXY} 2>&1)
+      output=$(crab --debug submit -c ${file_name} --proxy=${PROXY} 2>&1)
       submitExitCode=$?
       echo ${output}
       if [ $submitExitCode != 0 ]; then
