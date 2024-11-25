@@ -393,8 +393,9 @@ class MasterWorker(object):
         return True
 
     def runCanary(self):
-        # Decide whether to use canary_name based on the canary_load probability.
-        use_canary = random.random() < self.config.TaskWorker.canary_load
+        # Decide whether to use canary_name based on the canary_fraction value.
+        # canary_fraction is a float value in the range [0.0-1.0]
+        use_canary = random.random() < self.config.TaskWorker.canary_fraction
         workername = (
             self.config.TaskWorker.canary_name 
             if use_canary 
@@ -410,12 +411,12 @@ class MasterWorker(object):
         try:
             self.crabserver.post(api='workflowdb', data=urlencode(configreq))
         except HTTPException as hte:
-            msg = "HTTP Error during runCanary: %s\n" % str(hte)
+            msg = "HTTP Error while trying to change TW name in runCanary step: %s\n" % str(hte)
             msg += "HTTP Headers are %s: " % hte.headers
             self.logger.error(msg)
             return False
         except Exception: #pylint: disable=broad-except
-            self.logger.exception("Server could not process the runCanary request (prameters are %s)", configreq)
+            self.logger.exception("Error trying to change TW name in runCanary step")
             return False
 
         return True
@@ -552,9 +553,10 @@ class MasterWorker(object):
         self.restartQueuedTasks()
         self.logger.debug("Master Worker Starting Main Cycle.")
         while not self.STOP:
-            is_canary = self.config.TaskWorker.am_i_canary
+            is_canary = self.config.TaskWorker.is_canary
             canary_name = self.config.TaskWorker.canary_name
 
+            # _selectWork and _lockWork are run only if TW is master (not canary)
             if not is_canary:
                 selection_limit = self.config.TaskWorker.task_scheduling_limit
                 if not self._selectWork(limit=selection_limit):
@@ -565,10 +567,12 @@ class MasterWorker(object):
                 if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
                     time.sleep(self.config.TaskWorker.polling)
                     continue
-                    
+
+            # canary_name is a TW configuration variable only specified in master TW      
             if canary_name.startswith('crab'):
                 self.runCanary()
 
+            # getWork is run by both master TW and canary TW
             pendingwork = self.getWork(limit=limit, getstatus='HOLDING')
 
             if pendingwork:
