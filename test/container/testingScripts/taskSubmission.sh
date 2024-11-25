@@ -19,7 +19,7 @@ submitTasks(){
       submitExitCode=$?
       echo ${output}
       if [ $submitExitCode != 0 ]; then
-          cat crab_*/crab.log
+          cat /tmp/crabClientValidation/crab_*/crab.log
           echo ${file_name} >> ${WORK_DIR}/artifacts/failed_tasks
           killAfterFailure
       else
