@@ -750,11 +750,11 @@ def checkS3Object(crabserver=None, objecttype=None, username=None, tarballname=N
     downloadCommand += ' curl -v -s -f -o /dev/null --head '
     downloadCommand += ' "%s"' % preSignedUrl
 
-    with subprocess.Popen(downloadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True) as downloadProcess:
-        logger.debug("Will execute:\n%s", downloadCommand)
-        stdout, stderr = downloadProcess.communicate()
-        exitcode = downloadProcess.returncode
-        logger.debug('exitcode: %s\nstdout: %s', exitcode, stdout)
+    downloadProcess = subprocess.Popen(downloadCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    logger.debug("Will execute:\n%s", downloadCommand)
+    stdout, stderr = downloadProcess.communicate()
+    exitcode = downloadProcess.returncode
+    logger.debug('exitcode: %s\nstdout: %s', exitcode, stdout)
 
     if exitcode != 0:
         raise Exception('Download command %s failed. stderr is:\n%s' % (downloadCommand, stderr))
