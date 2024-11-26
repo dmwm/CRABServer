@@ -7,4 +7,4 @@ ENV=test2
 echo ${ENV}
 TAG=pypi-${ENV}-$(date +"%s")
 git tag $TAG
-git push gitlab $TAG -o ci.variable="MANUAL_CI_PIPELINE_ID=7990590"
+git push gitlab $TAG -o ci.variable="SKIP_SUBMIT=true"

@@ -69,6 +69,9 @@ case $CRABClient_version in
 
 	export PATH=${MY_CRAB}/bin:$PATH
 	source ${MY_CRAB}/etc/crab-bash-completion.sh
+        echo =======================================
+	grep -i head ${MY_CRAB}/src/python/*
+	echo =======================================
     ;;
   prod)
 	source /cvmfs/cms.cern.ch/common/crab-setup.sh
