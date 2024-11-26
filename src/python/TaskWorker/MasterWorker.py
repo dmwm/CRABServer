@@ -395,7 +395,7 @@ class MasterWorker(object):
     def runCanary(self):
         # Decide whether to use canary_name based on the canary_fraction value.
         # canary_fraction is a float value in the range [0.0-1.0]
-        use_canary = random.random() < self.config.TaskWorker.canary_fraction
+        use_canary = random.random() < float(self.config.TaskWorker.canary_fraction)
         workername = (
             self.config.TaskWorker.canary_name 
             if use_canary 
