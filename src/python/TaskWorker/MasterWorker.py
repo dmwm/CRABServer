@@ -421,11 +421,11 @@ class MasterWorker(object):
 
         if use_canary:
             self.logger.info("TW changed from %s to %s during runCanary", self.config.TaskWorker.name, self.config.TaskWorker.canary_name)
-        return True
+        return workername
 
 
-    def getWork(self, limit, getstatus, ignoreTWName=False):
-        configreq = {'limit': limit, 'workername': self.config.TaskWorker.name, 'getstatus': getstatus}
+    def getWork(self, limit, getstatus, workername, ignoreTWName=False):
+        configreq = {'limit': limit, 'workername': workername, 'getstatus': getstatus}
         if ignoreTWName:
             configreq['workername'] = '%'
 
@@ -474,7 +474,7 @@ class MasterWorker(object):
         limit = self.slaves.nworkers * 2
         total = 0
         while True:
-            pendingwork = self.getWork(limit=limit, getstatus='QUEUED')
+            pendingwork = self.getWork(limit=limit, getstatus='QUEUED', workername=self.config.TaskWorker.name)
             for task in pendingwork:
                 self.logger.debug("Restarting QUEUED task %s", task['tm_taskname'])
                 self.updateWork(task['tm_taskname'], task['tm_task_command'], 'NEW')
@@ -575,10 +575,12 @@ class MasterWorker(object):
 
             # canary_name is a TW configuration variable only specified in master TW      
             if canary_name.startswith('crab'):
-                self.runCanary()
+                workername = self.runCanary()
+            else:
+                workername = self.config.TaskWorker.name
 
-            # getWork is run by both master TW and canary TW
-            pendingwork = self.getWork(limit=limit, getstatus='HOLDING')
+            # getWork is run by both master TW and canary TW          
+            pendingwork = self.getWork(limit=limit, getstatus='HOLDING', workername=workername)
 
             if pendingwork:
                 keys = ['tm_task_command', 'tm_taskname']
