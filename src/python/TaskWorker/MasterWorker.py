@@ -421,7 +421,6 @@ class MasterWorker(object):
 
         if use_canary:
             self.logger.info("TW changed from %s to %s during runCanary", self.config.TaskWorker.name, self.config.TaskWorker.canary_name)
-            self.config.TaskWorker.name = self.config.TaskWorker.canary_name
         return True
 
 
@@ -572,7 +571,7 @@ class MasterWorker(object):
                     time.sleep(self.config.TaskWorker.polling)
                     continue
             else:
-                self.logger.info("This is canary TW %s running.", self.config.TaskWorker.canary_name)
+                self.logger.info("This is canary TW %s running.", self.config.TaskWorker.name)
 
             # canary_name is a TW configuration variable only specified in master TW      
             if canary_name.startswith('crab'):
