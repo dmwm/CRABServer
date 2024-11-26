@@ -555,6 +555,7 @@ class MasterWorker(object):
         while not self.STOP:
             is_canary = self.config.TaskWorker.is_canary
             canary_name = self.config.TaskWorker.canary_name
+            limit = self.slaves.queueableTasks()
 
             # _selectWork and _lockWork are run only if TW is master (not canary)
             if not is_canary:
@@ -563,7 +564,6 @@ class MasterWorker(object):
                     self.logger.warning("No tasks selected.")
                 else:
                     self.logger.info("Work selected successfully.")
-                limit = self.slaves.queueableTasks()
                 if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
                     time.sleep(self.config.TaskWorker.polling)
                     continue
