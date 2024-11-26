@@ -419,6 +419,9 @@ class MasterWorker(object):
             self.logger.exception("Error trying to change TW name in runCanary step")
             return False
 
+        if use_canary:
+            self.logger.info("TW changed from %s to %s during runCanary", self.config.TaskWorker.name, self.config.TaskWorker.canary_name)
+            self.config.TaskWorker.name = self.config.TaskWorker.canary_name
         return True
 
 
@@ -559,6 +562,7 @@ class MasterWorker(object):
 
             # _selectWork and _lockWork are run only if TW is master (not canary)
             if not is_canary:
+                self.logger.info("This is master TW %s running.", self.config.TaskWorker.name)
                 selection_limit = self.config.TaskWorker.task_scheduling_limit
                 if not self._selectWork(limit=selection_limit):
                     self.logger.warning("No tasks selected.")
@@ -567,6 +571,8 @@ class MasterWorker(object):
                 if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
                     time.sleep(self.config.TaskWorker.polling)
                     continue
+            else:
+                self.logger.info("This is canary TW %s running.", self.config.TaskWorker.canary_name)
 
             # canary_name is a TW configuration variable only specified in master TW      
             if canary_name.startswith('crab'):
