@@ -682,7 +682,7 @@ if __name__ == "__main__":
         jobExitCode = None
         applicationName = 'CMSSW JOB' if not options.scriptExe else 'ScriptEXE'
         print(f"==== {applicationName} Execution started at {UTCNow()} ====")
-        command = "stdbuf -oL -eL "
+        command = "unset PYTHONPATH; stdbuf -oL -eL "  # make sure COMP python does not leak to CMSSW #8805
         if not options.scriptExe:
             command += 'cmsRun -j FrameworkJobReport.xml PSet.py'
         else:
