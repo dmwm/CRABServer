@@ -396,11 +396,9 @@ class MasterWorker(object):
         # Decide whether to use canary_name based on the canary_fraction value.
         # canary_fraction is a float value in the range [0.0-1.0]
         use_canary = random.random() < float(self.config.TaskWorker.canary_fraction)
-        workername = (
-            self.config.TaskWorker.canary_name 
-            if use_canary 
-            else self.config.TaskWorker.name
-        )
+        if not use_canary:
+            return True
+        workername = self.config.TaskWorker.canary_name
 
         # Build the configreq dictionary
         #This changes just the workername, status remains 'HOLDING'
@@ -424,8 +422,7 @@ class MasterWorker(object):
             self.logger.exception("Error trying to change TW name in runCanary step")
             return False
 
-        if use_canary:
-            self.logger.info("TW changed from %s to %s during runCanary", self.config.TaskWorker.name, self.config.TaskWorker.canary_name)
+        self.logger.info("TW changed from %s to %s during runCanary", self.config.TaskWorker.name, self.config.TaskWorker.canary_name)
         return True
 
 
@@ -565,7 +562,10 @@ class MasterWorker(object):
             limit = self.slaves.queueableTasks()
 
             # _selectWork and _lockWork are run only if TW is master (not canary)
-            if not is_canary:
+            if is_canary:
+                self.logger.info("This is canary TW %s running.", self.config.TaskWorker.name)
+                time.sleep(self.config.TaskWorker.polling)
+            else:
                 self.logger.info("This is master TW %s running.", self.config.TaskWorker.name)
                 selection_limit = self.config.TaskWorker.task_scheduling_limit
                 if not self._selectWork(limit=selection_limit):
@@ -575,8 +575,7 @@ class MasterWorker(object):
                 if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
                     time.sleep(self.config.TaskWorker.polling)
                     continue
-            else:
-                self.logger.info("This is canary TW %s running.", self.config.TaskWorker.name)
+                
 
             # canary_name is a TW configuration variable only specified in master TW      
             if canary_name.startswith('crab'):
