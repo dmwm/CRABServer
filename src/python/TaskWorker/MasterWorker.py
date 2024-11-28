@@ -398,11 +398,12 @@ class MasterWorker(object):
         use_canary = random.random() < float(self.config.TaskWorker.canary_fraction)
         if not use_canary:
             return True
-        workername = self.config.TaskWorker.canary_name
 
         # Build the configreq dictionary
         #This changes just the workername, status remains 'HOLDING'
         #The arguments that are not changed can't be skipped
+        workername = self.config.TaskWorker.canary_name
+
         configreq = {
             'subresource': 'process',
             'workername': workername,
@@ -422,7 +423,7 @@ class MasterWorker(object):
             self.logger.exception("Error trying to change TW name in runCanary step")
             return False
 
-        self.logger.info("TW changed from %s to %s during runCanary", self.config.TaskWorker.name, self.config.TaskWorker.canary_name)
+        self.logger.info("TW changed from %s to %s during runCanary", self.config.TaskWorker.name, workername)
         return True
 
 
@@ -558,14 +559,13 @@ class MasterWorker(object):
         self.logger.debug("Master Worker Starting Main Cycle.")
         while not self.STOP:
             is_canary = self.config.TaskWorker.is_canary
-            canary_name = self.config.TaskWorker.canary_name
             limit = self.slaves.queueableTasks()
 
-            # _selectWork and _lockWork are run only if TW is master (not canary)
+            # _selectWork, _lockWork and runCanary steps are run only if TW is master (not canary)
             if is_canary:
                 self.logger.info("This is canary TW %s running.", self.config.TaskWorker.name)
-                time.sleep(self.config.TaskWorker.polling)
             else:
+                canary_name = self.config.TaskWorker.canary_name
                 self.logger.info("This is master TW %s running.", self.config.TaskWorker.name)
                 selection_limit = self.config.TaskWorker.task_scheduling_limit
                 if not self._selectWork(limit=selection_limit):
@@ -575,12 +575,9 @@ class MasterWorker(object):
                 if not self._lockWork(limit=limit, getstatus='NEW', setstatus='HOLDING'):
                     time.sleep(self.config.TaskWorker.polling)
                     continue
-                
-
-            # canary_name is a TW configuration variable only specified in master TW      
-            if canary_name.startswith('crab'):
-                self.runCanary(limit=limit)
-
+                if canary_name.startswith('crab'):
+                    self.runCanary(limit=limit)
+                  
             # getWork is run by both master TW and canary TW          
             pendingwork = self.getWork(limit=limit, getstatus='HOLDING')
 
@@ -589,6 +586,8 @@ class MasterWorker(object):
                 tasksInfo = [{k:v for k, v in task.items() if k in keys} for task in pendingwork]
                 self.logger.info("Retrieved a total of %d works", len(pendingwork))
                 self.logger.debug("Retrieved the following works: \n%s", str(tasksInfo))
+            else:
+                time.sleep(self.config.TaskWorker.polling)
 
             toInject = []
             for task in pendingwork:
