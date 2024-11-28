@@ -407,6 +407,12 @@ def executeUserApplication(cmd=None, scramTool=None, cleanEnv=True):
     exception can only be raised by unexpected failures of the Scram wrapper itself
     Scram() never raises and returns the exit code from executing 'command'
     """
+    # possibly needed environment overrides for CMSSW call go here
+    envOverride = {}
+    # Do not pass WM PYTHONPATH to CMSSW environment
+    pythonPath = os.environ.get('PYTHONPATH', '')
+    envOverride['PYTHONPATH'] = ""
+    os.environ.update(envOverride)
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.DEBUG):
         retCode = scramTool(cmd, runtimeDir=os.getcwd(), cleanEnv=cleanEnv)
         dest = shutil.move('cmsRun-stdout.log.tmp', 'cmsRun-stdout.log')
@@ -415,6 +421,10 @@ def executeUserApplication(cmd=None, scramTool=None, cleanEnv=True):
         with open('cmsRun-stdout.log', 'a', encoding='utf-8') as fh:
             fh.write(scramTool.diagnostic())
         print("Error executing application in CMSSW environment.\n\tSee stdout log")
+    # restore WM PYTHONPATH
+    envOverride['PYTHONPATH'] = pythonPath
+    os.environ.update(envOverride)
+
     return retCode
 
 
@@ -682,7 +692,7 @@ if __name__ == "__main__":
         jobExitCode = None
         applicationName = 'CMSSW JOB' if not options.scriptExe else 'ScriptEXE'
         print(f"==== {applicationName} Execution started at {UTCNow()} ====")
-        command = "stdbuf -oL -eL "
+        command = "stdbuf -oL -eL "  # make sure COMP python does not leak to CMSSW #8805
         if not options.scriptExe:
             command += 'cmsRun -j FrameworkJobReport.xml PSet.py'
         else:
