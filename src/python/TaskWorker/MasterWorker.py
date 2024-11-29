@@ -586,8 +586,6 @@ class MasterWorker(object):
                 tasksInfo = [{k:v for k, v in task.items() if k in keys} for task in pendingwork]
                 self.logger.info("Retrieved a total of %d works", len(pendingwork))
                 self.logger.debug("Retrieved the following works: \n%s", str(tasksInfo))
-            else:
-                time.sleep(self.config.TaskWorker.polling)
 
             toInject = []
             for task in pendingwork:
