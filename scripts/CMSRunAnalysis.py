@@ -660,9 +660,9 @@ if __name__ == "__main__":
             )
 
         print(f"==== SCRAM Obj CREATED at {UTCNow()} ====")
-        if scram.project() or scram.runtime():  # if any of the two commands fail...
+        if scram.project():  # if scram project fails...
             dgn = scram.diagnostic()
-            handleException("FAILED", EC_CMSMissingSoftware, f"Error setting CMSSW environment: {dgn}")
+            handleException("FAILED", EC_CMSMissingSoftware, f"Error creating CMSSW project area: {dgn}")
             mintime()
             sys.exit(EC_CMSMissingSoftware)
         print(f"==== {options.cmsswVersion} release directory created ====")
@@ -670,6 +670,14 @@ if __name__ == "__main__":
 
         print("==== Extract user sandbox in top and CMSSW directory ====")
         extractUserSandbox(options.archiveJob)
+
+        #Multi-microarch env: Setting cmssw env after extracting the sandbox
+        print(f"==== SCRAM runtime environment CREATED at {UTCNow()} ====")
+        if scram.runtime(): # if scram runtime fails...
+            dgn = scram.diagnostic()
+            handleException("FAILED", EC_CMSMissingSoftware, f"Error setting CMSSW environment: {dgn}")
+            mintime()
+            sys.exit(EC_CMSMissingSoftware)
 
         # tweaking of the PSet is needed both for CMSSWStack and ScriptEXE
         print(f"==== Tweak PSet at {UTCNow()} ====")
