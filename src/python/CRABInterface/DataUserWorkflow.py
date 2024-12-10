@@ -97,6 +97,7 @@ class DataUserWorkflow(object):
            :arg str jobtype: job type of the workflow, usually Analysis;
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
+           :arg str jobminuarch: minimum required microarchitecture (=SCRAM_MIN_SUPPORTED_MICROARCH);
            :arg str inputdata: input dataset;
            :arg str primarydataset: primary dataset;
            :arg str nonvaliddata: allow invalid input dataset;

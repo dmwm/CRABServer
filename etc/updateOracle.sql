@@ -125,22 +125,25 @@
 -- ALTER TABLE tasks ADD tm_user_config CLOB;
 
 --allow NULL in soon-to-be-removed columns
-alter table filetransfersdb modify TM_REST_URI varchar(1000) NULL;
-alter table filetransfersdb modify TM_REST_HOST varchar(1000) NULL;
+-- alter table filetransfersdb modify TM_REST_URI varchar(1000) NULL;
+-- alter table filetransfersdb modify TM_REST_HOST varchar(1000) NULL;
 
 -- Add new columns to allow RUCIO_Transfers communications with Publisher
-ALTER TABLE filetransfersdb ADD tm_dbs_blockname VARCHAR(1000);
-ALTER TABLE filetransfersdb ADD tm_block_complete VARCHAR(10);
+-- ALTER TABLE filetransfersdb ADD tm_dbs_blockname VARCHAR(1000);
+-- ALTER TABLE filetransfersdb ADD tm_block_complete VARCHAR(10);
 
 --Add Rucio ASO's transfer container name and rule id)
-ALTER TABLE tasks ADD tm_transfer_container VARCHAR(1000);
-ALTER TABLE tasks ADD tm_transfer_rule VARCHAR(255);
-ALTER TABLE tasks ADD tm_publish_rule VARCHAR(255);
+-- ALTER TABLE tasks ADD tm_transfer_container VARCHAR(1000);
+-- ALTER TABLE tasks ADD tm_transfer_rule VARCHAR(255);
+-- ALTER TABLE tasks ADD tm_publish_rule VARCHAR(255);
 
 --Add Rucio ASO's json kv for store container names and its rules.
-ALTER TABLE tasks ADD tm_multipub_rule CLOB;
+-- ALTER TABLE tasks ADD tm_multipub_rule CLOB;
 
 --Drop unused columns related to "panda", see issue #8418
 -- alter table tasks set unused ( PANDA_RESUBMITTED_JOBS, PANDA_JOBSET_ID );
 -- ALTER TABLE tasks DROP UNUSED COLUMNS;
+
+--Add support for scram microarchitecture
+alter table tasks add tm_job_min_microarch varchar(255) default 'any';
 

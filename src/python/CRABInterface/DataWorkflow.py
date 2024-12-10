@@ -90,8 +90,8 @@ class DataWorkflow(object):
         raise NotImplementedError
 
     @conn_handler(services=['centralconfig'])
-    def submit(self, workflow, activity, jobtype, jobsw, jobarch, use_parent, secondarydata, generator, events_per_lumi, siteblacklist,
-               sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
+    def submit(self, workflow, activity, jobtype, jobsw, jobarch, jobminuarch, use_parent, secondarydata, generator,
+               events_per_lumi, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                username, userdn, savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
                runs, lumis, totalunits, adduserfiles, oneEventMode=False, maxjobruntime=None, numcores=None, maxmemory=None, priority=None, lfn=None,
                ignorelocality=None, saveoutput=None, faillimit=10, userfiles=None, scriptexe=None, scriptargs=None,
@@ -104,6 +104,7 @@ class DataWorkflow(object):
            :arg str jobtype: job type of the workflow, usually Analysis;
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
+           :arg str jobminuarch: minimum required microarchitecture (=SCRAM_MIN_SUPPORTED_MICROARCH);
            :arg str inputdata: input dataset;
            :arg str primarydataset: primary dataset;
            :arg str nonvaliddata: allow invalid input dataset;
@@ -180,6 +181,7 @@ class DataWorkflow(object):
                             task_failure    = [''],
                             job_sw          = [jobsw],
                             job_arch        = [jobarch],
+                            job_min_microarch = [jobminuarch],
                             input_dataset   = [inputdata],
                             primary_dataset = [primarydataset],
                             nonvalid_data   = ['T' if nonvaliddata else 'F'],
