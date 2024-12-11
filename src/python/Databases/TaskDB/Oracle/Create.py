@@ -41,6 +41,7 @@ class Create(DBCreator):
         tm_task_failure CLOB,
         tm_job_sw VARCHAR(255) NOT NULL,
         tm_job_arch VARCHAR(255),
+        tm_job_min_microarch VARCHAR(255) DEFAULT 'any',
         tm_input_dataset VARCHAR(500),
         tm_nonvalid_input_dataset VARCHAR(1) DEFAULT 'T',
         tm_use_parent NUMBER(1),

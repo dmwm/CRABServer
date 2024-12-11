@@ -15,13 +15,14 @@ from WMCore.Lexicon import userprocdataset, userProcDSParts, primdataset
 # CRABServer dependecies here
 from CRABInterface.DataUserWorkflow import DataUserWorkflow
 from CRABInterface.RESTExtensions import authz_owner_match
-from CRABInterface.Regexps import (RX_TASKNAME, RX_ACTIVITY, RX_JOBTYPE, RX_GENERATOR, RX_LUMIEVENTS, RX_CMSSW, RX_ARCH, RX_DATASET,
-    RX_CMSSITE, RX_SPLIT, RX_CACHENAME, RX_CACHEURL, RX_LFN, RX_USERFILE, RX_VOPARAMS, RX_DBSURL, RX_LFNPRIMDS, RX_OUTFILES,
-    RX_RUNS, RX_LUMIRANGE, RX_SCRIPTARGS, RX_SCHEDD_NAME, RX_COLLECTOR, RX_SUBRESTAT, RX_JOBID, RX_ADDFILE,
-    RX_ANYTHING, RX_USERNAME, RX_DATE, RX_MANYLINES_SHORT, RX_CUDA_VERSION, RX_BLOCK, RX_RUCIODID, RX_RUCIOSCOPE)
+from CRABInterface.Regexps import (RX_TASKNAME, RX_ACTIVITY, RX_JOBTYPE, RX_GENERATOR, RX_LUMIEVENTS, RX_CMSSW,
+                                   RX_ARCH, RX_MICROARCH, RX_DATASET, RX_CMSSITE, RX_SPLIT, RX_CACHENAME,
+                                   RX_CACHEURL, RX_LFN, RX_USERFILE, RX_VOPARAMS, RX_DBSURL, RX_LFNPRIMDS, RX_OUTFILES,
+                                   RX_RUNS, RX_LUMIRANGE, RX_SCRIPTARGS, RX_SCHEDD_NAME, RX_COLLECTOR, RX_SUBRESTAT,
+                                   RX_JOBID, RX_ADDFILE, RX_ANYTHING, RX_USERNAME, RX_DATE, RX_MANYLINES_SHORT,
+                                   RX_CUDA_VERSION, RX_BLOCK, RX_RUCIODID, RX_RUCIOSCOPE)
 from CRABInterface.Utilities import CMSSitesCache, conn_handler, getDBinstance, validate_dict
 from ServerUtilities import checkOutLFN, generateTaskName
-
 
 
 class RESTUserWorkflow(RESTEntity):
@@ -151,17 +152,15 @@ class RESTUserWorkflow(RESTEntity):
         #saves that in kwargs since it's what we want
         kwargs['publishname2'] = outputDatasetTagToCheck
 
-        """
-        ##Determine if it's a dataset that will go into a group space and therefore the (group)username prefix it will be used
-        if 'publishgroupname' in kwargs and int(kwargs['publishgroupname']): #the first half of the if is for backward compatibility
-            if not (outlfn.startswith('/store/group/') and outlfn.split('/')[3]):
-                msg = "Parameter 'publishgroupname' is True,"
-                msg += " but parameter 'lfn' does not start with '/store/group/<groupname>'."
-                raise InvalidParameter(msg)
-            group_user_prefix = outlfn.split('/')[3]
-        else:
-            group_user_prefix = username
-        """
+        # ##Determine if it's a dataset that will go into a group space and therefore the (group)username prefix it will be used
+        # if 'publishgroupname' in kwargs and int(kwargs['publishgroupname']): #the first half of the if is for backward compatibility
+        #     if not (outlfn.startswith('/store/group/') and outlfn.split('/')[3]):
+        #         msg = "Parameter 'publishgroupname' is True,"
+        #         msg += " but parameter 'lfn' does not start with '/store/group/<groupname>'."
+        #         raise InvalidParameter(msg)
+        #     group_user_prefix = outlfn.split('/')[3]
+        # else:
+        #     group_user_prefix = username
 
         outputDatasetTagToCheck = "%s-%s" % (username, outputDatasetTagToCheck)
         try:
@@ -282,6 +281,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("jobsw", param, safe, RX_CMSSW, optional=False)
             validate_num("nonprodsw", param, safe, optional=False)
             validate_str("jobarch", param, safe, RX_ARCH, optional=False)
+            validate_str("jobminuarch", param, safe, RX_MICROARCH, optional=True)
             if not safe.kwargs["nonprodsw"]: #if the user wants to allow non-production releases
                 self._checkReleases(safe.kwargs['jobarch'], safe.kwargs['jobsw'])
             validate_num("useparent", param, safe, optional=True)
@@ -513,7 +513,8 @@ class RESTUserWorkflow(RESTEntity):
 
     @restcall
     #@getUserCert(headers=cherrypy.request.headers)
-    def put(self, workflow, activity, jobtype, jobsw, jobarch, inputdata, primarydataset, nonvaliddata, useparent, secondarydata, generator, eventsperlumi,
+    def put(self, workflow, activity, jobtype, jobsw, jobarch, jobminuarch, inputdata, primarydataset, nonvaliddata,
+            useparent, secondarydata, generator, eventsperlumi,
             siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, debugfilename, cacheurl, addoutputfiles,
             savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup,
             tfileoutfiles, edmoutfiles, runs, lumis,
@@ -527,6 +528,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str jobtype: job type of the workflow, usually Analysis;
            :arg str jobsw: software requirement;
            :arg str jobarch: software architecture (=SCRAM_ARCH);
+           :arg str jobminuarch: minimum required microarchitecture (=SCRAM_MIN_SUPPORTED_MICROARCH);
            :arg str inputdata: input dataset;
            :arg str primarydataset: primary dataset;
            :arg str nonvaliddata: allow invalid input dataset;
@@ -587,19 +589,25 @@ class RESTUserWorkflow(RESTEntity):
         }
 
         return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch,
-                                           inputdata=inputdata, primarydataset=primarydataset, nonvaliddata=nonvaliddata, use_parent=useparent,
+                                           jobminuarch=jobminuarch, inputdata=inputdata, primarydataset=primarydataset,
+                                           nonvaliddata=nonvaliddata, use_parent=useparent,
                                            secondarydata=secondarydata, generator=generator, events_per_lumi=eventsperlumi,
-                                           siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, splitalgo=splitalgo, algoargs=algoargs,
-                                           cachefilename=cachefilename, debugfilename=debugfilename, cacheurl=cacheurl,
-                                           addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],
-                                           username=cherrypy.request.user['login'], savelogsflag=savelogsflag, vorole=vorole, vogroup=vogroup,
-                                           publication=publication, publishname=publishname, publishname2=publishname2, asyncdest=asyncdest,
-                                           dbsurl=dbsurl, publishdbsurl=publishdbsurl, tfileoutfiles=tfileoutfiles,
-                                           edmoutfiles=edmoutfiles, runs=runs, lumis=lumis, totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
-                                           maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority, lfn=lfn,
-                                           ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit, userfiles=userfiles,
-                                           scriptexe=scriptexe, scriptargs=scriptargs, scheddname=scheddname, extrajdl=extrajdl, collector=collector, dryrun=dryrun,
-                                           submitipaddr=cherrypy.request.headers['X-Forwarded-For'], ignoreglobalblacklist=ignoreglobalblacklist, user_config=user_config)
+                                           siteblacklist=siteblacklist, sitewhitelist=sitewhitelist, splitalgo=splitalgo,
+                                           algoargs=algoargs, cachefilename=cachefilename, debugfilename=debugfilename,
+                                           cacheurl=cacheurl, addoutputfiles=addoutputfiles, userdn=cherrypy.request.user['dn'],
+                                           username=cherrypy.request.user['login'], savelogsflag=savelogsflag,
+                                           vorole=vorole, vogroup=vogroup,
+                                           publication=publication, publishname=publishname, publishname2=publishname2,
+                                           asyncdest=asyncdest, lfn=lfn,
+                                           dbsurl=dbsurl, publishdbsurl=publishdbsurl,
+                                           tfileoutfiles=tfileoutfiles, edmoutfiles=edmoutfiles, runs=runs, lumis=lumis,
+                                           totalunits=totalunits, adduserfiles=adduserfiles, oneEventMode=oneEventMode,
+                                           maxjobruntime=maxjobruntime, numcores=numcores, maxmemory=maxmemory, priority=priority,
+                                           ignorelocality=ignorelocality, saveoutput=saveoutput, faillimit=faillimit,
+                                           userfiles=userfiles, scriptexe=scriptexe, scriptargs=scriptargs,
+                                           scheddname=scheddname, extrajdl=extrajdl, collector=collector, dryrun=dryrun,
+                                           submitipaddr=cherrypy.request.headers['X-Forwarded-For'],
+                                           ignoreglobalblacklist=ignoreglobalblacklist, user_config=user_config)
 
     @restcall
     def post(self, workflow, subresource, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory,

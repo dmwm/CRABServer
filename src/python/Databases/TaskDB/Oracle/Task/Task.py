@@ -48,7 +48,7 @@ class Task(object):
     #New
     New_sql = "INSERT INTO tasks ( \
               tm_taskname, tm_activity, tm_task_status, tm_task_command, tm_start_time, tm_task_failure, tm_job_sw, \
-              tm_job_arch, tm_input_dataset, tm_primary_dataset, tm_nonvalid_input_dataset, tm_use_parent, tm_secondary_input_dataset, tm_site_whitelist, tm_site_blacklist, \
+              tm_job_arch, tm_job_min_microarch, tm_input_dataset, tm_primary_dataset, tm_nonvalid_input_dataset, tm_use_parent, tm_secondary_input_dataset, tm_site_whitelist, tm_site_blacklist, \
               tm_split_algo, tm_split_args, tm_totalunits, tm_user_sandbox, tm_debug_files, tm_cache_url, tm_username, tm_user_dn, \
               tm_user_vo, tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, tm_publish_dbs_url, \
               tm_publication, tm_outfiles, tm_tfile_outfiles, tm_edm_outfiles, tm_job_type, tm_generator, tm_arguments, \
@@ -57,7 +57,7 @@ class Task(object):
               tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode, tm_submitter_ip_addr, tm_ignore_global_blacklist, \
               tm_user_config) \
               VALUES (:task_name, :task_activity, upper(:task_status), upper(:task_command), SYS_EXTRACT_UTC(SYSTIMESTAMP), :task_failure, :job_sw, \
-              :job_arch, :input_dataset, :primary_dataset, :nonvalid_data, :use_parent, :secondary_dataset, :site_whitelist, :site_blacklist, \
+              :job_arch, :job_min_microarch, :input_dataset, :primary_dataset, :nonvalid_data, :use_parent, :secondary_dataset, :site_whitelist, :site_blacklist, \
               :split_algo, :split_args, :total_units, :user_sandbox, :debug_files, :cache_url, :username, :user_dn, \
               :user_vo, :user_role, :user_group, :publish_name, :asyncdest, :dbs_url, :publish_dbs_url, \
               :publication, :outfiles, :tfile_outfiles, :edm_outfiles, :job_type, :generator, :arguments, \
@@ -68,7 +68,7 @@ class Task(object):
 
     GetReadyTasks_tuple = namedtuple("GetReadyTasks", ["tm_taskname", "tm_task_status", "tm_task_command", \
                        "tm_start_time", "tm_start_injection", "tm_end_injection", \
-                       "tm_task_failure", "tm_job_sw", "tm_job_arch", "tm_input_dataset", "tm_DDM_reqid", \
+                       "tm_task_failure", "tm_job_sw", "tm_job_arch", "tm_job_min_microarch", "tm_input_dataset", "tm_DDM_reqid", \
                        "tm_site_whitelist", "tm_site_blacklist", "tm_split_algo", "tm_split_args", \
                        "tm_totalunits", "tm_user_sandbox", "tm_debug_files", "tm_cache_url", "tm_username", "tm_user_dn", "tm_user_vo", \
                        "tm_user_role", "tm_user_group", "tm_publish_name", "tm_asyncdest", "tm_dbs_url", \
@@ -83,7 +83,7 @@ class Task(object):
     #GetReadyTasks
     GetReadyTasks_sql = """SELECT tm_taskname, tm_task_status, tm_task_command, \
                        tm_start_time, tm_start_injection, tm_end_injection, \
-                       tm_task_failure, tm_job_sw, tm_job_arch, tm_input_dataset, tm_DDM_reqid, \
+                       tm_task_failure, tm_job_sw, tm_job_arch, tm_job_min_microarch, tm_input_dataset, tm_DDM_reqid, \
                        tm_site_whitelist, tm_site_blacklist, tm_split_algo, tm_split_args, \
                        tm_totalunits, tm_user_sandbox, tm_debug_files, tm_cache_url, tm_username, tm_user_dn, tm_user_vo, \
                        tm_user_role, tm_user_group, tm_publish_name, tm_asyncdest, tm_dbs_url, \

@@ -123,6 +123,7 @@ accounting_group_user = %(accounting_group_user)s
 
 # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
 +REQUIRED_ARCH = %(required_arch)s
++REQUIRED_MINIMUM_MICROARCH = %(required_minimum_microarch)s
 +DESIRED_CMSDataset = %(inputdata)s
 
 +JOBGLIDEIN_CMSSite = "$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])"
@@ -298,7 +299,7 @@ def transform_strings(data):
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', \
                'stageoutpolicy', 'taskType', 'worker_name', 'cms_wmtool', 'cms_tasktype', 'cms_type', \
-               'required_arch', 'resthost', 'dbinstance', 'submitter_ip_addr', \
+               'required_arch', 'required_minimum_microarch', 'resthost', 'dbinstance', 'submitter_ip_addr', \
                'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
         val = data.get(var, None)
         if val is None:
@@ -372,9 +373,9 @@ class DagmanCreator(TaskAction):
         self.rucioClient = rucioClient
 
     def populateGlideinMatching(self, info):
-        """ actually simply set the required arch """
+        """ actually simply set the required arch and microarch """
         scram_arch = info['tm_job_arch']
-        # Set defaults
+        # required_arch, set default
         info['required_arch'] = "X86_64"
         # The following regex matches a scram arch into four groups
         # for example el9_amd64_gcc10 is matched as (el)(9)_(amd64)_(gcc10)
@@ -386,8 +387,21 @@ class DagmanCreator(TaskAction):
                 msg = f"Job configured for non-supported ScramArch '{arch}'"
                 raise SubmissionRefusedException(msg)
             info['required_arch'] = SCRAM_TO_ARCH.get(arch)
-            # if arch == "amd64":
-            #     info['required_arch'] = "X86_64"
+
+        # required minimum micro_arch may need to be handled differently in the future (arm, risc, ...)
+        # and may need different classAd(s) in the JDL, so try to be general here
+        min_micro_arch = info['tm_job_min_microarch']
+        if not min_micro_arch:
+            info['required_minimum_microarch'] = 'x86-64-v2'  # the current default for CMSSW
+            return
+        if min_micro_arch == 'any':
+            info['required_minimum_microarch'] = 'any'
+            return
+        if min_micro_arch.startswith('x86-64-v'):
+            info['required_minimum_microarch'] = min_micro_arch
+            return
+        self.logger.error(f"Not supported microarch: {min_micro_arch}. Ignore it")
+        info['required_minimum_microarch'] = 'any'
 
 
     def getDashboardTaskType(self, task):
