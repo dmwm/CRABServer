@@ -152,17 +152,15 @@ class RESTUserWorkflow(RESTEntity):
         #saves that in kwargs since it's what we want
         kwargs['publishname2'] = outputDatasetTagToCheck
 
-        """
-        ##Determine if it's a dataset that will go into a group space and therefore the (group)username prefix it will be used
-        if 'publishgroupname' in kwargs and int(kwargs['publishgroupname']): #the first half of the if is for backward compatibility
-            if not (outlfn.startswith('/store/group/') and outlfn.split('/')[3]):
-                msg = "Parameter 'publishgroupname' is True,"
-                msg += " but parameter 'lfn' does not start with '/store/group/<groupname>'."
-                raise InvalidParameter(msg)
-            group_user_prefix = outlfn.split('/')[3]
-        else:
-            group_user_prefix = username
-        """
+        # ##Determine if it's a dataset that will go into a group space and therefore the (group)username prefix it will be used
+        # if 'publishgroupname' in kwargs and int(kwargs['publishgroupname']): #the first half of the if is for backward compatibility
+        #     if not (outlfn.startswith('/store/group/') and outlfn.split('/')[3]):
+        #         msg = "Parameter 'publishgroupname' is True,"
+        #         msg += " but parameter 'lfn' does not start with '/store/group/<groupname>'."
+        #         raise InvalidParameter(msg)
+        #     group_user_prefix = outlfn.split('/')[3]
+        # else:
+        #     group_user_prefix = username
 
         outputDatasetTagToCheck = "%s-%s" % (username, outputDatasetTagToCheck)
         try:
