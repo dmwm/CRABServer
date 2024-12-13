@@ -24,7 +24,7 @@ job_lumis_1.json content:
 {"1": [[669684, 669684]]}
 job_input_file_list_1.json content:
 ["1.root"]
-On Worker nodes it has a tarball with all files. but for debugging purpose it is also available to read directly from file
+On Worker nodes it has a tarball with all files. but for debugging purpose it is possible to read directly from file
 
 from old TweakPSet/SetupCMSSWPsetCore, some useful documentation of args
 inputFiles:     the input files of the job. This must be a list of dictionaries whose keys are "lfn" and "parents"
@@ -69,7 +69,9 @@ def readFileFromTarball(filename, tarball):
     content = '{}'
     if os.path.isfile(filename):
         # This is only for Debugging
-        print('DEBUGGING MODE!')
+        print("*********************")
+        print(f"DEBUGGING MODE! WILL USE EXISTING {filename} INSTEAD OR GETTING IT FROM {tarball}")
+        print("*********************")
         with open(filename, 'r', encoding='utf-8') as f:
             content = f.read()
         return literal_eval(content)
