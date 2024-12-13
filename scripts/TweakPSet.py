@@ -69,7 +69,9 @@ def readFileFromTarball(filename, tarball):
     content = '{}'
     if os.path.isfile(filename):
         # This is only for Debugging
+        print("*********************")
         print(f"DEBUGGING MODE! WILL USE EXISTING {filename} INSTEAD OR GETTING IT FROM {tarball}")
+        print("*********************")
         with open(filename, 'r', encoding='utf-8') as f:
             content = f.read()
         return literal_eval(content)
