@@ -100,7 +100,6 @@ class CRAB3ProxyRenewer():
                     'proxyValidity' : '144:0',
                     'min_time_left' : MINPROXYLENGTH, ## do we need this ? or should we use self.myproxylen?
                     'userDN' : ad['CRAB_UserDN'],
-                    'userName' : username + '_CRAB',
                     'group' : group,
                     'role' : role,
                     'server_key': self.config.MyProxy.serverhostkey,
