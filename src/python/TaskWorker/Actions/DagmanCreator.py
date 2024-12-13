@@ -392,13 +392,13 @@ class DagmanCreator(TaskAction):
         # and may need different classAd(s) in the JDL, so try to be general here
         min_micro_arch = info['tm_job_min_microarch']
         if not min_micro_arch:
-            info['required_minimum_microarch'] = 'x86-64-v2'  # the current default for CMSSW
+            info['required_minimum_microarch'] = '2'  # the current default for CMSSW
             return
         if min_micro_arch == 'any':
-            info['required_minimum_microarch'] = 'any'
+            info['required_minimum_microarch'] = 0
             return
         if min_micro_arch.startswith('x86-64-v'):
-            info['required_minimum_microarch'] = min_micro_arch
+            info['required_minimum_microarch'] = int(min_micro_arch.split('v')[-1])
             return
         self.logger.error(f"Not supported microarch: {min_micro_arch}. Ignore it")
         info['required_minimum_microarch'] = 'any'
