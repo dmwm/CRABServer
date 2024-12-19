@@ -78,14 +78,15 @@ def main(log):
     # prepare a JSON to be sent to MONIT
     jsonDoc = {'producer': MONITUSER, 'type': 'reportrecallquota', 'hostname': gethostname()}
     # get info for the used account, each will be sent with ad-hoc tag in the JSON
-    accounts = [{'name': 'crab_tape_recall', 'tag': 'tape_recall_total_TB'},
-                {'name': 'crab_input',       'tag': 'crab_input_total_TB'}]
+    # different strategies need to be used for tape reall and input locking
+    # tape recall rules are created on the various user accounts, so need to sum by activity
+    # input locking rules are all created by crab_input account and used quota can be obained very simply
+    accounts = [{'name': None, 'activity': 'Analysis TapeRecall', 'tag': 'tape_recall_total_TB'},
+                {'name': 'crab_input', 'activity': None,  'tag': 'crab_input_total_TB'}]
     for account in accounts:
-        if account['name']=='crab_tape_recall':
-            activity='Analysis TapeRecall'
-        elif account['name']=='crab_input':
-            activity='Analysis Input'
-        report = createQuotaReport(rucioClient=rucioClient, account=account['name'], activity=activity)
+        report = createQuotaReport(rucioClient=rucioClient,
+                                   account=account['name'],
+                                   activity=account['activity'])
         jsonDoc[account['tag']] = report['totalTB']
     send_and_check(jsonDoc)
 
