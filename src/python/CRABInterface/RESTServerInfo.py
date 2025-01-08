@@ -17,6 +17,7 @@ class RESTServerInfo(RESTEntity):
 
     def __init__(self, app, api, config, mount, centralcfg):
         RESTEntity.__init__(self, app, api, config, mount)
+        self.config = config
         self.centralcfg = centralcfg
         self.logger = logging.getLogger("CRABLogger.RESTServerInfo")
         #used by the client to get the url where to update the cache (cacheSSL)
@@ -41,7 +42,7 @@ class RESTServerInfo(RESTEntity):
 
     @conn_handler(services=['centralconfig'])
     def delegatedn(self, **kwargs):
-        yield {'services': self.centralcfg.centralconfig['delegate-dn']}
+        yield {'services': [self.config.delegateDN]}
 
     @conn_handler(services=['centralconfig'])
     def backendurls(self , **kwargs):
