@@ -121,8 +121,8 @@ def createScriptLines(opts, pklIn):
     if opts.runAndLumis:
         runAndLumis = readFileFromTarball(opts.runAndLumis, 'run_and_lumis.tar.gz')
     inputFiles = {}
-    if opts.inputFile:
-        inputFiles = readFileFromTarball(opts.inputFile, 'input_files.tar.gz')
+    if opts.inputFileList:
+        inputFiles = readFileFromTarball(opts.inputFileList, 'input_files.tar.gz')
 
     # build a tweak object with the needed changes to be applied to PSet
     tweak = PSetTweak()
