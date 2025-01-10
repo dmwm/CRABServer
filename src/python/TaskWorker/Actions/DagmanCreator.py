@@ -565,6 +565,7 @@ class DagmanCreator(TaskAction):
         else:
             raise TaskWorkerException(f"Cannot find TaskManagerRun.tar.gz inside the cwd: {os.getcwd()}")
         info['additional_input_file'] += ", sandbox.tar.gz"  # it will be present on SPOOL_DIR after dab_bootstrap
+        info['additional_input_file'] += ", input_args.json"
         info['additional_input_file'] += ", run_and_lumis.tar.gz"
         info['additional_input_file'] += ", input_files.tar.gz"
         info['additional_input_file'] += ", submit_env.sh"
