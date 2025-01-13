@@ -39,11 +39,12 @@ class DagmanKiller(TaskAction):
             raise ValueError("No proxy provided")
         self.proxy = self.task['user_proxy']  # pylint: disable=attribute-defined-outside-init
 
+        if not self.task['tw_name'] or not self.task['clusterid']:
+            self.logger.info("Task %s was not submitted to HTCondor scheduler yet", self.workflow)
+            return
+
         self.logger.info("About to kill workflow: %s.", self.workflow)
 
-        self.workflow = str(self.workflow)  # pylint: disable=attribute-defined-outside-init
-        if not WORKFLOW_RE.match(self.workflow):
-            raise Exception("Invalid workflow name.")
 
         # Query HTCondor for information about running jobs and update Dashboard appropriately
         if self.task['tm_collector']:
@@ -65,7 +66,8 @@ class DagmanKiller(TaskAction):
 
         # Note that we can not send kills for jobs not in queue at this time; we'll need the
         # DAG FINAL node to be fixed and the node status to include retry number.
-        return self.killAll(const)
+        self.killAll(const)
+        return
 
     def killAll(self, jobConst):
 
