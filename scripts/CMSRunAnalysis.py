@@ -322,12 +322,15 @@ def parseArgs():
 
     # allow for arguments simply be the jobId (a string because automtic splitting has format like N-M
     if getattr(opts, 'jobId', None):
+        arguments = {}
         with open('input_args.json', 'r', encoding='UTF-8') as fh:
             allArgs = json.load(fh)  # read file prepared by DagmanCreator
-        for arguments in allArgs:
-            if arguments['CRAB_Id'] == opts.jobId:
-                break  # pick the arguments for this job
-        # TODO: fail with error if jobId is not found in input_args.json (useful when using via preparelocal)
+        for args in allArgs:
+            if args['CRAB_Id'] == opts.jobId:
+                arguments = args  # pick the arguments for this job
+                break
+        if not arguments:
+            raise Exception("input jobId not found in input_args.json")
         for key, value in arguments.items():
             setattr(opts, key, value)
 
@@ -346,6 +349,7 @@ def parseArgs():
 
     # allow for most input arguments to be passed via a (job specific) JSON file
     if getattr(opts, 'jsonArgFile', None):
+        arguments = {}
         with open(opts.jsonArgFile, 'r', encoding='UTF-8') as fh:
             arguments = json.load(fh)
         for key, value in arguments.items():
