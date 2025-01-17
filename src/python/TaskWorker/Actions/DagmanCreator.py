@@ -307,10 +307,12 @@ def transform_strings(data):
         if val is None:
             info[var] = 'undefined'
         else:
+            # should better handle double quotes when filling JDL's and remove this !
+            # now it is a mess since some things in info get their double quote here, some in the JOB_SUBMIT string
             info[var] = json.dumps(val)
 
-    for var in 'accounting_group', 'accounting_group_user':
-        info[var] = data[var]
+    #for var in 'accounting_group', 'accounting_group_user':
+    #    info[var] = data[var]
 
     for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries', 'jobcount':
         info[var] = int(data[var])
@@ -328,10 +330,10 @@ def transform_strings(data):
     info['algoargs'] = '"' + json.dumps({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : data['algoargs']}).replace('"', r'\"') + '"'
     info['attempt'] = 0
 
-    for var in ["jobsw", "jobarch", "asyncdest", "requestname"]:
-        info[var] = data[var]
+    #for var in ["jobsw", "jobarch", "asyncdest", "requestname"]:
+    #    info[var] = data[var]
 
-    info["addoutputfiles"] = '{}'
+    # info["addoutputfiles"] = '{}'
 
     temp_dest, dest = makeLFNPrefixes(data)
     info["temp_dest"] = temp_dest
