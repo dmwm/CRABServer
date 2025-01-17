@@ -83,7 +83,6 @@ JOB_SUBMIT = \
 +CRAB_PublishName = %(publishname)s
 +CRAB_Publish = %(publication)s
 +CRAB_PublishDBSURL = %(publishdbsurl)s
-+CRAB_ISB = %(cacheurl)s
 +CRAB_AdditionalOutputFiles = %(addoutputfiles)s
 +CRAB_EDMOutputFiles = %(edmoutfiles)s
 +CRAB_TFileOutputFiles = %(tfileoutfiles)s
@@ -100,11 +99,9 @@ JOB_SUBMIT = \
 +CRAB_DbInstance = %(dbinstance)s
 +CRAB_NumAutomJobRetries = %(numautomjobretries)s
 CRAB_Attempt = %(attempt)d
-CRAB_ISB = %(cacheurl_flatten)s
-CRAB_AdditionalOutputFiles = %(addoutputfiles_flatten)s
-CRAB_JobSW = %(jobsw_flatten)s
-CRAB_JobArch = %(jobarch_flatten)s
-CRAB_Archive = %(cachefilename_flatten)s
+CRAB_AdditionalOutputFiles = %(addoutputfiles)s
+CRAB_JobSW = %(jobsw)s
+CRAB_JobArch = %(jobarch)s
 CRAB_Id = $(count)
 +CRAB_Id = "$(count)"
 +CRAB_JobCount = %(jobcount)d
@@ -300,7 +297,7 @@ def transform_strings(data):
     """
     info = {}
     for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'primarydataset', 'splitalgo', 'algoargs', \
-               'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
+               'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
                'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
                'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', \
                'stageoutpolicy', 'taskType', 'worker_name', 'cms_wmtool', 'cms_tasktype', 'cms_type', \
@@ -331,10 +328,10 @@ def transform_strings(data):
     info['algoargs'] = '"' + json.dumps({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : data['algoargs']}).replace('"', r'\"') + '"'
     info['attempt'] = 0
 
-    for var in ["cacheurl", "jobsw", "jobarch", "cachefilename", "asyncdest", "requestname"]:
-        info[var+"_flatten"] = data[var]
+    for var in ["jobsw", "jobarch", "asyncdest", "requestname"]:
+        info[var] = data[var]
 
-    info["addoutputfiles_flatten"] = '{}'
+    info["addoutputfiles"] = '{}'
 
     temp_dest, dest = makeLFNPrefixes(data)
     info["temp_dest"] = temp_dest
@@ -482,8 +479,6 @@ class DagmanCreator(TaskAction):
         #info['primarydataset'] = info['tm_primary_dataset']
         info['splitalgo'] = info['tm_split_algo']
         info['algoargs'] = info['tm_split_args']
-        info['cachefilename'] = info['tm_user_sandbox']
-        info['cacheurl'] = info['tm_cache_url']
         info['userhn'] = info['tm_username']
         info['publishname'] = info['tm_publish_name']
         info['asyncdest'] = info['tm_asyncdest']
@@ -550,7 +545,7 @@ class DagmanCreator(TaskAction):
                     info['accelerator_jdl'] += f"\n+CUDARuntime={classad.quote(cudaRuntime)}"
         else:
             info['accelerator_jdl'] = ''
-        arch = info['jobarch_flatten'].split("_")[0]  # extracts "slc7" from "slc7_amd64_gcc10"
+        arch = info['jobarch'].split("_")[0]  # extracts "slc7" from "slc7_amd64_gcc10"
         required_os_list = ARCH_TO_OS.get(arch)
         if not required_os_list:
             raise SubmissionRefusedException(f"Unsupported architecture {arch}")
@@ -729,7 +724,6 @@ class DagmanCreator(TaskAction):
             argDict['firstLumi'] = dagspec['firstLumi']  # 'None'
             argDict['firstRun'] = dagspec['firstRun']  # 'None'
             argDict['userSandbox'] = task['tm_user_sandbox']  #'sandbox.tar.gz'
-            argDict['CRAB_ISB'] = task['tm_cache_url']  # 'https://cmsweb.cern.ch/crabcache'
             argDict['cmsswVersion'] = task['tm_job_sw']  # 'CMSSW_9_2_5'
             argDict['scramArch'] = task['tm_job_arch']  # 'slc6_amd64_gcc530'
             argDict['seeding'] = 'AutomaticSeeding'
