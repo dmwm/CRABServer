@@ -720,18 +720,18 @@ class DagmanCreator(TaskAction):
         argdicts = []
         for dagspec in dagSpecs:
             argDict = {}
-            argDict['inputFiles'] = f"job_input_file_list_{dagspec['count']}.txt"  #'job_input_file_list_1.txt'
-            argDict['runAndLumiMask'] = f"job_lumis_{dagspec['count']}.json"
+            argDict['inputFileList'] = f"job_input_file_list_{dagspec['count']}.txt"  #'job_input_file_list_1.txt'
+            argDict['runAndLumis'] = f"job_lumis_{dagspec['count']}.json"
             argDict['CRAB_Id'] = dagspec['count'] #'1'
             argDict['lheInputFiles'] = dagspec['lheInputFiles']  # False
             argDict['firstEvent'] = dagspec['firstEvent']  # 'None'
             argDict['lastEvent'] = dagspec['lastEvent']  # 'None'
             argDict['firstLumi'] = dagspec['firstLumi']  # 'None'
             argDict['firstRun'] = dagspec['firstRun']  # 'None'
-            argDict['CRAB_Archive'] = task['tm_user_sandbox']  #'sandbox.tar.gz'
+            argDict['userSandbox'] = task['tm_user_sandbox']  #'sandbox.tar.gz'
             argDict['CRAB_ISB'] = task['tm_cache_url']  # 'https://cmsweb.cern.ch/crabcache'
-            argDict['CRAB_JobSW'] = task['tm_job_sw']  # 'CMSSW_9_2_5'
-            argDict['CRAB_JobArch'] = task['tm_job_arch']  # 'slc6_amd64_gcc530'
+            argDict['cmsswVersion'] = task['tm_job_sw']  # 'CMSSW_9_2_5'
+            argDict['scramArch'] = task['tm_job_arch']  # 'slc6_amd64_gcc530'
             argDict['seeding'] = 'AutomaticSeeding'
             argDict['scriptExe'] = task['tm_scriptexe']  #
             argDict['eventsPerLumi'] = task['tm_events_per_lumi']  #
