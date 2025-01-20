@@ -36,6 +36,9 @@ variables:
       when: never 
   skip_submit:
     - if: '$SKIP_SUBMIT == "true"'
+      when: never
+  skip_check:
+    - if: '$SUBMIT_STATUS_TRACKING == "false" && $CLIENT_CONFIGURATION_VALIDATION == "false" && $CLIENT_VALIDATION_SUITE == "false"'
       when: never 
 
 stages:
@@ -355,7 +358,7 @@ client_configuration_validation:
 check_test_result:
   rules:
     - if: '$SUBMIT_STATUS_TRACKING == "true" || $CLIENT_VALIDATION_SUITE == "true" || $CLIENT_CONFIGURATION_VALIDATION == "true"'
-    - !reference [.default_rules, skip_submit]
+    - !reference [.default_rules, skip_check]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: check_testsuite
