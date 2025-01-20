@@ -18,7 +18,11 @@ variables:
   CLIENT_VALIDATION_SUITE: "true"
   SKIP_BUILD: "false"
   SKIP_DEPLOY: "false"
-  SKIP_SUBMIT: "false" 
+  SKIP_SUBMIT: >
+    if [ "$SUBMIT_STATUS_TRACKING" == "false" ] && 
+       [ "$CLIENT_CONFIGURATION_VALIDATION" == "false" ] && 
+       [ "$CLIENT_VALIDATION_SUITE" == "false" ]; 
+    then echo "false"; else echo "false"; fi
 
 # This key define variables which are later used in `!reference` tag in `rules`.
 # Ref https://docs.gitlab.com/ee/ci/jobs/index.html#hide-jobs
