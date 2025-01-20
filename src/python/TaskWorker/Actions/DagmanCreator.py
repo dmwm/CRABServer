@@ -72,61 +72,61 @@ SCRIPT DEFER 4 300 PRE Job{count}SubJobs dag_bootstrap.sh PREDAG {stage} {comple
 
 JOB_SUBMIT = \
 """
-+CRAB_ReqName = %(requestname)s
-+CRAB_Workflow = %(workflow)s
-+CMS_JobType = %(jobtype)s
-+CRAB_JobSW = %(jobsw)s
-+CRAB_JobArch = %(jobarch)s
-+CRAB_DBSURL = %(dbsurl)s
++CRAB_ReqName = "%(requestname)s"
++CRAB_Workflow = "%(workflow)s"
++CMS_JobType = "%(jobtype)s"
++CRAB_JobSW = "%(jobsw)s"
++CRAB_JobArch = "%(jobarch)s"
++CRAB_DBSURL = "%(dbsurl)s"
 +CRAB_PostJobStatus = "NOT RUN"
 +CRAB_PostJobLastUpdate = 0
-+CRAB_PublishName = %(publishname)s
-+CRAB_Publish = %(publication)s
-+CRAB_PublishDBSURL = %(publishdbsurl)s
++CRAB_PublishName = "%(publishname)s"
++CRAB_Publish = "%(publication)s"
++CRAB_PublishDBSURL = "%(publishdbsurl)s"
 +CRAB_AdditionalOutputFiles = %(addoutputfiles)s
 +CRAB_EDMOutputFiles = %(edmoutfiles)s
 +CRAB_TFileOutputFiles = %(tfileoutfiles)s
-+CRAB_UserDN = %(userdn)s
-+CRAB_UserHN = %(userhn)s
-+CRAB_AsyncDest = %(asyncdest)s
-+CRAB_StageoutPolicy = %(stageoutpolicy)s
-+CRAB_UserRole = %(tm_user_role)s
-+CRAB_UserGroup = %(tm_user_group)s
-+CRAB_TaskWorker = %(worker_name)s
-+CRAB_RetryOnASOFailures = %(retry_aso)s
++CRAB_UserDN = "%(userdn)s"
++CRAB_UserHN = "%(userhn)s"
++CRAB_AsyncDest = "%(asyncdest)s"
++CRAB_StageoutPolicy = "%(stageoutpolicy)s"
++CRAB_UserRole = "%(tm_user_role)s"
++CRAB_UserGroup = "%(tm_user_group)s"
++CRAB_TaskWorker = "%(worker_name)s"
++CRAB_RetryOnASOFailures = "%(retry_aso)s"
 +CRAB_ASOTimeout = %(aso_timeout)s
-+CRAB_RestHost = %(resthost)s
-+CRAB_DbInstance = %(dbinstance)s
++CRAB_RestHost = "%(resthost)s"
++CRAB_DbInstance = "%(dbinstance)s"
 +CRAB_NumAutomJobRetries = %(numautomjobretries)s
 CRAB_Attempt = %(attempt)d
 CRAB_AdditionalOutputFiles = %(addoutputfiles)s
-CRAB_JobSW = %(jobsw)s
-CRAB_JobArch = %(jobarch)s
+CRAB_JobSW = "%(jobsw)s"
+CRAB_JobArch = "%(jobarch)s"
 CRAB_Id = $(count)
 +CRAB_Id = "$(count)"
 +CRAB_JobCount = %(jobcount)d
 +CRAB_OutTempLFNDir = "%(temp_dest)s"
 +CRAB_OutLFNDir = "%(output_dest)s"
-+CRAB_oneEventMode = %(oneEventMode)s
-+CRAB_PrimaryDataset = %(primarydataset)s
++CRAB_oneEventMode = "%(oneEventMode)s"
++CRAB_PrimaryDataset = "%(primarydataset)s"
 +CRAB_DAGType = "Job"
-accounting_group = %(accounting_group)s
-accounting_group_user = %(accounting_group_user)s
-+CRAB_SubmitterIpAddr = %(submitter_ip_addr)s
+accounting_group = "%(accounting_group)s"
+accounting_group_user = "%(accounting_group_user)s"
++CRAB_SubmitterIpAddr = "%(submitter_ip_addr)s"
 +CRAB_TaskLifetimeDays = %(task_lifetime_days)s
 +CRAB_TaskEndTime = %(task_endtime)s
-+CRAB_SplitAlgo =  %(splitalgo)s
++CRAB_SplitAlgo =  "%(splitalgo)s"
 +CRAB_AlgoArgs = %(algoargs)s
-+CMS_WMTool = %(cms_wmtool)s
-+CMS_TaskType = %(cms_tasktype)s
++CMS_WMTool = "%(cms_wmtool)s"
++CMS_TaskType = "%(cms_tasktype)s"
 +CMS_SubmissionTool = "CRAB"
-+CMS_Type = %(cms_type)s
++CMS_Type = "%(cms_type)s"
 
 
 # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
-+REQUIRED_ARCH = %(required_arch)s
-+REQUIRED_MINIMUM_MICROARCH = %(required_minimum_microarch)s
-+DESIRED_CMSDataset = %(inputdata)s
++REQUIRED_ARCH = "%(required_arch)s"
++REQUIRED_MINIMUM_MICROARCH = "%(required_minimum_microarch)s"
++DESIRED_CMSDataset = "%(inputdata)s"
 
 +JOBGLIDEIN_CMSSite = "$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])"
 job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite, RemoteSysCpu, RemoteUserCpu
@@ -290,6 +290,27 @@ def validateUserLFNs(path, outputFiles):
             msg += "\n and therefore can not be handled in our DataBase"
             raise SubmissionRefusedException(msg)
 
+def createJobSubmit(data):
+    """
+    create a JobSubmit object template which will be persisted as Job.submit file and send to
+    scheduler, where it will be used to submit individual jobs after PreJob.py fills in the job-specific valued
+    """
+    jobSubmit = htcondor.Submit()
+    for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'primarydataset', 'splitalgo', 'algoargs', \
+               'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
+               'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
+               'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', \
+               'stageoutpolicy', 'taskType', 'worker_name', 'cms_wmtool', 'cms_tasktype', 'cms_type', \
+               'required_arch', 'required_minimum_microarch', 'resthost', 'dbinstance', 'submitter_ip_addr', \
+               'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
+        val = data.get(var, None)
+        if val is None:
+            jobSubmit[var] = 'undefined'
+        else:
+            # should better handle double quotes when filling JDL's and remove this !
+            # now it is a mess since some things in info get their double quote here, some in the JOB_SUBMIT string
+            jobSubmit[var] = val
+
 def transform_strings(data):
     """
     Converts the arguments in the data dictionary to the arguments necessary
@@ -330,8 +351,9 @@ def transform_strings(data):
     info['algoargs'] = '"' + json.dumps({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : data['algoargs']}).replace('"', r'\"') + '"'
     info['attempt'] = 0
 
-    #for var in ["jobsw", "jobarch", "asyncdest", "requestname"]:
-    #    info[var] = data[var]
+    # SB these must not be "json dumped" here ! So revert what doen at line 312 ... oh my my my .....
+    for var in ["jobsw", "jobarch", "asyncdest", "requestname"]:
+        info[var] = data[var]
 
     # info["addoutputfiles"] = '{}'
 
@@ -454,77 +476,92 @@ class DagmanCreator(TaskAction):
 
     def makeJobSubmit(self, task):
         """
-        Create the submit file. This is reused by all jobs in the task; differences
-        between the jobs are taken care of in the makeDagSpecs.
-        Any key defined in the dictionary passed to transform_strings
-        is deleted unless accounted for in the transform_strings method.
+        Prepare an HTCondor Submit object which will serve as template for
+         all job submissions. It will be persisted in Job.submiy JDL file and
+         customized by PreJob.py for each job using info from DAG
+        Differences between the jobs are taken care of in the makeDagSpecs and
+         propagated to the scheduler via the DAG description files
         """
 
         if os.path.exists("Job.submit"):
-            info = {'jobcount': int(task['jobcount'])}
-            return info
+            return None
+            #info = {'jobcount': int(task['jobcount'])}
+            #return info
 
-        # From here on out, we convert from tm_* names to the DataWorkflow names
-        info = dict(task)
+        jobSbumit = htcondor.Submit()
+        # these are classAds that we want to be added to each grid job
+        # Note that argument to classad.quote can only be string or None
+        jobSubmit['My.CRAB_Reqname'] = classad.quote(task['tm_taskname'])
+        jobSubmit['My.CRAB_workflow'] = classad.quote(task['tm_taskname'])
+        jobSubmit['My.CMS_JobtYpe'] = classad.quote('Analysis')
+        jobSubmit['My.CRAB_JobSw'] = classad.quote(task['tm_job_sw'])
+        jobSubmit['My.CRAB_JobArch'] = classad.quote(task['tm_job_arch'])
+        jobSubmit['My.CRAB_DBSURL'] = classad.quote(task['tm_dbs_url'])
+        jobSubmit['My.CRAB_PostJobStatus'] = classad.quote("NOT RUN")
+        jobSubmit['My.CRAB_PostJobLastUpdate'] = classad.quote("0")
+        jobSubmit['My.CRAB_PublishName'] = %(publishname)
+        jobSubmit['My.CRAB_Publish = %(publication)
+        jobSubmit['My.CRAB_PublishDBSURL'] = classad.quote(task['tm_publish_dbs_url'])
+        jobSubmit['My.CRAB_ISB'] = classad.quote(task['tm_cache_url'])
 
-        info['workflow'] = task['tm_taskname']
-        info['jobtype'] = 'Analysis'
-        info['jobsw'] = info['tm_job_sw']
-        info['jobarch'] = info['tm_job_arch']
-        info['inputdata'] = info['tm_input_dataset']
-        ## The 1st line below is for backward compatibility with entries in the TaskDB
-        ## made by CRAB server < 3.3.1511, where tm_primary_dataset = null
-        ## and tm_input_dataset always contains at least one '/'. Once we don't
-        ## care about backward compatibility anymore, remove the 1st line and
-        ## uncomment the 2nd line.
-        info['primarydataset'] = info['tm_primary_dataset'] if info['tm_primary_dataset'] else info['tm_input_dataset'].split('/')[1]
-        #info['primarydataset'] = info['tm_primary_dataset']
-        info['splitalgo'] = info['tm_split_algo']
-        info['algoargs'] = info['tm_split_args']
-        info['userhn'] = info['tm_username']
-        info['publishname'] = info['tm_publish_name']
-        info['asyncdest'] = info['tm_asyncdest']
-        info['dbsurl'] = info['tm_dbs_url']
-        info['publishdbsurl'] = info['tm_publish_dbs_url']
-        info['publication'] = 1 if info['tm_publication'] == 'T' else 0
-        info['userdn'] = info['tm_user_dn']
-        info['requestname'] = task['tm_taskname'].replace('"', '')
-        info['savelogsflag'] = 1 if info['tm_save_logs'] == 'T' else 0 # Note: this must always be 0 for probe jobs, is taken care of in PostJob.py
-        info['blacklistT1'] = 0
-        info['siteblacklist'] = task['tm_site_blacklist']
-        info['sitewhitelist'] = task['tm_site_whitelist']
-        info['addoutputfiles'] = task['tm_outfiles']
-        info['tfileoutfiles'] = task['tm_tfile_outfiles']
-        info['edmoutfiles'] = task['tm_edm_outfiles']
-        info['oneEventMode'] = 1 if info['tm_one_event_mode'] == 'T' else 0
-        info['taskType'] = self.getDashboardTaskType(task)
-        info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
-        info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
-        if task['tm_output_lfn'].startswith('/store/user/rucio') or \
-            task['tm_output_lfn'].startswith('/store/group/rucio'):
-            info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASORucioTimeout', 0)
+        def pythonListToClassAdValue(aList):
+            # python lists need special handling to become the string '{"a","b",...,"c"}'
+            quotedItems = json.dumps(aList)  # from [s1, s2] to the string '["s1","s2"]'
+            quotedItems = quotedItems.lstrip('[').rstrip(']')  # remove square brackets [ ]
+            value = "{" + quotedItems + "}"  # make final string adding the curly brackets { }
+            return value
+        jobSubmit['My.CRAB_AdditionalOutputFiles'] = pythonListToClassAdValue(task['tm_outfiles'])
+        jobSubmit['My.CRAB_EDMOutputFiles'] =  pythonListToClassAdValue(task['tm_edm_outfiles'])
+        jobSubmit['My.CRAB_TFileOutputFiles'] = pythonListToClassAdValue(task['tm_outfiles'])
+        jobSubmit['My.CRAB_UserDN'] = classad.quote(task['tm_user_dn'])
+        jobSubmit['My.CRAB_UserHN'] = classad.quote(task['tm_username'])
+        jobSubmit['My.CRAB_AsyncDest'] = classad.quote(task['asyncdest'])
+        jobSubmit['My.CRAB_StageoutPolicy'] = classad.quote(task['stageoutpolicy'])
+        jobSubmit['My.CRAB_UserRole'] = classad.quote(task['tm_user_role'])
+        jobSubmit['My.CRAB_UserGroup'] = classad.quote(task['tm_user_group'])
+        jobSubmit['My.CRAB_TaskWorker'] = classad.quote(getattr(self.config.TaskWorker, 'name', 'unknown'))
+        retry_aso = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
+        jobSubmit['My.CRAB_RetryOnASOFailures'] = classad.quote(str(retry_aso))
+        jobSubmit['My.CRAB_ASOTimeout'] = classad.quote(str(getattr(self.config.TaskWorker, 'ASORucioTimeout', 0)))
+        jobSubmit['My.CRAB_RestHost'] = classad.quote(task['resthost'])
+        jobSubmit['My.CRAB_DbInstance'] = classad.quote(task['dbinstance'])
+        jobSubmit['My.CRAB_NumAutomJobRetries'] = classad.quote(str(task['numautomjobretries']))
+        jobSubmit['My.CRAB_Id'] = "$(count)"  #  count macro will be defined via VARS line in the DAG description file
+        jobSubmit['My.CRAB_JobCount'] = classad.quote(str(task['jobcount']))
+        temp_dest, dest = makeLFNPrefixes(task)
+        jobSubmit['My.CRAB_OutTempLFNDir'] = classad.quote(temp_dest)
+        jobSubmit['My.CRAB_OutLFNDir'] = classad.quote(dest)
+        oneEventMode = 1 if info['tm_one_event_mode'] == 'T' else 0
+        jobSubmit['My.CRAB_oneEventMode'] = classad.quote(str(oneEventMode))
+        jobSubmit['My.CRAB_PrimaryDataset'] = classad.quote(task['tm_primary_dataset'])
+        jobSubmit['My.CRAB_DAGType'] = classad.quote("Job")
+        jobSubmit['My.CRAB_SubmitterIpAddr'] = classad.quote(task['tm_submitter_ip_addr'])
+        jobSubmit['My.CRAB_TaskLifetimeDays'] = classad.quote(str(TASKLIFETIME // 24 // 60 // 60))
+        jobSubmit['My.CRAB_TaskEndTime'] = classad.quote(str(int(task["tm_start_time"]) + TASKLIFETIME))
+        jobSubmit['My.CRAB_SplitAlgo'] = info['tm_split_algo']
+        jobSubmit['My.CRAB_AlgoArgs'] = info['tm_split_args']
+        jobSubmit['My.CMS_WMTool'] =  classad.quote(self.setCMS_WMTool(task))
+        jobSubmit['My.CMS_TaskType'] = classad.quote(self.setCMS_TaskType(task))
+        jobSubmit['My.CMS_SubmissionTool'] = classad.quote("CRAB")
+        jobSubmit['My.CMS_Type'] = classad.quote(self.setCMS_Type(task))
+
+        transferOutputs = "1" if task['tm_transfer_outputs'] == 'T' else "0" # Note: this must always be 0 for probe jobs, is taken care of in PostJob.py
+        jobSbumit['.My.CRAB_TransferOutputs'] = classad.quote(transferOutputs)
+
+
+        # now actual HTC Job Submission commands, here right hand side can be simply strings
+
+        egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
+        if egroups and task['tm_username'] in self.getHighPrioUsers(info['user_proxy'], info['workflow'], egroups):
+            info['accounting_group'] = 'highprio'
         else:
-            info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASOTimeout', 0)
-        info['submitter_ip_addr'] = task['tm_submitter_ip_addr']
-        info['cms_wmtool'] = self.setCMS_WMTool(task)
-        info['cms_tasktype'] = self.setCMS_TaskType(task)
-        info['cms_type'] = self.setCMS_Type(task)
-
-        #Classads for task lifetime management, see https://github.com/dmwm/CRABServer/issues/5505
-        info['task_lifetime_days'] = TASKLIFETIME // 24 // 60 // 60
-        info['task_endtime'] = int(task["tm_start_time"]) + TASKLIFETIME
+            info['accounting_group'] = 'analysis'
+        jobSbumit['accounting_group_user'] = task['tm_username']
 
         self.populateGlideinMatching(info)
 
         info['runs'] = []
         info['lumis'] = []
-        info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0 # Note: this must always be 0 for probe jobs, is taken care of in PostJob.py
-        egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
-        if egroups and info['userhn'] in self.getHighPrioUsers(info['user_proxy'], info['workflow'], egroups):
-            info['accounting_group'] = 'highprio'
-        else:
-            info['accounting_group'] = 'analysis'
-        info['accounting_group_user'] = info['userhn']
         info = transform_strings(info)
         info['faillimit'] = task['tm_fail_limit']
         # tm_extrajdl and tm_user_config['acceleratorparams'] contain list of k=v
@@ -565,14 +602,14 @@ class DagmanCreator(TaskAction):
             info['additional_environment_options'] += ' CRAB_TASKMANAGER_TARBALL=local'
         else:
             raise TaskWorkerException(f"Cannot find TaskManagerRun.tar.gz inside the cwd: {os.getcwd()}")
-        info['additional_input_file'] += ", sandbox.tar.gz"  # it will be present on SPOOL_DIR after dab_bootstrap
-        info['additional_input_file'] += ", input_args.json"
-        info['additional_input_file'] += ", run_and_lumis.tar.gz"
-        info['additional_input_file'] += ", input_files.tar.gz"
-        info['additional_input_file'] += ", submit_env.sh"
-        info['additional_input_file'] += ", cmscp.sh"
+        jobSubmit['additional_input_file'] += ", sandbox.tar.gz"  # it will be present on SPOOL_DIR after dab_bootstrap
+        jobSubmit['additional_input_file'] += ", input_args.json"
+        jobSubmit['additional_input_file'] += ", run_and_lumis.tar.gz"
+        jobSubmit['additional_input_file'] += ", input_files.tar.gz"
+        jobSubmit['additional_input_file'] += ", submit_env.sh"
+        jobSubmit['additional_input_file'] += ", cmscp.sh"
 
-        info['max_disk_space'] = MAX_DISK_SPACE
+        jobSbumit['max_disk_space'] = MAX_DISK_SPACE
 
         with open("Job.submit", "w", encoding='utf-8') as fd:
             fd.write(JOB_SUBMIT % info)
@@ -1124,7 +1161,6 @@ class DagmanCreator(TaskAction):
         ## Cache site information
         with open("site.ad.json", "w", encoding='utf-8') as fd:
             json.dump(siteinfo, fd)
-
 
         ## Save the DAG into a file.
         with open(dagFileName, "w", encoding='utf-8') as fd:
