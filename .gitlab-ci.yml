@@ -298,6 +298,7 @@ client_validation_suite:
   rules:
     - if: '$CLIENT_VALIDATION_SUITE == "false"'
       when: never
+    - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: run_testsuite_CV
@@ -329,6 +330,7 @@ client_configuration_validation:
   rules:
     - if: '$CLIENT_CONFIGURATION_VALIDATION == "false"'
       when: never
+    - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: run_testsuite_CCV
@@ -360,6 +362,7 @@ check_test_result:
   rules:
     - if: '$SUBMIT_STATUS_TRACKING == "true" || $CLIENT_VALIDATION_SUITE == "true" || $CLIENT_CONFIGURATION_VALIDATION == "true"'
     - !reference [.default_rules, skip_check]
+    - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: check_testsuite
