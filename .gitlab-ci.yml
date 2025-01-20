@@ -13,9 +13,9 @@ variables:
   # https://docs.docker.com/build/cache/backends/
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
-  SUBMIT_STATUS_TRACKING: "true"
+  STATUS_TRACKING: "true"
   CLIENT_CONFIGURATION_VALIDATION: "true"
-  CLIENT_VALIDATION_SUITE: "true"
+  CLIENT_VALIDATION: "true"
   SKIP_BUILD: "false"
   SKIP_DEPLOY: "false"
   SKIP_SUBMIT: "false"
@@ -38,7 +38,7 @@ variables:
     - if: '$SKIP_SUBMIT == "true"'
       when: never
   skip_check:
-    - if: '$SUBMIT_STATUS_TRACKING == "false" && $CLIENT_CONFIGURATION_VALIDATION == "false" && $CLIENT_VALIDATION_SUITE == "false"'
+    - if: '$STATUS_TRACKING == "false" && $CLIENT_CONFIGURATION_VALIDATION == "false" && $CLIENT_VALIDATION == "false"'
       when: never 
 
 stages:
@@ -255,7 +255,7 @@ deploy_publisher_rucio:
 
 task_submission:
   rules:
-    - if: '$SUBMIT_STATUS_TRACKING == "true" || $CLIENT_VALIDATION_SUITE == "true" || $CLIENT_CONFIGURATION_VALIDATION == "true"'
+    - if: '$STATUS_TRACKING == "true" || $CLIENT_VALIDATION == "true" || $CLIENT_CONFIGURATION_VALIDATION == "true"'
     - !reference [.default_rules, skip_check]
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
@@ -270,9 +270,9 @@ task_submission:
     - export REST_Instance  # from .env
     - export ROOT_DIR
     - export CMSSW_release=CMSSW_13_0_2
-    - export Task_Submission_Status_Tracking=$SUBMIT_STATUS_TRACKING
+    - export Task_Submission_Status_Tracking=$STATUS_TRACKING
     - export Client_Configuration_Validation=$CLIENT_CONFIGURATION_VALIDATION
-    - export Client_Validation_Suite=$CLIENT_VALIDATION_SUITE
+    - export Client_Validation_Suite=$CLIENT_VALIDATION
     - bash -x cicd/gitlab/executeTests.sh
   cache:
     - key: $CI_PIPELINE_ID
@@ -296,7 +296,7 @@ task_submission:
 
 client_validation_suite:
   rules:
-    - if: '$CLIENT_VALIDATION_SUITE == "false"'
+    - if: '$CLIENT_VALIDATION == "false"'
       when: never
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
@@ -360,7 +360,7 @@ client_configuration_validation:
 
 check_test_result:
   rules:
-    - if: '$SUBMIT_STATUS_TRACKING == "true" || $CLIENT_VALIDATION_SUITE == "true" || $CLIENT_CONFIGURATION_VALIDATION == "true"'
+    - if: '$STATUS_TRACKING == "true" || $CLIENT_VALIDATION == "true" || $CLIENT_CONFIGURATION_VALIDATION == "true"'
     - !reference [.default_rules, skip_check]
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
