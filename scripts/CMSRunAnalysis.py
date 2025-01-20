@@ -286,6 +286,7 @@ def handleException(exitAcronym, exitCode, exitMsg):
 
 def parseArgs():
     parser = PassThroughOptionParser()
+    parser.add_option('--jobId', dest='jobId', type='string')
     parser.add_option('--json', dest='jsonArgFile', type='string')
     parser.add_option('-a', dest='archiveJob', type='string')
     parser.add_option('-o', dest='outFiles', type='string')
@@ -319,9 +320,36 @@ def parseArgs():
         if value == 'None':
             setattr(opts, name, None)
 
-    # allow for most input arguments to be passed via a JSON file
-    # in this case only -r and --JobNumber need to be present as arguments
+    # allow for arguments simply be the jobId (a string because automtic splitting has format like N-M
+    if getattr(opts, 'jobId', None):
+        arguments = {}
+        with open('input_args.json', 'r', encoding='UTF-8') as fh:
+            allArgs = json.load(fh)  # read file prepared by DagmanCreator
+        for args in allArgs:
+            if args['CRAB_Id'] == opts.jobId:
+                arguments = args  # pick the arguments for this job
+                break
+        if not arguments:
+            raise Exception("input jobId not found in input_args.json")
+        for key, value in arguments.items():
+            setattr(opts, key, value)
+
+        # remap key in input_args.json to the argument names required by CMSRunAnalysis.py
+        # use as : value_of_argument_name = inputArgs[argMap[argument_name]]
+        # to ease transition to cleaner code the new key are only added if missing
+        argMap = {
+            'archiveJob': 'CRAB_Archive', 'outFiles': 'CRAB_AdditionalOutputFiles',
+            'sourceURL': 'CRAB_ISB', 'cmsswVersion': 'CRAB_JobSW',
+            'scramArch': 'CRAB_JobArch', 'runAndLumis': 'runAndLumiMask',
+            'inputFile' : 'inputFiles', 'lheInputFiles': 'lheInputFiles'
+        }
+        for key, value in argMap.items():
+            if not getattr(opts, key, None):
+                setattr(opts, key, arguments[value])  # assign to our variables
+
+    # allow for most input arguments to be passed via a (job specific) JSON file
     if getattr(opts, 'jsonArgFile', None):
+        arguments = {}
         with open(opts.jsonArgFile, 'r', encoding='UTF-8') as fh:
             arguments = json.load(fh)
         for key, value in arguments.items():
