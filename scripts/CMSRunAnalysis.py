@@ -12,7 +12,6 @@ import json
 import shutil
 import signal
 import logging
-import somethingwhichidonotneed
 
 
 import subprocess
@@ -23,7 +22,6 @@ from optparse import OptionParser, BadOptionError, AmbiguousOptionError  # pylin
 
 from TweakPSet import prepareTweakingScript
 
-useanundefinedvariable = nothere
 
 
 # replicate here code from ServerUtilities.py to avoid importing CRABServer in jobs
