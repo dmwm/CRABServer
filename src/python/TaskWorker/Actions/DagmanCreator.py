@@ -399,11 +399,12 @@ class DagmanCreator(TaskAction):
         self.rucioClient = rucioClient
         self.runningInTW = crabserver is not None
 
-    def populateGlideinMatching(self, info):
+    def populateGlideinMatching(self, task):
         """ actually simply set the required arch and microarch """
-        scram_arch = info['tm_job_arch']
+        matchInfo = {}
+        scram_arch = task['tm_job_arch']
         # required_arch, set default
-        info['required_arch'] = "X86_64"
+        matchInfo['required_arch'] = "X86_64"
         # The following regex matches a scram arch into four groups
         # for example el9_amd64_gcc10 is matched as (el)(9)_(amd64)_(gcc10)
         # later, only the third group is returned, the one corresponding to the arch.
@@ -413,22 +414,24 @@ class DagmanCreator(TaskAction):
             if arch not in SCRAM_TO_ARCH:
                 msg = f"Job configured for non-supported ScramArch '{arch}'"
                 raise SubmissionRefusedException(msg)
-            info['required_arch'] = SCRAM_TO_ARCH.get(arch)
+            matchInfo['required_arch'] = SCRAM_TO_ARCH.get(arch)
 
         # required minimum micro_arch may need to be handled differently in the future (arm, risc, ...)
         # and may need different classAd(s) in the JDL, so try to be general here
-        min_micro_arch = info['tm_job_min_microarch']
+        min_micro_arch = task['tm_job_min_microarch']
         if not min_micro_arch:
-            info['required_minimum_microarch'] = '2'  # the current default for CMSSW
+            matchInfo['required_minimum_microarch'] = '2'  # the current default for CMSSW
             return
         if min_micro_arch == 'any':
-            info['required_minimum_microarch'] = 0
+            matchInfo['required_minimum_microarch'] = 0
             return
         if min_micro_arch.startswith('x86-64-v'):
-            info['required_minimum_microarch'] = int(min_micro_arch.split('v')[-1])
+            matchInfo['required_minimum_microarch'] = int(min_micro_arch.split('v')[-1])
             return
         self.logger.error(f"Not supported microarch: {min_micro_arch}. Ignore it")
-        info['required_minimum_microarch'] = 'any'
+        matchInfo['required_minimum_microarch'] = 'any'
+
+        return matchInfo
 
     def getDashboardTaskType(self, task):
         """ Get the dashboard activity name for the task.
@@ -549,16 +552,30 @@ class DagmanCreator(TaskAction):
         jobSbumit['.My.CRAB_TransferOutputs'] = classad.quote(transferOutputs)
 
 
+        matchInfo = self.populateGlideinMatching(task)
+
+        # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
+        jobSbumit['My.REQUIRED_ARCH'] = matchInfo['required_arch']
+        jobSbumit['My.REQUIRED_MINIMUM_MICROARCH'] = matchInfo['required_minimum_microarch']
+        jobSbumit['My.DESIRED_CMSDataset'] = classad.quote(task['tm_input_dataset'])
+
+        # Stefano is not sure why we need this, i.e. whether we can replace its use with GLIDEIN_CMSSite
+        jobSbumit['My.JOBGLIDEIN_CMSSite'] = classad.quote("$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])")
+
         # now actual HTC Job Submission commands, here right hand side can be simply strings
 
         egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
-        if egroups and task['tm_username'] in self.getHighPrioUsers(info['user_proxy'], info['workflow'], egroups):
-            info['accounting_group'] = 'highprio'
+        if egroups and task['tm_username'] in self.getHighPrioUsers(egroups):
+            jobSbumit['accounting_group'] = 'highprio'
         else:
-            info['accounting_group'] = 'analysis'
+            jobSbumit['accounting_group'] = 'analysis'
         jobSbumit['accounting_group_user'] = task['tm_username']
 
-        self.populateGlideinMatching(info)
+        job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite, RemoteSysCpu, RemoteUserCpu
+
+        # Recover job output and logs on eviction events; make sure they aren't spooled
+        # This allows us to return stdout to users when they hit memory limits (which triggers PeriodicRemove).
+        WhenToTransferOutput = ON_EXIT_OR_EVICT
 
         info['runs'] = []
         info['lumis'] = []
@@ -1207,7 +1224,7 @@ class DagmanCreator(TaskAction):
 
         return info, splitterResult, subdags
 
-    def getHighPrioUsers(self, userProxy, workflow, egroups):
+    def getHighPrioUsers(self, egroups):
         """ get the list of high priority users """
 
         highPrioUsers = set()
@@ -1218,7 +1235,7 @@ class DagmanCreator(TaskAction):
             msg = "Error when getting the high priority users list." \
                   " Will ignore the high priority list and continue normally." \
                   f" Error reason: {ex}"
-            self.uploadWarning(msg, userProxy, workflow)
+            self.logger.error(msg)
             return []
         return highPrioUsers
 
