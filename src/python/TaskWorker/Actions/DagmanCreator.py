@@ -491,7 +491,7 @@ class DagmanCreator(TaskAction):
             #info = {'jobcount': int(task['jobcount'])}
             #return info
 
-        jobSbumit = htcondor.Submit()
+        jobSubmit = htcondor.Submit()
         # these are classAds that we want to be added to each grid job
         # Note that argument to classad.quote can only be string or None
         jobSubmit['My.CRAB_Reqname'] = classad.quote(task['tm_taskname'])
@@ -523,66 +523,141 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_UserRole'] = classad.quote(task['tm_user_role'])
         jobSubmit['My.CRAB_UserGroup'] = classad.quote(task['tm_user_group'])
         jobSubmit['My.CRAB_TaskWorker'] = classad.quote(getattr(self.config.TaskWorker, 'name', 'unknown'))
-        retry_aso = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
-        jobSubmit['My.CRAB_RetryOnASOFailures'] = classad.quote(str(retry_aso))
-        jobSubmit['My.CRAB_ASOTimeout'] = classad.quote(str(getattr(self.config.TaskWorker, 'ASORucioTimeout', 0)))
+        retry_aso = "1" if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else "0"
+        jobSubmit['My.CRAB_RetryOnASOFailures'] = retry_aso
+        jobSubmit['My.CRAB_ASOTimeout'] = str(getattr(self.config.TaskWorker, 'ASORucioTimeout', 0))
         jobSubmit['My.CRAB_RestHost'] = classad.quote(task['resthost'])
         jobSubmit['My.CRAB_DbInstance'] = classad.quote(task['dbinstance'])
-        jobSubmit['My.CRAB_NumAutomJobRetries'] = classad.quote(str(task['numautomjobretries']))
+        jobSubmit['My.CRAB_NumAutomJobRetries'] = str(task['numautomjobretries'])
         jobSubmit['My.CRAB_Id'] = "$(count)"  #  count macro will be defined via VARS line in the DAG description file
-        jobSubmit['My.CRAB_JobCount'] = classad.quote(str(task['jobcount']))
+        jobSubmit['My.CRAB_JobCount'] = str(task['jobcount'])
         temp_dest, dest = makeLFNPrefixes(task)
         jobSubmit['My.CRAB_OutTempLFNDir'] = classad.quote(temp_dest)
         jobSubmit['My.CRAB_OutLFNDir'] = classad.quote(dest)
-        oneEventMode = 1 if info['tm_one_event_mode'] == 'T' else 0
-        jobSubmit['My.CRAB_oneEventMode'] = classad.quote(str(oneEventMode))
+        oneEventMode = "1" if info['tm_one_event_mode'] == 'T' else "0"
+        jobSubmit['My.CRAB_oneEventMode'] = oneEventMode
         jobSubmit['My.CRAB_PrimaryDataset'] = classad.quote(task['tm_primary_dataset'])
         jobSubmit['My.CRAB_DAGType'] = classad.quote("Job")
         jobSubmit['My.CRAB_SubmitterIpAddr'] = classad.quote(task['tm_submitter_ip_addr'])
-        jobSubmit['My.CRAB_TaskLifetimeDays'] = classad.quote(str(TASKLIFETIME // 24 // 60 // 60))
-        jobSubmit['My.CRAB_TaskEndTime'] = classad.quote(str(int(task["tm_start_time"]) + TASKLIFETIME))
-        jobSubmit['My.CRAB_SplitAlgo'] = info['tm_split_algo']
-        jobSubmit['My.CRAB_AlgoArgs'] = info['tm_split_args']
+        jobSubmit['My.CRAB_TaskLifetimeDays'] = str(TASKLIFETIME // 24 // 60 // 60)
+        jobSubmit['My.CRAB_TaskEndTime'] = str(int(task["tm_start_time"]) + TASKLIFETIME)
+        jobSubmit['My.CRAB_SplitAlgo'] = classad.quote(task['tm_split_algo'])
+        jobSubmit['My.CRAB_AlgoArgs'] = classad.quote(task['tm_split_args'])
         jobSubmit['My.CMS_WMTool'] =  classad.quote(self.setCMS_WMTool(task))
         jobSubmit['My.CMS_TaskType'] = classad.quote(self.setCMS_TaskType(task))
         jobSubmit['My.CMS_SubmissionTool'] = classad.quote("CRAB")
         jobSubmit['My.CMS_Type'] = classad.quote(self.setCMS_Type(task))
-
         transferOutputs = "1" if task['tm_transfer_outputs'] == 'T' else "0" # Note: this must always be 0 for probe jobs, is taken care of in PostJob.py
-        jobSbumit['.My.CRAB_TransferOutputs'] = classad.quote(transferOutputs)
-
-
-        matchInfo = self.populateGlideinMatching(task)
+        jobSubmit['.My.CRAB_TransferOutputs'] = transferOutputs
 
         # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
-        jobSbumit['My.REQUIRED_ARCH'] = matchInfo['required_arch']
-        jobSbumit['My.REQUIRED_MINIMUM_MICROARCH'] = matchInfo['required_minimum_microarch']
-        jobSbumit['My.DESIRED_CMSDataset'] = classad.quote(task['tm_input_dataset'])
+        matchInfo = self.populateGlideinMatching(task)
+        jobSubmit['My.REQUIRED_ARCH'] = matchInfo['required_arch']
+        jobSubmit['My.REQUIRED_MINIMUM_MICROARCH'] = matchInfo['required_minimum_microarch']
+        jobSubmit['My.DESIRED_CMSDataset'] = classad.quote(task['tm_input_dataset'])
 
         # Stefano is not sure why we need this, i.e. whether we can replace its use with GLIDEIN_CMSSite
-        jobSbumit['My.JOBGLIDEIN_CMSSite'] = classad.quote("$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])")
+        # but that would require changes elsewhere in the code base as well
+        jobSubmit['My.JOBGLIDEIN_CMSSite'] = classad.quote("$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])")
 
+        #
         # now actual HTC Job Submission commands, here right hand side can be simply strings
+        #
 
         egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
         if egroups and task['tm_username'] in self.getHighPrioUsers(egroups):
-            jobSbumit['accounting_group'] = 'highprio'
+            jobSubmit['accounting_group'] = 'highprio'
         else:
-            jobSbumit['accounting_group'] = 'analysis'
-        jobSbumit['accounting_group_user'] = task['tm_username']
+            jobSubmit['accounting_group'] = 'analysis'
+        jobSubmit['accounting_group_user'] = task['tm_username']
 
-        job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite, RemoteSysCpu, RemoteUserCpu
+        jobSubmit['job_ad_information_attrs'] = "MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite, RemoteSysCpu, RemoteUserCpu"
 
         # Recover job output and logs on eviction events; make sure they aren't spooled
         # This allows us to return stdout to users when they hit memory limits (which triggers PeriodicRemove).
-        WhenToTransferOutput = ON_EXIT_OR_EVICT
+        jobSubmit['WhenToTransferOutput'] = "ON_EXIT_OR_EVICT"
+        # old code had this line in Job.submit, but I can't find it used nor documented anywhere
+        # +SpoolOnEvict = false
 
-        info['runs'] = []
-        info['lumis'] = []
-        info = transform_strings(info)
-        info['faillimit'] = task['tm_fail_limit']
+        # Keep job in the queue upon completion long enough for the postJob to run,
+        # allowing the monitoring script to fetch the postJob status and job exit-code updated by the postJob
+        jobSubmit['LeaveJobInQueue'] = "ifThenElse((JobStatus=?=4 || JobStatus=?=3)" + \
+                                        "&& (time() - EnteredCurrentStatus < 30 * 60*60), true, false)"
+
+        jobSubmit['universe'] = "vanilla"
+        jobSubmit['Executable'] = "gWMS-CMSRunAnalysis.sh"
+        jobSubmit['Output'] = "job_out.$(count)"
+        jobSubmit['Error'] = "job_err.$(count)"
+        jobSubmit['Log'] = "job_log"
+
+        jobSubmit['Arguments'] = "--jobNumber=$(CRAB_Id)"
+        jobSubmit['transfer_output_files'] = "jobReport.json.$(count), WMArchiveReport.json.$(count)"
+        additional_input_files = .....
+        jobSubmit['transfer_input_files'] = f"CMSRunAnalysis.sh, cmscp.py{additional_input_file}"
+        # make sure coredump (if any) is not added to output files ref: https://lists.cs.wisc.edu/archive/htcondor-users/2022-September/msg00052.shtml
+        jobSubmit['coresize'] = "0"
+        # TODO: fold this into the config file instead of hardcoding things.
+        additional_environment_options = .....
+        jobSubmit['Environment'] = f"SCRAM_ARCH=$(CRAB_JobArch) {additional_environment_options}"
+        jobSubmit['should_transfer_files'] = "YES"
+        jobSubmit['use_x509userproxy'] = "true"
+
+        arch = task['tm_job_arch'].split("_")[0]  # extracts "slc7" from "slc7_amd64_gcc10"
+        required_os_list = ARCH_TO_OS.get(arch)
+        if not required_os_list:
+            raise SubmissionRefusedException(f"Unsupported architecture {arch}")
+        # ARCH_TO_OS.get("slc7") gives a list with one item only: ['rhel7']
+        jobSubmit['My.REQUIRED_OS'] = required_os_list[0]
+        jobSubmit['Requirements'] = "stringListMember(TARGET.Arch, REQUIRED_ARCH)"
+
+        # Ref: https://htcondor.readthedocs.io/en/latest/classad-attributes/job-classad-attributes.html#HoldReasonCode
+        jobSubmit['periodic_release'] = "(HoldReasonCode == 28) || (HoldReasonCode == 30) " + \
+                                         " || (HoldReasonCode == 13) || HoldReasonCode == 6)"
+
+        # Remove if
+        # a) job is in the 'held' status for more than 7 minutes
+        # b) job is idle more than 7 days
+        # c) job is running and one of:
+        #    1) Over memory use
+        #    2) Over wall clock limit
+        #    3) Over disk usage of N GB, which is set in ServerUtilities
+        # d) the taks EndTime has been reached
+        # e) job is idle and users proxy expired 1 day ago.
+        # (P.S. why 1 day ago? because there is recurring action which is updating user proxy and lifetime.)
+        # ** If New periodic remove expression is added, also it should have Periodic Remove Reason. **
+        # ** Otherwise message will not be clear and it is hard to debug **
+        periodicRemove = "( (JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60) )"  # a)
+        periodicRemove += "|| ( (JobStatus =?= 1) && (time() - EnteredCurrentStatus > 7*24*60*60) )"  # b)
+        periodicRemove += "|| ( (JobStatus =?= 2) && ( "  # c)
+        periodicRemove += "(MemoryUsage = != UNDEFINED && MemoryUsage > RequestMemory)"  # c) 1)
+        periodicRemove += "|| (MaxWallTimeMinsRun * 60 < time() - EnteredCurrentStatus)"  # c) 2)
+        periodicRemove += f"|| (DiskUsage > {MAX_DISK_SPACE})"  # c) 3)
+        periodicRemove += "))"  # these parentheses close the "if running" condition, i.e. JobStatus==2
+        periodicRemove += "|| (time() > CRAB_TaskEndTime)"  # d)
+        periodicRemove += "|| ( (JobStatus =?= 1) && (time() > (x509UserProxyExpiration + 86400)))"""  # e)
+        jobSubmit['periodic_remove'] = periodicRemove
+
+        # remove reasons are "ordered" in the following big IF starting from the less-conditial ones
+        # order is relevant and getting it right is "an art"
+        periodicRemoveReason = "ifThenElse("
+        periodicRemoveReason += "time() - EnteredCurrentStatus > 7 * 24 * 60 * 60 && isUndefined(MemoryUsage),"
+        periodicRemoveReason += "\"Removed due to idle time limit\","  # set this reasons. Else
+        periodicRemoveReason += "ifThenElse(time() > x509UserProxyExpiration, \"Removed job due to proxy expiration\","
+        periodicRemoveReason += "ifThenElse(MemoryUsage > RequestMemory, \"Removed due to memory use\","
+        periodicRemoveReason += "ifThenElse(MaxWallTimeMinsRun * 60 < time() - EnteredCurrentStatus, \"Removed due to wall clock limit\","
+        periodicRemoveReason += f"ifThenElse(DiskUsage > {MAX_DISK_SPACE}, \"Removed due to disk usage\","
+        periodicRemoveReason += "ifThenElse(time() > CRAB_TaskEndTime, \"Removed due to reached CRAB_TaskEndTime\","
+        periodicRemoveReason += "\"Removed due to job being held\"))))))"  # one closed ")" for each "ifThenElse("
+        jobSubmit['My.PeriodicRemoveReason'] = periodicRemoveReason
+
+        %(accelerator_jdl)
+
         # tm_extrajdl and tm_user_config['acceleratorparams'] contain list of k=v
         # assignements to be turned into classAds, so here we turn them from a python list of strings to
+        for extraJdl in task['tm_extra_jdl']:
+            k,v = extraJdl.split('=',1)
+            jobSubmit[k] = v
+
         # a single string with k=v separated by \n which can be pasted into the Job.submit JDL
         info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
         if task['tm_user_config']['requireaccelerator']:
@@ -626,7 +701,7 @@ class DagmanCreator(TaskAction):
         jobSubmit['additional_input_file'] += ", submit_env.sh"
         jobSubmit['additional_input_file'] += ", cmscp.sh"
 
-        jobSbumit['max_disk_space'] = MAX_DISK_SPACE
+        jobSubmit['max_disk_space'] = MAX_DISK_SPACE
 
         with open("Job.submit", "w", encoding='utf-8') as fd:
             fd.write(JOB_SUBMIT % info)
