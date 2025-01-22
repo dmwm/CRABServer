@@ -502,8 +502,8 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_DBSURL'] = classad.quote(task['tm_dbs_url'])
         jobSubmit['My.CRAB_PostJobStatus'] = classad.quote("NOT RUN")
         jobSubmit['My.CRAB_PostJobLastUpdate'] = classad.quote("0")
-        jobSubmit['My.CRAB_PublishName'] = %(publishname)
-        jobSubmit['My.CRAB_Publish = %(publication)
+        ?jobSubmit['My.CRAB_PublishName'] = %(publishname)
+        ?jobSubmit['My.CRAB_Publish = %(publication)
         jobSubmit['My.CRAB_PublishDBSURL'] = classad.quote(task['tm_publish_dbs_url'])
         jobSubmit['My.CRAB_ISB'] = classad.quote(task['tm_cache_url'])
 
