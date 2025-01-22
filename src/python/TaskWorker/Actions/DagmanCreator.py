@@ -36,8 +36,10 @@ from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS, SCRAM_TO_ARCH
 
 if 'useHtcV2' in os.environ:
+    import htcondor2 as htcondor
     import classad2 as classad
 else:
+    import htcondor
     import classad
 
 DAG_HEADER = """
@@ -421,13 +423,13 @@ class DagmanCreator(TaskAction):
         min_micro_arch = task['tm_job_min_microarch']
         if not min_micro_arch:
             matchInfo['required_minimum_microarch'] = '2'  # the current default for CMSSW
-            return
+            return matchInfo
         if min_micro_arch == 'any':
             matchInfo['required_minimum_microarch'] = 0
-            return
+            return matchInfo
         if min_micro_arch.startswith('x86-64-v'):
             matchInfo['required_minimum_microarch'] = int(min_micro_arch.split('v')[-1])
-            return
+            return matchInfo
         self.logger.error(f"Not supported microarch: {min_micro_arch}. Ignore it")
         matchInfo['required_minimum_microarch'] = 'any'
 
@@ -486,12 +488,12 @@ class DagmanCreator(TaskAction):
          propagated to the scheduler via the DAG description files
         """
 
-        if os.path.exists("Job.submit"):
-            return None
-            #info = {'jobcount': int(task['jobcount'])}
-            #return info
-
         jobSubmit = htcondor.Submit()
+
+        if os.path.exists("Job.submit"):
+            jobSubmit['jobcount'] = str(task['jobcount'])
+            return jobSubmit
+
         # these are classAds that we want to be added to each grid job
         # Note that argument to classad.quote can only be string or None
         jobSubmit['My.CRAB_Reqname'] = classad.quote(task['tm_taskname'])
@@ -502,8 +504,8 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_DBSURL'] = classad.quote(task['tm_dbs_url'])
         jobSubmit['My.CRAB_PostJobStatus'] = classad.quote("NOT RUN")
         jobSubmit['My.CRAB_PostJobLastUpdate'] = classad.quote("0")
-        ?jobSubmit['My.CRAB_PublishName'] = %(publishname)
-        ?jobSubmit['My.CRAB_Publish = %(publication)
+        jobSubmit['My.CRAB_PublishName'] = classad.quote(task['tm_publish_name'])
+        jobSubmit['My.CRAB_Publish'] =  "1" if task['tm_publication'] == 'T' else "0"
         jobSubmit['My.CRAB_PublishDBSURL'] = classad.quote(task['tm_publish_dbs_url'])
         jobSubmit['My.CRAB_ISB'] = classad.quote(task['tm_cache_url'])
 
@@ -534,7 +536,7 @@ class DagmanCreator(TaskAction):
         temp_dest, dest = makeLFNPrefixes(task)
         jobSubmit['My.CRAB_OutTempLFNDir'] = classad.quote(temp_dest)
         jobSubmit['My.CRAB_OutLFNDir'] = classad.quote(dest)
-        oneEventMode = "1" if info['tm_one_event_mode'] == 'T' else "0"
+        oneEventMode = "1" if task['tm_one_event_mode'] == 'T' else "0"
         jobSubmit['My.CRAB_oneEventMode'] = oneEventMode
         jobSubmit['My.CRAB_PrimaryDataset'] = classad.quote(task['tm_primary_dataset'])
         jobSubmit['My.CRAB_DAGType'] = classad.quote("Job")
@@ -558,7 +560,7 @@ class DagmanCreator(TaskAction):
 
         # Stefano is not sure why we need this, i.e. whether we can replace its use with GLIDEIN_CMSSite
         # but that would require changes elsewhere in the code base as well
-        jobSubmit['My.JOBGLIDEIN_CMSSite'] = classad.quote("$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])")
+        jobSubmit['My.JOBGLIDEIN_CMSSite'] = classad.quote('$$([ifThenElse(GLIDEIN_CMSSite is undefined, "Unknown", GLIDEIN_CMSSite)])')
 
         #
         # now actual HTC Job Submission commands, here right hand side can be simply strings
@@ -592,12 +594,28 @@ class DagmanCreator(TaskAction):
 
         jobSubmit['Arguments'] = "--jobNumber=$(CRAB_Id)"
         jobSubmit['transfer_output_files'] = "jobReport.json.$(count), WMArchiveReport.json.$(count)"
-        additional_input_files = .....
+
+        additional_input_file = ""
+        additional_environment_options = ""
+        if os.path.exists("CMSRunAnalysis.tar.gz"):
+            additional_environment_options += ' CRAB_RUNTIME_TARBALL=local'
+            additional_input_file += ", CMSRunAnalysis.tar.gz"
+        else:
+            raise TaskWorkerException(f"Cannot find CMSRunAnalysis.tar.gz inside the cwd: {os.getcwd()}")
+        if os.path.exists("TaskManagerRun.tar.gz"):
+            additional_environment_options += ' CRAB_TASKMANAGER_TARBALL=local'
+        else:
+            raise TaskWorkerException(f"Cannot find TaskManagerRun.tar.gz inside the cwd: {os.getcwd()}")
+        additional_input_file += ", sandbox.tar.gz"  # it will be present on SPOOL_DIR after dab_bootstrap
+        additional_input_file += ", run_and_lumis.tar.gz"
+        additional_input_file += ", input_files.tar.gz"
+        additional_input_file += ", submit_env.sh"
+        additional_input_file += ", cmscp.sh"
         jobSubmit['transfer_input_files'] = f"CMSRunAnalysis.sh, cmscp.py{additional_input_file}"
         # make sure coredump (if any) is not added to output files ref: https://lists.cs.wisc.edu/archive/htcondor-users/2022-September/msg00052.shtml
         jobSubmit['coresize'] = "0"
-        # TODO: fold this into the config file instead of hardcoding things.
-        additional_environment_options = .....
+
+        # we should fold this into the config file instead of hardcoding things.
         jobSubmit['Environment'] = f"SCRAM_ARCH=$(CRAB_JobArch) {additional_environment_options}"
         jobSubmit['should_transfer_files'] = "YES"
         jobSubmit['use_x509userproxy'] = "true"
@@ -650,50 +668,27 @@ class DagmanCreator(TaskAction):
         periodicRemoveReason += "\"Removed due to job being held\"))))))"  # one closed ")" for each "ifThenElse("
         jobSubmit['My.PeriodicRemoveReason'] = periodicRemoveReason
 
-        %(accelerator_jdl)
-
         # tm_extrajdl and tm_user_config['acceleratorparams'] contain list of k=v
         # assignements to be turned into classAds, so here we turn them from a python list of strings to
         for extraJdl in task['tm_extra_jdl']:
             k,v = extraJdl.split('=',1)
             jobSubmit[k] = v
 
-        # a single string with k=v separated by \n which can be pasted into the Job.submit JDL
-        info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
         if task['tm_user_config']['requireaccelerator']:
             # hardcoding accelerator to GPU (SI currently only have nvidia GPU)
-            info['accelerator_jdl'] = '+RequiresGPU=1\nrequest_GPUs=1'
+            jobSubmit['My.RequiresGPU'] = "1"
+            jobSubmit['request_GPUs'] = "1"
             if task['tm_user_config']['acceleratorparams']:
                 gpuMemoryMB = task['tm_user_config']['acceleratorparams'].get('GPUMemoryMB', None)
                 cudaCapabilities = task['tm_user_config']['acceleratorparams'].get('CUDACapabilities', None)
                 cudaRuntime = task['tm_user_config']['acceleratorparams'].get('CUDARuntime', None)
                 if gpuMemoryMB:
-                    info['accelerator_jdl'] += f"\n+GPUMemoryMB={gpuMemoryMB}"
+                    jobSubmit['My.GPUMemoryMB'] = classad.quote(gpuMemoryMB)
                 if cudaCapabilities:
                     cudaCapability = ','.join(sorted(cudaCapabilities))
-                    info['accelerator_jdl'] += f"\n+CUDACapability={classad.quote(cudaCapability)}"
+                    jobSubmit['My.CUDACapability'] = classad.quote(cudaCapability)
                 if cudaRuntime:
-                    info['accelerator_jdl'] += f"\n+CUDARuntime={classad.quote(cudaRuntime)}"
-        else:
-            info['accelerator_jdl'] = ''
-        arch = info['jobarch'].split("_")[0]  # extracts "slc7" from "slc7_amd64_gcc10"
-        required_os_list = ARCH_TO_OS.get(arch)
-        if not required_os_list:
-            raise SubmissionRefusedException(f"Unsupported architecture {arch}")
-        # ARCH_TO_OS.get("slc7") gives a list with one item only: ['rhel7']
-        info['opsys_req'] = f'+REQUIRED_OS="{required_os_list[0]}"'
-
-        info.setdefault("additional_environment_options", '')
-        info.setdefault("additional_input_file", "")
-        if os.path.exists("CMSRunAnalysis.tar.gz"):
-            info['additional_environment_options'] += 'CRAB_RUNTIME_TARBALL=local'
-            info['additional_input_file'] += ", CMSRunAnalysis.tar.gz"
-        else:
-            raise TaskWorkerException(f"Cannot find CMSRunAnalysis.tar.gz inside the cwd: {os.getcwd()}")
-        if os.path.exists("TaskManagerRun.tar.gz"):
-            info['additional_environment_options'] += ' CRAB_TASKMANAGER_TARBALL=local'
-        else:
-            raise TaskWorkerException(f"Cannot find TaskManagerRun.tar.gz inside the cwd: {os.getcwd()}")
+                    jobSubmit['My.CUDARuntime'] = classad.quote(cudaRuntime)
         jobSubmit['additional_input_file'] += ", sandbox.tar.gz"  # it will be present on SPOOL_DIR after dab_bootstrap
         jobSubmit['additional_input_file'] += ", input_args.json"
         jobSubmit['additional_input_file'] += ", run_and_lumis.tar.gz"
@@ -704,9 +699,9 @@ class DagmanCreator(TaskAction):
         jobSubmit['max_disk_space'] = MAX_DISK_SPACE
 
         with open("Job.submit", "w", encoding='utf-8') as fd:
-            fd.write(JOB_SUBMIT % info)
+            print(jobSubmit, file=fd)
 
-        return info
+        return jobSubmit
 
 
     def getPreScriptDefer(self, task, jobid):
@@ -886,7 +881,7 @@ class DagmanCreator(TaskAction):
          automatic splitting (multiple subdags which will be added in the scheduler by
          the PreDag.py script which calls this DagmanCreator
         Returns:
-            info : dictionary : passes info to next action (DagmanSubmitter)
+            jobSubmit : HTCondor submit object : passes the Job.submit template to next action (DagmanSubmitter)
             splitterResult : object : this is the output of previous action (Splitter) and is part of input
                              arguments to DagmanCreator ! As far as Stefano can tell returning it
                              here is a "perverse" way to pass it also to DagmanSubmitter
@@ -1260,7 +1255,7 @@ class DagmanCreator(TaskAction):
 
         kwargs['task']['jobcount'] = len(dagSpecs)
 
-        info = self.makeJobSubmit(kwargs['task'])
+        jobSubmit = self.makeJobSubmit(kwargs['task'])
 
         # list of input arguments needed for each jobs
         argdicts = self.prepareJobArguments(dagSpecs, kwargs['task'])
@@ -1276,28 +1271,28 @@ class DagmanCreator(TaskAction):
 
         maxidle = getattr(self.config.TaskWorker, 'maxIdle', MAX_IDLE_JOBS)
         if maxidle == -1:
-            maxidle = info['jobcount']
+            maxidle = kwargs['task']['jobcount']
         elif maxidle == 0:
-            maxidle = int(max(MAX_IDLE_JOBS, info['jobcount']*.1))
-        info['maxidle'] = maxidle
+            maxidle = int(max(MAX_IDLE_JOBS, kwargs['task']['jobcount']*.1))
+        jobSubmit['maxidle'] = str(maxidle)
 
         maxpost = getattr(self.config.TaskWorker, 'maxPost', MAX_POST_JOBS)
         if maxpost == -1:
-            maxpost = info['jobcount']
+            maxpost = kwargs['task']['jobcount']
         elif maxpost == 0:
-            maxpost = int(max(MAX_POST_JOBS, info['jobcount']*.1))
-        info['maxpost'] = maxpost
+            maxpost = int(max(MAX_POST_JOBS, kwargs['task']['jobcount']*.1))
+        jobSubmit['maxpost'] = str(maxpost)
 
-        if info.get('faillimit') is None:
-            info['faillimit'] = -1
-            #if info['jobcount'] > 200
-            #    info['faillimit'] = 100
+        if not 'faillimit' in jobSubmit:
+            jobSubmit['faillimit'] = "-1"
+            #if jobSubmit['jobcount'] > 200
+            #    jobSubmit['faillimit'] = 100
             #else:
-            #    info['faillimit'] = -1
-        elif info.get('faillimit') < 0:
-            info['faillimit'] = -1
+            #    jobSubmit['faillimit'] = -1
+        elif int(jobSubmit['faillimit']) < 0:
+            jobSubmit['faillimit'] = "-1"
 
-        return info, splitterResult, subdags
+        return jobSubmit, splitterResult, subdags
 
     def getHighPrioUsers(self, egroups):
         """ get the list of high priority users """
@@ -1371,13 +1366,13 @@ class DagmanCreator(TaskAction):
         filesForSched = filesForWN + \
             ['gWMS-CMSRunAnalysis.sh', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh',
              'AdjustSites.py', 'site.ad.json', 'TaskManagerRun.tar.gz',
-             'datadiscovery.pkl', 'taskinformation.pkl', 'taskworkerconfig.pkl',]
+             'datadiscovery.pkl', 'taskjobSubmitrmation.pkl', 'taskworkerconfig.pkl',]
 
         if kw['task']['tm_input_dataset']:
             filesForSched.append("input_dataset_lumis.json")
             filesForSched.append("input_dataset_duplicate_lumis.json")
 
-        info, splitterResult, subdags = self.createSubdag(*args, **kw)
+        jobSubmit, splitterResult, subdags = self.createSubdag(*args, **kw)
 
         # as splitter summary is useful for dryrun, let's add it to the InputFiles tarball
         jobGroups = splitterResult[0]  # the first returned value of Splitter action is the splitterFactory output
@@ -1390,7 +1385,7 @@ class DagmanCreator(TaskAction):
 
         self.prepareTarballForSched(filesForSched, subdags)
 
-        return info, params, ["InputFiles.tar.gz"], splitterResult
+        return jobSubmit, params, ["InputFiles.tar.gz"], splitterResult
 
 
     def execute(self, *args, **kw):
@@ -1398,7 +1393,7 @@ class DagmanCreator(TaskAction):
         cwd = os.getcwd()
         try:
             os.chdir(kw['tempDir'])
-            info, params, inputFiles, splitterResult = self.executeInternal(*args, **kw)
-            return TaskWorker.DataObjects.Result.Result(task=kw['task'], result=(info, params, inputFiles, splitterResult))
+            jobSubmit, params, inputFiles, splitterResult = self.executeInternal(*args, **kw)
+            return TaskWorker.DataObjects.Result.Result(task=kw['task'], result=(jobSubmit, params, inputFiles, splitterResult))
         finally:
             os.chdir(cwd)
