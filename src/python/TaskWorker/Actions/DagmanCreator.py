@@ -424,11 +424,11 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_Reqname'] = classad.quote(task['tm_taskname'])
         jobSubmit['My.CRAB_workflow'] = classad.quote(task['tm_taskname'])
         jobSubmit['My.CMS_JobtYpe'] = classad.quote('Analysis')
-        jobSubmit['My.CRAB_JobSw'] = classad.quote(task['tm_job_sw'])
+        jobSubmit['My.CRAB_JobSW'] = classad.quote(task['tm_job_sw'])
         jobSubmit['My.CRAB_JobArch'] = classad.quote(task['tm_job_arch'])
         jobSubmit['My.CRAB_DBSURL'] = classad.quote(task['tm_dbs_url'])
         jobSubmit['My.CRAB_PostJobStatus'] = classad.quote("NOT RUN")
-        jobSubmit['My.CRAB_PostJobLastUpdate'] = classad.quote("0")
+        jobSubmit['My.CRAB_PostJobLastUpdate'] = "0"
         jobSubmit['My.CRAB_PublishName'] = classad.quote(task['tm_publish_name'])
         jobSubmit['My.CRAB_Publish'] =  "1" if task['tm_publication'] == 'T' else "0"
         jobSubmit['My.CRAB_PublishDBSURL'] = classad.quote(task['tm_publish_dbs_url'])
@@ -447,8 +447,12 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_UserHN'] = classad.quote(task['tm_username'])
         jobSubmit['My.CRAB_AsyncDest'] = classad.quote(task['tm_asyncdest'])
         jobSubmit['My.CRAB_StageoutPolicy'] = classad.quote(task['stageoutpolicy'])
-        jobSubmit['My.CRAB_UserRole'] = classad.quote(task['tm_user_role'])
-        jobSubmit['My.CRAB_UserGroup'] = classad.quote(task['tm_user_group'])
+        # for VOMS role and group, PostJob and RenewRemoteProxies code want the undefined value, not "
+        userRole = task['tm_user_role']"
+        jobSubmit['My.CRAB_UserRole'] = classad.quote(userRole) if userRole else 'undefined'
+        userGroup = task['tm_user_group']
+        jobSubmit['My.CRAB_UserRole'] = classad.quote(userGroup) if userGroup else 'undefined'
+        jobSubmit['My.CRAB_UserGroup'] = classad.quote(userGroup)
         jobSubmit['My.CRAB_TaskWorker'] = classad.quote(getattr(self.config.TaskWorker, 'name', 'unknown'))
         retry_aso = "1" if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else "0"
         jobSubmit['My.CRAB_RetryOnASOFailures'] = retry_aso
@@ -456,7 +460,7 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_RestHost'] = classad.quote(task['resthost'])
         jobSubmit['My.CRAB_DbInstance'] = classad.quote(task['dbinstance'])
         jobSubmit['My.CRAB_NumAutomJobRetries'] = str(task['numautomjobretries'])
-        jobSubmit['My.CRAB_Id'] = "$(count)"  #  count macro will be defined via VARS line in the DAG description file
+        jobSubmit['My.CRAB_Id'] = classad.quote("$(count)")  #  count macro defined via VARS line in the DAG file
         jobSubmit['My.CRAB_JobCount'] = str(task['jobcount'])
         temp_dest, dest = makeLFNPrefixes(task)
         jobSubmit['My.CRAB_OutTempLFNDir'] = classad.quote(temp_dest)
@@ -475,12 +479,12 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CMS_SubmissionTool'] = classad.quote("CRAB")
         jobSubmit['My.CMS_Type'] = classad.quote(self.setCMS_Type(task))
         transferOutputs = "1" if task['tm_transfer_outputs'] == 'T' else "0" # Note: this must always be 0 for probe jobs, is taken care of in PostJob.py
-        jobSubmit['.My.CRAB_TransferOutputs'] = transferOutputs
+        jobSubmit['My.CRAB_TransferOutputs'] = transferOutputs
 
         # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
         matchInfo = self.populateGlideinMatching(task)
-        jobSubmit['My.REQUIRED_ARCH'] = matchInfo['required_arch']
-        jobSubmit['My.REQUIRED_MINIMUM_MICROARCH'] = matchInfo['required_minimum_microarch']
+        jobSubmit['My.REQUIRED_ARCH'] = classad.quote(matchInfo['required_arch'])
+        jobSubmit['My.REQUIRED_MINIMUM_MICROARCH'] = classad.quote(matchInfo['required_minimum_microarch'])
         jobSubmit['My.DESIRED_CMSDataset'] = classad.quote(task['tm_input_dataset'])
 
         # Stefano is not sure why we need this, i.e. whether we can replace its use with GLIDEIN_CMSSite
@@ -508,7 +512,7 @@ class DagmanCreator(TaskAction):
 
         # Keep job in the queue upon completion long enough for the postJob to run,
         # allowing the monitoring script to fetch the postJob status and job exit-code updated by the postJob
-        jobSubmit['LeaveJobInQueue'] = "ifThenElse((JobStatus=?=4 || JobStatus=?=3)" + \
+        jobSubmit['LeaveJobInQueue'] = "ifThenElse((JobStatus=?=4 || JobStatus=?=3) " + \
                                         "&& (time() - EnteredCurrentStatus < 30 * 60*60), true, false)"
 
         jobSubmit['universe'] = "vanilla"
@@ -541,7 +545,7 @@ class DagmanCreator(TaskAction):
         jobSubmit['coresize'] = "0"
 
         # we should fold this into the config file instead of hardcoding things.
-        jobSubmit['Environment'] = f"SCRAM_ARCH=$(CRAB_JobArch) {additional_environment_options}"
+        jobSubmit['Environment'] = classad.quote(f"SCRAM_ARCH=$(CRAB_JobArch) {additional_environment_options}")
         jobSubmit['should_transfer_files'] = "YES"
         jobSubmit['use_x509userproxy'] = "true"
 
@@ -550,12 +554,12 @@ class DagmanCreator(TaskAction):
         if not required_os_list:
             raise SubmissionRefusedException(f"Unsupported architecture {arch}")
         # ARCH_TO_OS.get("slc7") gives a list with one item only: ['rhel7']
-        jobSubmit['My.REQUIRED_OS'] = required_os_list[0]
+        jobSubmit['My.REQUIRED_OS'] = classad.quote(required_os_list[0])
         jobSubmit['Requirements'] = "stringListMember(TARGET.Arch, REQUIRED_ARCH)"
 
         # Ref: https://htcondor.readthedocs.io/en/latest/classad-attributes/job-classad-attributes.html#HoldReasonCode
         jobSubmit['periodic_release'] = "(HoldReasonCode == 28) || (HoldReasonCode == 30) " + \
-                                         " || (HoldReasonCode == 13) || HoldReasonCode == 6)"
+                                         "|| (HoldReasonCode == 13) || (HoldReasonCode == 6)"
 
         # Remove if
         # a) job is in the 'held' status for more than 7 minutes
