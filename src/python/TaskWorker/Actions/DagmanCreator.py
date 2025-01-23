@@ -423,7 +423,7 @@ class DagmanCreator(TaskAction):
         # Note that argument to classad.quote can only be string or None
         jobSubmit['My.CRAB_Reqname'] = classad.quote(task['tm_taskname'])
         jobSubmit['My.CRAB_workflow'] = classad.quote(task['tm_taskname'])
-        jobSubmit['My.CMS_JobtYpe'] = classad.quote('Analysis')
+        jobSubmit['My.CMS_JobType'] = classad.quote('Analysis')
         jobSubmit['My.CRAB_JobSW'] = classad.quote(task['tm_job_sw'])
         jobSubmit['My.CRAB_JobArch'] = classad.quote(task['tm_job_arch'])
         jobSubmit['My.CRAB_DBSURL'] = classad.quote(task['tm_dbs_url'])
