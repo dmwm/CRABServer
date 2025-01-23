@@ -451,8 +451,7 @@ class DagmanCreator(TaskAction):
         userRole = task['tm_user_role']
         jobSubmit['My.CRAB_UserRole'] = classad.quote(userRole) if userRole else 'undefined'
         userGroup = task['tm_user_group']
-        jobSubmit['My.CRAB_UserRole'] = classad.quote(userGroup) if userGroup else 'undefined'
-        jobSubmit['My.CRAB_UserGroup'] = classad.quote(userGroup)
+        jobSubmit['My.CRAB_UserGroup'] = classad.quote(userGroup) if userGroup else 'undefined'
         jobSubmit['My.CRAB_TaskWorker'] = classad.quote(getattr(self.config.TaskWorker, 'name', 'unknown'))
         retry_aso = "1" if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else "0"
         jobSubmit['My.CRAB_RetryOnASOFailures'] = retry_aso
@@ -478,7 +477,7 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CMS_TaskType'] = classad.quote(self.setCMS_TaskType(task))
         jobSubmit['My.CMS_SubmissionTool'] = classad.quote("CRAB")
         jobSubmit['My.CMS_Type'] = classad.quote(self.setCMS_Type(task))
-        transferOutputs = "1" if task['tm_transfer_outputs'] == 'T' else "0" # Note: this must always be 0 for probe jobs, is taken care of in PostJob.py
+        transferOutputs = "1" if task['tm_transfer_outputs'] == 'T' else "0" # Note: this must always be 0 for probe jobs, is taken care of in PreJob.py
         jobSubmit['My.CRAB_TransferOutputs'] = transferOutputs
 
         # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
@@ -545,7 +544,7 @@ class DagmanCreator(TaskAction):
         jobSubmit['coresize'] = "0"
 
         # we should fold this into the config file instead of hardcoding things.
-        jobSubmit['Environment'] = classad.quote(f"SCRAM_ARCH=$(CRAB_JobArch) {additional_environment_options}")
+        jobSubmit['Environment'] = classad.quote(f"SCRAM_ARCH=$(CRAB_JobArch){additional_environment_options}")
         jobSubmit['should_transfer_files'] = "YES"
         jobSubmit['use_x509userproxy'] = "true"
 
