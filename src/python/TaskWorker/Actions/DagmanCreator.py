@@ -30,7 +30,6 @@ from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedEx
 from RucioUtils import getWritePFN
 from CMSGroupMapper import get_egroup_users
 
-import WMCore.WMSpec.WMTask
 from WMCore import Lexicon
 from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS, SCRAM_TO_ARCH
@@ -240,6 +239,7 @@ def makeLFNPrefixes(task):
 
     return temp_dest, dest
 
+
 def validateLFNs(path, outputFiles):
     """
     validate against standard Lexicon the LFN's that this task will try to publish in DBS
@@ -266,6 +266,7 @@ def validateLFNs(path, outputFiles):
             msg += "\n and therefore can not be handled in our DataBase"
             raise SubmissionRefusedException(msg)
 
+
 def validateUserLFNs(path, outputFiles):
     """
     validate against standard Lexicon a user-defined LFN which will not go in DBS, but still needs to be sane
@@ -291,82 +292,6 @@ def validateUserLFNs(path, outputFiles):
             msg += "\n which exceeds maximum length of 500"
             msg += "\n and therefore can not be handled in our DataBase"
             raise SubmissionRefusedException(msg)
-
-def createJobSubmit(data):
-    """
-    create a JobSubmit object template which will be persisted as Job.submit file and send to
-    scheduler, where it will be used to submit individual jobs after PreJob.py fills in the job-specific valued
-    """
-    jobSubmit = htcondor.Submit()
-    for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'primarydataset', 'splitalgo', 'algoargs', \
-               'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
-               'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
-               'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', \
-               'stageoutpolicy', 'taskType', 'worker_name', 'cms_wmtool', 'cms_tasktype', 'cms_type', \
-               'required_arch', 'required_minimum_microarch', 'resthost', 'dbinstance', 'submitter_ip_addr', \
-               'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
-        val = data.get(var, None)
-        if val is None:
-            jobSubmit[var] = 'undefined'
-        else:
-            # should better handle double quotes when filling JDL's and remove this !
-            # now it is a mess since some things in info get their double quote here, some in the JOB_SUBMIT string
-            jobSubmit[var] = val
-
-def transform_strings(data):
-    """
-    Converts the arguments in the data dictionary to the arguments necessary
-    for the job submit file string.
-    """
-    info = {}
-    for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'primarydataset', 'splitalgo', 'algoargs', \
-               'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
-               'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
-               'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', \
-               'stageoutpolicy', 'taskType', 'worker_name', 'cms_wmtool', 'cms_tasktype', 'cms_type', \
-               'required_arch', 'required_minimum_microarch', 'resthost', 'dbinstance', 'submitter_ip_addr', \
-               'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
-        val = data.get(var, None)
-        if val is None:
-            info[var] = 'undefined'
-        else:
-            # should better handle double quotes when filling JDL's and remove this !
-            # now it is a mess since some things in info get their double quote here, some in the JOB_SUBMIT string
-            info[var] = json.dumps(val)
-
-    #for var in 'accounting_group', 'accounting_group_user':
-    #    info[var] = data[var]
-
-    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries', 'jobcount':
-        info[var] = int(data[var])
-
-    for var in 'siteblacklist', 'sitewhitelist', 'addoutputfiles', 'tfileoutfiles', 'edmoutfiles':
-        val = data[var]
-        if val is None:
-            info[var] = "{}"
-        else:
-            info[var] = "{" + json.dumps(val)[1:-1] + "}"
-
-    info['lumimask'] = '"' + json.dumps(WMCore.WMSpec.WMTask.buildLumiMask(data['runs'], data['lumis'])).replace(r'"', r'\"') + '"'
-
-    splitArgName = SPLIT_ARG_MAP[data['splitalgo']]
-    info['algoargs'] = '"' + json.dumps({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : data['algoargs']}).replace('"', r'\"') + '"'
-    info['attempt'] = 0
-
-    # SB these must not be "json dumped" here ! So revert what doen at line 312 ... oh my my my .....
-    for var in ["jobsw", "jobarch", "asyncdest", "requestname"]:
-        info[var] = data[var]
-
-    # info["addoutputfiles"] = '{}'
-
-    temp_dest, dest = makeLFNPrefixes(data)
-    info["temp_dest"] = temp_dest
-    info["output_dest"] = dest
-    info['x509up_file'] = os.path.split(data['user_proxy'])[-1]
-    info['user_proxy'] = data['user_proxy']
-    info['scratch'] = data['scratch']
-
-    return info
 
 
 def getLocation(default_name):
@@ -703,7 +628,6 @@ class DagmanCreator(TaskAction):
 
         return jobSubmit
 
-
     def getPreScriptDefer(self, task, jobid):
         """ Return the string to be used for deferring prejobs
             If the extrajdl CRAB_JobReleaseTimeout is not set in the client it returns
@@ -722,7 +646,6 @@ class DagmanCreator(TaskAction):
         else:
             prescriptDeferString = ''
         return prescriptDeferString
-
 
     def makeDagSpecs(self, task, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, parent=None, stage='conventional'):
         """ need a comment line here """
@@ -830,7 +753,7 @@ class DagmanCreator(TaskAction):
     def prepareJobArguments(self, dagSpecs, task):
         """ Prepare an object with all the input parameters of each jobs. It is a list
             with a dictionary for each job. The dictionary key/value pairs are the variables needed in CMSRunAnalysis.py
-            This will be save in "input_args*.json", a differnt json file for the main DAG and each subdags
+            This will be save in "input_args.json" by the caller, adding to existing list in ther if any
             Inputs:
                 dagSpecs : list of dictionaries with information for each DAG job
                 task: dictionary, the "standard" task dictionary with info from the DataBase TASK table
@@ -1309,7 +1232,6 @@ class DagmanCreator(TaskAction):
             return []
         return highPrioUsers
 
-
     def executeInternal(self, *args, **kw):
         """ all real work is done here """
         transform_location = getLocation('CMSRunAnalysis.sh')
@@ -1386,7 +1308,6 @@ class DagmanCreator(TaskAction):
         self.prepareTarballForSched(filesForSched, subdags)
 
         return jobSubmit, params, ["InputFiles.tar.gz"], splitterResult
-
 
     def execute(self, *args, **kw):
         """ entry point called by Hanlder """
