@@ -448,7 +448,7 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_AsyncDest'] = classad.quote(task['tm_asyncdest'])
         jobSubmit['My.CRAB_StageoutPolicy'] = classad.quote(task['stageoutpolicy'])
         # for VOMS role and group, PostJob and RenewRemoteProxies code want the undefined value, not "
-        userRole = task['tm_user_role']"
+        userRole = task['tm_user_role']
         jobSubmit['My.CRAB_UserRole'] = classad.quote(userRole) if userRole else 'undefined'
         userGroup = task['tm_user_group']
         jobSubmit['My.CRAB_UserRole'] = classad.quote(userGroup) if userGroup else 'undefined'
