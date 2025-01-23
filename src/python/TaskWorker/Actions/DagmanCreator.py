@@ -445,7 +445,7 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_TFileOutputFiles'] = pythonListToClassAdValue(task['tm_outfiles'])
         jobSubmit['My.CRAB_UserDN'] = classad.quote(task['tm_user_dn'])
         jobSubmit['My.CRAB_UserHN'] = classad.quote(task['tm_username'])
-        jobSubmit['My.CRAB_AsyncDest'] = classad.quote(task['asyncdest'])
+        jobSubmit['My.CRAB_AsyncDest'] = classad.quote(task['tm_asyncdest'])
         jobSubmit['My.CRAB_StageoutPolicy'] = classad.quote(task['stageoutpolicy'])
         jobSubmit['My.CRAB_UserRole'] = classad.quote(task['tm_user_role'])
         jobSubmit['My.CRAB_UserGroup'] = classad.quote(task['tm_user_group'])
@@ -469,7 +469,7 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_TaskLifetimeDays'] = str(TASKLIFETIME // 24 // 60 // 60)
         jobSubmit['My.CRAB_TaskEndTime'] = str(int(task["tm_start_time"]) + TASKLIFETIME)
         jobSubmit['My.CRAB_SplitAlgo'] = classad.quote(task['tm_split_algo'])
-        jobSubmit['My.CRAB_AlgoArgs'] = classad.quote(task['tm_split_args'])
+        jobSubmit['My.CRAB_AlgoArgs'] = classad.quote(str(task['tm_split_args']))  # from dict to str before quoting
         jobSubmit['My.CMS_WMTool'] =  classad.quote(self.setCMS_WMTool(task))
         jobSubmit['My.CMS_TaskType'] = classad.quote(self.setCMS_TaskType(task))
         jobSubmit['My.CMS_SubmissionTool'] = classad.quote("CRAB")
@@ -593,9 +593,11 @@ class DagmanCreator(TaskAction):
         periodicRemoveReason += "\"Removed due to job being held\"))))))"  # one closed ")" for each "ifThenElse("
         jobSubmit['My.PeriodicRemoveReason'] = periodicRemoveReason
 
-        # tm_extrajdl and tm_user_config['acceleratorparams'] contain list of k=v
-        # assignements to be turned into classAds, so here we turn them from a python list of strings to
-        for extraJdl in task['tm_extra_jdl']:
+        # tm_extrajdl and tm_user_config['acceleratorparams'] contain list of k=v assignements to be turned into classAds
+        # also special handling is needed because is retrieved from DB not as a python list, but as a string
+        # with format "['a=b','c=d'...]"  (a change in RESTWorkerWorkflow would be needed to get a python list
+        # so we use here the same literal_eval which is used in RESTWorkerWorkflow.py )
+        for extraJdl in literal_eval(task['tm_extrajdl']):
             k,v = extraJdl.split('=',1)
             jobSubmit[k] = v
 
@@ -614,14 +616,6 @@ class DagmanCreator(TaskAction):
                     jobSubmit['My.CUDACapability'] = classad.quote(cudaCapability)
                 if cudaRuntime:
                     jobSubmit['My.CUDARuntime'] = classad.quote(cudaRuntime)
-        jobSubmit['additional_input_file'] += ", sandbox.tar.gz"  # it will be present on SPOOL_DIR after dab_bootstrap
-        jobSubmit['additional_input_file'] += ", input_args.json"
-        jobSubmit['additional_input_file'] += ", run_and_lumis.tar.gz"
-        jobSubmit['additional_input_file'] += ", input_files.tar.gz"
-        jobSubmit['additional_input_file'] += ", submit_env.sh"
-        jobSubmit['additional_input_file'] += ", cmscp.sh"
-
-        jobSubmit['max_disk_space'] = MAX_DISK_SPACE
 
         with open("Job.submit", "w", encoding='utf-8') as fd:
             print(jobSubmit, file=fd)
