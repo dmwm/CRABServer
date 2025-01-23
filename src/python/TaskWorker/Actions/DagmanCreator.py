@@ -1282,7 +1282,7 @@ class DagmanCreator(TaskAction):
         filesForSched = filesForWN + \
             ['gWMS-CMSRunAnalysis.sh', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh',
              'AdjustSites.py', 'site.ad.json', 'TaskManagerRun.tar.gz',
-             'datadiscovery.pkl', 'taskjobSubmitrmation.pkl', 'taskworkerconfig.pkl',]
+             'datadiscovery.pkl', 'taskinformation.pkl', 'taskworkerconfig.pkl',]
 
         if kw['task']['tm_input_dataset']:
             filesForSched.append("input_dataset_lumis.json")
