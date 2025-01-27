@@ -18,8 +18,8 @@ echo "(debug) X509_USER_PROXY=${X509_USER_PROXY}"
 source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
 python ${ROOT_DIR}/test/makeTests.py
 
-# Ensure the log files exist (creating successful_tests and error.log, and deleting/recreating retry_tests and failed_tests)
-touch ${WORK_DIR}/successful_tests ${WORK_DIR}/error.log
+# Ensure the log files exist (creating successful_tests (if doesn't exist) and deleting/recreating retry_tests and failed_tests)
+touch ${WORK_DIR}/successful_tests
 
 # Delete and recreate retry_tests and failed_tests (if they exist)
 rm -f ${WORK_DIR}/retry_tests ${WORK_DIR}/failed_tests
@@ -33,25 +33,20 @@ if [ -f "${WORK_DIR}/submitted_tasks_CCV" ]; then
     test_to_execute=$(echo "${task}" | grep -oP '(?<=_crab_).*(?=)')
     echo "Test to execute: ${test_to_execute}"
 
-    # Ensure the test script exists and is executable
-    if [ -x "${test_to_execute}-check.sh" ]; then
-      bash -x ${test_to_execute}-check.sh ${task}
-      retVal=$?
-      echo "Exit Code: $retVal"
+    bash -x ${test_to_execute}-check.sh ${task}
+    retVal=$?
+    echo "Exit Code: $retVal"
 
-      if [ $retVal -eq 0 ]; then
-        echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/successful_tests
-      elif [ $retVal -eq 2 ]; then
-        echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/retry_tests
-      else
-        echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/failed_tests
-      fi
+    if [ $retVal -eq 0 ]; then
+      echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/successful_tests
+    elif [ $retVal -eq 2 ]; then
+      echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/retry_tests
     else
-      echo "Error: ${test_to_execute}-check.sh not found or not executable" >> ${WORK_DIR}/error.log
+      echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/failed_tests
     fi
-  done < "${WORK_DIR}/submitted_tasks_CCV"
+  done <"${WORK_DIR}/submitted_tasks_CCV"
 else
-  echo "Error: ${WORK_DIR}/submitted_tasks_CCV is not a file" >> ${WORK_DIR}/error.log
+  echo "Error: ${WORK_DIR}/submitted_tasks_CCV is not a file"
   exit 1
 fi
 
