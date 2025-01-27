@@ -35,7 +35,8 @@ if [ "X${singularity}" == X6 ] || [ "X${singularity}" == X7 ] || [ "X${singulari
     if [ "X${singularity}" == X7 ]; then scramprefix=el${singularity}; fi
     if [ "X${singularity}" == X8 ]; then scramprefix=el${singularity}; fi
     ERR=false;
-    /cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- "${ROOT_DIR}/cicd/gitlab/clientConfigurationValidation.sh" || ERR=true
+    /cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- "${ROOT_DIR}/cicd/gitlab/clientConfigurationValidation.sh"
+    ERR=$([[ $? -eq 0 || $? -eq 2 ]] && echo "false" || echo "true") #ERR is true if return is other than 0 or 2
 else
     echo "!!! I am not prepared to run for slc${singularity}."
     exit 1
