@@ -1,4 +1,4 @@
-# https://github.com/dmwm/WMCore/blob/2.2.4rc6/requirements.txt
+# https://github.com/dmwm/WMCore/blob/2.3.7.1/requirements.txt
 # update deps version when bump wmcore version
 
 dbs3-client~=4.0.12
