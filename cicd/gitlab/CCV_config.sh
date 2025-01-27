@@ -52,12 +52,6 @@ MESSAGE='Test failed. Investigate manually'
 # Define an associative array to hold the test results
 declare -A results=( ["SUCCESSFUL"]="successful_tests" ["FAILED"]="failed_tests" ["RETRY"]="retry_tests" )
 
-# Check if the tests passed or failed
-if [ -s "successful_tests" ] && { [ ! -e "failed_tests" ] || [[ $(<failed_tests) == *none* ]]; }; then
-    TEST_RESULT='SUCCEEDED'
-    MESSAGE='Test is done.'
-fi
-
 for result in "${!results[@]}"; do
 	if [ -s "${results[$result]}" ]; then
 		test_result=$(cat "${results[$result]}")
@@ -76,6 +70,15 @@ for result in "${!results[@]}"; do
 		echo -e "\n${result} TESTS:\n none" >> message_CCVResult_interim
 	fi
 done
+
+# Check if the tests passed or failed
+if [ -s "successful_tests" ] && { 
+    { [ ! -e "failed_tests" ] || [[ $(<failed_tests) == *none* ]]; }; 
+    && { [ ! -e "retry_tests" ] || [[ $(<retry_tests) == *none* ]]; };
+}; then
+    TEST_RESULT='SUCCEEDED'
+    MESSAGE='Test is done.'
+fi
 
 # Create the final result message
 echo -e "**Test:** Client configuration validation\n\
