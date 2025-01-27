@@ -41,6 +41,10 @@ else
     exit 1
 fi
 
+if [ "$ERR" == true ]; then
+    echo "clientConfigurationValidation.sh script failed to run properly."
+    exit 1
+fi
 # Change to the working directory
 # cd ${WORK_DIR}
 
@@ -75,12 +79,14 @@ for result in "${!results[@]}"; do
 done
 
 # Check if the tests passed or failed
-# Check if the tests passed or failed
-if [ -s "successful_tests" ] && { [ ! -e "failed_tests" ] || [[ $(<failed_tests) == *none* ]]; } && { [ ! -e "retry_tests" ] || [[ $(<retry_tests) == *none* ]]; }; then
+if [ -s "failed_tests" ]; then
+    TEST_RESULT='FAILED'
+elif [ -s "retry_tests" ]; then
+    TEST_RESULT='FULL-STATUS-UNKNOWN'
+elif [ -s "successful_tests" ]; then
     TEST_RESULT='SUCCEEDED'
     MESSAGE='Test is done.'
 fi
-
 
 # Create the final result message
 echo -e "**Test:** Client configuration validation\n\
