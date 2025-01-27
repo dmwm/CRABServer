@@ -12,9 +12,12 @@ echo "(DEBUG) CMSSW_release: ${CMSSW_release}"
 echo "(DEBUG) Client_Configuration_Validation: ${Client_Configuration_Validation}"
 
 # always run inside ./workdir
-export ROOT_DIR=$PWD
-export WORK_DIR=$PWD/workdir
-mkdir -p workdir
+export ROOT_DIR="${PWD}"
+export WORK_DIR="${PWD}/workdir"
+if [ ! -d "$WORK_DIR" ]; then
+  mkdir -p "$WORK_DIR"
+  echo "(DEBUG) workdir was recreated"
+fi
 pushd "${WORK_DIR}"
 
 # Get configuration from CMSSW_release
@@ -39,7 +42,7 @@ else
 fi
 
 # Change to the working directory
-cd ${WORK_DIR}
+# cd ${WORK_DIR}
 
 # Set retry variables (GitLab does not have NAGINATOR; you can set these manually or use GitLab CI variables)
 export RETRY=${CI_PIPELINE_RETRY_COUNT:-0}
@@ -72,13 +75,12 @@ for result in "${!results[@]}"; do
 done
 
 # Check if the tests passed or failed
-if [ -s "successful_tests" ] && { 
-    { [ ! -e "failed_tests" ] || [[ $(<failed_tests) == *none* ]]; }; 
-    && { [ ! -e "retry_tests" ] || [[ $(<retry_tests) == *none* ]]; };
-}; then
+# Check if the tests passed or failed
+if [ -s "successful_tests" ] && { [ ! -e "failed_tests" ] || [[ $(<failed_tests) == *none* ]]; } && { [ ! -e "retry_tests" ] || [[ $(<retry_tests) == *none* ]]; }; then
     TEST_RESULT='SUCCEEDED'
     MESSAGE='Test is done.'
 fi
+
 
 # Create the final result message
 echo -e "**Test:** Client configuration validation\n\
@@ -89,6 +91,8 @@ echo -e "**Test:** Client configuration validation\n\
 
 # Append interim result to the final message
 echo -e "\`\`\`$(cat message_CCVResult_interim)\n\`\`\`"  >> message_CCVResult
+
+popd
 
 if [[ ${TEST_RESULT} == 'FULL-STATUS-UNKNOWN' ]]; then
     exit 4
