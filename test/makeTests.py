@@ -431,7 +431,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "== JOB AD: CRAB_AlgoArgs.*273150 "${workDir}/results/job_out.1.*.txt"
+lookFor "== JOB AD: CRAB_AlgoArgs.*273150" "${workDir}/results/job_out.1.*.txt"
 """
 if SL6:  # skip: our runRange does not work on the primary input used for CMSSW_7 tests
     validationScript = dummyTestScript
