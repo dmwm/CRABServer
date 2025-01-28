@@ -68,7 +68,8 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: CRAB_TransferOutputs = 0" "${workDir}/results/job_out.1.*.txt"
@@ -84,7 +85,8 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: CRAB_SaveLogsFlag = 1" "${workDir}/results/job_out.1.*.txt"
@@ -100,7 +102,8 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "JOB AD: CMS_Type = \\"Test\\"" "${workDir}/results/job_out.1.*.txt"
 lookFor "JOB AD: CMS_TaskType = \\"hctestnew\\"" "${workDir}/results/job_out.1.*.txt"
@@ -125,7 +128,8 @@ lookInTarFor "^centos-release" ${workDir}/inputs/*default.tgz
 """
 validationScript = """
 checkStatus ${taskName} SUBMITTED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -138,7 +142,8 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "^Output files.*: \$" "${workDir}/results/job_out.1.*.txt"
@@ -160,7 +165,8 @@ confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getoutput "--jobids=1 --proxy=$PROXY"
 lookFor "Success in retrieving output_1.root " commandLog.txt
 lookFor "Success in retrieving My_output_1.txt " commandLog.txt
@@ -179,7 +185,8 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} SUBMITTED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -192,7 +199,8 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: RequestMemory = 2500" "${workDir}/results/job_out.1.*.txt"
@@ -208,7 +216,8 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: MaxWallTimeMins_RAW = 100" "${workDir}/results/job_out.1.*.txt"
@@ -229,7 +238,8 @@ confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: RequestCpus = 8" "${workDir}/results/job_out.1.*.txt"
@@ -247,7 +257,8 @@ lookInTarFor "^SIMPLE-SCRIPT.sh" ${workDir}/inputs/*default.tgz
 """
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "SB CMSRUN starting" "${workDir}/results/job_out.1.*.txt"
@@ -269,7 +280,8 @@ lookInTarFor "^SIMPLE-SCRIPT.sh" ${workDir}/inputs/*default.tgz
 """
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "SB CMSRUN starting" "${workDir}/results/job_out.1.*.txt"
@@ -290,7 +302,8 @@ lookInTarFor "^venv/" ${workDir}/inputs/*default.tgz
 """
 validationScript = """
 checkStatus ${taskName} SUBMITTED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -306,7 +319,8 @@ lookInTarFor "^external/" ${workDir}/inputs/*default.tgz
 """
 validationScript = """
 checkStatus ${taskName} SUBMITTED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -329,7 +343,8 @@ testSubmitScript = dummyTestScript
 # but if it was sumitted, it means that DBS lookup was OK
 validationScript = """
 checkStatus ${taskName} SUBMITTED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -343,7 +358,8 @@ testSubmitScript = dummyTestScript
 # make sure that parents were really read by cmsRun
 validationScript = """
 checkStatus ${taskName} COMPFAIL
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "request to open.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt"
@@ -363,7 +379,8 @@ testSubmitScript = dummyTestScript
 # make sure that the secondary dataset was really used in cmsRun
 validationScript = """
 checkStatus ${taskName} COMPFAIL
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "request to open.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt"
@@ -385,7 +402,8 @@ testSubmitScript = dummyTestScript
 # make sure that the lumimask was really applied
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "== JOB AD: CRAB_AlgoArgs.*1,10,20,25" "${workDir}/results/job_out.1.*.txt"
@@ -410,7 +428,8 @@ if not SL6:  # skip on SL6, can't fetch lumMask from URL inside singularity
     # make sure that the lumimask was really applied
     validationScript = """
     checkStatus ${taskName} COMPLETED
-    [ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+    statusCode=$?
+    ([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
     crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
     lookFor "Retrieved job_out.1.*.txt" commandLog.txt
     lookFor "== JOB AD: CRAB_AlgoArgs.*273158" "${workDir}/results/job_out.1.*.txt"
@@ -426,7 +445,8 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getoutput "--dump --jobids=1 --proxy=$PROXY"
 lookFor "OLFNtest/Adir" commandLog.txt
 """
@@ -449,7 +469,8 @@ testSubmitScript = dummyTestScript
 # make sure that the run range was really applied
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "== JOB AD: CRAB_AlgoArgs.*273150" "${workDir}/results/job_out.1.*.txt"
@@ -474,7 +495,8 @@ confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand status "--long --proxy=$PROXY"
 lookFor "T2_CH_CERN" commandLog.txt
 """
@@ -496,7 +518,8 @@ confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 """
 if SL6:  # skip: those input files can't be read with CMSSW_7
     validationScript = dummyTestScript
@@ -518,7 +541,8 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: DESIRED_SITES = \\"T2_DE_DESY\\"" "${workDir}/results/job_out.1.*.txt"
@@ -542,7 +566,8 @@ confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: JOB_CMSSite = \\"T1_US_FNAL\\"" "${workDir}/results/job_out.1.*.txt"
@@ -562,7 +587,8 @@ testSubmitScript = dummyTestScript
 # let's simply make sure that task completes
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -579,7 +605,8 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: CRAB_UserRole = \\"production\\"" "${workDir}/results/job_out.1.*.txt"
@@ -599,7 +626,8 @@ writeValidationScript(testName=name, validationScript=validationScript)
 #testSubmitScript = dummyTestScript
 #validationScript = """
 #checkStatus ${taskName} COMPLETED
-#[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+#statusCode=$?
+#([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 #crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 #lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 #lookFor "JOB AD: CRAB_UserGroup = \\"itcms\\"" "${workDir}/results/job_out.1.*.txt"
@@ -623,7 +651,8 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} SUBMITTED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 lookFor "crab3@vocms059.cern.ch" statusLog.txt
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
@@ -640,7 +669,8 @@ confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} SUBMITTED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -653,7 +683,8 @@ confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
-[ $? -eq 0 ] || [ $? -eq 2 ] || exit 1
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
 lookFor "JOB AD: CMS_ALLOW_OVERFLOW = false" "${workDir}/results/job_out.1.*.txt"
