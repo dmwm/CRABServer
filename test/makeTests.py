@@ -370,7 +370,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "== JOB AD: CRAB_AlgoArgs.*\\"lumis\\": \\[\\"1,10" "${workDir}/results/job_out.1.*.txt"
+lookFor "== JOB AD: CRAB_AlgoArgs.*1,10,20,25" "${workDir}/results/job_out.1.*.txt"
 """
 if SL6:  # skip: our lumiMask does not work on the primary input used for CMSSW_7 tests
     validationScript = dummyTestScript
@@ -394,7 +394,7 @@ if not SL6:  # skip on SL6, can't fetch lumMask from URL inside singularity
     checkStatus ${taskName} COMPLETED
     crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
     lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-    lookFor "== JOB AD: CRAB_AlgoArgs.*\\"273158\\"" "${workDir}/results/job_out.1.*.txt"
+    lookFor "== JOB AD: CRAB_AlgoArgs.*273158" "${workDir}/results/job_out.1.*.txt"
     """
     writeConfigFile(testName=name, listOfDicts=confChangesList)
     writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -431,7 +431,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "== JOB AD: CRAB_AlgoArgs.*\\"273150\\"" "${workDir}/results/job_out.1.*.txt"
+lookFor "== JOB AD: CRAB_AlgoArgs.*273150 "${workDir}/results/job_out.1.*.txt"
 """
 if SL6:  # skip: our runRange does not work on the primary input used for CMSSW_7 tests
     validationScript = dummyTestScript
