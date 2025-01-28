@@ -55,7 +55,7 @@ function lookFor {
   local string="$1"
   local file="$2"
   grep -q "${string}" ${file}
-  [ $? -ne 0 ] && exit 1
+  [ $? -ne 0 ] && return 1
   return 0
 }
 
@@ -64,7 +64,7 @@ function lookInTarFor {
   local file="$1"
   local tarball="$2"
   tar tf ${tarball} | grep -q ${file}
-  [ $? -ne 0 ] && exit 1
+  [ $? -ne 0 ] && return 1
   return 0
 }
 
