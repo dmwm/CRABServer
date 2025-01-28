@@ -40,11 +40,11 @@ function checkStatus {
       [ ${isSub} -eq 0 ] && [ ${isDone} -eq 0 ] && [ ${isFailed} -eq 0 ] && exit 1
       ;;
     COMPLETED)
-      [ ${isSub} -eq 1 ] && exit 2  # ask for a check later on
+      [ ${isSub} -eq 1 ] && return 2  # ask for a check later on
       [ ${isDone} -eq 0 ] && exit 1
       ;;
     COMPFAIL)
-      [ ${isSub} -eq 1 ] && exit 2  # ask for a check later on
+      [ ${isSub} -eq 1 ] && return 2  # ask for a check later on
       [ ${isDone} -eq 0 ] && [ ${isFailed} -eq 0 ] && exit 1
   esac
   return 0
