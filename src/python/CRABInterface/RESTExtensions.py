@@ -73,8 +73,10 @@ def authz_login_valid():
         raise cherrypy.HTTPError(403, "You are not allowed to access this resource. Please run: crab checkusername")
 
 class BadRequestException(RESTError):
-    "User make any kind of invalid request."
+    """ Generic Exception for any kind of bad/invalid request."""
     http_code = 400
     app_code = 40001
-    message = "This request are invalid."
 
+    def __init__(self, message):
+        RESTError.__init__(self)
+        self.message = message

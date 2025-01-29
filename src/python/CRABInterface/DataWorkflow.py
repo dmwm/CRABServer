@@ -406,7 +406,8 @@ class DataWorkflow(object):
             self.api.modify(self.Task.SetStatusWarningTask_sql, status=["KILLED"], command=["KILL"],
                             taskname=[workflow], warnings=[str(warnings)])
         else:
-            raise BadRequestException()
+            msg = "You cannot kill a task if it is in the %s status" % row.task_status
+            raise BadRequestException(msg)
 
         return [{"result":retmsg}]
 
