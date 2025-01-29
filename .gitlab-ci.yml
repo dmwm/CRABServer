@@ -49,7 +49,7 @@ stages:
   - submit_testsuite
   - run_testsuite_CV
   - run_testsuite_CCV
-  - check_testsuite
+  - run_testsuite_TS
   - tagging_release
 
 get_env:
@@ -358,14 +358,14 @@ client_configuration_validation:
         - workdir/submitted_tasks_CCV
       policy: pull
 
-check_test_result:
+check_status_tracking:
   rules:
     - if: '$STATUS_TRACKING == "true" || $CLIENT_VALIDATION == "true" || $CLIENT_CONFIGURATION_VALIDATION == "true"'
     - !reference [.default_rules, skip_check]
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
-  stage: check_testsuite
+  stage: run_testsuite_TS
   tags:
     - crab3-shell
   script:
@@ -377,24 +377,15 @@ check_test_result:
     - export CMSSW_release=CMSSW_13_0_2
     - export SCRAM_ARCH=el8_amd64_gcc11
     - export Check_Publication_Status=Yes
-    - echo ${MANUAL_CI_PIPELINE_ID}
-    # manual task name
-    - |
-        if [[ -n "${MANUAL_TASKNAME:-}" ]]; then
-            echo "${MANUAL_TASKNAME}" > workdir/submitted_tasks_TS
-            echo "${MANUAL_TASKNAME}" > workdir/submitted_tasks_CV
-            echo "${MANUAL_TASKNAME}" > workdir/submitted_tasks_CCV
-        fi
     - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
   cache:
-    - key: $MANUAL_CI_PIPELINE_ID
-      fallback_keys:
-        - $CI_PIPELINE_ID
-        - submitted_tasks_TS_latest
-        - submitted_tasks_CCV_latest
-        - submitted_tasks_CV_latest
+    - key: $CI_PIPELINE_ID
       paths:
-        - workdir
+        - workdir/submitted_tasks_TS
+      policy: pull
+    - key: submitted_tasks_TS_latest
+      paths:
+        - workdir/submitted_tasks_TS
       policy: pull
 
 # if test is pass, retag with `*-stable`
