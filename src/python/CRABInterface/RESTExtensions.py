@@ -72,12 +72,9 @@ def authz_login_valid():
     if not cherrypy.request.user['login']:
         raise cherrypy.HTTPError(403, "You are not allowed to access this resource. Please run: crab checkusername")
 
-class TaskKillNotAllowedException(RESTError):
-    "User cannot kill a <task_status> Task"
+class BadRequestException(RESTError):
+    "User make any kind of invalid request."
     http_code = 400
-    app_code = 10001
-
-    def __init__(self, task_status=None):
-        RESTError.__init__(self)
-        self.message = "You cannot kill a task if it is in the %s status" % task_status
+    app_code = 40001
+    message = "This request are invalid."
 
