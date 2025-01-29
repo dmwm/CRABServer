@@ -370,7 +370,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "== JOB AD: CRAB_AlgoArgs.*\\"lumis\\": \\[\\"1,10" "${workDir}/results/job_out.1.*.txt"
+lookFor "== JOB AD: CRAB_AlgoArgs.*1,10,20,25" "${workDir}/results/job_out.1.*.txt"
 """
 if SL6:  # skip: our lumiMask does not work on the primary input used for CMSSW_7 tests
     validationScript = dummyTestScript
@@ -394,7 +394,7 @@ if not SL6:  # skip on SL6, can't fetch lumMask from URL inside singularity
     checkStatus ${taskName} COMPLETED
     crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
     lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-    lookFor "== JOB AD: CRAB_AlgoArgs.*\\"273158\\"" "${workDir}/results/job_out.1.*.txt"
+    lookFor "== JOB AD: CRAB_AlgoArgs.*273158" "${workDir}/results/job_out.1.*.txt"
     """
     writeConfigFile(testName=name, listOfDicts=confChangesList)
     writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -431,7 +431,7 @@ validationScript = """
 checkStatus ${taskName} COMPLETED
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "== JOB AD: CRAB_AlgoArgs.*\\"273150\\"" "${workDir}/results/job_out.1.*.txt"
+lookFor "== JOB AD: CRAB_AlgoArgs.*273150" "${workDir}/results/job_out.1.*.txt"
 """
 if SL6:  # skip: our runRange does not work on the primary input used for CMSSW_7 tests
     validationScript = dummyTestScript
@@ -563,22 +563,27 @@ writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # voGroup
-name = 'voGroup'
-changeDict = {'param': name, 'value': '"itcms"', 'section': 'User'}
-confChangesList = [changeDict]
-testSubmitScript = dummyTestScript
-validationScript = """
-checkStatus ${taskName} COMPLETED
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt
-lookFor "JOB AD: CRAB_UserGroup = \\"itcms\\"" "${workDir}/results/job_out.1.*.txt"
-lookFor "attribute : /cms/itcms/Role=NULL/Capability=NULL" "${workDir}/results/job_out.1.*.txt"
-# now that condor does not fill x509UserProxyFirstFQAN anymore we lack a good way to check the FirstFQAN 
-#lookFor "JOB AD: x509UserProxyFirstFQAN = \\"/cms/itcms/Role=NULL/Capability=NULL\\"" "${workDir}/results/job_out.1.*.txt"
-"""
-writeConfigFile(testName=name, listOfDicts=confChangesList)
-writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
-writeValidationScript(testName=name, validationScript=validationScript)
+# this test is currently disabled since we now run tests in the crabint1 account
+# and its DN it is not visible in cms-auth page so Stefano has no way to
+# make it possible for it to be in cms:itcms group or any other group
+#name = 'voGroup'
+#changeDict = {'param': name, 'value': '"itcms"', 'section': 'User'}
+#confChangesList = [changeDict]
+#testSubmitScript = dummyTestScript
+#validationScript = """
+#checkStatus ${taskName} COMPLETED
+#crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
+#lookFor "Retrieved job_out.1.*.txt" commandLog.txt
+#lookFor "JOB AD: CRAB_UserGroup = \\"itcms\\"" "${workDir}/results/job_out.1.*.txt"
+#lookFor "attribute : /cms/itcms/Role=NULL/Capability=NULL" "${workDir}/results/job_out.1.*.txt"
+## now that condor does not fill x509UserProxyFirstFQAN anymore we lack a good way to check the FirstFQAN
+##lookFor "JOB AD: x509UserProxyFirstFQAN = \\"/cms/itcms/Role=NULL/Capability=NULL\\"" "${workDir}/results/job_out.1.*.txt"
+#"""
+#writeConfigFile(testName=name, listOfDicts=confChangesList)
+#writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+#writeValidationScript(testName=name, validationScript=validationScript)
+# end of commented-out voGroup test
+
 #=============================
 # SECTION DEBUG
 #=============================
