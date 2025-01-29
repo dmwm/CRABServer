@@ -2,6 +2,7 @@ import copy
 import time
 import logging
 import json
+import cherrypy
 from ast import literal_eval
 
 ## WMCore dependecies
@@ -14,7 +15,7 @@ from ServerUtilities import NUM_DAYS_FOR_RESUBMITDRAIN
 from ServerUtilities import getEpochFromDBTime
 
 from CRABInterface.Utilities import CMSSitesCache, conn_handler, getDBinstance
-
+from CRABInterface.RESTExtensions import TaskKillNotAllowedException
 
 class DataWorkflow(object):
     """Entity that allows to operate on workflow resources.
@@ -406,7 +407,7 @@ class DataWorkflow(object):
             self.api.modify(self.Task.SetStatusWarningTask_sql, status=["KILLED"], command=["KILL"],
                             taskname=[workflow], warnings=[str(warnings)])
         else:
-            raise ExecutionError("You cannot kill a task if it is in the %s status" % row.task_status)
+            raise TaskKillNotAllowedException(task_status=row.task_status)
 
         return [{"result":retmsg}]
 

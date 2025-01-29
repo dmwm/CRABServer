@@ -4,7 +4,7 @@ These are extensions which are not directly contained in WMCore.REST module
 and it shouldn't have any other dependencies a part of that and cherrypy.
 
 """
-from WMCore.REST.Error import MissingObject
+from WMCore.REST.Error import MissingObject, RESTError
 
 import cherrypy
 import traceback
@@ -71,3 +71,13 @@ def authz_owner_match(dbapi, workflows, Task):
 def authz_login_valid():
     if not cherrypy.request.user['login']:
         raise cherrypy.HTTPError(403, "You are not allowed to access this resource. Please run: crab checkusername")
+
+class TaskKillNotAllowedException(RESTError):
+    "User cannot kill a <task_status> Task"
+    http_code = 400
+    app_code = 10001
+
+    def __init__(self, task_status=None):
+        RESTError.__init__(self)
+        self.message = "You cannot kill a task if it is in the %s status" % task_status
+
