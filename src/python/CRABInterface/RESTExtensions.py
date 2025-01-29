@@ -52,7 +52,7 @@ def authz_owner_match(dbapi, workflows, Task):
             wfrow = next(dbapi.query(None, None, Task.GetUserFromID_sql, taskname = wf))
         except Exception as ex:
             excauthz = RuntimeError("The document '%s' is not retrievable '%s'" % (wf, str(ex)))
-            raise MissingObject("The resource requested does not exist", trace=traceback.format_exc(), errobj = excauthz)
+            raise MissingObject('The resource requested does not exist', trace=traceback.format_exc(), errobj=excauthz) from ex
 
         if wfrow[0] == cherrypy.request.user['login']:
             alldocs.append(wfrow)

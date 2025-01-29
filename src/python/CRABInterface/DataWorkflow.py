@@ -2,7 +2,6 @@ import copy
 import time
 import logging
 import json
-import cherrypy
 from ast import literal_eval
 
 ## WMCore dependecies
