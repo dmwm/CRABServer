@@ -4,7 +4,7 @@ These are extensions which are not directly contained in WMCore.REST module
 and it shouldn't have any other dependencies a part of that and cherrypy.
 
 """
-from WMCore.REST.Error import MissingObject
+from WMCore.REST.Error import MissingObject, RESTError
 
 import cherrypy
 import traceback
@@ -52,7 +52,7 @@ def authz_owner_match(dbapi, workflows, Task):
             wfrow = next(dbapi.query(None, None, Task.GetUserFromID_sql, taskname = wf))
         except Exception as ex:
             excauthz = RuntimeError("The document '%s' is not retrievable '%s'" % (wf, str(ex)))
-            raise MissingObject("The resource requested does not exist", trace=traceback.format_exc(), errobj = excauthz)
+            raise MissingObject('The resource requested does not exist', trace=traceback.format_exc(), errobj=excauthz) from ex
 
         if wfrow[0] == cherrypy.request.user['login']:
             alldocs.append(wfrow)
@@ -71,3 +71,10 @@ def authz_owner_match(dbapi, workflows, Task):
 def authz_login_valid():
     if not cherrypy.request.user['login']:
         raise cherrypy.HTTPError(403, "You are not allowed to access this resource. Please run: crab checkusername")
+
+class BadRequestException(RESTError):
+    "User make any kind of invalid request."
+    http_code = 400
+    app_code = 40001
+    message = "This request are invalid."
+

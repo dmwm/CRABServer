@@ -14,7 +14,7 @@ from ServerUtilities import NUM_DAYS_FOR_RESUBMITDRAIN
 from ServerUtilities import getEpochFromDBTime
 
 from CRABInterface.Utilities import CMSSitesCache, conn_handler, getDBinstance
-
+from CRABInterface.RESTExtensions import BadRequestException
 
 class DataWorkflow(object):
     """Entity that allows to operate on workflow resources.
@@ -406,7 +406,7 @@ class DataWorkflow(object):
             self.api.modify(self.Task.SetStatusWarningTask_sql, status=["KILLED"], command=["KILL"],
                             taskname=[workflow], warnings=[str(warnings)])
         else:
-            raise ExecutionError("You cannot kill a task if it is in the %s status" % row.task_status)
+            raise BadRequestException()
 
         return [{"result":retmsg}]
 
