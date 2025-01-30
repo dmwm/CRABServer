@@ -10,7 +10,6 @@ import time
 from http.client import HTTPException
 from urllib.parse import urlencode
 
-import CMSGroupMapper
 import HTCondorLocator
 
 from ServerUtilities import FEEDBACKMAIL
@@ -28,80 +27,74 @@ else:
     import htcondor
     import classad
 
-## These are the CRAB attributes that we want to add to the job class ad when
-## using the submitDirect() method. I.e. to submit the dagman boostrap job to the scheduler (AP)
-# We do not need all of this anymore !! Most of them are in Job.submit created by
-# DagmanCreator and are not needed to submit/run the DagMan.
-SUBMIT_INFO = [ \
-    ('+CRAB_ReqName', 'requestname'),
-    ('+CRAB_Workflow', 'workflow'),
-    ('+CMS_JobType', 'jobtype'),
-    ('+CRAB_JobSW', 'jobsw'),
-    ('+CRAB_JobArch', 'jobarch'),
-    ('+DESIRED_CMSDataset', 'inputdata'),
-    ('+CRAB_DBSURL', 'dbsurl'),
-    ('+CRAB_PublishName', 'publishname'),
-    ('+CRAB_Publish', 'publication'),
-    ('+CRAB_PublishDBSURL', 'publishdbsurl'),
-    ('+CRAB_PrimaryDataset', 'primarydataset'),
-    ('+CRAB_ISB', 'cacheurl'),
-    ('+CRAB_AdditionalOutputFiles', 'addoutputfiles'),
-    ('+CRAB_EDMOutputFiles', 'edmoutfiles'),
-    ('+CRAB_TFileOutputFiles', 'tfileoutfiles'),
-    ('+CRAB_TransferOutputs', 'saveoutput'),
-    ('+CRAB_SaveLogsFlag', 'savelogsflag'),
-    ('+CRAB_UserDN', 'userdn'),
-    ('+CRAB_UserHN', 'userhn'),
-    ('+CRAB_AsyncDest', 'asyncdest'),
-    #('+CRAB_StageoutPolicy', 'stageoutpolicy'),
-    ('+CRAB_UserRole', 'tm_user_role'),
-    ('+CRAB_UserGroup', 'tm_user_group'),
-    ('+CRAB_TaskWorker', 'worker_name'),
-    ('+CRAB_RetryOnASOFailures', 'retry_aso'),
-    ('+CRAB_ASOTimeout', 'aso_timeout'),
-    ('+CRAB_RestHost', 'resthost'),
-    ('+CRAB_DbInstance', 'dbinstance'),
-    ('+CRAB_NumAutomJobRetries', 'numautomjobretries'),
-    ('+CRAB_SplitAlgo', 'splitalgo'),
-    ('+CRAB_AlgoArgs', 'algoargs'),
-    ('+CRAB_LumiMask', 'lumimask'),
-    ('+CRAB_JobCount', 'jobcount'),
-    ('+CRAB_UserVO', 'tm_user_vo'),
-    ('+CRAB_SiteBlacklist', 'siteblacklist'),
-    ('+CRAB_SiteWhitelist', 'sitewhitelist'),
-    ('+CRAB_RequestedMemory', 'tm_maxmemory'),
-    ('+CRAB_RequestedCores', 'tm_numcores'),
-    ('+MaxWallTimeMins', 'tm_maxjobruntime'),
-    ('+MaxWallTimeMinsRun', 'tm_maxjobruntime'),
-    ('+MaxWallTimeMinsProbe', 'maxproberuntime'),
-    ('+MaxWallTimeMinsTail', 'maxtailruntime'),
-    ('+CRAB_FailedNodeLimit', 'faillimit'),
-    ('+CRAB_DashboardTaskType', 'taskType'),
-    ('+CRAB_MaxIdle', 'maxidle'),
-    ('+CRAB_MaxPost', 'maxpost'),
-    ('+CMS_Type', 'cms_type'),
-    ('+CMS_WMTool', 'cms_wmtool'),
-    ('+CMS_TaskType', 'cms_tasktype'),
-              ]
 
+def addJobSubmitInfoToDagJobJDL(dagJdl, jobSubmit):
+    """
+    given an htondor.Submit objecty, add the appropriate information
+    from the jobSubmit prepared by DagmanCreator
+    """
+    # These are the CRAB attributes that we want to add to the job class ad when
+    # using the submitDirect() method. I.e. to submit the dagman boostrap job to the scheduler (AP)
+    # These ads are the way to communivate variable values to the scripts which run in the scheduler,
+    # Why classAds rather than e.g. a JSON or `setenv` file ? It started this way, and it stuck.
+    adsToPort = [
+        # used in bootstrap script (in other places too !) and useful to lookup things with condor_q
+        'My.CRAB_RestHost',
+        'My.CRAB_DbInstance',
+        'My.CRAB_ReqName',
+        'My.CRAB_Workflow',
+        'My.CRAB_UserDN',
+        'My.CRAB_UserHN',
+        # these are used in Pre/Post scripts
+        'My.CMS_JobType',
+        'My.CRAB_JobSW',
+        'My.CRAB_JobArch',
+        'My.DESIRED_CMSDataset',
+        'My.CRAB_MaxIdle',
+        'My.CRAB_MaxPost',
+        'My.CRAB_FailedNodeLimit',
+        'My.CRAB_SaveLogsFlag',
+        'My.CRAB_TransferOutputs',
+        'My.CRAB_SiteBlacklist',
+        'My.CRAB_SiteWhitelist',
+        'My.CRAB_JobReleaseTimeout',
+        'My.CRAB_RequestedMemory',
+        'My.CRAB_RequestedCores',
+        'My.MaxWallTimeMins',
+        'My.MaxWallTimeMinsRun',
+        'My.MaxWallTimeMinsProbe',
+        'My.MaxWallTimeMinsTail',
+        # these are used in PostJob only
+        'My.CRAB_UserRole',
+        'My.CRAB_UserGroup',
+        'My.CRAB_DBSURL',
+        'My.CRAB_PrimaryDataset',
+        'My.CRAB_AdditionalOutputFiles',
+        'My.CRAB_EDMOutputFiles',
+        'My.CRAB_TFileOutputFiles',
+        'My.CRAB_RetryOnASOFailures',
+        'My.CRAB_AsyncDest',
+        'My.CRAB_ASOTimeout',
+        'My.CRAB_PublishName',
+        'My.CRAB_Publish',
+        # usefulness of these is to be be determined
+        'My.CRAB_PublishDBSURL',  # not used anywhere in our code in GH
+        'My.CRAB_TaskWorker',
+        'My.CRAB_NumAutomJobRetries',
+        'My.CRAB_SplitAlgo',
+        'My.CRAB_AlgoArgs',
+        'My.CRAB_LumiMask',
+        'My.CRAB_JobCount',
+        'My.CRAB_UserVO',
+        'My.CRAB_DashboardTaskType',
+        'My.CMS_Type',
+        'My.CMS_WMTool',
+        'My.CMS_TaskType',
+    ]
 
-def addCRABInfoToJobJDL(jdl, info):
-    """
-    given a submit objecty, add in the appropriate CRAB_& attributes
-    from the info directory
-    """
-    for adName, dictName in SUBMIT_INFO:
-        if dictName in info and info[dictName] is not None:  # 0 or False still is valid info[]
-            jdl[adName] = str(info[dictName])
-    # CRAB_JobReleaseTimeout is passed in the config as an extraJDL, even if
-    # it is meant to be used in the PreJob which will look in the DAG ads
-    # so we need to add it to the DAG JDL as well
-    # Note: extraJDL config. param is a list,  DagmanCreator changes it to multiple lines
-    if 'extra_jdl' in info and info['extra_jdl']:
-        for ejdl in info['extra_jdl'].split('\n'):
-            k, v = ejdl.split('=', 1)
-            if k == "+CRAB_JobReleaseTimeout":
-                jdl[k] = v
+    for adName in adsToPort:
+        if adName in jobSubmit:
+            dagJdl[adName] = jobSubmit[adName]
 
 
 class ScheddStats(dict):
@@ -151,10 +144,17 @@ class ScheddStats(dict):
 scheddStats = ScheddStats()
 
 
-def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
+def checkMemoryWalltime(task, cmd, logger, warningUploader):
     """ Check memory and walltime and if user requires too much:
         - upload warning back to crabserver
         - change walltime to max 47h Issue: #4742
+        NOTE: this is used also in DagmanResubmitter.
+        Arguments:
+            task : dictionary : the Task info from taskdb
+            cmd: string : "tm" if called by D.Submitter, "resubmit" if callead by D.Resubmitter
+            logger: logging object : the current logger
+            warningUploader : should remove this as arg. and use CRABUtils.TaskUtils.uploadWarning
+                                  must remove from TW/Actions/TaskAction and cleanup of TW/Actions code
     """
 
     stdmaxjobruntime = 2750
@@ -169,8 +169,8 @@ def checkMemoryWalltime(info, task, cmd, logger, warningUploader):
         msg += " Jobs may not find a site where to run."
         msg += f" CRAB has changed this value to {stdmaxjobruntime} minutes."
         logger.warning(msg)
-        if info is not None:
-            info['tm_maxjobruntime'] = str(stdmaxjobruntime)
+        if cmd == 'tm':  # means this was called by DagmanSubmitter, not DagmanResubmitter
+            task['tm_maxjobruntime'] = str(stdmaxjobruntime)
         # somehow TaskAction/uploadWaning wants the user proxy to make a POST to task DB
         warningUploader(msg, task['user_proxy'], task['tm_taskname'])
     if memory is not None and memory > absmaxmemory:
@@ -203,7 +203,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         """ Try to set the schedd to the oracle database in the REST interface
             Raises TaskWorkerException in case of failure
         """
-        task['tm_schedd'] = schedd
         configreq = {'workflow':task['tm_taskname'],
                      'subresource':'updateschedd', 'scheddname':schedd}
         try:
@@ -218,6 +217,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
     def pickAndSetSchedd(self, task):
         """ Pick up a schedd using the correct formula
             Send it to the REST
+            Set it in the task{} dictionary
 
             If we can't send the schedd to the REST this is considered a permanent error
 
@@ -237,8 +237,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
             schedd = loc.getSchedd(chooserFunction=self.config.TaskWorker.scheddPickerFunction)
         else:
             schedd = loc.getSchedd() #uses the default memory stuff
+
         self.logger.debug("Finished picking up scheduler. Sending schedd name (%s) to REST", schedd)
-        self.sendScheddToREST(task, schedd)
+        self.sendScheddToREST(task, schedd)  # this will raise if it fails
+        task['tm_schedd'] = schedd
 
         return schedd
 
@@ -251,14 +253,20 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 In case of multiple failures is will set a new schedd and return back to the asction handler for retries.
         """
         task = kwargs['task']
-        schedd = task['tm_schedd']
-        info = args[0][0]
-        inputFiles = args[0][2]
+        schedName = task['tm_schedd']
+        # jobSubmit from DagmanCreator is an htcondor.Submit() object with same content as Job.submit file
+        # with the addition of : CRAB_MaxIdle, CRAB_MaxPost, CRAB_FailedNodeLimit which only make sense for DAG
+        jobSubmit = args[0][0]
+        # DagmanCreated also created the list of files to be transferred to the scheduler host
+        filesForScheduler = args[0][2]
 
-        checkMemoryWalltime(info, task, 'tm', self.logger, self.uploadWarning)
+        cwd = os.getcwd()
 
-        if not schedd:
-            schedd = self.pickAndSetSchedd(task)
+        checkMemoryWalltime(task, 'tm', self.logger, self.uploadWarning)
+
+        if not schedName:
+            self.pickAndSetSchedd(task)
+            schedName = task['tm_schedd']
 
         self.logger.debug("Starting duplicate check")
         dupRes = self.duplicateCheck(task)
@@ -266,29 +274,33 @@ class DagmanSubmitter(TaskAction.TaskAction):
         if dupRes is not None:
             return dupRes
 
-
         for retry in range(self.config.TaskWorker.max_retry + 1): #max_retry can be 0
-            self.logger.debug("Trying to submit task %s to schedd %s for the %s time.", task['tm_taskname'], schedd, str(retry))
+            self.logger.debug("Try to submit %s to %s for the %s time.", task['tm_taskname'], schedName, str(retry+1))
+            os.chdir(kwargs['tempDir'])
             try:
-                execInt = self.executeInternal(info, inputFiles, **kwargs)
-                scheddStats.success(schedd, self.clusterId)
+                execInt = self.executeInternal(jobSubmit, filesForScheduler, task)
+                scheddStats.success(schedName, self.clusterId)
+                os.chdir(cwd)
                 return execInt
             except Exception as ex: #pylint: disable=broad-except
-                scheddStats.failure(schedd)
-                msg = f"Failed to submit task to: {schedd} . Task: {task['tm_taskname']};\n{ex}"
+                scheddStats.failure(schedName)
+                msg = f"Failed to submit task to: {schedName} . Task: {task['tm_taskname']};\n{ex}"
                 self.logger.exception(msg)
-                scheddStats.taskError(schedd, msg)
+                scheddStats.taskError(schedName, msg)
                 if retry < self.config.TaskWorker.max_retry: #do not sleep on the last retry
-                    self.logger.error("Will retry in %s seconds on %s.", self.config.TaskWorker.retry_interval[retry], schedd)
+                    self.logger.error("Will retry in %s seconds on %s.",
+                                      self.config.TaskWorker.retry_interval[retry], schedName)
                     time.sleep(self.config.TaskWorker.retry_interval[retry])
             finally:
                 self.logger.info(scheddStats)
+                os.chdir(cwd)
             ## All the submission retries to the current schedd have failed. Record the
             ## failures.
 
         ## Returning back to Handler.py for retries, and in case try on a new schedd
-        self.logger.debug("Choosing a new schedd and then retrying")
-        schedd = self.pickAndSetSchedd(task)
+        self.logger.debug("Choosing a new schedd and retry")
+        self.pickAndSetSchedd(task)
+        schedName = task['tm_schedd']
 
         ## All the submission retries to this schedd have failed.
         msg = "The CRAB server backend was not able to submit the jobs to the Grid schedulers."
@@ -299,7 +311,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         msg += f" The submission was retried {nTries} times on {nScheds} schedulers."
         msg += f" These are the failures per Grid scheduler:\n {scheddStats.taskErrors}"
 
-        raise TaskWorkerException(msg, retry=(schedd is not None))
+        raise TaskWorkerException(msg, retry=(schedName is not None))
 
 
     def duplicateCheck(self, task):
@@ -322,8 +334,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
             schedd, dummyAddress = loc.getScheddObjNew(task['tm_schedd'])
             self.logger.debug("Got schedd obj for %s ", task['tm_schedd'])
 
-            rootConst = f'CRAB_DAGType =?= "BASE" && CRAB_ReqName =?= {classad.quote(workflow)}' \
-                        '&& (isUndefined(CRAB_Attempt) || CRAB_Attempt == 0)'
+            rootConst = f'CRAB_DAGType =?= "BASE" && CRAB_ReqName =?= {classad.quote(workflow)}'
 
             self.logger.debug("Duplicate check is querying the schedd: %s", rootConst)
             results = list(schedd.query(rootConst, []))
@@ -374,32 +385,39 @@ class DagmanSubmitter(TaskAction.TaskAction):
         # Note that we don't re-send Dashboard jobs; we assume this is a rare occurrance and
         # don't want to upset any info already in the Dashboard.
 
-        return Result.Result(task=task, result=(-1))
+        return Result.Result(task=task, result=-1)
 
 
-    def executeInternal(self, info, inputFiles, **kwargs):
+    def executeInternal(self, jobSubmit, filesForScheduler, task):
         """Internal execution to submit to selected scheduler
            Before submission it does duplicate check to see if
-           task was not submitted by previous time"""
+           task was not submitted by previous time
+           Arguments:
+               jobSubmit : htcondor.Submit object: the content of Job.submit file
+               filesForScheduler : list : list of files to be spooled for dagman job submission
+               task : dictionary : the Task infor from taskdb
+            Returns:
+                if all ok , returns a TaskWorker.DataObjects.Result oject
+                    Result(task=task, result='OK')
+                otherwise, raise TaskWorkerException
+            Side effects:
+                HTC job is submitted to remote schedulere (AP) to execute dagman_bootstrap_startup.sh
+                DAGJob.jdl file is written to tmp directory with the JDL used to submit that
+                subdag.jdl file is written to tmp directory with the a JDL fragment to be included in DAG
+                            description files by PreDag.py when creating subdags for automatic splitting
+                            this cointains a (very large) subset of DAGJob.jdl
+           """
 
-        task = kwargs['task']
-        workflow = task['tm_taskname']
+        # start preparing the JDL which will be used for submitting the Dagman bootstrap job
+        dagJobJDL = htcondor.Submit()
+        addJobSubmitInfoToDagJobJDL(dagJobJDL, jobSubmit)  # start with the Job.submit from DagmanCreator
 
-        cwd = os.getcwd()
-        os.chdir(kwargs['tempDir'])
-
-        info['start_time'] = task['tm_start_time']
-        info['inputFilesString'] = ", ".join(inputFiles + ['subdag.jdl'])
+        dagJobJDL['CRAB_TaskSubmitTime'] = str(task['tm_start_time'])
+        dagJobJDL['transfer_input_files'] = ", ".join(filesForScheduler + ['subdag.jdl'])
         outputFiles = ["RunJobs.dag.dagman.out", "RunJobs.dag.rescue.001"]
-        info['outputFilesString'] = ", ".join(outputFiles)
-        arg = "RunJobs.dag"
-
-        # for uniformity with values prepared in DagmanCreator (in JSON format), add double quotes
-        info['resthost'] = f"\"{self.crabserver.server['host']}\""
-        info['dbinstance'] = f'"{self.crabserver.getDbInstance()}"'
+        dagJobJDL['transfer_output_files'] = ", ".join(outputFiles)
 
         try:
-            info['remote_condor_setup'] = ''
             if task['tm_collector']:
                 self.backendurls['htcondorPool'] = task['tm_collector']
             loc = HTCondorLocator.HTCondorLocator(self.backendurls)
@@ -413,7 +431,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 msg = "The CRAB server backend was not able to contact the Grid scheduler."
                 msg += " Please try again later."
                 msg += f" Message from the scheduler: {exp}"
-                self.logger.exception("%s: %s", workflow, msg)
+                self.logger.exception("%s: %s", task['tm_taskname'], msg)
                 raise TaskWorkerException(msg, retry=True) from exp
 
             try:
@@ -423,17 +441,14 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 raise TaskWorkerException(msg, retry=True) from ex
 
             # Get location of schedd-specific environment script from schedd ad.
-            info['remote_condor_setup'] = loc.scheddAd.get("RemoteCondorSetup", "")
-
-            info["CMSGroups"] = set.union(CMSGroupMapper.map_user_to_groups(kwargs['task']['tm_username']), kwargs['task']['user_groups'])
-            self.logger.info("User %s mapped to local groups %s.", kwargs['task']['tm_username'], info["CMSGroups"])
-            if not info["CMSGroups"]:
-                raise TaskWorkerException(f"CMSGroups can not be empty. Failing task {task['tm_taskname']}", retry=True)
+            dagJobJDL['My.RemoteCondorSetup'] = loc.scheddAd.get("RemoteCondorSetup", "")
 
             self.logger.debug("Finally submitting to the schedd")
             if address:
+                cmd = 'dag_bootstrap_startup.sh'
+                arg = "RunJobs.dag"
                 try:
-                    self.clusterId = self.submitDirect(schedd, 'dag_bootstrap_startup.sh', arg, info)
+                    self.clusterId = self.submitDirect(schedd, cmd, arg, dagJobJDL, task)
                 except Exception as submissionError:
                     msg = f"Something went wrong: {submissionError} \n"
                     if self.clusterId:
@@ -442,7 +457,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                         msg += 'No clusterId was returned to DagmanSubmitter.'
                     msg += " Clean up condor queue before trying again."
                     self.logger.error(msg)
-                    constrain = f"crab_reqname==\"{kwargs['task']['tm_taskname']}\""
+                    constrain = f"crab_reqname==\"{task['tm_taskname']}\""
                     constrain = str(constrain)  # beware unicode, it breaks htcondor binding
                     self.logger.error("Sending: condor_rm -constrain '%s'", constrain)
                     schedd.act(htcondor.JobAction.Remove, constrain)
@@ -452,9 +467,9 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 raise TaskWorkerException("Not able to get schedd address.", retry=True)
             self.logger.debug("Submission finished")
         finally:
-            os.chdir(cwd)
+            pass
 
-        configreq = {'workflow': kwargs['task']['tm_taskname'],
+        configreq = {'workflow': task['tm_taskname'],
                      'status': "SUBMITTED",
                      'subresource': 'success',
                      'clusterid' : self.clusterId} #that's the condor cluster id of the dag_bootstrap.sh
@@ -462,59 +477,49 @@ class DagmanSubmitter(TaskAction.TaskAction):
         data = urlencode(configreq)
         self.crabserver.post(api='workflowdb', data=data)
 
-        return Result.Result(task=kwargs['task'], result='OK')
+        return Result.Result(task=task, result='OK')
 
-    def submitDirect(self, schedd, cmd, arg, info): #pylint: disable=R0201
+    def submitDirect(self, schedd, cmd, arg, dagJobJDL, task):
         """
         Submit directly to the schedd using the HTCondor module
         """
-        jobJDL = htcondor.Submit()
-        addCRABInfoToJobJDL(jobJDL, info)
-
-        if info["CMSGroups"]:
-            jobJDL["+CMSGroups"] = classad.quote(','.join(info["CMSGroups"]))
-        else:
-            jobJDL["+CMSGroups"] = classad.Value.Undefined
 
         # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
-        jobJDL["+CRAB_Attempt"] = "0"
-        jobJDL["+CMS_SubmissionTool"] = classad.quote("CRAB")
+        dagJobJDL["+CMS_SubmissionTool"] = classad.quote("CRAB")
         # We switched from local to scheduler universe.  Why?  It seems there's no way in the
         # local universe to change the hold signal at runtime.  That's fairly important for our
         # resubmit implementation.
-        jobJDL["JobUniverse"] = "7"
-        jobJDL["HoldKillSig"] = "SIGUSR1"
-        jobJDL["X509UserProxy"] = info['user_proxy']
+        dagJobJDL["JobUniverse"] = "7"
+        dagJobJDL["HoldKillSig"] = "SIGUSR1"
+        dagJobJDL["X509UserProxy"] = task['user_proxy']
         # submission command "priority" maps to jobAd "JobPrio" !
-        jobJDL["priority"] = info['tm_priority']
-        jobJDL["Requirements"] = "TARGET.Cpus >= 1"  # see https://github.com/dmwm/CRABServer/issues/8456#issuecomment-2145887432
-        jobJDL["Requirements"] = "True"
+        dagJobJDL["priority"] = str(task['tm_priority'])
+        dagJobJDL["Requirements"] = "TARGET.Cpus >= 1"  # see https://github.com/dmwm/CRABServer/issues/8456#issuecomment-2145887432
+        dagJobJDL["Requirements"] = "True"
         environmentString = "PATH=/usr/bin:/bin CRAB3_VERSION=3.3.0-pre1"
         environmentString += " CONDOR_ID=$(ClusterId).$(ProcId)"
-        environmentString += " " + " ".join(info['additional_environment_options'].split(';'))
+        environmentString += " CRAB_RUNTIME_TARBALL=local CRAB_TASKMANAGER_TARBALL=local"
+        ##SB environmentString += " " + " ".join(task['additional_environment_options'].split(';'))
         if 'useHtcV2' in os.environ:
             environmentString += " useHtcV2=True"
         # Environment command in JDL requires proper quotes https://htcondor.readthedocs.io/en/latest/man-pages/condor_submit.html#environment
-        jobJDL["Environment"] = classad.quote(environmentString)
-        jobJDL["+RemoteCondorSetup"] = classad.quote(info['remote_condor_setup'])
-        jobJDL["+CRAB_TaskSubmitTime"] = str(info['start_time'])  # this is an int (seconds from epoch)
-        jobJDL['+CRAB_TaskLifetimeDays'] = str(TASKLIFETIME // 24 // 60 // 60)
-        jobJDL['+CRAB_TaskEndTime'] = str(int(info['start_time']) + TASKLIFETIME)
+        dagJobJDL["Environment"] = classad.quote(environmentString)
+        dagJobJDL['+CRAB_TaskLifetimeDays'] = str(TASKLIFETIME // 24 // 60 // 60)
+        dagJobJDL['+CRAB_TaskEndTime'] = str(int(task['tm_start_time']) + TASKLIFETIME)
         #For task management info see https://github.com/dmwm/CRABServer/issues/4681#issuecomment-302336451
-        jobJDL["LeaveJobInQueue"] = "True"
-        jobJDL["PeriodicHold"] = "time() > CRAB_TaskEndTime"
-        jobJDL["transfer_output_files"] = str(info['outputFilesString'])
-        jobJDL["OnExitHold"] = "(ExitCode =!= UNDEFINED && ExitCode != 0)"
-        jobJDL["OnExitRemove"] = "( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))"
-        # jobJDL["OtherJobRemoveRequirements"] = "DAGManJobId =?= ClusterId"  # appears unused SB
-        jobJDL["RemoveKillSig"] = "SIGUSR1"
+        dagJobJDL["LeaveJobInQueue"] = "True"
+        dagJobJDL["PeriodicHold"] = "time() > CRAB_TaskEndTime"
+        dagJobJDL["OnExitHold"] = "(ExitCode =!= UNDEFINED && ExitCode != 0)"
+        dagJobJDL["OnExitRemove"] = "( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))"
+        # dagJobJDL["OtherJobRemoveRequirements"] = "DAGManJobId =?= ClusterId"  # appears unused SB
+        dagJobJDL["RemoveKillSig"] = "SIGUSR1"
 
-        # prepare a jobJDL fragment to be used when running in the scheduler
+        # prepare a dagJobJDL fragment to be used when running in the scheduler
         # to create subdags for automatic splitting. A crucial change is location of the proxy
         subdagJDL = htcondor.Submit()  # submit object does not have a copy method
-        for k,v in jobJDL.items():     # so we have to create a new object and
+        for k,v in dagJobJDL.items():     # so we have to create a new object and
             subdagJDL[k] = v           # fill it one element at a time
-        subdagJDL['X509UserProxy'] = os.path.basename(jobJDL['X509UserProxy'])  # proxy in scheduler will be in cwd
+        subdagJDL['X509UserProxy'] = os.path.basename(dagJobJDL['X509UserProxy'])  # proxy in scheduler will be in cwd
 
         # make sure that there is no "queue" statement in subdagJDL "jdl fragment" (introduced in v2 HTC bindings)
         # since condor_submit_dag will add one anyhow
@@ -525,27 +530,26 @@ class DagmanSubmitter(TaskAction.TaskAction):
         with open('subdag.jdl', 'w', encoding='utf-8') as fd:
             print(subdag, file=fd)
 
-        jobJDL["+CRAB_DAGType"] = classad.quote("BASE")  # we want the ad value to be "BASE", not BASE
-        jobJDL["output"] = os.path.join(info['scratch'], "request.out")
-        jobJDL["error"] = os.path.join(info['scratch'], "request.err")
-        jobJDL["Cmd"] = cmd
-        jobJDL['Args'] = arg
-        jobJDL["transfer_input_files"] = str(info['inputFilesString'])
+        dagJobJDL["+CRAB_DAGType"] = classad.quote("BASE")  # we want the ad value to be "BASE", not BASE
+        dagJobJDL["output"] = os.path.join(task['scratch'], "request.out")
+        dagJobJDL["error"] = os.path.join(task['scratch'], "request.err")
+        dagJobJDL["Executable"] = cmd
+        dagJobJDL['Arguments'] = arg
 
         # for debugging purpose
         with open('DAGJob.jdl', 'w', encoding='utf-8') as fd:
-            print(jobJDL, file=fd)
+            print(dagJobJDL, file=fd)
 
         htcondor.param['DELEGATE_FULL_JOB_GSI_CREDENTIALS'] = 'true'
         htcondor.param['DELEGATE_JOB_GSI_CREDENTIALS_LIFETIME'] = '0'
         try:
-            submitResult = schedd.submit(description=jobJDL, count=1, spool=True)
+            submitResult = schedd.submit(description=dagJobJDL, count=1, spool=True)
             clusterId = submitResult.cluster()
             numProcs = submitResult.num_procs()
             if 'useHtcV2' in os.environ:
                 schedd.spool(submitResult)
             else:
-                myjobs = jobJDL.jobs(count=numProcs, clusterid=clusterId)
+                myjobs = dagJobJDL.jobs(count=numProcs, clusterid=clusterId)
                 schedd.spool(list(myjobs))
         except Exception as hte:
             raise TaskWorkerException(f"Submission failed with:\n{hte}") from hte

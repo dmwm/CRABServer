@@ -15,7 +15,6 @@ import logging
 import subprocess
 import traceback
 from xml.etree import ElementTree
-from ast import literal_eval
 from optparse import OptionParser, BadOptionError, AmbiguousOptionError  # pylint: disable=deprecated-module
 
 from TweakPSet import prepareTweakingScript
@@ -288,10 +287,8 @@ def parseArgs():
     parser = PassThroughOptionParser()
     parser.add_option('--jobId', dest='jobId', type='string')
     parser.add_option('--json', dest='jsonArgFile', type='string')
-    parser.add_option('-a', dest='archiveJob', type='string')
-    parser.add_option('-o', dest='outFiles', type='string')
-    parser.add_option('--inputFile', dest='inputFile', type='string')
-    parser.add_option('--sourceURL', dest='sourceURL', type='string')
+    parser.add_option('--userSandbox', dest='userSandbox', type='string')
+    parser.add_option('--inputFileList', dest='inputFileList', type='string')
     parser.add_option('--jobNumber', dest='jobNumber', type='string')
     parser.add_option('--cmsswVersion', dest='cmsswVersion', type='string')
     parser.add_option('--scramArch', dest='scramArch', type='string')
@@ -334,19 +331,6 @@ def parseArgs():
         for key, value in arguments.items():
             setattr(opts, key, value)
 
-        # remap key in input_args.json to the argument names required by CMSRunAnalysis.py
-        # use as : value_of_argument_name = inputArgs[argMap[argument_name]]
-        # to ease transition to cleaner code the new key are only added if missing
-        argMap = {
-            'archiveJob': 'CRAB_Archive', 'outFiles': 'CRAB_AdditionalOutputFiles',
-            'sourceURL': 'CRAB_ISB', 'cmsswVersion': 'CRAB_JobSW',
-            'scramArch': 'CRAB_JobArch', 'runAndLumis': 'runAndLumiMask',
-            'inputFile' : 'inputFiles', 'lheInputFiles': 'lheInputFiles'
-        }
-        for key, value in argMap.items():
-            if not getattr(opts, key, None):
-                setattr(opts, key, arguments[value])  # assign to our variables
-
     # allow for most input arguments to be passed via a (job specific) JSON file
     if getattr(opts, 'jsonArgFile', None):
         arguments = {}
@@ -366,13 +350,11 @@ def parseArgs():
 
     try:
         print(f"==== Parameters Dump at {UTCNow()} ===")
-        print("archiveJob:    ", opts.archiveJob)
-        print("sourceURL:     ", opts.sourceURL)
+        print("userSandbox:   ", opts.userSandbox)
         print("jobNumber:     ", opts.jobNumber)
         print("cmsswVersion:  ", opts.cmsswVersion)
         print("scramArch:     ", opts.scramArch)
-        print("inputFile      ", opts.inputFile)
-        print("outFiles:      ", opts.outFiles)
+        print("inputFileList  ", opts.inputFileList)
         print("runAndLumis:   ", opts.runAndLumis)
         print("lheInputFiles: ", opts.lheInputFiles)
         print("firstEvent:    ", opts.firstEvent)
@@ -697,7 +679,7 @@ if __name__ == "__main__":
         print(f"==== SCRAM Obj INITIALIZED at {UTCNow()} ====")
 
         print("==== Extract user sandbox in top and CMSSW directory ====")
-        extractUserSandbox(options.archiveJob)
+        extractUserSandbox(options.userSandbox)
 
         #Multi-microarch env: Setting cmssw env after extracting the sandbox
         print(f"==== SCRAM runtime environment CREATED at {UTCNow()} ====")
@@ -901,19 +883,7 @@ if __name__ == "__main__":
         mintime()
         sys.exit(EC_ReportHandlingErr)
 
-    # rename output files. Doing this after checksums otherwise outfile is not found.
-    if jobExitCode == 0:
-        try:
-            oldName = 'UNKNOWN'
-            newName = 'UNKNOWN'
-            for oldName, newName in literal_eval(options.outFiles).items():
-                os.rename(oldName, newName)
-        except Exception as ex:  # pylint: disable=broad-except
-            handleException("FAILED", EC_MoveOutErr, f"Exception while renaming file {oldName} to {newName}.")
-            mintime()
-            sys.exit(EC_MoveOutErr)
-    else:
-        mintime()
+    mintime()
 
     print(f"==== CMSRunAnalysis.py FINISHED at {UTCNow()} ====")
     print(f"Local time : {time.ctime()}")
