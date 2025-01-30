@@ -5,7 +5,8 @@ from http.client import HTTPException
 from urllib.parse import urlencode
 
 import HTCondorLocator
-from ServerUtilities import FEEDBACKMAIL
+from ServerUtilities import getColumn, FEEDBACKMAIL
+
 from TaskWorker.DataObjects import Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
@@ -39,7 +40,11 @@ class DagmanKiller(TaskAction):
             raise ValueError("No proxy provided")
         self.proxy = self.task['user_proxy']  # pylint: disable=attribute-defined-outside-init
 
-        if not self.task['tw_name'] or not self.task['clusterid']:
+        # retrieve full task info to assess if it is in a "killable" status
+        data = {'subresource': 'search', 'workflow': self.workflow}
+        dictresult, _, _ = self.crabserver.get(api='task', data=data)
+
+        if not getColumn(dictresult, 'tw_name') or not getColumn(dictresult, 'clusterid'):
             self.logger.info("Task %s was not submitted to HTCondor scheduler yet", self.workflow)
             return
 
