@@ -123,7 +123,7 @@ accounting_group_user = %(accounting_group_user)s
 
 # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
 +REQUIRED_ARCH = %(required_arch)s
-+REQUIRED_MINIMUM_MICROARCH = %(required_minimum_microarch)s
++REQUIRED_MINIMUM_MICROARCH = 0
 +DESIRED_CMSDataset = %(inputdata)s
 
 +JOBGLIDEIN_CMSSite = "$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])"
