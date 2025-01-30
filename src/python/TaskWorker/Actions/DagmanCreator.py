@@ -310,15 +310,19 @@ class DagmanCreator(TaskAction):
             return jobSubmit
 
         # these are classAds that we want to be added to each grid job
-        # in the assignement the RHS has to be a "classAd primitieve type" i.e.
+        # in the assignement the RHS has to be a string which will be
+        # internally resolved in the HTC python APIU to a "classAd primitieve type" i.e.
         # integer or double-quoted string. If we put a simple string like
         # ad = something, HTCondor will look for a variable named something.
         # Therefore 3 types are acceptable RHS here:
-        #   - for int variables, convert to str: jobSubmit[] = str(myInt)
+        #   - for int variables, use a simple str: jobSubmit[] = str(myInt)
         #   - for string variable, need to quote: jobSubmit[] = classad.quote(myString)
-        #   - if we "type the literal", we can simply use: jobSubmit[]="my text"
+        #   - if we "type the literal", we can simply use: jobSubmit[]="3" for
+        #      a classAd that should resolve to an int and jobSubmit[]='"sometext"'
+        #      for a classAd that should resolve to a string. In this latter case
+        #      we can also (and better) user jobSubmit[]=classad.quote('sometext')
         # Note that argument to classad.quote can only be string or None
-        #  we prefer to use classad.quote to f'"{myString}"' as it is more clear and robust
+        #  we prefer to use classad.quote to using f'"{myString}"' as it is more clear and robust
         #   e.g. it handles cases where myString contains '"' by inserting proper escaping
 
         jobSubmit['My.CRAB_Reqname'] = classad.quote(task['tm_taskname'])
@@ -511,10 +515,10 @@ class DagmanCreator(TaskAction):
         periodicRemoveReason += "\"Removed due to job being held\"))))))"  # one closed ")" for each "ifThenElse("
         jobSubmit['My.PeriodicRemoveReason'] = periodicRemoveReason
 
-        # tm_extrajdl and tm_user_config['acceleratorparams'] contain list of k=v assignements to be turned into classAds
+        # tm_extrajdl contains a list of k=v assignements to be turned each into a classAds
         # also special handling is needed because is retrieved from DB not as a python list, but as a string
         # with format "['a=b','c=d'...]"  (a change in RESTWorkerWorkflow would be needed to get a python list
-        # so we use here the same literal_eval which is used in RESTWorkerWorkflow.py )
+        # so we use here the same literal_eval trick which is used in RESTWorkerWorkflow.py )
         for extraJdl in literal_eval(task['tm_extrajdl']):
             k,v = extraJdl.split('=',1)
             jobSubmit[k] = v
