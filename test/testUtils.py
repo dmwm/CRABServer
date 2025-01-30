@@ -40,11 +40,11 @@ function checkStatus {
       [ ${isSub} -eq 0 ] && [ ${isDone} -eq 0 ] && [ ${isFailed} -eq 0 ] && exit 1
       ;;
     COMPLETED)
-      [ ${isSub} -eq 1 ] && exit 2  # ask for a check later on
+      [ ${isSub} -eq 1 ] && return 2  # ask for a check later on
       [ ${isDone} -eq 0 ] && exit 1
       ;;
     COMPFAIL)
-      [ ${isSub} -eq 1 ] && exit 2  # ask for a check later on
+      [ ${isSub} -eq 1 ] && return 2  # ask for a check later on
       [ ${isDone} -eq 0 ] && [ ${isFailed} -eq 0 ] && exit 1
   esac
   return 0
@@ -55,7 +55,7 @@ function lookFor {
   local string="$1"
   local file="$2"
   grep -q "${string}" ${file}
-  [ $? -ne 0 ] && exit 1
+  [ $? -ne 0 ] && return 1
   return 0
 }
 
@@ -64,7 +64,7 @@ function lookInTarFor {
   local file="$1"
   local tarball="$2"
   tar tf ${tarball} | grep -q ${file}
-  [ $? -ne 0 ] && exit 1
+  [ $? -ne 0 ] && return 1
   return 0
 }
 

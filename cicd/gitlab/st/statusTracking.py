@@ -86,7 +86,7 @@ def parse_result(listOfTasks, checkPublication=False):
                 needToResubmit = True
             else:
                 result = 'TestRunning'
-        elif task['dbStatus'] in ['HOLDING', 'QUEUED', 'NEW']:
+        elif task['dbStatus'] in ['HOLDING', 'QUEUED', 'NEW', 'WAITING']:
             result = 'TestRunning'
         else:
             needToResubmit = True
@@ -147,7 +147,7 @@ def main():
     # Read all tasks from the specified files into a single list
     tasks = [
     line 
-    for file_name in ['submitted_tasks_TS', 'submitted_tasks_CCV', 'submitted_tasks_CV']
+    for file_name in ['submitted_tasks_TS']
     if os.path.exists(f'{work_dir}/{file_name}')
     for line in open(f'{work_dir}/{file_name}').readlines()
     ]

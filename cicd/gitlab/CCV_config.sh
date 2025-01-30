@@ -12,9 +12,12 @@ echo "(DEBUG) CMSSW_release: ${CMSSW_release}"
 echo "(DEBUG) Client_Configuration_Validation: ${Client_Configuration_Validation}"
 
 # always run inside ./workdir
-export ROOT_DIR=$PWD
-export WORK_DIR=$PWD/workdir
-mkdir -p workdir
+export ROOT_DIR="${PWD}"
+export WORK_DIR="${PWD}/workdir"
+if [ ! -d "$WORK_DIR" ]; then
+  mkdir -p "$WORK_DIR"
+  echo "(DEBUG) workdir was recreated"
+fi
 pushd "${WORK_DIR}"
 
 # Get configuration from CMSSW_release
@@ -32,14 +35,19 @@ if [ "X${singularity}" == X6 ] || [ "X${singularity}" == X7 ] || [ "X${singulari
     if [ "X${singularity}" == X7 ]; then scramprefix=el${singularity}; fi
     if [ "X${singularity}" == X8 ]; then scramprefix=el${singularity}; fi
     ERR=false;
-    /cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- "${ROOT_DIR}/cicd/gitlab/clientConfigurationValidation.sh" || ERR=true
+    /cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- "${ROOT_DIR}/cicd/gitlab/clientConfigurationValidation.sh"
+    ERR=$([[ $? -eq 0 || $? -eq 2 ]] && echo "false" || echo "true") #ERR is true if return is other than 0 or 2
 else
     echo "!!! I am not prepared to run for slc${singularity}."
     exit 1
 fi
 
+if [ "$ERR" == true ]; then
+    echo "clientConfigurationValidation.sh script failed to run properly."
+    exit 1
+fi
 # Change to the working directory
-cd ${WORK_DIR}
+# cd ${WORK_DIR}
 
 # Set retry variables (GitLab does not have NAGINATOR; you can set these manually or use GitLab CI variables)
 export RETRY=${CI_PIPELINE_RETRY_COUNT:-0}
@@ -51,12 +59,6 @@ MESSAGE='Test failed. Investigate manually'
 
 # Define an associative array to hold the test results
 declare -A results=( ["SUCCESSFUL"]="successful_tests" ["FAILED"]="failed_tests" ["RETRY"]="retry_tests" )
-
-# Check if the tests passed or failed
-if [ -s "successful_tests" ] && { [ ! -e "failed_tests" ] || [[ $(<failed_tests) == *none* ]]; }; then
-    TEST_RESULT='SUCCEEDED'
-    MESSAGE='Test is done.'
-fi
 
 for result in "${!results[@]}"; do
 	if [ -s "${results[$result]}" ]; then
@@ -77,6 +79,16 @@ for result in "${!results[@]}"; do
 	fi
 done
 
+# Check if the tests passed or failed
+if [ -s "failed_tests" ]; then
+    TEST_RESULT='FAILED'
+elif [ -s "retry_tests" ]; then
+    TEST_RESULT='FULL-STATUS-UNKNOWN'
+elif [ -s "successful_tests" ]; then
+    TEST_RESULT='SUCCEEDED'
+    MESSAGE='Test is done.'
+fi
+
 # Create the final result message
 echo -e "**Test:** Client configuration validation\n\
 **Result:** ${TEST_RESULT}\n\
@@ -86,6 +98,8 @@ echo -e "**Test:** Client configuration validation\n\
 
 # Append interim result to the final message
 echo -e "\`\`\`$(cat message_CCVResult_interim)\n\`\`\`"  >> message_CCVResult
+
+popd
 
 if [[ ${TEST_RESULT} == 'FULL-STATUS-UNKNOWN' ]]; then
     exit 4
