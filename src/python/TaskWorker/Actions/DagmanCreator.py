@@ -520,8 +520,10 @@ class DagmanCreator(TaskAction):
         # with format "['a=b','c=d'...]"  (a change in RESTWorkerWorkflow would be needed to get a python list
         # so we use here the same literal_eval trick which is used in RESTWorkerWorkflow.py )
         for extraJdl in literal_eval(task['tm_extrajdl']):
-            k,v = extraJdl.split('=',1)
-            jobSubmit[k] = v
+            name,value = extraJdl.split('=',1)
+            if name.startswith('+'):
+                name = name.replace('+', 'My.', 1)  # make sure JDL line starts with My. instead of +
+            jobSubmit[name] = value
 
         if task['tm_user_config']['requireaccelerator']:
             # hardcoding accelerator to GPU (SI currently only have nvidia GPU)
@@ -551,9 +553,11 @@ class DagmanCreator(TaskAction):
             jobid * CRAB_JobReleaseTimeout seconds
         """
         slowJobRelease = False
-        extrajdls = literal_eval(task['tm_extrajdl'])
+        extrajdls = literal_eval(task['tm_extrajdl'])  # from "['a','b',...]" to a python list
         for ej in extrajdls:
-            if ej.find('CRAB_JobReleaseTimeout') in [0, 1]: #there might be a + before
+            if ej.startswith('+'):
+                ej = ej.replace('+', 'My.', 1)
+            if ej.startswith('My.CRAB_JobReleaseTimeout'):
                 slowJobRelease = True
                 releaseTimeout = int(ej.split('=')[1])
 

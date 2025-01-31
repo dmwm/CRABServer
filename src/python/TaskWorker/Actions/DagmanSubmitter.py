@@ -412,7 +412,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagJobJDL = htcondor.Submit()
         addJobSubmitInfoToDagJobJDL(dagJobJDL, jobSubmit)  # start with the Job.submit from DagmanCreator
 
-        dagJobJDL['CRAB_TaskSubmitTime'] = str(task['tm_start_time'])
+        dagJobJDL['My.CRAB_TaskSubmitTime'] = str(task['tm_start_time'])
         dagJobJDL['transfer_input_files'] = ", ".join(filesForScheduler + ['subdag.jdl'])
         outputFiles = ["RunJobs.dag.dagman.out", "RunJobs.dag.rescue.001"]
         dagJobJDL['transfer_output_files'] = ", ".join(outputFiles)
