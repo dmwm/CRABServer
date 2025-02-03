@@ -89,7 +89,7 @@ def main():
     rules = [ r for r in ruleList if r['account'] != 'transfer_ops']
     msg = f"{len(ruleList)} rules exist for activity: {activity}"
     logger.info(msg)
-    msg = f"skip {len(ruleLists)-len(rules)} rules created by 'transfer_ops'. {len(rules)} are left"
+    msg = f"skip {len(ruleList)-len(rules)} rules created by 'transfer_ops'. {len(rules)} are left"
     logger.info(msg)
 
     # make a DataFrame
