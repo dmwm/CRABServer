@@ -180,9 +180,12 @@ def getLocation(default_name):
     """ Get the location of the runtime code (job wrapper, postjob, anything executed on the schedd
         and on the worker node)
 
-        First check if the files are present in the current working directory
+        First check if the files are present in the current working directory (as it happens
+        when DagmanCreator is run in the scheduler by PreDag for automatic splitting)
         Then check if CRABTASKWORKER_ROOT is in the environment and use that location (that viariable is
             set by the taskworker init script. In the prod source script we use "export CRABTASKWORKER_ROOT")
+            which is the case when DagmanCreator runs in the TaskWorker container, where the build process
+            places files to be transferred in the "data" directory
     """
     loc = default_name
     if not os.path.exists(loc):
@@ -700,7 +703,7 @@ class DagmanCreator(TaskAction):
             argDict['lastEvent'] = dagspec['lastEvent']  # 'None'
             argDict['firstLumi'] = dagspec['firstLumi']  # 'None'
             argDict['firstRun'] = dagspec['firstRun']  # 'None'
-            argDict['userSandbox'] = task['tm_user_sandbox']  #' sandbox.tar.gz'
+            argDict['userSandbox'] = task['tm_user_sandbox']  #SB we could simply hardocode 'sandbox.tar.gz'
             argDict['cmsswVersion'] = task['tm_job_sw']  # 'CMSSW_9_2_5'
             argDict['scramArch'] = task['tm_job_arch']  # 'slc6_amd64_gcc530'
             argDict['seeding'] = 'AutomaticSeeding'
@@ -763,6 +766,8 @@ class DagmanCreator(TaskAction):
           site.ad.json : sites assigned to jobs in each job group (info from Splitter)
         """
 
+        # SB should have a createDagSpects() methos to move away a lot of following code
+
         startjobid = kwargs.get('startjobid', 0)
         # parentDag below is only used during automatic splitting
         # possible values in each stage are:  probe: 0, tail: 1/2/3, processing: None
@@ -770,8 +775,8 @@ class DagmanCreator(TaskAction):
         stage = kwargs.get('stage', 'conventional')
         self.logger.debug('starting createSubdag, kwargs are:')
         self.logger.debug(str(kwargs))
-        dagSpecs = []
-        subdags = []
+        dagSpecs = []  # there will be a dagSpec for every node to be written in the DAG file
+        subdags = []  # in automatic splitting a DAG may contain a list of one or more subdags to start
 
         # disable direct stageout for rucio tasks
         if kwargs['task']['tm_output_lfn'].startswith('/store/user/rucio') or \
@@ -1025,7 +1030,7 @@ class DagmanCreator(TaskAction):
             self.logger.warning(msg)
 
         ## Write down the DAG as needed by DAGMan.
-        restHostForSchedd = kwargs['task']['resthost']
+        restHostForSchedd = kwargs['task']['resthost']  # SB better to use self.crabserver.server['host']
         dag = DAG_HEADER.format(nodestate=f".{parentDag}" if parentDag else ('.0' if stage == 'processing' else ''),
                                 resthost=restHostForSchedd)
         if stage == 'probe':
@@ -1093,7 +1098,10 @@ class DagmanCreator(TaskAction):
                 tfd2.close()
                 shutil.rmtree(tempDir2)
 
+        # pick the name for the DAG file that we will create
         if stage in ('probe', 'conventional'):
+            # this stages means that we run in TW, so let's also save as pickles
+            # some data that will be needed to be able to run in the scheduler
             dagFileName = "RunJobs.dag"
             with open("datadiscovery.pkl", "wb") as fd:
                 pickle.dump(splitterResult[1], fd)  # Cache data discovery
@@ -1172,6 +1180,8 @@ class DagmanCreator(TaskAction):
 
     def executeInternal(self, *args, **kw):
         """ all real work is done here """
+
+        # put in current directory all files that we need to move around
         transform_location = getLocation('CMSRunAnalysis.sh')
         cmscp_location = getLocation('cmscp.py')
         cmscpsh_location = getLocation('cmscp.sh')
@@ -1191,9 +1201,11 @@ class DagmanCreator(TaskAction):
         shutil.copy(adjust_location, '.')
 
         # make sure we have InputSandBox
-        sandboxTarBall = 'sandbox.tar.gz'
+        sandboxTarBall = 'sandbox.tar.gz'  # SB only used once 10 lines below ! no need for a variable !
 
         # Bootstrap the ISB if we are running in the TW
+        # SB: I do not like this overwriting of kw['task']['tm_user_sandbox'] nor
+        # understand yet why it is being done.
         if self.runningInTW:
             username = kw['task']['tm_username']
             taskname = kw['task']['tm_taskname']
@@ -1202,7 +1214,7 @@ class DagmanCreator(TaskAction):
             try:
                 checkS3Object(crabserver=self.crabserver, objecttype='sandbox', taskname=taskname,
                               username=username, tarballname=sandboxName, logger=self.logger)
-                kw['task']['tm_user_sandbox'] = sandboxTarBall
+                kw['task']['tm_user_sandbox'] = sandboxTarBall  # SB no need for this either ! it is only there to reuse same name in prepareArguments. A variable in self would be much cleaner, of even one constant to ensure same name in AdjustSites and CRABClient
             except Exception as ex:
                 raise TaskWorkerException("The CRAB server backend could not find the input sandbox with your code " + \
                                   "from S3.\nThis could be a temporary glitch; please try to submit a new task later " + \
@@ -1210,13 +1222,14 @@ class DagmanCreator(TaskAction):
                                   f"\nError reason: {ex}") from ex
 
         # Bootstrap the runtime if it is available.
+        # SB I presume these lines can be move up toghether with the other getLocations and copy
         job_runtime = getLocation('CMSRunAnalysis.tar.gz',)
         shutil.copy(job_runtime, '.')
         task_runtime = getLocation('TaskManagerRun.tar.gz')
         shutil.copy(task_runtime, '.')
 
-        kw['task']['resthost'] = self.crabserver.server['host']
-        kw['task']['dbinstance'] = self.crabserver.getDbInstance()
+        kw['task']['resthost'] = self.crabserver.server['host']  # SB most likely not needed, see Line 1027
+        kw['task']['dbinstance'] = self.crabserver.getDbInstance()  # SB never used in here nor in DagmanSubmitter ??
         params = {}
 
         # files to be transferred to remove WN's via Job.submit, could pack most in a tarball
@@ -1232,6 +1245,8 @@ class DagmanCreator(TaskAction):
             filesForSched.append("input_dataset_lumis.json")
             filesForSched.append("input_dataset_duplicate_lumis.json")
 
+        # now create the DAG. According to wheter this runs in the TW or in one PreDag, it will
+        # create the MAIN DAG or one of the subdags for automatic splitting, hence it was called "createsubdag"
         jobSubmit, splitterResult, subdags = self.createSubdag(*args, **kw)
 
         # as splitter summary is useful for dryrun, let's add it to the InputFiles tarball
