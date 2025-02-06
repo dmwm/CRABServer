@@ -70,11 +70,9 @@ def parse_result(listOfTasks, checkPublication=False):
                 else:
                     needToResubmit = True
                 if checkPublication and 'nopublication' not in task['taskName']:
-                    # remove probe jobs (job id of X-Y kind) if any from count
-                    jobsToPublish = total_jobs
-                    for job in task['jobs'].keys():
-                        if '-' in job:
-                            jobsToPublish -= 1
+                    # Remove probe jobs (job id of X-Y kind) from count
+                    probe_jobs_count = sum(1 for job in task['jobs'].keys() if '-' in job)
+                    jobsToPublish = total_jobs - probe_jobs_count
                     if published_in_transfersdb == jobsToPublish and published_in_dbs == jobsToPublish:
                         result = 'TestPassed'
                     elif failedPublications:
