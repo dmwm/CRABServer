@@ -65,21 +65,18 @@ def parse_result(listOfTasks, checkPublication=False):
             task['pubSummary'] = '%d/%d/%d' % (failedPublications, published_in_transfersdb, published_in_dbs)
 
             if total_jobs > 0 and ('finished', total_jobs) in task['jobsPerStatus'].items():
+                if task['status'] == 'COMPLETED':
+                    result = 'TestPassed'
+                else:
+                    needToResubmit = True
                 if checkPublication and 'nopublication' not in task['taskName']:
-                    # Remove probe jobs (job id of X-Y kind) from count
-                    probe_jobs_count = sum(1 for job in task['jobs'].keys() if '-' in job)
-                    jobsToPublish = total_jobs - probe_jobs_count
-                    if published_in_transfersdb == jobsToPublish and published_in_dbs == jobsToPublish:
+                    if published_in_transfersdb == total_jobs and published_in_dbs == total_jobs:
                         result = 'TestPassed'
                     elif failedPublications:
                         #result = 'TestFailed'
                         needToResubmitPublication = True
                     else:
                         result = 'TestRunning'
-                if task['status'] == 'COMPLETED':
-                    result = 'TestPassed'
-                else:
-                    needToResubmit = True
             elif any(k in task['jobsPerStatus'] for k in ('failed', 'held')):
                 needToResubmit = True
             else:
