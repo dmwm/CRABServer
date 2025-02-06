@@ -360,7 +360,8 @@ client_configuration_validation:
 
 check_status_tracking:
   rules:
-    - if: '$STATUS_TRACKING == "true" || $CLIENT_VALIDATION == "true" || $CLIENT_CONFIGURATION_VALIDATION == "true"'
+    - if: '$STATUS_TRACKING == "false"'
+      when: never
     - !reference [.default_rules, skip_check]
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
