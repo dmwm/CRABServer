@@ -263,13 +263,26 @@ task_submission:
   stage: submit_testsuite
   tags:
     - crab3-shell
+  parallel:
+    matrix:
+      - CMSSW_release: 
+          - CMSSW_13_0_2
+          - CMSSW_12_6_4
+          - CMSSW_12_5_0
+          - CMSSW_11_3_4
+          - CMSSW_10_6_26
+          - CMSSW_10_1_0
+          - CMSSW_9_4_21
+          - CMSSW_8_0_36
+          - CMSSW_7_6_7
+          - CMSSW_7_1_29
   script:
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
     - export CRABClient_version  # from .env
     - export REST_Instance  # from .env
     - export ROOT_DIR
-    - export CMSSW_release=CMSSW_13_0_2
+    - export CMSSW_release=$CMSSW_release
     - export Task_Submission_Status_Tracking=$STATUS_TRACKING
     - export Client_Configuration_Validation=$CLIENT_CONFIGURATION_VALIDATION
     - export Client_Validation_Suite=$CLIENT_VALIDATION
@@ -304,6 +317,19 @@ client_validation_suite:
   stage: run_testsuite_CV
   tags:
     - crab3-shell
+  parallel:
+    matrix:
+      - CMSSW_release: 
+          - CMSSW_13_0_2
+          - CMSSW_12_6_4
+          - CMSSW_12_5_0
+          - CMSSW_11_3_4
+          - CMSSW_10_6_26
+          - CMSSW_10_1_0
+          - CMSSW_9_4_21
+          - CMSSW_8_0_36
+          - CMSSW_7_6_7
+          - CMSSW_7_1_29
   script:
     - echo "Waiting for 20 minutes after task submission..."
     - sleep 1200 
@@ -312,7 +338,7 @@ client_validation_suite:
     - export CRABClient_version  # from .env
     - export REST_Instance  # from .env
     - export ROOT_DIR
-    - export CMSSW_release=CMSSW_13_0_2
+    - export CMSSW_release=$CMSSW_release
     - export Client_Validation_Suite=true
     - ls workdir/submitted_tasks_CV
     - bash -x cicd/gitlab/CV_config.sh
@@ -336,6 +362,19 @@ client_configuration_validation:
   stage: run_testsuite_CCV
   tags:
     - crab3-shell
+  parallel:
+    matrix:
+      - CMSSW_release: 
+          - CMSSW_13_0_2
+          - CMSSW_12_6_4
+          - CMSSW_12_5_0
+          - CMSSW_11_3_4
+          - CMSSW_10_6_26
+          - CMSSW_10_1_0
+          - CMSSW_9_4_21
+          - CMSSW_8_0_36
+          - CMSSW_7_6_7
+          - CMSSW_7_1_29
   script:
     # - echo "Waiting for 20 minutes after task submission..."
     # - sleep 1200 
@@ -344,7 +383,7 @@ client_configuration_validation:
     - export CRABClient_version  # from .env
     - export REST_Instance  # from .env
     - export ROOT_DIR
-    - export CMSSW_release=CMSSW_13_0_2
+    - export CMSSW_release=$CMSSW_release
     - export Client_Configuration_Validation=true
     - ls workdir/submitted_tasks_CCV
     - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/CCV_config.sh
@@ -368,13 +407,26 @@ check_status_tracking:
   stage: run_testsuite_TS
   tags:
     - crab3-shell
+  parallel:
+    matrix:
+      - CMSSW_release: 
+          - CMSSW_13_0_2
+          - CMSSW_12_6_4
+          - CMSSW_12_5_0
+          - CMSSW_11_3_4
+          - CMSSW_10_6_26
+          - CMSSW_10_1_0
+          - CMSSW_9_4_21
+          - CMSSW_8_0_36
+          - CMSSW_7_6_7
+          - CMSSW_7_1_29
   script:
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
     - export REST_Instance  # from .env
     - export CRABClient_version  # from .env
     - export ROOT_DIR
-    - export CMSSW_release=CMSSW_13_0_2
+    - export CMSSW_release=$CMSSW_release
     - export SCRAM_ARCH=el8_amd64_gcc11
     - export Check_Publication_Status=Yes
     - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
