@@ -15,7 +15,7 @@ config.General.instance = os.getenv('REST_Instance','test12')
 #config.General.restHost = ''
 #config.General.dbInstance = ''
 config.General.requestName = filename_nopy + '_' + now_str
-config.General.workArea = '/tmp/crabStatusTracking'
+config.General.workArea = f'/tmp/crabStatusTracking_{os.environ["CMSSW_release"]}'
 config.General.transferLogs=False
 
 config.section_("JobType")
