@@ -121,8 +121,8 @@ def createScriptLines(opts, pklIn):
     if opts.runAndLumis:
         runAndLumis = readFileFromTarball(opts.runAndLumis, 'run_and_lumis.tar.gz')
     inputFiles = {}
-    if opts.inputFile:
-        inputFiles = readFileFromTarball(opts.inputFile, 'input_files.tar.gz')
+    if opts.inputFileList:
+        inputFiles = readFileFromTarball(opts.inputFileList, 'input_files.tar.gz')
 
     # build a tweak object with the needed changes to be applied to PSet
     tweak = PSetTweak()
@@ -186,6 +186,11 @@ def createScriptLines(opts, pklIn):
         opts.lastEvent = None  # for MC there has to be no lastEvent
     tweak.addParameter("process.maxEvents.input",
                        f"customTypeCms.untracked.int32({maxEvents})")
+
+    # special handling for LHE input files
+    if opts.lheInputFiles:
+        tweak.addParameter("process.source.skipEvents",
+                           f"customTypeCms.untracked.uint32({int(opts.firstEvent) - 1})")
 
     if opts.lastEvent:
         tweak.addParameter("process.source.lastEvent",

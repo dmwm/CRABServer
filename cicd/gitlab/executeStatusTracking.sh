@@ -27,6 +27,11 @@ if [ "X${singularity}" == X8 ]; then scramprefix=el${singularity}; fi
 ERR=false
 /cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- bash -x "${ROOT_DIR}"/cicd/gitlab/st/statusTracking.sh || ERR=true
 
+if [ "$ERR" == true ]; then
+    echo "statusTracking.sh script failed to run properly."
+    exit 1
+fi
+
 #3. Update issue with submission results
 TEST_RESULT='FAILED'
 if [ ! -s "./result" ]; then

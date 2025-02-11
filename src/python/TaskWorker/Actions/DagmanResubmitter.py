@@ -61,8 +61,7 @@ class DagmanResubmitter(TaskAction):
             raise TaskWorkerException(msg) from exp
 
         # Check memory and walltime
-        checkMemoryWalltime(None, task, 'resubmit', self.logger, self.uploadWarning)
-
+        checkMemoryWalltime(task, 'resubmit', self.logger, self.uploadWarning)
 
         # Find only the originally submitted DAG to hold and release: this
         # will re-trigger the scripts and adjust retries and other

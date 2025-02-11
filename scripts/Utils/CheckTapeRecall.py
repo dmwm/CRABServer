@@ -84,8 +84,12 @@ def main():
 
     # get rules for this activity
     ruleGen = rucio.list_replication_rules({'activity': activity})
-    rules = list(ruleGen)
-    msg = f"{len(rules)} rules exist for activity: {activity}"
+    ruleList = list(ruleGen)
+    # avoid rules created by DM operators
+    rules = [ r for r in ruleList if r['account'] != 'transfer_ops']
+    msg = f"{len(ruleList)} rules exist for activity: {activity}"
+    logger.info(msg)
+    msg = f"skip {len(ruleList)-len(rules)} rules created by 'transfer_ops'. {len(rules)} are left"
     logger.info(msg)
 
     # make a DataFrame

@@ -28,16 +28,17 @@ from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.Actions.Splitter import SplittingSummary
 from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedException
 from RucioUtils import getWritePFN
-from CMSGroupMapper import get_egroup_users
+from CMSGroupMapper import get_egroup_users, map_user_to_groups
 
-import WMCore.WMSpec.WMTask
 from WMCore import Lexicon
 from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS, SCRAM_TO_ARCH
 
 if 'useHtcV2' in os.environ:
+    import htcondor2 as htcondor
     import classad2 as classad
 else:
+    import htcondor
     import classad
 
 DAG_HEADER = """
@@ -49,6 +50,7 @@ NODE_STATUS_FILE node_state{nodestate} 30 ALWAYS-UPDATE
 #SCRIPT PRE FinalCleanup dag_bootstrap.sh FINAL $DAG_STATUS $FAILED_COUNT {resthost}
 
 """
+
 
 DAG_FRAGMENT = """
 JOB Job{count} Job.{count}.submit
@@ -65,135 +67,13 @@ VARS Job{count} My.CRAB_Destination="\\"{destination}\\""
 ABORT-DAG-ON Job{count} 3
 """
 
+
 SUBDAG_FRAGMENT = """
 SUBDAG EXTERNAL Job{count}SubJobs RunJobs{count}.subdag NOOP
 SCRIPT DEFER 4 300 PRE Job{count}SubJobs dag_bootstrap.sh PREDAG {stage} {completion} {count}
 """
 
-JOB_SUBMIT = \
-"""
-+CRAB_ReqName = %(requestname)s
-+CRAB_Workflow = %(workflow)s
-+CMS_JobType = %(jobtype)s
-+CRAB_JobSW = %(jobsw)s
-+CRAB_JobArch = %(jobarch)s
-+CRAB_DBSURL = %(dbsurl)s
-+CRAB_PostJobStatus = "NOT RUN"
-+CRAB_PostJobLastUpdate = 0
-+CRAB_PublishName = %(publishname)s
-+CRAB_Publish = %(publication)s
-+CRAB_PublishDBSURL = %(publishdbsurl)s
-+CRAB_ISB = %(cacheurl)s
-+CRAB_AdditionalOutputFiles = %(addoutputfiles)s
-+CRAB_EDMOutputFiles = %(edmoutfiles)s
-+CRAB_TFileOutputFiles = %(tfileoutfiles)s
-+CRAB_UserDN = %(userdn)s
-+CRAB_UserHN = %(userhn)s
-+CRAB_AsyncDest = %(asyncdest)s
-+CRAB_StageoutPolicy = %(stageoutpolicy)s
-+CRAB_UserRole = %(tm_user_role)s
-+CRAB_UserGroup = %(tm_user_group)s
-+CRAB_TaskWorker = %(worker_name)s
-+CRAB_RetryOnASOFailures = %(retry_aso)s
-+CRAB_ASOTimeout = %(aso_timeout)s
-+CRAB_RestHost = %(resthost)s
-+CRAB_DbInstance = %(dbinstance)s
-+CRAB_NumAutomJobRetries = %(numautomjobretries)s
-CRAB_Attempt = %(attempt)d
-CRAB_ISB = %(cacheurl_flatten)s
-CRAB_AdditionalOutputFiles = %(addoutputfiles_flatten)s
-CRAB_JobSW = %(jobsw_flatten)s
-CRAB_JobArch = %(jobarch_flatten)s
-CRAB_Archive = %(cachefilename_flatten)s
-CRAB_Id = $(count)
-+CRAB_Id = "$(count)"
-+CRAB_JobCount = %(jobcount)d
-+CRAB_OutTempLFNDir = "%(temp_dest)s"
-+CRAB_OutLFNDir = "%(output_dest)s"
-+CRAB_oneEventMode = %(oneEventMode)s
-+CRAB_PrimaryDataset = %(primarydataset)s
-+CRAB_DAGType = "Job"
-accounting_group = %(accounting_group)s
-accounting_group_user = %(accounting_group_user)s
-+CRAB_SubmitterIpAddr = %(submitter_ip_addr)s
-+CRAB_TaskLifetimeDays = %(task_lifetime_days)s
-+CRAB_TaskEndTime = %(task_endtime)s
-+CRAB_SplitAlgo =  %(splitalgo)s
-+CRAB_AlgoArgs = %(algoargs)s
-+CMS_WMTool = %(cms_wmtool)s
-+CMS_TaskType = %(cms_tasktype)s
-+CMS_SubmissionTool = "CRAB"
-+CMS_Type = %(cms_type)s
 
-
-# These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
-+REQUIRED_ARCH = %(required_arch)s
-+REQUIRED_MINIMUM_MICROARCH = %(required_minimum_microarch)s
-+DESIRED_CMSDataset = %(inputdata)s
-
-+JOBGLIDEIN_CMSSite = "$$([ifThenElse(GLIDEIN_CMSSite is undefined, \\"Unknown\\", GLIDEIN_CMSSite)])"
-job_ad_information_attrs = MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite, RemoteSysCpu, RemoteUserCpu
-
-# Recover job output and logs on eviction events; make sure they aren't spooled
-# This requires 8.1.6 or later (https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=4292)
-# This allows us to return stdout to users when they hit memory limits (which triggers PeriodicRemove).
-WhenToTransferOutput = ON_EXIT_OR_EVICT
-+SpoolOnEvict = false
-
-# Keep job in the queue upon completion long enough for the postJob to run,
-# allowing the monitoring script to fetch the postJob status and job exit-code updated by the postJob
-LeaveJobInQueue = ifThenElse((JobStatus=?=4 || JobStatus=?=3) && (time() - EnteredCurrentStatus < 30 * 60*60), true, false)
-
-universe = vanilla
-Executable = gWMS-CMSRunAnalysis.sh
-Output = job_out.$(CRAB_Id)
-Error = job_err.$(CRAB_Id)
-Log = job_log
-# args changed...
-
-Arguments = "--jobId=$(CRAB_Id)"
-
-transfer_input_files = CMSRunAnalysis.sh, cmscp.py%(additional_input_file)s
-transfer_output_files = jobReport.json.$(count), WMArchiveReport.json.$(count)
-# make sure coredump (if any) is not added to output files ref: https://lists.cs.wisc.edu/archive/htcondor-users/2022-September/msg00052.shtml
-coresize = 0
-# TODO: fold this into the config file instead of hardcoding things.
-Environment = "SCRAM_ARCH=$(CRAB_JobArch) %(additional_environment_options)s"
-should_transfer_files = YES
-#x509userproxy = %(x509up_file)s
-use_x509userproxy = true
-%(opsys_req)s
-Requirements = stringListMember(TARGET.Arch, REQUIRED_ARCH)
-# Ref: https://htcondor.readthedocs.io/en/latest/classad-attributes/job-classad-attributes.html#HoldReasonCode
-periodic_release = (HoldReasonCode == 28) || (HoldReasonCode == 30) || (HoldReasonCode == 13) || (HoldReasonCode == 6)
-# Remove if
-# a) job is in the 'held' status for more than 7 minutes
-# b) job is idle more than 7 days
-# c) job is running and one of:
-#    1) Over memory use
-#    2) Over wall clock limit
-#    3) Over disk usage of N GB, which is set in ServerUtilities
-# d) job is idle and users proxy expired 1 day ago. (P.S. why 1 day ago? because there is recurring action which is updating user proxy and lifetime.)
-# == If New periodic remove expression is added, also it should have Periodic Remove Reason. Otherwise message will not be clear and it is hard to debug
-periodic_remove = ((JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60)) || \
-                  ((JobStatus =?= 1) && (time() - EnteredCurrentStatus > 7*24*60*60)) || \
-                  ((JobStatus =?= 2) && ( \
-                     (MemoryUsage =!= UNDEFINED && MemoryUsage > RequestMemory) || \
-                     (MaxWallTimeMinsRun*60 < time() - EnteredCurrentStatus) || \
-                     (DiskUsage > %(max_disk_space)s))) || \
-                     (time() > CRAB_TaskEndTime) || \
-                  ((JobStatus =?= 1) && (time() > (x509UserProxyExpiration + 86400)))
-+PeriodicRemoveReason = ifThenElse(time() - EnteredCurrentStatus > 7*24*60*60 && isUndefined(MemoryUsage), "Removed due to idle time limit", \
-                          ifThenElse(time() > x509UserProxyExpiration, "Removed job due to proxy expiration", \
-                            ifThenElse(MemoryUsage > RequestMemory, "Removed due to memory use", \
-                              ifThenElse(MaxWallTimeMinsRun*60 < time() - EnteredCurrentStatus, "Removed due to wall clock limit", \
-                                ifThenElse(DiskUsage >  %(max_disk_space)s, "Removed due to disk usage", \
-                                  ifThenElse(time() > CRAB_TaskEndTime, "Removed due to reached CRAB_TaskEndTime", \
-                                  "Removed due to job being held"))))))
-%(accelerator_jdl)s
-%(extra_jdl)s
-queue
-"""
 SPLIT_ARG_MAP = {"Automatic": "minutes_per_job",
                  "LumiBased": "lumis_per_job",
                  "EventBased": "events_per_job",
@@ -241,6 +121,7 @@ def makeLFNPrefixes(task):
 
     return temp_dest, dest
 
+
 def validateLFNs(path, outputFiles):
     """
     validate against standard Lexicon the LFN's that this task will try to publish in DBS
@@ -253,9 +134,9 @@ def validateLFNs(path, outputFiles):
     dirCounter = '0001'   # need to be same length as 'counter' used later in makeDagSpecs
 
     for origFile in outputFiles:
-        info = origFile.rsplit(".", 1)
-        if len(info) == 2:    # filename ends with .<something>, put jobId before the dot
-            fileName = f"{info[0]}_{jobId}.{info[1]}"
+        nameParts = origFile.rsplit(".", 1)
+        if len(nameParts) == 2:    # filename ends with .<something>, put jobId before the dot
+            fileName = f"{nameParts[0]}_{jobId}.{nameParts[1]}"
         else:
             fileName = f"{origFile}_{jobId}"
         testLfn = os.path.join(path, dirCounter, fileName)
@@ -266,6 +147,7 @@ def validateLFNs(path, outputFiles):
             msg += "\n which exceeds maximum length of 500"
             msg += "\n and therefore can not be handled in our DataBase"
             raise SubmissionRefusedException(msg)
+
 
 def validateUserLFNs(path, outputFiles):
     """
@@ -279,9 +161,9 @@ def validateUserLFNs(path, outputFiles):
     dirCounter = '0001'   # need to be same length as 'counter' used later in makeDagSpecs
 
     for origFile in outputFiles:
-        info = origFile.rsplit(".", 1)
-        if len(info) == 2:    # filename ends with .<something>, put jobId before the dot
-            fileName = f"{info[0]}_{jobId}.{info[1]}"
+        nameParts = origFile.rsplit(".", 1)
+        if len(nameParts) == 2:    # filename ends with .<something>, put jobId before the dot
+            fileName = f"{nameParts[0]}_{jobId}.{nameParts[1]}"
         else:
             fileName = f"{origFile}_{jobId}"
         testLfn = os.path.join(path, dirCounter, fileName)
@@ -293,66 +175,17 @@ def validateUserLFNs(path, outputFiles):
             msg += "\n and therefore can not be handled in our DataBase"
             raise SubmissionRefusedException(msg)
 
-def transform_strings(data):
-    """
-    Converts the arguments in the data dictionary to the arguments necessary
-    for the job submit file string.
-    """
-    info = {}
-    for var in 'workflow', 'jobtype', 'jobsw', 'jobarch', 'inputdata', 'primarydataset', 'splitalgo', 'algoargs', \
-               'cachefilename', 'cacheurl', 'userhn', 'publishname', 'asyncdest', 'dbsurl', 'publishdbsurl', \
-               'userdn', 'requestname', 'oneEventMode', 'tm_user_vo', 'tm_user_role', 'tm_user_group', \
-               'tm_maxmemory', 'tm_numcores', 'tm_maxjobruntime', 'tm_priority', \
-               'stageoutpolicy', 'taskType', 'worker_name', 'cms_wmtool', 'cms_tasktype', 'cms_type', \
-               'required_arch', 'required_minimum_microarch', 'resthost', 'dbinstance', 'submitter_ip_addr', \
-               'task_lifetime_days', 'task_endtime', 'maxproberuntime', 'maxtailruntime':
-        val = data.get(var, None)
-        if val is None:
-            info[var] = 'undefined'
-        else:
-            info[var] = json.dumps(val)
-
-    for var in 'accounting_group', 'accounting_group_user':
-        info[var] = data[var]
-
-    for var in 'savelogsflag', 'blacklistT1', 'retry_aso', 'aso_timeout', 'publication', 'saveoutput', 'numautomjobretries', 'jobcount':
-        info[var] = int(data[var])
-
-    for var in 'siteblacklist', 'sitewhitelist', 'addoutputfiles', 'tfileoutfiles', 'edmoutfiles':
-        val = data[var]
-        if val is None:
-            info[var] = "{}"
-        else:
-            info[var] = "{" + json.dumps(val)[1:-1] + "}"
-
-    info['lumimask'] = '"' + json.dumps(WMCore.WMSpec.WMTask.buildLumiMask(data['runs'], data['lumis'])).replace(r'"', r'\"') + '"'
-
-    splitArgName = SPLIT_ARG_MAP[data['splitalgo']]
-    info['algoargs'] = '"' + json.dumps({'halt_job_on_file_boundaries': False, 'splitOnRun': False, splitArgName : data['algoargs']}).replace('"', r'\"') + '"'
-    info['attempt'] = 0
-
-    for var in ["cacheurl", "jobsw", "jobarch", "cachefilename", "asyncdest", "requestname"]:
-        info[var+"_flatten"] = data[var]
-
-    info["addoutputfiles_flatten"] = '{}'
-
-    temp_dest, dest = makeLFNPrefixes(data)
-    info["temp_dest"] = temp_dest
-    info["output_dest"] = dest
-    info['x509up_file'] = os.path.split(data['user_proxy'])[-1]
-    info['user_proxy'] = data['user_proxy']
-    info['scratch'] = data['scratch']
-
-    return info
-
 
 def getLocation(default_name):
     """ Get the location of the runtime code (job wrapper, postjob, anything executed on the schedd
         and on the worker node)
 
-        First check if the files are present in the current working directory
+        First check if the files are present in the current working directory (as it happens
+        when DagmanCreator is run in the scheduler by PreDag for automatic splitting)
         Then check if CRABTASKWORKER_ROOT is in the environment and use that location (that viariable is
             set by the taskworker init script. In the prod source script we use "export CRABTASKWORKER_ROOT")
+            which is the case when DagmanCreator runs in the TaskWorker container, where the build process
+            places files to be transferred in the "data" directory
     """
     loc = default_name
     if not os.path.exists(loc):
@@ -378,11 +211,19 @@ class DagmanCreator(TaskAction):
         self.rucioClient = rucioClient
         self.runningInTW = crabserver is not None
 
-    def populateGlideinMatching(self, info):
-        """ actually simply set the required arch and microarch """
-        scram_arch = info['tm_job_arch']
+    def populateGlideinMatching(self, task):
+        """ actually simply set the required arch and microarch
+            arguments:
+                task : dictionary : the standard task info from taskdb
+            returns:
+                matchinfo : dictionary : keys:
+                            required_arch (string)
+                            required_minimum_microarch (int)
+        """
+        matchInfo = {}
+        scram_arch = task['tm_job_arch']
         # required_arch, set default
-        info['required_arch'] = "X86_64"
+        matchInfo['required_arch'] = "X86_64"
         # The following regex matches a scram arch into four groups
         # for example el9_amd64_gcc10 is matched as (el)(9)_(amd64)_(gcc10)
         # later, only the third group is returned, the one corresponding to the arch.
@@ -392,22 +233,25 @@ class DagmanCreator(TaskAction):
             if arch not in SCRAM_TO_ARCH:
                 msg = f"Job configured for non-supported ScramArch '{arch}'"
                 raise SubmissionRefusedException(msg)
-            info['required_arch'] = SCRAM_TO_ARCH.get(arch)
+            matchInfo['required_arch'] = SCRAM_TO_ARCH.get(arch)
 
         # required minimum micro_arch may need to be handled differently in the future (arm, risc, ...)
         # and may need different classAd(s) in the JDL, so try to be general here
-        min_micro_arch = info['tm_job_min_microarch']
+        # ref:  https://github.com/dmwm/WMCore/issues/12168#issuecomment-2539233761 and comments below
+        min_micro_arch = task['tm_job_min_microarch']
         if not min_micro_arch:
-            info['required_minimum_microarch'] = '2'  # the current default for CMSSW
-            return
+            matchInfo['required_minimum_microarch'] = 2  # the current default for CMSSW
+            return matchInfo
         if min_micro_arch == 'any':
-            info['required_minimum_microarch'] = 0
-            return
+            matchInfo['required_minimum_microarch'] = 0
+            return matchInfo
         if min_micro_arch.startswith('x86-64-v'):
-            info['required_minimum_microarch'] = int(min_micro_arch.split('v')[-1])
-            return
+            matchInfo['required_minimum_microarch'] = int(min_micro_arch.split('v')[-1])
+            return matchInfo
         self.logger.error(f"Not supported microarch: {min_micro_arch}. Ignore it")
-        info['required_minimum_microarch'] = 'any'
+        matchInfo['required_minimum_microarch'] = 0
+
+        return matchInfo
 
     def getDashboardTaskType(self, task):
         """ Get the dashboard activity name for the task.
@@ -455,133 +299,255 @@ class DagmanCreator(TaskAction):
 
     def makeJobSubmit(self, task):
         """
-        Create the submit file. This is reused by all jobs in the task; differences
-        between the jobs are taken care of in the makeDagSpecs.
-        Any key defined in the dictionary passed to transform_strings
-        is deleted unless accounted for in the transform_strings method.
+        Prepare an HTCondor Submit object which will serve as template for
+         all job submissions. It will be persisted in Job.submiy JDL file and
+         customized by PreJob.py for each job using info from DAG
+        Differences between the jobs are taken care of in the makeDagSpecs and
+         propagated to the scheduler via the DAG description files
         """
 
+        jobSubmit = htcondor.Submit()
+
         if os.path.exists("Job.submit"):
-            info = {'jobcount': int(task['jobcount'])}
-            return info
+            jobSubmit['jobcount'] = str(task['jobcount'])
+            return jobSubmit
 
-        # From here on out, we convert from tm_* names to the DataWorkflow names
-        info = dict(task)
+        # these are classAds that we want to be added to each grid job
+        # in the assignement the RHS has to be a string which will be
+        # internally resolved in the HTC python APIU to a "classAd primitieve type" i.e.
+        # integer or double-quoted string. If we put a simple string like
+        # ad = something, HTCondor will look for a variable named something.
+        # Therefore 3 types are acceptable RHS here:
+        #   - for int variables, use a simple str: jobSubmit[] = str(myInt)
+        #   - for string variable, need to quote: jobSubmit[] = classad.quote(myString)
+        #   - if we "type the literal", we can simply use: jobSubmit[]="3" for
+        #      a classAd that should resolve to an int and jobSubmit[]='"sometext"'
+        #      for a classAd that should resolve to a string. In this latter case
+        #      we can also (and better) user jobSubmit[]=classad.quote('sometext')
+        # Note that argument to classad.quote can only be string or None
+        #  we prefer to use classad.quote to using f'"{myString}"' as it is more clear and robust
+        #   e.g. it handles cases where myString contains '"' by inserting proper escaping
 
-        info['workflow'] = task['tm_taskname']
-        info['jobtype'] = 'Analysis'
-        info['jobsw'] = info['tm_job_sw']
-        info['jobarch'] = info['tm_job_arch']
-        info['inputdata'] = info['tm_input_dataset']
-        ## The 1st line below is for backward compatibility with entries in the TaskDB
-        ## made by CRAB server < 3.3.1511, where tm_primary_dataset = null
-        ## and tm_input_dataset always contains at least one '/'. Once we don't
-        ## care about backward compatibility anymore, remove the 1st line and
-        ## uncomment the 2nd line.
-        info['primarydataset'] = info['tm_primary_dataset'] if info['tm_primary_dataset'] else info['tm_input_dataset'].split('/')[1]
-        #info['primarydataset'] = info['tm_primary_dataset']
-        info['splitalgo'] = info['tm_split_algo']
-        info['algoargs'] = info['tm_split_args']
-        info['cachefilename'] = info['tm_user_sandbox']
-        info['cacheurl'] = info['tm_cache_url']
-        info['userhn'] = info['tm_username']
-        info['publishname'] = info['tm_publish_name']
-        info['asyncdest'] = info['tm_asyncdest']
-        info['dbsurl'] = info['tm_dbs_url']
-        info['publishdbsurl'] = info['tm_publish_dbs_url']
-        info['publication'] = 1 if info['tm_publication'] == 'T' else 0
-        info['userdn'] = info['tm_user_dn']
-        info['requestname'] = task['tm_taskname'].replace('"', '')
-        info['savelogsflag'] = 1 if info['tm_save_logs'] == 'T' else 0 # Note: this must always be 0 for probe jobs, is taken care of in PostJob.py
-        info['blacklistT1'] = 0
-        info['siteblacklist'] = task['tm_site_blacklist']
-        info['sitewhitelist'] = task['tm_site_whitelist']
-        info['addoutputfiles'] = task['tm_outfiles']
-        info['tfileoutfiles'] = task['tm_tfile_outfiles']
-        info['edmoutfiles'] = task['tm_edm_outfiles']
-        info['oneEventMode'] = 1 if info['tm_one_event_mode'] == 'T' else 0
-        info['taskType'] = self.getDashboardTaskType(task)
-        info['worker_name'] = getattr(self.config.TaskWorker, 'name', 'unknown')
-        info['retry_aso'] = 1 if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else 0
-        if task['tm_output_lfn'].startswith('/store/user/rucio') or \
-            task['tm_output_lfn'].startswith('/store/group/rucio'):
-            info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASORucioTimeout', 0)
-        else:
-            info['aso_timeout'] = getattr(self.config.TaskWorker, 'ASOTimeout', 0)
-        info['submitter_ip_addr'] = task['tm_submitter_ip_addr']
-        info['cms_wmtool'] = self.setCMS_WMTool(task)
-        info['cms_tasktype'] = self.setCMS_TaskType(task)
-        info['cms_type'] = self.setCMS_Type(task)
+        jobSubmit['My.CRAB_Reqname'] = classad.quote(task['tm_taskname'])
+        jobSubmit['My.CRAB_Workflow'] = classad.quote(task['tm_taskname'])
+        jobSubmit['My.CMS_JobType'] = classad.quote('Analysis')
+        jobSubmit['My.CRAB_JobSW'] = classad.quote(task['tm_job_sw'])
+        jobSubmit['My.CRAB_JobArch'] = classad.quote(task['tm_job_arch'])
+        # Note: next ad must always be 0 for probe jobs, this is taken care of in PreJob.py
+        jobSubmit['My.CRAB_SaveLogsFlag'] = "1" if task['tm_save_logs'] == 'T' else "0"
+        jobSubmit['My.CRAB_DBSURL'] = classad.quote(task['tm_dbs_url'])
+        jobSubmit['My.CRAB_PostJobStatus'] = classad.quote("NOT RUN")
+        jobSubmit['My.CRAB_PostJobLastUpdate'] = "0"
+        jobSubmit['My.CRAB_PublishName'] = classad.quote(task['tm_publish_name'])
+        jobSubmit['My.CRAB_Publish'] =  "1" if task['tm_publication'] == 'T' else "0"
+        jobSubmit['My.CRAB_PublishDBSURL'] = classad.quote(task['tm_publish_dbs_url'])
+        jobSubmit['My.CRAB_ISB'] = classad.quote(task['tm_cache_url'])
 
-        #Classads for task lifetime management, see https://github.com/dmwm/CRABServer/issues/5505
-        info['task_lifetime_days'] = TASKLIFETIME // 24 // 60 // 60
-        info['task_endtime'] = int(task["tm_start_time"]) + TASKLIFETIME
+        def pythonListToClassAdValue(aList):
+            # python lists need special handling to become the string '{"a","b",...,"c"}'
+            quotedItems = json.dumps(aList)  # from [s1, s2] to the string '["s1","s2"]'
+            quotedItems = quotedItems.lstrip('[').rstrip(']')  # remove square brackets [ ]
+            value = "{" + quotedItems + "}"  # make final string adding the curly brackets { }
+            return value
+        jobSubmit['My.CRAB_SiteBlacklist'] = pythonListToClassAdValue(task['tm_site_blacklist'])
+        jobSubmit['My.CRAB_SiteWhitelist'] =  pythonListToClassAdValue(task['tm_site_whitelist'])
+        jobSubmit['My.CRAB_AdditionalOutputFiles'] = pythonListToClassAdValue(task['tm_outfiles'])
+        jobSubmit['My.CRAB_EDMOutputFiles'] =  pythonListToClassAdValue(task['tm_edm_outfiles'])
+        jobSubmit['My.CRAB_TFileOutputFiles'] = pythonListToClassAdValue(task['tm_outfiles'])
+        jobSubmit['My.CRAB_UserDN'] = classad.quote(task['tm_user_dn'])
+        jobSubmit['My.CRAB_UserHN'] = classad.quote(task['tm_username'])
+        jobSubmit['My.CRAB_AsyncDest'] = classad.quote(task['tm_asyncdest'])
+        jobSubmit['My.CRAB_StageoutPolicy'] = classad.quote(task['stageoutpolicy'])
+        # for VOMS role and group, PostJob and RenewRemoteProxies code want the undefined value, not "
+        userRole = task['tm_user_role']
+        jobSubmit['My.CRAB_UserRole'] = classad.quote(userRole) if userRole else 'undefined'
+        userGroup = task['tm_user_group']
+        jobSubmit['My.CRAB_UserGroup'] = classad.quote(userGroup) if userGroup else 'undefined'
+        jobSubmit['My.CRAB_TaskWorker'] = classad.quote(getattr(self.config.TaskWorker, 'name', 'unknown'))
+        retry_aso = "1" if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else "0"
+        jobSubmit['My.CRAB_RetryOnASOFailures'] = retry_aso
+        jobSubmit['My.CRAB_ASOTimeout'] = str(getattr(self.config.TaskWorker, 'ASORucioTimeout', 0))
+        jobSubmit['My.CRAB_RestHost'] = classad.quote(task['resthost'])
+        jobSubmit['My.CRAB_DbInstance'] = classad.quote(task['dbinstance'])
+        jobSubmit['My.CRAB_NumAutomJobRetries'] = str(task['numautomjobretries'])
+        jobSubmit['My.CRAB_Id'] = classad.quote("$(count)")  # count macro will be defined in VARS line in the DAG file
+        jobSubmit['My.CRAB_JobCount'] = str(task['jobcount'])
+        temp_dest, dest = makeLFNPrefixes(task)
+        jobSubmit['My.CRAB_OutTempLFNDir'] = classad.quote(temp_dest)
+        jobSubmit['My.CRAB_OutLFNDir'] = classad.quote(dest)
+        oneEventMode = "1" if task['tm_one_event_mode'] == 'T' else "0"
+        jobSubmit['My.CRAB_oneEventMode'] = oneEventMode
+        jobSubmit['My.CRAB_PrimaryDataset'] = classad.quote(task['tm_primary_dataset'])
+        jobSubmit['My.CRAB_DAGType'] = classad.quote("Job")
+        jobSubmit['My.CRAB_SubmitterIpAddr'] = classad.quote(task['tm_submitter_ip_addr'])
+        jobSubmit['My.CRAB_TaskLifetimeDays'] = str(TASKLIFETIME // 24 // 60 // 60)
+        jobSubmit['My.CRAB_TaskEndTime'] = str(int(task["tm_start_time"]) + TASKLIFETIME)
+        jobSubmit['My.CRAB_SplitAlgo'] = classad.quote(task['tm_split_algo'])
+        jobSubmit['My.CRAB_AlgoArgs'] = classad.quote(str(task['tm_split_args']))  # from dict to str before quoting
+        jobSubmit['My.CMS_WMTool'] =  classad.quote(self.setCMS_WMTool(task))
+        jobSubmit['My.CMS_TaskType'] = classad.quote(self.setCMS_TaskType(task))
+        jobSubmit['My.CMS_SubmissionTool'] = classad.quote("CRAB")
+        jobSubmit['My.CMS_Type'] = classad.quote(self.setCMS_Type(task))
+        transferOutputs = "1" if task['tm_transfer_outputs'] == 'T' else "0" # Note: this must always be 0 for probe jobs, is taken care of in PreJob.py
+        jobSubmit['My.CRAB_TransferOutputs'] = transferOutputs
 
-        self.populateGlideinMatching(info)
+        # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
+        matchInfo = self.populateGlideinMatching(task)
+        jobSubmit['My.REQUIRED_ARCH'] = classad.quote(matchInfo['required_arch'])
+        jobSubmit['My.REQUIRED_MINIMUM_MICROARCH'] = str(matchInfo['required_minimum_microarch'])
+        jobSubmit['My.DESIRED_CMSDataset'] = classad.quote(task['tm_input_dataset'])
 
-        info['runs'] = []
-        info['lumis'] = []
-        info['saveoutput'] = 1 if info['tm_transfer_outputs'] == 'T' else 0 # Note: this must always be 0 for probe jobs, is taken care of in PostJob.py
+        # extra requirements that user may set when submitting
+        jobSubmit['My.CRAB_RequestedMemory'] = str(task['tm_maxmemory'])
+        jobSubmit['My.CRAB_RequestedCores'] = str(task['tm_numcores'])
+        jobSubmit['My.MaxWallTimeMins'] = str(task['tm_maxjobruntime'])
+        ## Add group information (local groups in SITECONF via CMSGroupMapper, VOMS groups via task info in DB)
+        groups = set.union(map_user_to_groups(task['tm_username']), task['user_groups'])
+        groups = ','.join(groups)  # from the set {'g1','g2'...,'gN'} to the string 'g1,g2,..gN'
+        jobSubmit['My.CMSGroups'] = classad.quote(groups)
+
+        # do we really need this ?  i.e. or can replace it with GLIDEIN_CMSSite where it is used in the code ?
+        jobSubmit['My.JOBGLIDEIN_CMSSite'] = classad.quote('$$([ifThenElse(GLIDEIN_CMSSite is undefined, "Unknown", GLIDEIN_CMSSite)])')
+
+        #
+        # now actual HTC Job Submission commands, here right hand side can be simply strings
+        #
+
         egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
-        if egroups and info['userhn'] in self.getHighPrioUsers(info['user_proxy'], info['workflow'], egroups):
-            info['accounting_group'] = 'highprio'
+        if egroups and task['tm_username'] in self.getHighPrioUsers(egroups):
+            jobSubmit['accounting_group'] = 'highprio'
         else:
-            info['accounting_group'] = 'analysis'
-        info['accounting_group_user'] = info['userhn']
-        info = transform_strings(info)
-        info['faillimit'] = task['tm_fail_limit']
-        # tm_extrajdl and tm_user_config['acceleratorparams'] contain list of k=v
-        # assignements to be turned into classAds, so here we turn them from a python list of strings to
-        # a single string with k=v separated by \n which can be pasted into the Job.submit JDL
-        info['extra_jdl'] = '\n'.join(literal_eval(task['tm_extrajdl']))
+            jobSubmit['accounting_group'] = 'analysis'
+        jobSubmit['accounting_group_user'] = task['tm_username']
+
+        jobSubmit['job_ad_information_attrs'] = "MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite, RemoteSysCpu, RemoteUserCpu"
+
+        # Recover job output and logs on eviction events; make sure they aren't spooled
+        # This allows us to return stdout to users when they hit memory limits (which triggers PeriodicRemove).
+        jobSubmit['WhenToTransferOutput'] = "ON_EXIT_OR_EVICT"
+        # old code had this line in Job.submit, but I can't find it used nor documented anywhere
+        # +SpoolOnEvict = false
+
+        # Keep job in the queue upon completion long enough for the postJob to run,
+        # allowing the monitoring script to fetch the postJob status and job exit-code updated by the postJob
+        jobSubmit['LeaveJobInQueue'] = "ifThenElse((JobStatus=?=4 || JobStatus=?=3) " + \
+                                        "&& (time() - EnteredCurrentStatus < 30 * 60*60), true, false)"
+
+        jobSubmit['universe'] = "vanilla"
+        jobSubmit['Executable'] = "gWMS-CMSRunAnalysis.sh"
+        jobSubmit['Output'] = "job_out.$(count)"
+        jobSubmit['Error'] = "job_err.$(count)"
+        jobSubmit['Log'] = "job_log"
+
+        # from https://htcondor.readthedocs.io/en/latest/man-pages/condor_submit.html#submit-description-file-commands
+        # The entire string representing the command line arguments is surrounded by double quote marks
+        jobSubmit['Arguments'] = classad.quote("--jobId=$(count)")
+        jobSubmit['transfer_output_files'] = "jobReport.json.$(count), WMArchiveReport.json.$(count)"
+
+        additional_input_file = ""
+        additional_environment_options = ""
+        if os.path.exists("CMSRunAnalysis.tar.gz"):
+            additional_environment_options += ' CRAB_RUNTIME_TARBALL=local'
+            additional_input_file += ", CMSRunAnalysis.tar.gz"
+        else:
+            raise TaskWorkerException(f"Cannot find CMSRunAnalysis.tar.gz inside the cwd: {os.getcwd()}")
+        if os.path.exists("TaskManagerRun.tar.gz"):
+            additional_environment_options += ' CRAB_TASKMANAGER_TARBALL=local'
+        else:
+            raise TaskWorkerException(f"Cannot find TaskManagerRun.tar.gz inside the cwd: {os.getcwd()}")
+        additional_input_file += ", sandbox.tar.gz"  # it will be present on SPOOL_DIR after dab_bootstrap
+        additional_input_file += ", input_args.json"
+        additional_input_file += ", run_and_lumis.tar.gz"
+        additional_input_file += ", input_files.tar.gz"
+        additional_input_file += ", submit_env.sh"
+        additional_input_file += ", cmscp.sh"
+        jobSubmit['transfer_input_files'] = f"CMSRunAnalysis.sh, cmscp.py{additional_input_file}"
+        # make sure coredump (if any) is not added to output files ref: https://lists.cs.wisc.edu/archive/htcondor-users/2022-September/msg00052.shtml
+        jobSubmit['coresize'] = "0"
+
+        # we should fold this into the config file instead of hardcoding things.
+        jobSubmit['Environment'] = classad.quote(f"SCRAM_ARCH=$(CRAB_JobArch){additional_environment_options}")
+        jobSubmit['should_transfer_files'] = "YES"
+        jobSubmit['use_x509userproxy'] = "true"
+
+        arch = task['tm_job_arch'].split("_")[0]  # extracts "slc7" from "slc7_amd64_gcc10"
+        required_os_list = ARCH_TO_OS.get(arch)
+        if not required_os_list:
+            raise SubmissionRefusedException(f"Unsupported architecture {arch}")
+        # ARCH_TO_OS.get("slc7") gives a list with one item only: ['rhel7']
+        jobSubmit['My.REQUIRED_OS'] = classad.quote(required_os_list[0])
+        jobSubmit['Requirements'] = "stringListMember(TARGET.Arch, REQUIRED_ARCH)"
+
+        # Ref: https://htcondor.readthedocs.io/en/latest/classad-attributes/job-classad-attributes.html#HoldReasonCode
+        jobSubmit['periodic_release'] = "(HoldReasonCode == 28) || (HoldReasonCode == 30) " + \
+                                         "|| (HoldReasonCode == 13) || (HoldReasonCode == 6)"
+
+        # Remove if
+        # a) job is in the 'held' status for more than 7 minutes
+        # b) job is idle more than 7 days
+        # c) job is running and one of:
+        #    1) Over memory use
+        #    2) Over wall clock limit
+        #    3) Over disk usage of N GB, which is set in ServerUtilities
+        # d) the taks EndTime has been reached
+        # e) job is idle and users proxy expired 1 day ago.
+        # (P.S. why 1 day ago? because there is recurring action which is updating user proxy and lifetime.)
+        # ** If New periodic remove expression is added, also it should have Periodic Remove Reason. **
+        # ** Otherwise message will not be clear and it is hard to debug **
+        periodicRemove = "( (JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60) )"  # a)
+        periodicRemove += "|| ( (JobStatus =?= 1) && (time() - EnteredCurrentStatus > 7*24*60*60) )"  # b)
+        periodicRemove += "|| ( (JobStatus =?= 2) && ( "  # c)
+        periodicRemove += "(MemoryUsage =!= UNDEFINED && MemoryUsage > RequestMemory)"  # c) 1)
+        periodicRemove += "|| (MaxWallTimeMinsRun * 60 < time() - EnteredCurrentStatus)"  # c) 2)
+        periodicRemove += f"|| (DiskUsage > {MAX_DISK_SPACE})"  # c) 3)
+        periodicRemove += "))"  # these parentheses close the "if running" condition, i.e. JobStatus==2
+        periodicRemove += "|| (time() > CRAB_TaskEndTime)"  # d)
+        periodicRemove += "|| ( (JobStatus =?= 1) && (time() > (x509UserProxyExpiration + 86400)))"""  # e)
+        jobSubmit['periodic_remove'] = periodicRemove
+
+        # remove reasons are "ordered" in the following big IF starting from the less-conditial ones
+        # order is relevant and getting it right is "an art"
+        periodicRemoveReason = "ifThenElse("
+        periodicRemoveReason += "time() - EnteredCurrentStatus > 7 * 24 * 60 * 60 && isUndefined(MemoryUsage),"
+        periodicRemoveReason += "\"Removed due to idle time limit\","  # set this reasons. Else
+        periodicRemoveReason += "ifThenElse(time() > x509UserProxyExpiration, \"Removed job due to proxy expiration\","
+        periodicRemoveReason += "ifThenElse(MemoryUsage > RequestMemory, \"Removed due to memory use\","
+        periodicRemoveReason += "ifThenElse(MaxWallTimeMinsRun * 60 < time() - EnteredCurrentStatus, \"Removed due to wall clock limit\","
+        periodicRemoveReason += f"ifThenElse(DiskUsage > {MAX_DISK_SPACE}, \"Removed due to disk usage\","
+        periodicRemoveReason += "ifThenElse(time() > CRAB_TaskEndTime, \"Removed due to reached CRAB_TaskEndTime\","
+        periodicRemoveReason += "\"Removed due to job being held\"))))))"  # one closed ")" for each "ifThenElse("
+        jobSubmit['My.PeriodicRemoveReason'] = periodicRemoveReason
+
+        # tm_extrajdl contains a list of k=v assignements to be turned each into a classAds
+        # also special handling is needed because is retrieved from DB not as a python list, but as a string
+        # with format "['a=b','c=d'...]"  (a change in RESTWorkerWorkflow would be needed to get a python list
+        # so we use here the same literal_eval trick which is used in RESTWorkerWorkflow.py )
+        for extraJdl in literal_eval(task['tm_extrajdl']):
+            name,value = extraJdl.split('=',1)
+            if name.startswith('+'):
+                name = name.replace('+', 'My.', 1)  # make sure JDL line starts with My. instead of +
+            jobSubmit[name] = value
+
         if task['tm_user_config']['requireaccelerator']:
             # hardcoding accelerator to GPU (SI currently only have nvidia GPU)
-            info['accelerator_jdl'] = '+RequiresGPU=1\nrequest_GPUs=1'
+            jobSubmit['My.RequiresGPU'] = "1"
+            jobSubmit['request_GPUs'] = "1"
             if task['tm_user_config']['acceleratorparams']:
                 gpuMemoryMB = task['tm_user_config']['acceleratorparams'].get('GPUMemoryMB', None)
                 cudaCapabilities = task['tm_user_config']['acceleratorparams'].get('CUDACapabilities', None)
                 cudaRuntime = task['tm_user_config']['acceleratorparams'].get('CUDARuntime', None)
                 if gpuMemoryMB:
-                    info['accelerator_jdl'] += f"\n+GPUMemoryMB={gpuMemoryMB}"
+                    jobSubmit['My.GPUMemoryMB'] = classad.quote(gpuMemoryMB)
                 if cudaCapabilities:
                     cudaCapability = ','.join(sorted(cudaCapabilities))
-                    info['accelerator_jdl'] += f"\n+CUDACapability={classad.quote(cudaCapability)}"
+                    jobSubmit['My.CUDACapability'] = classad.quote(cudaCapability)
                 if cudaRuntime:
-                    info['accelerator_jdl'] += f"\n+CUDARuntime={classad.quote(cudaRuntime)}"
-        else:
-            info['accelerator_jdl'] = ''
-        arch = info['jobarch_flatten'].split("_")[0]  # extracts "slc7" from "slc7_amd64_gcc10"
-        required_os_list = ARCH_TO_OS.get(arch)
-        if not required_os_list:
-            raise SubmissionRefusedException(f"Unsupported architecture {arch}")
-        # ARCH_TO_OS.get("slc7") gives a list with one item only: ['rhel7']
-        info['opsys_req'] = f'+REQUIRED_OS="{required_os_list[0]}"'
-
-        info.setdefault("additional_environment_options", '')
-        info.setdefault("additional_input_file", "")
-        if os.path.exists("CMSRunAnalysis.tar.gz"):
-            info['additional_environment_options'] += 'CRAB_RUNTIME_TARBALL=local'
-            info['additional_input_file'] += ", CMSRunAnalysis.tar.gz"
-        else:
-            raise TaskWorkerException(f"Cannot find CMSRunAnalysis.tar.gz inside the cwd: {os.getcwd()}")
-        if os.path.exists("TaskManagerRun.tar.gz"):
-            info['additional_environment_options'] += ' CRAB_TASKMANAGER_TARBALL=local'
-        else:
-            raise TaskWorkerException(f"Cannot find TaskManagerRun.tar.gz inside the cwd: {os.getcwd()}")
-        info['additional_input_file'] += ", sandbox.tar.gz"  # it will be present on SPOOL_DIR after dab_bootstrap
-        info['additional_input_file'] += ", input_args.json"
-        info['additional_input_file'] += ", run_and_lumis.tar.gz"
-        info['additional_input_file'] += ", input_files.tar.gz"
-        info['additional_input_file'] += ", submit_env.sh"
-        info['additional_input_file'] += ", cmscp.sh"
-
-        info['max_disk_space'] = MAX_DISK_SPACE
+                    jobSubmit['My.CUDARuntime'] = classad.quote(cudaRuntime)
 
         with open("Job.submit", "w", encoding='utf-8') as fd:
-            fd.write(JOB_SUBMIT % info)
+            print(jobSubmit, file=fd)
 
-        return info
-
+        return jobSubmit
 
     def getPreScriptDefer(self, task, jobid):
         """ Return the string to be used for deferring prejobs
@@ -590,9 +556,11 @@ class DagmanCreator(TaskAction):
             jobid * CRAB_JobReleaseTimeout seconds
         """
         slowJobRelease = False
-        extrajdls = literal_eval(task['tm_extrajdl'])
+        extrajdls = literal_eval(task['tm_extrajdl'])  # from "['a','b',...]" to a python list
         for ej in extrajdls:
-            if ej.find('CRAB_JobReleaseTimeout') in [0, 1]: #there might be a + before
+            if ej.startswith('+'):
+                ej = ej.replace('+', 'My.', 1)
+            if ej.startswith('My.CRAB_JobReleaseTimeout'):
                 slowJobRelease = True
                 releaseTimeout = int(ej.split('=')[1])
 
@@ -602,9 +570,14 @@ class DagmanCreator(TaskAction):
             prescriptDeferString = ''
         return prescriptDeferString
 
-
-    def makeDagSpecs(self, task, siteinfo, jobgroup, block, availablesites, datasites, outfiles, startjobid, parent=None, stage='conventional'):
-        """ need a comment line here """
+    def makeDagSpecs(self, task, siteinfo, jobgroup, block, availablesites, datasites,
+                     outfiles, startjobid, parentDag=None, stage='conventional'):
+        """
+        prepares the information for the lines for a DAG description file
+        as a list of `dagspec` objects. Each object is used to set value in the
+        DAG_FRAGMENT string and to extract values for JSON object which passes
+        arguments to CMSRunAnalysis.py (store in input_args.json), see prepareJobArguments below
+        """
         dagSpecs = []
         i = startjobid
         temp_dest, dest = makeLFNPrefixes(task)
@@ -643,17 +616,17 @@ class DagmanCreator(TaskAction):
             firstLumi = str(job['mask']['FirstLumi'])
             firstRun = str(job['mask']['FirstRun'])
             i = int(i) + 1
-            if parent is None or parent == "":
+            if parentDag is None or parentDag == "":
                 count = str(i)
             else:
-                count = f"{parent}-{i}"
+                count = f"{parentDag}-{i}"
             siteinfo[count] = groupid
             remoteOutputFiles = []
             localOutputFiles = []
             for origFile in outfiles:
-                info = origFile.rsplit(".", 1)
-                if len(info) == 2:
-                    fileName = f"{info[0]}_{count}.{info[1]}"
+                nameParts = origFile.rsplit(".", 1)
+                if len(nameParts) == 2:  # filename ends with .<something>, put jobId before the dot
+                    fileName = f"{nameParts[0]}_{count}.{nameParts[1]}"
                 else:
                     fileName = f"{origFile}_{count}"
                 remoteOutputFiles.append(fileName)
@@ -709,7 +682,7 @@ class DagmanCreator(TaskAction):
     def prepareJobArguments(self, dagSpecs, task):
         """ Prepare an object with all the input parameters of each jobs. It is a list
             with a dictionary for each job. The dictionary key/value pairs are the variables needed in CMSRunAnalysis.py
-            This will be save in "input_args*.json", a differnt json file for the main DAG and each subdags
+            This will be save in "input_args.json" by the caller, adding to existing list in ther if any
             Inputs:
                 dagSpecs : list of dictionaries with information for each DAG job
                 task: dictionary, the "standard" task dictionary with info from the DataBase TASK table
@@ -720,24 +693,33 @@ class DagmanCreator(TaskAction):
         argdicts = []
         for dagspec in dagSpecs:
             argDict = {}
-            argDict['inputFiles'] = f"job_input_file_list_{dagspec['count']}.txt"  #'job_input_file_list_1.txt'
-            argDict['runAndLumiMask'] = f"job_lumis_{dagspec['count']}.json"
-            argDict['CRAB_Id'] = dagspec['count'] #'1'
+            argDict['inputFileList'] = f"job_input_file_list_{dagspec['count']}.txt"  #'job_input_file_list_1.txt'
+            argDict['runAndLumis'] = f"job_lumis_{dagspec['count']}.json"
+            # TODO: should find a way to use only CRAB_Id and get rid or jobNumber
+            argDict['jobNumber'] = dagspec['count'] # '1' or '0-3' etc
+            argDict['CRAB_Id'] = dagspec['count'] # '1' or '0-3' etc
             argDict['lheInputFiles'] = dagspec['lheInputFiles']  # False
             argDict['firstEvent'] = dagspec['firstEvent']  # 'None'
             argDict['lastEvent'] = dagspec['lastEvent']  # 'None'
             argDict['firstLumi'] = dagspec['firstLumi']  # 'None'
             argDict['firstRun'] = dagspec['firstRun']  # 'None'
-            argDict['CRAB_Archive'] = task['tm_user_sandbox']  #'sandbox.tar.gz'
-            argDict['CRAB_ISB'] = task['tm_cache_url']  # 'https://cmsweb.cern.ch/crabcache'
-            argDict['CRAB_JobSW'] = task['tm_job_sw']  # 'CMSSW_9_2_5'
-            argDict['CRAB_JobArch'] = task['tm_job_arch']  # 'slc6_amd64_gcc530'
+            argDict['userSandbox'] = task['tm_user_sandbox']  #SB we could simply hardocode 'sandbox.tar.gz'
+            argDict['cmsswVersion'] = task['tm_job_sw']  # 'CMSSW_9_2_5'
+            argDict['scramArch'] = task['tm_job_arch']  # 'slc6_amd64_gcc530'
             argDict['seeding'] = 'AutomaticSeeding'
             argDict['scriptExe'] = task['tm_scriptexe']  #
             argDict['eventsPerLumi'] = task['tm_events_per_lumi']  #
             argDict['maxRuntime'] = dagspec['maxRuntime']  # -1
             argDict['scriptArgs'] = task['tm_scriptargs']
             argDict['CRAB_AdditionalOutputFiles'] = "{}"
+            # following one are for bkw compat. with CRABClient v3.241125, to be removed
+            argDict['CRAB_Archive'] = argDict['userSandbox']
+            argDict['CRAB_ISB'] = 'dummy'
+            argDict['CRAB_JobSW'] = argDict['cmsswVersion']
+            argDict['CRAB_JobArch'] = argDict['scramArch']
+            argDict['runAndLumiMask'] = argDict['runAndLumis']
+            argDict['inputFiles'] = argDict['inputFileList']
+
             # The following two are for fixing up job.submit files
             # SB argDict['CRAB_localOutputFiles'] = dagspec['localOutputFiles']
             # SB argDict['CRAB_Destination'] = dagspec['destination']
@@ -761,7 +743,7 @@ class DagmanCreator(TaskAction):
          automatic splitting (multiple subdags which will be added in the scheduler by
          the PreDag.py script which calls this DagmanCreator
         Returns:
-            info : dictionary : passes info to next action (DagmanSubmitter)
+            jobSubmit : HTCondor submit object : passes the Job.submit template to next action (DagmanSubmitter)
             splitterResult : object : this is the output of previous action (Splitter) and is part of input
                              arguments to DagmanCreator ! As far as Stefano can tell returning it
                              here is a "perverse" way to pass it also to DagmanSubmitter
@@ -784,13 +766,17 @@ class DagmanCreator(TaskAction):
           site.ad.json : sites assigned to jobs in each job group (info from Splitter)
         """
 
+        # SB should have a createDagSpects() methos to move away a lot of following code
+
         startjobid = kwargs.get('startjobid', 0)
-        parent = kwargs.get('parent', None)
+        # parentDag below is only used during automatic splitting
+        # possible values in each stage are:  probe: 0, tail: 1/2/3, processing: None
+        parentDag = kwargs.get('parent', None)
         stage = kwargs.get('stage', 'conventional')
         self.logger.debug('starting createSubdag, kwargs are:')
         self.logger.debug(str(kwargs))
-        dagSpecs = []
-        subdags = []
+        dagSpecs = []  # there will be a dagSpec for every node to be written in the DAG file
+        subdags = []  # in automatic splitting a DAG may contain a list of one or more subdags to start
 
         # disable direct stageout for rucio tasks
         if kwargs['task']['tm_output_lfn'].startswith('/store/user/rucio') or \
@@ -824,7 +810,7 @@ class DagmanCreator(TaskAction):
                 kwargs['task']['max_runtime'] = proberuntime
                 outfiles = []
                 stage = 'probe'
-                parent = 0
+                parentDag = 0
             elif stage == 'processing':
                 # include a buffer of one hour for overhead beyond the time
                 # given to CMSSW
@@ -996,9 +982,10 @@ class DagmanCreator(TaskAction):
                 msg += f" This is expected to result in DESIRED_SITES = {list(available)}"
                 self.logger.debug(msg)
 
-            jobgroupDagSpecs, startjobid = self.makeDagSpecs(kwargs['task'], siteinfo,
-                                                             jobgroup, list(jgblocks)[0], availablesites,
-                                                             datasites, outfiles, startjobid, parent=parent, stage=stage)
+            jobgroupDagSpecs, startjobid = self.makeDagSpecs(
+                kwargs['task'], siteinfo, jobgroup, list(jgblocks)[0],
+                availablesites, datasites, outfiles, startjobid,
+                parentDag=parentDag, stage=stage)
             dagSpecs += jobgroupDagSpecs
 
         def getBlacklistMsg():
@@ -1043,8 +1030,8 @@ class DagmanCreator(TaskAction):
             self.logger.warning(msg)
 
         ## Write down the DAG as needed by DAGMan.
-        restHostForSchedd = kwargs['task']['resthost']
-        dag = DAG_HEADER.format(nodestate=f".{parent}" if parent else ('.0' if stage == 'processing' else ''),
+        restHostForSchedd = kwargs['task']['resthost']  # SB better to use self.crabserver.server['host']
+        dag = DAG_HEADER.format(nodestate=f".{parentDag}" if parentDag else ('.0' if stage == 'processing' else ''),
                                 resthost=restHostForSchedd)
         if stage == 'probe':
             dagSpecs = dagSpecs[:getattr(self.config.TaskWorker, 'numAutomaticProbes', 5)]
@@ -1111,7 +1098,10 @@ class DagmanCreator(TaskAction):
                 tfd2.close()
                 shutil.rmtree(tempDir2)
 
+        # pick the name for the DAG file that we will create
         if stage in ('probe', 'conventional'):
+            # this stages means that we run in TW, so let's also save as pickles
+            # some data that will be needed to be able to run in the scheduler
             dagFileName = "RunJobs.dag"
             with open("datadiscovery.pkl", "wb") as fd:
                 pickle.dump(splitterResult[1], fd)  # Cache data discovery
@@ -1122,13 +1112,12 @@ class DagmanCreator(TaskAction):
         elif stage == 'processing':
             dagFileName = "RunJobs0.subdag"
         else:
-            dagFileName = f"RunJobs{parent}.subdag"
+            dagFileName = f"RunJobs{parentDag}.subdag"
         argFileName = "input_args.json"
 
         ## Cache site information
         with open("site.ad.json", "w", encoding='utf-8') as fd:
             json.dump(siteinfo, fd)
-
 
         ## Save the DAG into a file.
         with open(dagFileName, "w", encoding='utf-8') as fd:
@@ -1136,7 +1125,7 @@ class DagmanCreator(TaskAction):
 
         kwargs['task']['jobcount'] = len(dagSpecs)
 
-        info = self.makeJobSubmit(kwargs['task'])
+        jobSubmit = self.makeJobSubmit(kwargs['task'])
 
         # list of input arguments needed for each jobs
         argdicts = self.prepareJobArguments(dagSpecs, kwargs['task'])
@@ -1150,32 +1139,31 @@ class DagmanCreator(TaskAction):
         with open(argFileName, 'w', encoding='utf-8') as fd:
             json.dump(argdicts, fd)
 
+        # add maxidle, maxpost and faillimit to the object passed to DagmanSubmitter
+        # first two be used in the DAG submission and the latter the PostJob
         maxidle = getattr(self.config.TaskWorker, 'maxIdle', MAX_IDLE_JOBS)
         if maxidle == -1:
-            maxidle = info['jobcount']
+            maxidle = kwargs['task']['jobcount']
         elif maxidle == 0:
-            maxidle = int(max(MAX_IDLE_JOBS, info['jobcount']*.1))
-        info['maxidle'] = maxidle
+            maxidle = int(max(MAX_IDLE_JOBS, kwargs['task']['jobcount']*.1))
+        jobSubmit['My.CRAB_MaxIdle'] = str(maxidle)
 
         maxpost = getattr(self.config.TaskWorker, 'maxPost', MAX_POST_JOBS)
         if maxpost == -1:
-            maxpost = info['jobcount']
+            maxpost = kwargs['task']['jobcount']
         elif maxpost == 0:
-            maxpost = int(max(MAX_POST_JOBS, info['jobcount']*.1))
-        info['maxpost'] = maxpost
+            maxpost = int(max(MAX_POST_JOBS, kwargs['task']['jobcount']*.1))
+        jobSubmit['My.CRAB_MaxPost'] = str(maxpost)
 
-        if info.get('faillimit') is None:
-            info['faillimit'] = -1
-            #if info['jobcount'] > 200
-            #    info['faillimit'] = 100
-            #else:
-            #    info['faillimit'] = -1
-        elif info.get('faillimit') < 0:
-            info['faillimit'] = -1
+        if not 'My.CRAB_FailedNodeLimit' in jobSubmit:
+            jobSubmit['My.CRAB_FailedNodeLimit'] = "-1"
+        elif int(jobSubmit['My.CRAB_FailedNodeLimit']) < 0:
+            jobSubmit['My.CRAB_FailedNodeLimit'] = "-1"
 
-        return info, splitterResult, subdags
 
-    def getHighPrioUsers(self, userProxy, workflow, egroups):
+        return jobSubmit, splitterResult, subdags
+
+    def getHighPrioUsers(self, egroups):
         """ get the list of high priority users """
 
         highPrioUsers = set()
@@ -1186,13 +1174,14 @@ class DagmanCreator(TaskAction):
             msg = "Error when getting the high priority users list." \
                   " Will ignore the high priority list and continue normally." \
                   f" Error reason: {ex}"
-            self.uploadWarning(msg, userProxy, workflow)
+            self.logger.error(msg)
             return []
         return highPrioUsers
 
-
     def executeInternal(self, *args, **kw):
         """ all real work is done here """
+
+        # put in current directory all files that we need to move around
         transform_location = getLocation('CMSRunAnalysis.sh')
         cmscp_location = getLocation('cmscp.py')
         cmscpsh_location = getLocation('cmscp.sh')
@@ -1212,9 +1201,11 @@ class DagmanCreator(TaskAction):
         shutil.copy(adjust_location, '.')
 
         # make sure we have InputSandBox
-        sandboxTarBall = 'sandbox.tar.gz'
+        sandboxTarBall = 'sandbox.tar.gz'  # SB only used once 10 lines below ! no need for a variable !
 
         # Bootstrap the ISB if we are running in the TW
+        # SB: I do not like this overwriting of kw['task']['tm_user_sandbox'] nor
+        # understand yet why it is being done.
         if self.runningInTW:
             username = kw['task']['tm_username']
             taskname = kw['task']['tm_taskname']
@@ -1223,7 +1214,7 @@ class DagmanCreator(TaskAction):
             try:
                 checkS3Object(crabserver=self.crabserver, objecttype='sandbox', taskname=taskname,
                               username=username, tarballname=sandboxName, logger=self.logger)
-                kw['task']['tm_user_sandbox'] = sandboxTarBall
+                kw['task']['tm_user_sandbox'] = sandboxTarBall  # SB no need for this either ! it is only there to reuse same name in prepareArguments. A variable in self would be much cleaner, of even one constant to ensure same name in AdjustSites and CRABClient
             except Exception as ex:
                 raise TaskWorkerException("The CRAB server backend could not find the input sandbox with your code " + \
                                   "from S3.\nThis could be a temporary glitch; please try to submit a new task later " + \
@@ -1231,13 +1222,14 @@ class DagmanCreator(TaskAction):
                                   f"\nError reason: {ex}") from ex
 
         # Bootstrap the runtime if it is available.
+        # SB I presume these lines can be move up toghether with the other getLocations and copy
         job_runtime = getLocation('CMSRunAnalysis.tar.gz',)
         shutil.copy(job_runtime, '.')
         task_runtime = getLocation('TaskManagerRun.tar.gz')
         shutil.copy(task_runtime, '.')
 
-        kw['task']['resthost'] = self.crabserver.server['host']
-        kw['task']['dbinstance'] = self.crabserver.getDbInstance()
+        kw['task']['resthost'] = self.crabserver.server['host']  # SB most likely not needed, see Line 1027
+        kw['task']['dbinstance'] = self.crabserver.getDbInstance()  # SB never used in here nor in DagmanSubmitter ??
         params = {}
 
         # files to be transferred to remove WN's via Job.submit, could pack most in a tarball
@@ -1253,7 +1245,9 @@ class DagmanCreator(TaskAction):
             filesForSched.append("input_dataset_lumis.json")
             filesForSched.append("input_dataset_duplicate_lumis.json")
 
-        info, splitterResult, subdags = self.createSubdag(*args, **kw)
+        # now create the DAG. According to wheter this runs in the TW or in one PreDag, it will
+        # create the MAIN DAG or one of the subdags for automatic splitting, hence it was called "createsubdag"
+        jobSubmit, splitterResult, subdags = self.createSubdag(*args, **kw)
 
         # as splitter summary is useful for dryrun, let's add it to the InputFiles tarball
         jobGroups = splitterResult[0]  # the first returned value of Splitter action is the splitterFactory output
@@ -1266,15 +1260,14 @@ class DagmanCreator(TaskAction):
 
         self.prepareTarballForSched(filesForSched, subdags)
 
-        return info, params, ["InputFiles.tar.gz"], splitterResult
-
+        return jobSubmit, params, ["InputFiles.tar.gz"], splitterResult
 
     def execute(self, *args, **kw):
         """ entry point called by Hanlder """
         cwd = os.getcwd()
         try:
             os.chdir(kw['tempDir'])
-            info, params, inputFiles, splitterResult = self.executeInternal(*args, **kw)
-            return TaskWorker.DataObjects.Result.Result(task=kw['task'], result=(info, params, inputFiles, splitterResult))
+            jobSubmit, params, inputFiles, splitterResult = self.executeInternal(*args, **kw)
+            return TaskWorker.DataObjects.Result.Result(task=kw['task'], result=(jobSubmit, params, inputFiles, splitterResult))
         finally:
             os.chdir(cwd)
