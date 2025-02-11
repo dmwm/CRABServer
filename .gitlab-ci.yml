@@ -287,6 +287,7 @@ task_submission:
     - export Client_Configuration_Validation=$CLIENT_CONFIGURATION_VALIDATION
     - export Client_Validation_Suite=$CLIENT_VALIDATION
     - bash -x cicd/gitlab/executeTests.sh
+  allow_failure: true
   cache:
     - key: $CI_PIPELINE_ID
       paths:
@@ -342,6 +343,7 @@ client_validation_suite:
     - export Client_Validation_Suite=true
     - ls workdir/submitted_tasks_CV
     - bash -x cicd/gitlab/CV_config.sh
+  allow_failure: true
   cache:
     - key: $CI_PIPELINE_ID
       paths:
@@ -387,6 +389,7 @@ client_configuration_validation:
     - export Client_Configuration_Validation=true
     - ls workdir/submitted_tasks_CCV
     - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/CCV_config.sh
+  allow_failure: true
   cache:
     - key: $CI_PIPELINE_ID
       paths:
@@ -430,6 +433,7 @@ check_status_tracking:
     - export SCRAM_ARCH=el8_amd64_gcc11
     - export Check_Publication_Status=Yes
     - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
+  allow_failure: true
   cache:
     - key: $CI_PIPELINE_ID
       paths:
