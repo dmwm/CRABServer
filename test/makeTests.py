@@ -561,7 +561,7 @@ confChangesList = []
 changeDict = {'param': name, 'section': 'Site',
               'value': "['T1_IT*','T1_DE*','T1_ES*','T1_FR*','T1_RU*','T1_UK*','T2_*','T3_*']"}
 confChangesList.append(changeDict)
-changeDict = {'section':'Debug', 'param': 'extraJDL', 'value': "['+CMS_ALLOW_OVERFLOW=False']"}
+changeDict = {'section':'Debug', 'param': 'extraJDL', 'value': "['My.CMS_ALLOW_OVERFLOW=False']"}
 confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
@@ -674,7 +674,7 @@ writeValidationScript(testName=name, validationScript=validationScript)
 
 # extraJDL
 name = 'extraJDL'
-changeDict = {'param': name, 'value': "['+CMS_ALLOW_OVERFLOW=False', '+CRAB_StageoutPolicy=\"remote\"']", 'section': 'Debug'}
+changeDict = {'param': name, 'value': "['My.CMS_ALLOW_OVERFLOW=False', 'My.CRAB_StageoutPolicy=\"remote\"']", 'section': 'Debug'}
 confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
