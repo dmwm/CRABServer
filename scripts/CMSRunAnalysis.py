@@ -348,6 +348,10 @@ def parseArgs():
     if not hasattr(opts, 'oneEventMode'):
         setattr(opts, 'oneEventMode', 0)
 
+    # next lines are for backward compatibility with Client v3.241218 or earlier, to be removed
+    opts.userSandbox = opts.userSandbox if opts.userSandbox else opts.archiveJob
+    opts.inputFileList = opts.inputFileList if opts.inputFileList else opts.inputFile
+
     try:
         print(f"==== Parameters Dump at {UTCNow()} ===")
         print("userSandbox:   ", opts.userSandbox)
