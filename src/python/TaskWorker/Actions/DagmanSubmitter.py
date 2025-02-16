@@ -504,8 +504,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
             environmentString += " useHtcV2=True"
         # Environment command in JDL requires proper quotes https://htcondor.readthedocs.io/en/latest/man-pages/condor_submit.html#environment
         dagJobJDL["Environment"] = classad.quote(environmentString)
-        dagJobJDL['+CRAB_TaskLifetimeDays'] = str(TASKLIFETIME // 24 // 60 // 60)
-        dagJobJDL['+CRAB_TaskEndTime'] = str(int(task['tm_start_time']) + TASKLIFETIME)
+        dagJobJDL['My.CRAB_TaskLifetimeDays'] = str(TASKLIFETIME // 24 // 60 // 60)
+        dagJobJDL['My.CRAB_TaskEndTime'] = str(int(task['tm_start_time']) + TASKLIFETIME)
         #For task management info see https://github.com/dmwm/CRABServer/issues/4681#issuecomment-302336451
         dagJobJDL["LeaveJobInQueue"] = "True"
         dagJobJDL["PeriodicHold"] = "time() > CRAB_TaskEndTime"

@@ -335,10 +335,10 @@ class PreDAG():
     def submitSubdag(subdag, maxidle, maxpost, stage):
         """ Submit a subdag
         """
-        subprocess.check_call(['condor_submit_dag', '-DoRecov', '-AutoRescue', '0', '-MaxPre', '20', '-MaxIdle', str(maxidle),
-                               '-MaxPost', str(maxpost), '-insert_sub_file', 'subdag.jdl',
-                               '-append', '+Environment = strcat(Environment," _CONDOR_DAGMAN_LOG={0}/{1}.dagman.out")'.format(os.getcwd(), subdag),
-                               '-append', '+CRAB_DAGType = "{0}"'.format(stage.upper()), subdag])
+        subprocess.check_call(['condor_submit_dag', '-DoRecov', '-AutoRescue', '0', '-MaxPre', '20',
+                               '-MaxIdle', str(maxidle), '-MaxPost', str(maxpost), '-insert_sub_file', 'subdag.jdl',
+                               '-append', f'Environment = "_CONDOR_DAGMAN_LOG={os.getcwd()}/{subdag}.dagman.out"',
+                               '-append', f'My.CRAB_DAGType = "{stage.upper()}"', subdag])
 
     def adjustLumisForCompletion(self, task, unprocessed):
         """Sets the run, lumi information in the task information for the

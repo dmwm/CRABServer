@@ -712,7 +712,7 @@ class DagmanCreator(TaskAction):
             argDict['maxRuntime'] = dagspec['maxRuntime']  # -1
             argDict['scriptArgs'] = task['tm_scriptargs']
             argDict['CRAB_AdditionalOutputFiles'] = "{}"
-            # following one are for bkw compat. with CRABClient v3.241125, to be removed
+            # following one are for bkw compat. with CRABClient v3.241218 or earlier, to be removed
             argDict['CRAB_Archive'] = argDict['userSandbox']
             argDict['CRAB_ISB'] = 'dummy'
             argDict['CRAB_JobSW'] = argDict['cmsswVersion']
