@@ -13,3 +13,4 @@ PyJWT~=2.4.0
 
 # crab deps
 python-ldap==3.4.3
+diskcache==5.6.3
