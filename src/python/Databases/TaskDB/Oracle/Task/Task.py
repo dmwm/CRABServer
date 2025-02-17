@@ -105,7 +105,7 @@ class Task(object):
     GetTasksFromUser_sql ="SELECT tm_taskname, tm_task_status, tw_name, tm_user_dn FROM tasks WHERE tm_username=:username AND tm_start_time>TO_TIMESTAMP(:timestamp, 'YYYY-MM-DD')"
 
     #GetResubmitParams -- Used by DataWorkflow.resubmit (crab resubmit)
-    GetResubmitParams_sql = "SELECT tm_site_blacklist, tm_site_whitelist, tm_maxjobruntime, tm_maxmemory, tm_numcores, tm_priority \
+    GetResubmitParams_sql = "SELECT tm_site_blacklist, tm_site_whitelist, tm_maxjobruntime, tm_maxmemory, tm_priority \
                              FROM tasks \
                              WHERE tm_taskname = :taskname"
 
