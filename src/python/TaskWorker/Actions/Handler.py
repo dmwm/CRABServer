@@ -9,6 +9,7 @@ import copy
 
 from RESTInteractions import CRABRest
 from RucioUtils import getNativeRucioClient
+from TaskWorker.ExternalService import CachedCRICService
 
 from TaskWorker import __version__
 from TaskWorker.Actions.Splitter import Splitter
@@ -174,6 +175,10 @@ def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
     crabserver.setDbInstance(dbInstance)
     handler = TaskHandler(task, procnum, crabserver, config, 'handleNewTask', createTempDir=True)
     rucioClient = getNativeRucioClient(config=config, logger=handler.logger)
+    resourceCatalog = None
+    with config.TaskWorker.envForCMSWEB:
+        resourceCatalog = CachedCRICService(logger=handler.logger, 
+                                            configDict={"cacheduration": 1, "pycurl": True})
     # Temporary use `crab_input` account to checking other account quota.
     # See discussion in https://mattermost.web.cern.ch/cms-o-and-c/pl/ej7zwkr747rifezzcyyweisx9r
     tmpConfig = copy.deepcopy(config)
@@ -187,19 +192,21 @@ def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
         if task.get('tm_input_dataset'):
             if ':' in task.get('tm_input_dataset'):  # Rucio DID is scope:name
                 handler.addWork(RucioDataDiscovery(config=config, crabserver=crabserver,
+                resourceCatalog=resourceCatalog,
                                                    procnum=procnum, rucioClient=rucioClient))
             else:
                 handler.addWork(DBSDataDiscovery(config=config, crabserver=crabserver,
+                resourceCatalog=resourceCatalog,
                                                  procnum=procnum, rucioClient=rucioClient))
 
         elif task.get('tm_user_files'):
-            handler.addWork(UserDataDiscovery(config=config, crabserver=crabserver, procnum=procnum))
+            handler.addWork(UserDataDiscovery(config=config, crabserver=crabserver, resourceCatalog=resourceCatalog, procnum=procnum))
         else:
             raise SubmissionRefusedException("Neither inputDataset nor userInputFiles specified", retry=0)
     elif task['tm_job_type'] == 'PrivateMC':
-        handler.addWork(MakeFakeFileSet(config=config, crabserver=crabserver, procnum=procnum))
+        handler.addWork(MakeFakeFileSet(config=config, crabserver=crabserver, resourceCatalog=resourceCatalog, procnum=procnum))
     handler.addWork(Splitter(config=config, crabserver=crabserver, procnum=procnum))
-    handler.addWork(DagmanCreator(config=config, crabserver=crabserver, procnum=procnum, rucioClient=rucioClient))
+    handler.addWork(DagmanCreator(config=config, crabserver=crabserver, resourceCatalog=resourceCatalog, procnum=procnum, rucioClient=rucioClient))
     handler.addWork(Uploader(config=config, crabserver=crabserver, procnum=procnum))
     if task['tm_dry_run'] == 'T':
         # stop here and wait for user to be satisfied with what's been uploaded

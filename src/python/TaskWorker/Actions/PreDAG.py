@@ -44,6 +44,7 @@ from TaskWorker.Actions.DagmanCreator import DagmanCreator
 from TaskWorker.Actions.Recurring.BanDestinationSites import CRAB3BanDestinationSites
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from TaskWorker.Worker import failTask
+from TaskWorker.ExternalService import CachedCRICService
 
 if 'useHtcV2' in os.environ:
     import classad2 as classad
@@ -314,8 +315,9 @@ class PreDAG():
         try:
             parent = self.prefix if self.stage == 'tail' else None
             rucioClient = getNativeRucioClient(config=config, logger=self.logger)
-            creator = DagmanCreator(config, crabserver=None, rucioClient=rucioClient)
             with config.TaskWorker.envForCMSWEB:
+                resourceCatalog = CachedCRICService(logger=self.logger, configDict={"cacheduration": 1, "pycurl": True})
+                creator = DagmanCreator(config, crabserver=None, resourceCatalog=resourceCatalog, rucioClient=rucioClient)
                 creator.createSubdag(splitResult.result, task=task, parent=parent, stage=self.stage)
             self.submitSubdag('RunJobs{0}.subdag'.format(self.prefix),
                               getattr(config.TaskWorker, 'maxIdle', MAX_IDLE_JOBS),
