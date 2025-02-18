@@ -31,8 +31,8 @@ def main():
         x509Cert = userProxy
         x509Key = userProxy
     else:
-        x509Cert = os.getenv('X509_USER_CERT') if os.getenv('X509_USER_CERT') else '/data/certs/servicecert.pem'
-        x509Key = os.getenv('X509_USER_KEY') if os.getenv('X509_USER_KEY') else '/data/certs/servicekey.pem'
+        x509Cert = os.getenv('X509_USER_CERT') if os.getenv('X509_USER_CERT') else '/data/certs/robotcert.pem'
+        x509Key = os.getenv('X509_USER_KEY') if os.getenv('X509_USER_KEY') else '/data/certs/robotkey.pem'
     os.environ['X509_USER_CERT'] = x509Cert
     os.environ['X509_USER_KEY'] = x509Key
     #migUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSMigrate'
