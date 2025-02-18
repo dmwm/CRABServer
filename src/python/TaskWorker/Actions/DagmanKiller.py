@@ -1,5 +1,4 @@
 """ need a doc string here """
-import os
 import re
 from http.client import HTTPException
 from urllib.parse import urlencode

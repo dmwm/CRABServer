@@ -1,5 +1,4 @@
 """ used by TaskWorker to decide which scheduler to submit to """
-import os
 import time
 import bisect
 import random
