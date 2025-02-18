@@ -4,12 +4,8 @@ import time
 import bisect
 import random
 
-if 'useHtcV2' in os.environ:
-    import htcondor2 as htcondor
-    import classad2 as classad
-else:
-    import htcondor
-    import classad
+import htcondor2 as htcondor
+import classad2 as classad
 
 # From http://stackoverflow.com/questions/3679694/a-weighted-version-of-random-choice
 def weightedChoice(choices):

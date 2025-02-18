@@ -11,12 +11,9 @@ from TaskWorker.DataObjects import Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
-if 'useHtcV2' in os.environ:
-    import htcondor2 as htcondor
-    import classad2 as classad
-else:
-    import htcondor
-    import classad
+import htcondor2 as htcondor
+import classad2 as classad
+
 
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
 

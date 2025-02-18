@@ -112,12 +112,9 @@ from ServerUtilities import isFailurePermanent, mostCommon, TRANSFERDB_STATES, P
 from ServerUtilities import getLock, getHashLfn
 from RESTInteractions import CRABRest
 
-if 'useHtcV2' in os.environ:
-    import htcondor2 as htcondor
-    import classad2 as classad
-else:
-    import htcondor
-    import classad
+import htcondor2 as htcondor
+import classad2 as classad
+
 
 ASO_JOB = None
 G_JOB_REPORT_NAME = None

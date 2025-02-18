@@ -34,12 +34,9 @@ from WMCore import Lexicon
 from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS, SCRAM_TO_ARCH
 
-if 'useHtcV2' in os.environ:
-    import htcondor2 as htcondor
-    import classad2 as classad
-else:
-    import htcondor
-    import classad
+import htcondor2 as htcondor
+import classad2 as classad0
+
 
 DAG_HEADER = """
 

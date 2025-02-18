@@ -31,12 +31,8 @@ from http.client import HTTPException
 from RESTInteractions import CRABRest
 from ServerUtilities import getProxiedWebDir, getColumn, downloadFromS3
 
-if 'useHtcV2' in os.environ:
-    import htcondor2 as htcondor
-    import classad2 as classad
-else:
-    import htcondor
-    import classad
+import htcondor2 as htcondor
+import classad2 as classad
 
 def printLog(msg):
     """ Utility function to print the timestamp in the log. Can be replaced
