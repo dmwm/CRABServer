@@ -392,8 +392,8 @@ def ensureEnvironment(logger=None):
         auth_type='x509',
     )
 
-    crab = CRABRest(hostname='cmsweb.cern.ch', localcert="/data/certs/servicecert.pem",
-                    localkey="/data/certs/servicekey.pem", userAgent='CheckTapeRecall')
+    crab = CRABRest(hostname='cmsweb.cern.ch', localcert="/data/certs/robotcert.pem",
+                    localkey="/data/certs/robotkey.pem", userAgent='CheckTapeRecall')
     crab.setDbInstance('prod')
 
     return rucio, crab

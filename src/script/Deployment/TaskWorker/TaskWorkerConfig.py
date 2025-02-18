@@ -67,8 +67,8 @@ config.TaskWorker.scratchDir = '/data/srv/tmp' #make sure this directory exists
 config.TaskWorker.logsDir = './logs'
 
 ## the parameters here below are used to contact cmsweb services for the REST-DB interactions
-config.TaskWorker.cmscert = '/data/certs/servicecert.pem'
-config.TaskWorker.cmskey = '/data/certs/servicekey.pem'
+config.TaskWorker.cmscert = '/data/certs/robotcert.pem'
+config.TaskWorker.cmskey = '/data/certs/robotkey.pem'
 
 config.TaskWorker.backend = 'glidein'
 

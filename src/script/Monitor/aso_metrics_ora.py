@@ -30,8 +30,8 @@ LOGFILE = f'GenMonit-{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
 
 CMSWEB = 'cmsweb.cern.ch'
 DBINSTANCE = 'prod'
-CMSWEB_CERTIFICATE = '/data/certs/servicecert.pem'
-CMSWEB_KEY = '/data/certs/servicekey.pem'
+CMSWEB_CERTIFICATE = '/data/certs/robotcert.pem'
+CMSWEB_KEY = '/data/certs/robotkey.pem'
 
 def readpwd():
     """
