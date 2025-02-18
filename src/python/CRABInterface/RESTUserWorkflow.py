@@ -288,9 +288,9 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("secondarydata", param, safe, RX_DATASET, optional=True)
             # site black/white list needs to be cast to unicode for later use in self._expandSites
             validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
-            safe.kwargs['siteblacklist'] = self._expandSites(safe.kwargs['siteblacklist'])
+            safe.kwargs['siteblacklist'] = safe.kwargs['siteblacklist']
             validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
-            safe.kwargs['sitewhitelist'] = self._expandSites(safe.kwargs['sitewhitelist'])
+            safe.kwargs['sitewhitelist'] = safe.kwargs['sitewhitelist']
             validate_str("splitalgo", param, safe, RX_SPLIT, optional=False)
             validate_num("algoargs", param, safe, optional=False)
             try:
@@ -311,7 +311,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("faillimit", param, safe, optional=True)
             validate_num("ignorelocality", param, safe, optional=True)
             if safe.kwargs['ignorelocality'] and self.centralcfg.centralconfig.get('ign-locality-blacklist', []):
-                safe.kwargs['siteblacklist'] += self._expandSites(self.centralcfg.centralconfig['ign-locality-blacklist'])
+                safe.kwargs['siteblacklist'] += self.centralcfg.centralconfig['ign-locality-blacklist']
             validate_str("vorole", param, safe, RX_VOPARAMS, optional=True)
             validate_str("vogroup", param, safe, RX_VOPARAMS, optional=True)
             validate_num("publication", param, safe, optional=False)
@@ -466,7 +466,7 @@ class RESTUserWorkflow(RESTEntity):
                 del param.kwargs['siteblacklist']
             else:
                 validate_strlist("siteblacklist", param, safe, RX_CMSSITE)
-                safe.kwargs['siteblacklist'] = self._expandSites(safe.kwargs['siteblacklist'])
+                safe.kwargs['siteblacklist'] = safe.kwargs['siteblacklist']
             if 'sitewhitelist' not in param.kwargs:
                 safe.kwargs['sitewhitelist'] = None
             elif param.kwargs['sitewhitelist'] == 'empty':
@@ -474,7 +474,7 @@ class RESTUserWorkflow(RESTEntity):
                 del param.kwargs['sitewhitelist']
             else:
                 validate_strlist("sitewhitelist", param, safe, RX_CMSSITE)
-                safe.kwargs['sitewhitelist'] = self._expandSites(safe.kwargs['sitewhitelist'])
+                safe.kwargs['sitewhitelist'] = safe.kwargs['sitewhitelist']
             validate_num("maxjobruntime", param, safe, optional=True)
             validate_num("maxmemory", param, safe, optional=True)
             validate_num("numcores", param, safe, optional=True)
