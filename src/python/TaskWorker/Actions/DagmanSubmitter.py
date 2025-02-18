@@ -539,7 +539,6 @@ class DagmanSubmitter(TaskAction.TaskAction):
         try:
             submitResult = schedd.submit(description=dagJobJDL, count=1, spool=True)
             clusterId = submitResult.cluster()
-            numProcs = submitResult.num_procs()
             schedd.spool(submitResult)
 
         except Exception as hte:
