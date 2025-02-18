@@ -853,6 +853,9 @@ class DagmanCreator(TaskAction):
         blocksWithBannedLocations = set()
         allblocks = set()
 
+        bannedOutDestinations = self.crabserver.get(api='info', data={'subresource': 'bannedoutdest'})[0]['result'][0]
+        self._checkASODestination(kwargs['task']['tm_asyncdest'], bannedOutDestinations)
+
         siteWhitelist = self._expandSites(set(kwargs['task']['tm_site_whitelist']))
         siteBlacklist = self._expandSites(set(kwargs['task']['tm_site_blacklist']))
         self.logger.debug("Site whitelist: %s", list(siteWhitelist))
