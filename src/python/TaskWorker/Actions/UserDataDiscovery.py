@@ -4,7 +4,6 @@ does data discovery when user submitted a list of files
 from WMCore.DataStructs.Run import Run
 from WMCore.DataStructs.File import File
 from WMCore.DataStructs.Fileset import Fileset
-from WMCore.Services.CRIC.CRIC import CRIC
 
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.DataDiscovery import DataDiscovery

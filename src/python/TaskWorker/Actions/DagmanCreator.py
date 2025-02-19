@@ -31,7 +31,6 @@ from RucioUtils import getWritePFN
 from CMSGroupMapper import get_egroup_users, map_user_to_groups
 
 from WMCore import Lexicon
-from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS, SCRAM_TO_ARCH
 
 if 'useHtcV2' in os.environ:

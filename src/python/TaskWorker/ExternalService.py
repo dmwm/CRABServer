@@ -14,6 +14,10 @@ class CachedCRICService(CRIC):
     def __init__(self, *args, **kwargs):
         with tempSetLogLevel(logger=kwargs['logger'], level=logging.ERROR):
             super().__init__(*args, **kwargs)
+    
+    @cache.memoize(ignore={0}, expire=CRIC_TTL)
+    def _CRICSiteQuery(self, *args, **kwargs):
+        return super()._CRICSiteQuery(*args, **kwargs)
 
     @cache.memoize(ignore={0}, expire=CRIC_TTL)
     def getAllPhEDExNodeNames(self, *args, **kwargs):

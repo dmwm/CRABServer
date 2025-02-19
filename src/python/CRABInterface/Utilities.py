@@ -16,7 +16,6 @@ import cherrypy
 
 from WMCore.WMFactory import WMFactory
 from WMCore.REST.Error import ExecutionError, InvalidParameter
-from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.Services.pycurl_manager import ResponseHeader
 from WMCore.REST.Server import RESTArgs
 
