@@ -349,9 +349,11 @@ class PreJob:
         ## Job.<job_id>.submit content.
         new_submit_text = self.redo_sites(new_submit_text, crab_retry, use_resubmit_info)
 
-        ## Finally add (copy) all the content of the generic Job.submit file.
+        ## Finally add  these new JDL lines to the content of the generic Job.submit file.
+        ## so that we can override things where appropriate
         with open("Job.submit", 'r', encoding='utf-8') as fd:
-            new_submit_text += fd.read()
+            jobSubmit = fd.read()
+            new_submit_text = jobSubmit + new_submit_text
         ## Write the Job.<job_id>.submit file.
         with open("Job.%s.submit" % (self.job_id), 'w', encoding='utf-8') as fd:
             fd.write(new_submit_text)
