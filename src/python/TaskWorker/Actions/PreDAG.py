@@ -16,6 +16,7 @@ it starts when N=Completion jobs have finished. Again, the splitting is
 performed but using as lumi mask the unprocessed lumis (lumis missing from
 jobs that did not complete in time). It also includes failed jobs.
 """
+
 from __future__ import division
 from __future__ import print_function
 
@@ -43,14 +44,15 @@ from TaskWorker.Actions.Splitter import Splitter
 from TaskWorker.Actions.DagmanCreator import DagmanCreator
 from TaskWorker.Actions.Recurring.BanDestinationSites import CRAB3BanDestinationSites
 from TaskWorker.WorkerExceptions import TaskWorkerException
+from TaskWorker.WorkerUtilities import CRICService
 from TaskWorker.Worker import failTask
 
 import classad2 as classad
 
 
-class PreDAG():
-    """ Main class that implement all the necessary features
-    """
+class PreDAG:
+    """Main class that implement all the necessary features"""
+
     def __init__(self):
         """PreDAG constructor"""
         self.stage = None
@@ -61,8 +63,10 @@ class PreDAG():
         self.failedJobs = []
         self.logger = logging.getLogger()
         handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(module)s %(message)s", \
-                                      datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)")
+        formatter = logging.Formatter(
+            "%(asctime)s:%(levelname)s:%(module)s %(message)s",
+            datefmt="%a, %d %b %Y %H:%M:%S %Z(%z)",
+        )
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
         self.logger.setLevel(logging.DEBUG)
@@ -76,22 +80,23 @@ class PreDAG():
         (copy some code from PostJob.py). Get user proxy from
         X509_USER_PROXY environment variable.
         """
-        proxy = os.environ['X509_USER_PROXY']
-        self.crabserver = CRABRest(restHost, proxy, proxy, retry=20,
-                                   logger=self.logger, userAgent='CRABSchedd')
+        proxy = os.environ["X509_USER_PROXY"]
+        self.crabserver = CRABRest(
+            restHost, proxy, proxy, retry=20, logger=self.logger, userAgent="CRABSchedd"
+        )
         self.crabserver.setDbInstance(dbInstance)
 
     def readJobStatus(self):
         """Read the job status(es) from the cache_status file and save the relevant info into self.statusCacheInfo"""
         if not os.path.exists("task_process/status_cache.pkl"):
             return
-        with open("task_process/status_cache.pkl", 'rb') as fd:
+        with open("task_process/status_cache.pkl", "rb") as fd:
             statusCache = pickle.load(fd)
-            if not 'nodes' in statusCache:
+            if not "nodes" in statusCache:
                 return
-            self.statusCacheInfo = statusCache['nodes']
-            if 'DagStatus' in self.statusCacheInfo:
-                del self.statusCacheInfo['DagStatus']
+            self.statusCacheInfo = statusCache["nodes"]
+            if "DagStatus" in self.statusCacheInfo:
+                del self.statusCacheInfo["DagStatus"]
 
     def readProcessedJobs(self):
         """Read processed job ids"""
@@ -111,21 +116,20 @@ class PreDAG():
         failed jobs are saved in self.failedJobs, too.
         """
         stagere = {}
-        stagere['processing'] = re.compile(r"^0-\d+$")
-        stagere['tail'] = re.compile(r"^[1-9]\d*$")
+        stagere["processing"] = re.compile(r"^0-\d+$")
+        stagere["tail"] = re.compile(r"^[1-9]\d*$")
         completedCount = 0
         for jobnr, jobdict in self.statusCacheInfo.items():
-            state = jobdict.get('State')
-            if stagere[stage].match(jobnr) and state in ('finished', 'failed'):
-                if state == 'failed' and processFailed:
+            state = jobdict.get("State")
+            if stagere[stage].match(jobnr) and state in ("finished", "failed"):
+                if state == "failed" and processFailed:
                     self.failedJobs.append(jobnr)
                 completedCount += 1
                 yield jobnr
         self.logger.info("found %s completed jobs", completedCount)
 
     def execute(self, *args):
-        """Excecute executeInternal in locked mode
-        """
+        """Excecute executeInternal in locked mode"""
         self.logger.debug("Acquiring PreDAG lock")
         with getLock("PreDAG") as dummyLock:
             self.logger.debug("PreDAGlock acquired")
@@ -146,10 +150,12 @@ class PreDAG():
                 logpath = os.getcwd()
         ## Create (open) the pre-dag log file predag.<prefix>.txt.
         predagLogFileName = os.path.join(logpath, f"predag.{self.prefix}.txt")
-        fdPredagLog = os.open(predagLogFileName, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
+        fdPredagLog = os.open(
+            predagLogFileName, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644
+        )
         os.chmod(predagLogFileName, 0o644)
         ## Redirect stdout and stderr to the pre-dag log file.
-        if os.environ.get('TEST_DONT_REDIRECT_STDOUT', False):
+        if os.environ.get("TEST_DONT_REDIRECT_STDOUT", False):
             print("Pre-DAG started with no output redirection.")
         else:
             os.dup2(fdPredagLog, 1)
@@ -165,7 +171,9 @@ class PreDAG():
 
         self.setupLog()
 
-        self.statusCacheInfo = {} #Will be filled with the status from the status cache
+        self.statusCacheInfo = (
+            {}
+        )  # Will be filled with the status from the status cache
 
         self.readJobStatus()
         completed = set(self.completedJobs(stage=self.stage))
@@ -178,14 +186,14 @@ class PreDAG():
             self.logger.error("Missing job ad!")
             sys.exit(1)
         try:
-            with open(taskAdFile, 'r', encoding='utf-8') as fh:
+            with open(taskAdFile, "r", encoding="utf-8") as fh:
                 taskAd = classad.parseOne(fh)
         except Exception as ex:  # pylint: disable=broad-except
             self.logger.exception("Error parsing job ad: %s", str(ex))
             sys.exit(1)
 
-        restHost = taskAd['CRAB_RestHost']
-        dbInstance = taskAd['CRAB_DbInstance']
+        restHost = taskAd["CRAB_RestHost"]
+        dbInstance = taskAd["CRAB_DbInstance"]
 
         # init CRABRest self.crabserver
         self.setupCRABRest(restHost, dbInstance)
@@ -193,34 +201,42 @@ class PreDAG():
         self.readProcessedJobs()
         unprocessed = completed - self.processedJobs
         estimates = copy.copy(unprocessed)
-        self.logger.info("jobs remaining to process: %s", ", ".join(sorted(unprocessed)))
-        if self.stage == 'tail' and len(estimates-set(self.failedJobs)) == 0:
-            estimates = set(self.completedJobs(stage='processing', processFailed=True))
-        self.logger.info("jobs remaining to process: %s", ", ".join(sorted(unprocessed)))
+        self.logger.info(
+            "jobs remaining to process: %s", ", ".join(sorted(unprocessed))
+        )
+        if self.stage == "tail" and len(estimates - set(self.failedJobs)) == 0:
+            estimates = set(self.completedJobs(stage="processing", processFailed=True))
+        self.logger.info(
+            "jobs remaining to process: %s", ", ".join(sorted(unprocessed))
+        )
 
         # The TaskWorker saves some files that now we are gonna read
-        with open('datadiscovery.pkl', 'rb') as fd:
-            dataset = pickle.load(fd) #Output from the discovery process
-        with open('taskinformation.pkl', 'rb') as fd:
-            task = pickle.load(fd) #A dictionary containing information about the task as in the Oracle DB
-        with open('taskworkerconfig.pkl', 'rb') as fd:
-            config = pickle.load(fd) #Task worker configuration
+        with open("datadiscovery.pkl", "rb") as fd:
+            dataset = pickle.load(fd)  # Output from the discovery process
+        with open("taskinformation.pkl", "rb") as fd:
+            task = pickle.load(
+                fd
+            )  # A dictionary containing information about the task as in the Oracle DB
+        with open("taskworkerconfig.pkl", "rb") as fd:
+            config = pickle.load(fd)  # Task worker configuration
 
         # need to use user proxy as credential for talking with cmsweb
-        config.TaskWorker.cmscert = os.environ.get('X509_USER_PROXY')
-        config.TaskWorker.cmskey = os.environ.get('X509_USER_PROXY')
-        config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=config.TaskWorker.cmscert,
-                                                    X509_USER_KEY=config.TaskWorker.cmskey)
+        config.TaskWorker.cmscert = os.environ.get("X509_USER_PROXY")
+        config.TaskWorker.cmskey = os.environ.get("X509_USER_PROXY")
+        config.TaskWorker.envForCMSWEB = newX509env(
+            X509_USER_CERT=config.TaskWorker.cmscert,
+            X509_USER_KEY=config.TaskWorker.cmskey,
+        )
 
         # need to get username from classAd to setup for Rucio access
         # and use user cert to talking with rucio
-        username = taskAd['CRAB_UserHN']
+        username = taskAd["CRAB_UserHN"]
         config.Services.Rucio_account = username
-        config.Services.Rucio_cert = os.environ.get('X509_USER_PROXY')
-        config.Services.Rucio_key = os.environ.get('X509_USER_PROXY')
+        config.Services.Rucio_cert = os.environ.get("X509_USER_PROXY")
+        config.Services.Rucio_key = os.environ.get("X509_USER_PROXY")
 
         # need the global black list
-        config.TaskWorker.scratchDir = './scratchdir'
+        config.TaskWorker.scratchDir = "./scratchdir"
         if not os.path.exists(config.TaskWorker.scratchDir):
             os.makedirs(config.TaskWorker.scratchDir)
         banSites = CRAB3BanDestinationSites(config, self.logger)
@@ -238,7 +254,7 @@ class PreDAG():
             if jid in self.failedJobs:
                 continue
             fn = f"automatic_splitting/throughputs/{jid}"
-            with open(fn, 'r', encoding='utf-8') as fd:
+            with open(fn, "r", encoding="utf-8") as fd:
                 throughput, eventsize = json.load(fd)
                 sumEventsThr += throughput
                 sumEventsSize += eventsize
@@ -246,8 +262,12 @@ class PreDAG():
         if count:
             eventsThr = sumEventsThr / count
             eventsSize = sumEventsSize / count
-            self.logger.info("average throughput for %s jobs: %s evt/s", count, eventsThr)
-            self.logger.info("average eventsize for %s jobs: %s bytes", count, eventsSize)
+            self.logger.info(
+                "average throughput for %s jobs: %s evt/s", count, eventsThr
+            )
+            self.logger.info(
+                "average eventsize for %s jobs: %s bytes", count, eventsSize
+            )
         else:
             self.logger.info("No probe job output could be found")
             eventsThr = 0
@@ -258,31 +278,40 @@ class PreDAG():
             self.logger.error(retmsg)
             return 1
 
-        maxSize = getattr(config.TaskWorker, 'automaticOutputSizeMaximum', 5 * 1000**3)
+        maxSize = getattr(config.TaskWorker, "automaticOutputSizeMaximum", 5 * 1000**3)
         maxEvents = (maxSize / eventsSize) if eventsSize > 0 else 0
 
-        runtime = task['tm_split_args'].get('minutes_per_job', -1)
+        runtime = task["tm_split_args"].get("minutes_per_job", -1)
         if self.stage == "processing":
             # Build in a 33% error margin in the runtime to not create too
             # many tails. This essentially moves the peak to lower
             # runtimes and cuts off less of the job distribution tail.
             target = int(0.75 * runtime)
-        elif self.stage == 'tail':
-            target = int(max(
-                getattr(config.TaskWorker, 'automaticTailRuntimeMinimumMins', 45),
-                getattr(config.TaskWorker, 'automaticTailRuntimeFraction', 0.2) * runtime
-            ))
+        elif self.stage == "tail":
+            target = int(
+                max(
+                    getattr(config.TaskWorker, "automaticTailRuntimeMinimumMins", 45),
+                    getattr(config.TaskWorker, "automaticTailRuntimeFraction", 0.2)
+                    * runtime,
+                )
+            )
         # `target` is in minutes, `eventsThr` is in events/second!
         events = int(target * eventsThr * 60)
         if maxEvents and events > maxEvents:
-        #if events > maxEvents and maxEvents > 0:
-            self.logger.info("reduced the target event count from %s to %s to obey output size", events, maxEvents)
+            # if events > maxEvents and maxEvents > 0:
+            self.logger.info(
+                "reduced the target event count from %s to %s to obey output size",
+                events,
+                maxEvents,
+            )
             events = int(maxEvents)
         splitTask = dict(task)
-        splitTask['tm_split_algo'] = 'EventAwareLumiBased'
-        splitTask['tm_split_args']['events_per_job'] = events
+        splitTask["tm_split_algo"] = "EventAwareLumiBased"
+        splitTask["tm_split_args"]["events_per_job"] = events
 
-        if self.stage == 'tail' and not self.adjustLumisForCompletion(splitTask, unprocessed):
+        if self.stage == "tail" and not self.adjustLumisForCompletion(
+            splitTask, unprocessed
+        ):
             self.logger.info("nothing to process for completion")
             self.saveProcessedJobs(unprocessed)
             return 0
@@ -306,43 +335,77 @@ class PreDAG():
             retmsg = f"Splitting failed with:\n{e}"
             failTaskMsg = f"PreDAG error: {retmsg}"
             self.logger.error(retmsg)
-            failTask(task['tm_taskname'], self.crabserver, failTaskMsg, self.logger, 'FAILED')
+            failTask(
+                task["tm_taskname"], self.crabserver, failTaskMsg, self.logger, "FAILED"
+            )
             return 1
         try:
-            parent = self.prefix if self.stage == 'tail' else None
+            parent = self.prefix if self.stage == "tail" else None
             rucioClient = getNativeRucioClient(config=config, logger=self.logger)
-            creator = DagmanCreator(config, crabserver=None, rucioClient=rucioClient)
             with config.TaskWorker.envForCMSWEB:
-                creator.createSubdag(splitResult.result, task=task, parent=parent, stage=self.stage)
-            self.submitSubdag('RunJobs{0}.subdag'.format(self.prefix),
-                              getattr(config.TaskWorker, 'maxIdle', MAX_IDLE_JOBS),
-                              getattr(config.TaskWorker, 'maxPost', MAX_POST_JOBS),
-                              self.stage)
+                resourceCatalog = CRICService(
+                    logger=self.logger, configDict={"cacheduration": 1, "pycurl": True}
+                )
+                creator = DagmanCreator(
+                    config,
+                    crabserver=None,
+                    resourceCatalog=resourceCatalog,
+                    rucioClient=rucioClient,
+                )
+                creator.createSubdag(
+                    splitResult.result, task=task, parent=parent, stage=self.stage
+                )
+            self.submitSubdag(
+                "RunJobs{0}.subdag".format(self.prefix),
+                getattr(config.TaskWorker, "maxIdle", MAX_IDLE_JOBS),
+                getattr(config.TaskWorker, "maxPost", MAX_POST_JOBS),
+                self.stage,
+            )
         except TaskWorkerException as e:
             retmsg = f"DAG creation failed with:\n{e}"
             self.logger.error(retmsg)
             failTaskMsg = f"PreDAG error: {retmsg}"
             self.logger.error(retmsg)
-            failTask(task['tm_taskname'], self.crabserver, failTaskMsg, self.logger, 'FAILED')
+            failTask(
+                task["tm_taskname"], self.crabserver, failTaskMsg, self.logger, "FAILED"
+            )
             return 1
         self.saveProcessedJobs(unprocessed)
         return 0
 
     @staticmethod
     def submitSubdag(subdag, maxidle, maxpost, stage):
-        """ Submit a subdag
-        """
-        subprocess.check_call(['condor_submit_dag', '-DoRecov', '-AutoRescue', '0', '-MaxPre', '20',
-                               '-MaxIdle', str(maxidle), '-MaxPost', str(maxpost), '-insert_sub_file', 'subdag.jdl',
-                               '-append', f'Environment = "_CONDOR_DAGMAN_LOG={os.getcwd()}/{subdag}.dagman.out"',
-                               '-append', f'My.CRAB_DAGType = "{stage.upper()}"', subdag])
+        """Submit a subdag"""
+        subprocess.check_call(
+            [
+                "condor_submit_dag",
+                "-DoRecov",
+                "-AutoRescue",
+                "0",
+                "-MaxPre",
+                "20",
+                "-MaxIdle",
+                str(maxidle),
+                "-MaxPost",
+                str(maxpost),
+                "-insert_sub_file",
+                "subdag.jdl",
+                "-append",
+                f'Environment = "_CONDOR_DAGMAN_LOG={os.getcwd()}/{subdag}.dagman.out"',
+                "-append",
+                f'My.CRAB_DAGType = "{stage.upper()}"',
+                subdag,
+            ]
+        )
 
     def adjustLumisForCompletion(self, task, unprocessed):
         """Sets the run, lumi information in the task information for the
         completion jobs.  Returns True if completion jobs are needed,
         otherwise False.
         """
-        missingDir = "automatic_splitting/missing_lumis/"  # NB this name is shared with PostJob
+        missingDir = (
+            "automatic_splitting/missing_lumis/"  # NB this name is shared with PostJob
+        )
 
         try:
             available = set(os.listdir(missingDir)) & unprocessed
@@ -356,7 +419,9 @@ class PreDAG():
 
         missing = LumiList()
         for missingFile in available:
-            with open(os.path.join(missingDir, missingFile), 'r', encoding='utf-8') as fd:
+            with open(
+                os.path.join(missingDir, missingFile), "r", encoding="utf-8"
+            ) as fd:
                 self.logger.info("Adding missing lumis from job %s", missingFile)
                 missing = missing + LumiList(compactList=literal_eval(fd.read()))
         for failedId in failed:
@@ -365,7 +430,7 @@ class PreDAG():
             with tarfile.open("run_and_lumis.tar.gz") as f:
                 fn = f"job_lumis_{failedId}.json"
                 f.extract(fn, path=tmpdir)
-                with open(os.path.join(tmpdir, fn), 'r', encoding='utf-8') as fd:
+                with open(os.path.join(tmpdir, fn), "r", encoding="utf-8") as fd:
                     injson = json.load(fd)
                     missing = missing + LumiList(compactList=injson)
                     self.logger.info("Adding lumis from failed job %s", failedId)
@@ -380,12 +445,19 @@ class PreDAG():
         # Now we turn lumis it into something like:
         # lumis=['1, 33, 35, 35, 37, 47, 49, 75, 77, 130, 133, 136','1,45,50,80']
         # which is the format expected by buildLumiMask in the splitting algorithm
-        lumis = [",".join(str(l) for l in functools.reduce(lambda x, y: x + y, missignCompact[run])) for run in runs]
+        lumis = [
+            ",".join(
+                str(l)
+                for l in functools.reduce(lambda x, y: x + y, missignCompact[run])
+            )
+            for run in runs
+        ]
 
-        task['tm_split_args']['runs'] = runs
-        task['tm_split_args']['lumis'] = lumis
+        task["tm_split_args"]["runs"] = runs
+        task["tm_split_args"]["lumis"] = lumis
 
         return True
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     sys.exit(PreDAG().execute(sys.argv[1:]))

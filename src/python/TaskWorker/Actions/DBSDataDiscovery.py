@@ -629,7 +629,12 @@ if __name__ == '__main__':
 
     rucioClient = getNativeRucioClient(config=config, logger=logging.getLogger())
 
-    discovery = DBSDataDiscovery(config=config, rucioClient=rucioClient)
+    resourceCatalog = None
+    with config.TaskWorker.envForCMSWEB:
+        resourceCatalog = CachedCRICService(logger=logging.getLogger(),
+                                        configDict={"cacheduration": 1, "pycurl": True})
+    discovery = DBSDataDiscovery(config=config, 
+                                 resourceCatalog=resourceCatalog, rucioClient=rucioClient)
     userConfig = {'partialdataset':False,
                   'inputblocks':blockList
                   }
