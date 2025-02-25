@@ -8,6 +8,7 @@ import logging
 import sys
 
 from WMCore.Configuration import loadConfigurationFile
+from TaskWorker.MasterWorker import MasterWorker
 from TaskWorker.WorkerExceptions import ConfigException
 
 # NOTE: While importing the list of exceptions must be done before code starts
@@ -75,15 +76,6 @@ def main():
     status, msg = validateConfig(configuration)
     if not status:
         raise ConfigException(msg)
-
-    # Only after loacConfiguratiob has set useHtcV2 in the environment
-    # we can importing HTCondorLocator and TaskWorker so that in all files we can use
-    # the env.vat. to decide if to import htcondor or htcondor2
-    if getattr(configuration.TaskWorker, 'useHtcV2', None):
-        print("Configuration says to use HTC Bindings V2")
-    else:
-        print("Configuration says to use HTC Bindings V1")
-    from TaskWorker.MasterWorker import MasterWorker
 
     if options.pdb:
         # override root loglevel to debug

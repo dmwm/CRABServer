@@ -92,7 +92,6 @@ set_version_name:
 
 build_rest_image:
   rules:
-    - if: $BUILD || $BUILD_DEPLOY || $ONLY_BUILD_RELEASE
     - !reference [.default_rules, skip_build]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -117,7 +116,6 @@ build_rest_image:
 
 build_tw_image:
   rules:
-    - if: $BUILD || $BUILD_DEPLOY || $ONLY_BUILD_RELEASE
     - !reference [.default_rules, skip_build]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -140,7 +138,6 @@ build_tw_image:
 
 build_monit_image:
   rules:
-    - if: $BUILD
     - !reference [.default_rules, skip_build]
     - !reference [.default_rules, release]
   stage: build_docker
@@ -163,7 +160,6 @@ build_monit_image:
 
 build_crabtwfilebeat_image:
   rules:
-    - if: $BUILD
     - !reference [.default_rules, skip_build]
     - !reference [.default_rules, release]
   stage: build_docker
@@ -185,7 +181,6 @@ build_crabtwfilebeat_image:
 
 build_spark_image:
   rules:
-    - if: $BUILD
     - !reference [.default_rules, skip_build]
     - !reference [.default_rules, release]
   stage: build_docker
@@ -203,7 +198,6 @@ build_spark_image:
 
 deploy_server:
   rules:
-    - if: $BUILD_DEPLOY
     - !reference [.default_rules, skip_deploy]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -222,7 +216,6 @@ deploy_server:
 
 .deploy_tw_template:
   rules:
-    - if: $BUILD_DEPLOY
     - !reference [.default_rules, skip_deploy]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -255,9 +248,9 @@ deploy_publisher_rucio:
 
 task_submission:
   rules:
+    - !reference [.default_rules, skip_submit]
     - if: '$STATUS_TRACKING == "true" || $CLIENT_VALIDATION == "true" || $CLIENT_CONFIGURATION_VALIDATION == "true"'
     - !reference [.default_rules, skip_check]
-    - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: submit_testsuite
@@ -362,7 +355,6 @@ check_status_tracking:
   rules:
     - if: '$STATUS_TRACKING == "false"'
       when: never
-    - !reference [.default_rules, skip_check]
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
