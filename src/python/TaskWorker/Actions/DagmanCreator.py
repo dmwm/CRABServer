@@ -1578,7 +1578,7 @@ class DagmanCreator(TaskAction):
             else:
                 self._checkSite(site, pnn)
                 res.add(site)
-        return list(res)
+        return res
 
     def _checkASODestination(self, site, bannedOutDestinations=[]):
         """Check that the ASO destination is correct and not among the banned ones"""
