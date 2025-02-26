@@ -15,12 +15,13 @@ from RucioUtils import getNativeRucioClient
 
 
 class RucioDataDiscovery(DataDiscovery):
-    """Performing the data discovery through CMS Rucio service.
-    """
+    """Performing the data discovery through CMS Rucio service."""
 
     # disable pylint warning in next line since they refer to conflict with the main()
     # at the bottom of this file which is only used for testing
-    def __init__(self, *args, rucioClient=None, **kwargs): # pylint: disable=redefined-outer-name
+    def __init__(
+        self, *args, rucioClient=None, **kwargs
+    ):  # pylint: disable=redefined-outer-name
         DataDiscovery.__init__(self, *args, **kwargs)
         self.rucioClient = rucioClient
 
@@ -39,27 +40,27 @@ class RucioDataDiscovery(DataDiscovery):
         return result
 
     def executeInternal(self, *args, **kwargs):  # pylint: disable=unused-argument
-        """ real work happens here """
+        """real work happens here"""
 
         self.logger.info("Data discovery with Rucio")  # to be changed into debug
 
-        self.taskName = kwargs['task']['tm_taskname']           # pylint: disable=W0201
-        self.username = kwargs['task']['tm_username']           # pylint: disable=W0201
-        self.userproxy = kwargs['task']['user_proxy']           # pylint: disable=W0201
+        self.taskName = kwargs["task"]["tm_taskname"]  # pylint: disable=W0201
+        self.username = kwargs["task"]["tm_username"]  # pylint: disable=W0201
+        self.userproxy = kwargs["task"]["user_proxy"]  # pylint: disable=W0201
 
-        if kwargs['task']['tm_split_algo'] != 'FileBased':
+        if kwargs["task"]["tm_split_algo"] != "FileBased":
             msg = "Data.splitting must be set to 'FileBased' when using Rucio for DataDiscovery."
             raise SubmissionRefusedException(msg)
-        if kwargs['task']['tm_use_parent']:
+        if kwargs["task"]["tm_use_parent"]:
             msg = "Parent processing needs lumi info from DBS.\nCan't work when using Rucio for DataDiscovery."
             raise SubmissionRefusedException(msg)
-        if kwargs['task']['tm_secondary_input_dataset']:
+        if kwargs["task"]["tm_secondary_input_dataset"]:
             msg = "Secondary dataset processing needs lumi info from DBS.\nCan't work when using Rucio for DataDiscovery."
             raise SubmissionRefusedException(msg)
 
-        rucioDID = kwargs['task']['tm_input_dataset']
-        rucioContainer = rucioDID.split(':')[1]
-        rucioScope = rucioDID.split(':')[0]
+        rucioDID = kwargs["task"]["tm_input_dataset"]
+        rucioContainer = rucioDID.split(":")[1]
+        rucioScope = rucioDID.split(":")[0]
 
         # when using Rucio for data discovery there is no lumi info and no secondary dataset
         # and it makes no difference USER dataset or not, the only thing that matter
@@ -70,11 +71,15 @@ class RucioDataDiscovery(DataDiscovery):
             datasets = list(self.rucioClient.list_content(rucioScope, rucioContainer))
         except Exception as ex:
             # dataset not found is a known use case
-            if str(ex).find('No Dids found'):
-                raise SubmissionRefusedException(f"Did not find container {rucioContainer} in scope {rucioScope}:") from ex
+            if str(ex).find("No Dids found"):
+                raise SubmissionRefusedException(
+                    f"Did not find container {rucioContainer} in scope {rucioScope}:"
+                ) from ex
             raise
         if not datasets:
-            raise SubmissionRefusedException(f"Rucio DID {rucioScope}:{rucioContainer} not existing or empty")
+            raise SubmissionRefusedException(
+                f"Rucio DID {rucioScope}:{rucioContainer} not existing or empty"
+            )
 
         # Create a map for block's locations: for each block get the list of locations.
         # locationsMap is a dictionary, key=blockName, value=list of RSE's
@@ -88,17 +93,23 @@ class RucioDataDiscovery(DataDiscovery):
         try:
             for ds in datasets:
                 replicas = set()
-                response = self.rucioClient.list_dataset_replicas(scope=ds['scope'], name=ds['name'], deep=True)
+                response = self.rucioClient.list_dataset_replicas(
+                    scope=ds["scope"], name=ds["name"], deep=True
+                )
                 for item in response:
-                    if 'Tape' in item['rse']:
+                    if "Tape" in item["rse"]:
                         continue  # skip tape locations
-                    if 'T3_CH_CERN_OpenData' in item['rse']:
+                    if "T3_CH_CERN_OpenData" in item["rse"]:
                         continue  # ignore OpenData until it is accessible by CRAB
-                    if item['state'].upper() == 'AVAILABLE':  # means all files in the block are on disk
-                        replicas.add(item['rse'])
-                        sizeBytes = item['bytes']
-                if replicas:  # only fill map for blocks which have at least one location
-                    locationsMap[ds['name']] = replicas
+                    if (
+                        item["state"].upper() == "AVAILABLE"
+                    ):  # means all files in the block are on disk
+                        replicas.add(item["rse"])
+                        sizeBytes = item["bytes"]
+                if (
+                    replicas
+                ):  # only fill map for blocks which have at least one location
+                    locationsMap[ds["name"]] = replicas
                     totalSizeBytes += sizeBytes
         except Exception as e:  # pylint: disable=broad-except
             msg = f"Rucio lookup failed with\n{str(e)}"
@@ -110,16 +121,18 @@ class RucioDataDiscovery(DataDiscovery):
         if not locationsMap:
             self.logger.warning("No locations found with Rucio for %s", rucioDID)
             raise TaskWorkerException(
-                "CRAB server could not get data locations from Rucio.\n" + \
-                "This is could be a temporary Rucio glitch, please try to submit a new task (resubmit will not work)" + \
-                " and contact the experts if the error persists."
-                )
+                "CRAB server could not get data locations from Rucio.\n"
+                + "This is could be a temporary Rucio glitch, please try to submit a new task (resubmit will not work)"
+                + " and contact the experts if the error persists."
+            )
 
         blocksWithLocation = locationsMap.keys()
         skipped = len(blocksWithLocation) != len(datasets)
         if skipped:
             msg = f"{skipped} blocks will not be processed because they have no (or not complete) disk replica"
-            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+            self.uploadWarning(
+                msg, kwargs["task"]["user_proxy"], kwargs["task"]["tm_taskname"]
+            )
 
         try:
             # Here's DBS3Reader.listDatsetFileDetails re-implemented via Rucio API
@@ -142,35 +155,50 @@ class RucioDataDiscovery(DataDiscovery):
             filedetails = {}
             detail = {  # a template
                 # to be filled
-                'BlockName': 'to be filled', 'Adler32': 'anAdler', 'FileSize': 0,
+                "BlockName": "to be filled",
+                "Adler32": "anAdler",
+                "FileSize": 0,
                 # to maintain compatibility with downstream code that deals with data from DBS as well
-                'ValidFile': 1, 'NumberOfEvents': 0, 'Lumis': {}, 'Parents': [],
-                'Checksum': 'aChecksum', 'Md5': 'anMd5'}
+                "ValidFile": 1,
+                "NumberOfEvents": 0,
+                "Lumis": {},
+                "Parents": [],
+                "Checksum": "aChecksum",
+                "Md5": "anMd5",
+            }
             for ds in datasets:
-                block = ds['name']  #  DBS block = Rucio dataset name
+                block = ds["name"]  #  DBS block = Rucio dataset name
                 if block not in blocksWithLocation:
                     continue
-                detail['BlockName'] = block
-                dids = self.rucioClient.list_files(ds['scope'], ds['name'])
+                detail["BlockName"] = block
+                dids = self.rucioClient.list_files(ds["scope"], ds["name"])
                 for did in dids:
-                    lfn = did['name']
-                    detail['FileSize'] = did['bytes']
-                    detail['Adler32'] = did['adler32']
+                    lfn = did["name"]
+                    detail["FileSize"] = did["bytes"]
+                    detail["Adler32"] = did["adler32"]
                     filedetails[lfn] = copy.deepcopy(detail)
         except Exception as ex:
             self.logger.exception(ex)
-            raise TaskWorkerException("CRAB could not contact Rucio to get file list.\n" + \
-                                      "This could be a temporary glitch. Try to submit a new task (resubmit will not work)" + \
-                                      f" and contact the experts if the error persists.\nError reason: {ex}") from ex
+            raise TaskWorkerException(
+                "CRAB could not contact Rucio to get file list.\n"
+                + "This could be a temporary glitch. Try to submit a new task (resubmit will not work)"
+                + f" and contact the experts if the error persists.\nError reason: {ex}"
+            ) from ex
         if not filedetails:
-            raise SubmissionRefusedException("Cannot find any file inside the dataset. Check dataset scope and name\n" + \
-                                      "Aborting submission. Submitting your task again will not help.")
+            raise SubmissionRefusedException(
+                "Cannot find any file inside the dataset. Check dataset scope and name\n"
+                + "Aborting submission. Submitting your task again will not help."
+            )
 
         # Format the output creating the data structures required by WMCore. Filters out invalid files,
         # files whose block has no location, and figures out the PSN
-        result = self.formatOutput(task=kwargs['task'], requestname=self.taskName,
-                                   datasetfiles=filedetails, locations=locationsMap,
-                                   tempDir=kwargs['tempDir'])
+        result = self.formatOutput(
+            task=kwargs["task"],
+            requestname=self.taskName,
+            datasetfiles=filedetails,
+            locations=locationsMap,
+            tempDir=kwargs["tempDir"],
+        )
 
         if not result.result:
             # the following message is wrong. failure inside formatOutput can fail for varied reasons
@@ -184,7 +212,7 @@ class RucioDataDiscovery(DataDiscovery):
         return result
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     #
     # Usage: python3 RucioDataDiscovery.py rucioScope dbsDataset
     #
@@ -195,7 +223,7 @@ if __name__ == '__main__':
     rucioDid = f"{scope}:{container}"
 
     logging.basicConfig(level=logging.DEBUG)
-    from TaskWorker.ExternalService import CachedCRICService
+    from TaskWorker.WorkerUtilities import CRICService
     from WMCore.Configuration import ConfigurationEx
     from ServerUtilities import newX509env
 
@@ -207,36 +235,48 @@ if __name__ == '__main__':
     if "X509_USER_CERT" in os.environ:
         config.TaskWorker.cmscert = os.environ["X509_USER_CERT"]
     else:
-        config.TaskWorker.cmscert = '/data/certs/robotcert.pem'
+        config.TaskWorker.cmscert = "/data/certs/robotcert.pem"
     if "X509_USER_KEY" in os.environ:
         config.TaskWorker.cmskey = os.environ["X509_USER_KEY"]
     else:
-        config.TaskWorker.cmskey = '/data/certs/robotkey.pem'
+        config.TaskWorker.cmskey = "/data/certs/robotkey.pem"
 
-    config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=config.TaskWorker.cmscert,
-                                                X509_USER_KEY=config.TaskWorker.cmskey)
+    config.TaskWorker.envForCMSWEB = newX509env(
+        X509_USER_CERT=config.TaskWorker.cmscert, X509_USER_KEY=config.TaskWorker.cmskey
+    )
 
-    config.TaskWorker.instance = 'prod'
+    config.TaskWorker.instance = "prod"
 
-    config.Services.Rucio_host = 'https://cms-rucio.cern.ch'
-    config.Services.Rucio_account = 'crab_server'
-    config.Services.Rucio_authUrl = 'https://cms-rucio-auth.cern.ch'
-    config.Services.Rucio_caPath = '/etc/grid-security/certificates/'
+    config.Services.Rucio_host = "https://cms-rucio.cern.ch"
+    config.Services.Rucio_account = "crab_server"
+    config.Services.Rucio_authUrl = "https://cms-rucio-auth.cern.ch"
+    config.Services.Rucio_caPath = "/etc/grid-security/certificates/"
     rucioClient = getNativeRucioClient(config=config, logger=logging.getLogger())
     resourceCatalog = None
     with config.TaskWorker.envForCMSWEB:
-        resourceCatalog = CachedCRICService(logger=logging.getLogger(),
-                                        configDict={"cacheduration": 1, "pycurl": True})
+        resourceCatalog = CRICService(
+            logger=logging.getLogger(),
+            configDict={"cacheduration": 1, "pycurl": True, "usestalecache": True},
+        )
 
-    fileset = RucioDataDiscovery(config=config,
-                                  resourceCatalog=resourceCatalog, rucioClient=rucioClient)
-    fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, 'user_proxy': 'None',
-                          'tm_input_dataset': rucioDid, 'tm_split_algo': 'FileBased',
-                          'tm_taskname': 'pippo1', 'tm_username': config.Services.Rucio_account,
-                          'tm_secondary_input_dataset': None,
-                          }, tempDir='')
+    fileset = RucioDataDiscovery(
+        config=config, resourceCatalog=resourceCatalog, rucioClient=rucioClient
+    )
+    fileset.execute(
+        task={
+            "tm_nonvalid_input_dataset": "T",
+            "tm_use_parent": 0,
+            "user_proxy": "None",
+            "tm_input_dataset": rucioDid,
+            "tm_split_algo": "FileBased",
+            "tm_taskname": "pippo1",
+            "tm_username": config.Services.Rucio_account,
+            "tm_secondary_input_dataset": None,
+        },
+        tempDir="",
+    )
 
-#===============================================================================
+# ===============================================================================
 #    Some interesting datasets for testing
 #    dataset = '/DoubleMuon/Run2018B-PromptReco-v2/AOD'       # on tape
 #    dataset = '/DoubleMuon/Run2018B-02Apr2020-v1/NANOAOD'    # isNano
@@ -245,4 +285,4 @@ if __name__ == '__main__':
 #    dataset = '/MuonEG/Run2016B-v1/RAW'                      # on tape
 #    dataset = '/MuonEG/Run2016B-23Sep2016-v3/MINIAOD'        # no NANO on disk (MINIAOD should always be on disk)
 #    dataset = '/GenericTTbar/belforte-Stefano-Test-bb695911428445ed11a1006c9940df69/USER' # USER dataset on prod/phys03
-#===============================================================================
+# ===============================================================================

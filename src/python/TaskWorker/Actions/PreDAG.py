@@ -344,8 +344,14 @@ class PreDAG:
             rucioClient = getNativeRucioClient(config=config, logger=self.logger)
             with config.TaskWorker.envForCMSWEB:
                 resourceCatalog = CRICService(
-                    logger=self.logger, configDict={"cacheduration": 1, "pycurl": True}
+                    logger=self.logger,
+                    configDict={
+                        "cacheduration": 1,
+                        "pycurl": True,
+                        "usestalecache": True,
+                    },
                 )
+
                 creator = DagmanCreator(
                     config,
                     crabserver=None,
