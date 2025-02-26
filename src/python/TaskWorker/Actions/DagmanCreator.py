@@ -495,7 +495,7 @@ class DagmanCreator(TaskAction):
         periodicRemove += "|| ( (JobStatus =?= 1) && (time() - EnteredCurrentStatus > 7*24*60*60) )"  # b)
         periodicRemove += "|| ( (JobStatus =?= 2) && ( "  # c)
         periodicRemove += "(MemoryUsage =!= UNDEFINED && MemoryUsage > RequestMemory)"  # c) 1)
-        periodicRemove += "|| (MaxWallTimeMinsRun * 60 < time() - EnteredCurrentStatus)"  # c) 2)
+        periodicRemove += "|| (MaxWallTimeMinsRun * 60 < (time() - EnteredCurrentStatus))"  # c) 2)
         periodicRemove += f"|| (DiskUsage > {MAX_DISK_SPACE})"  # c) 3)
         periodicRemove += "))"  # these parentheses close the "if running" condition, i.e. JobStatus==2
         periodicRemove += "|| (time() > CRAB_TaskEndTime)"  # d)
