@@ -14,11 +14,9 @@ class MakeFakeFileSet(TaskAction):
        set all the other parmas to dummy values. We may want to set
        them in the future"""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, resourceCatalog=None, **kwargs):
         TaskAction.__init__(self, *args, **kwargs)
-        with self.config.TaskWorker.envForCMSWEB:
-            configDict = {"cacheduration": 1, "pycurl": True} # cache duration is in hours
-            self.resourceCatalog = CRIC(logger=self.logger, configDict=configDict)
+        self.resourceCatalog = resourceCatalog
 
     def getListOfSites(self):
         """ Get the list of sites to use for PrivateMC workflows.
@@ -26,8 +24,7 @@ class MakeFakeFileSet(TaskAction):
             and don't want to overtake production (WMAgent) jobs there. In the
             future we would like to take this list from the SSB.
         """
-        with self.config.TaskWorker.envForCMSWEB:
-            sites = self.resourceCatalog.getAllPSNs()
+        sites = self.resourceCatalog.getAllPSNs()
         filteredSites = [site for site in sites if not site.startswith("T1_")]
 
         return filteredSites
