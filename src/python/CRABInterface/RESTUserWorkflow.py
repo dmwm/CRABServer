@@ -21,7 +21,7 @@ from CRABInterface.Regexps import (RX_TASKNAME, RX_ACTIVITY, RX_JOBTYPE, RX_GENE
                                    RX_RUNS, RX_LUMIRANGE, RX_SCRIPTARGS, RX_SCHEDD_NAME, RX_COLLECTOR, RX_SUBRESTAT,
                                    RX_JOBID, RX_ADDFILE, RX_ANYTHING, RX_USERNAME, RX_DATE, RX_MANYLINES_SHORT,
                                    RX_CUDA_VERSION, RX_BLOCK, RX_RUCIODID, RX_RUCIOSCOPE)
-from CRABInterface.Utilities import CMSSitesCache, conn_handler, getDBinstance, validate_dict
+from CRABInterface.Utilities import conn_handler, getDBinstance, validate_dict
 from ServerUtilities import checkOutLFN, generateTaskName
 
 
@@ -33,33 +33,9 @@ class RESTUserWorkflow(RESTEntity):
 
         self.logger = logging.getLogger("CRABLogger.RESTUserWorkflow")
         self.userworkflowmgr = DataUserWorkflow()
-        self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
-        self.allPNNNames = CMSSitesCache(cachetime=0, sites={})
         self.centralcfg = centralcfg
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
         self.tagCollector = TagCollector(logger = self.logger, anytype = 1, anyarch = 1)
-
-    def _expandSites(self, sites, pnn=False):
-        """Check if there are sites cotaining the '*' wildcard and convert them in the corresponding list
-           Raise exception if any wildcard site does expand to an empty list
-           note that all*names.sites come from an HTTP query to CRIC which returns JSON and thus are unicode
-        """
-        res = set()
-        for site in sites:
-            if '*' in site:
-                sitere = re.compile(site.replace('*', '.*'))
-                expanded = [str(s) for s in (self.allPNNNames.sites if pnn else self.allCMSNames.sites) if sitere.match(s)]
-                self.logger.debug("Site %s expanded to %s during validate", site, expanded)
-                if not expanded:
-                    excasync = ValueError("Remote output data site not valid")
-                    invalidp = InvalidParameter("Cannot expand site %s to anything" % site, errobj=excasync)
-                    setattr(invalidp, 'trace', '')
-                    raise invalidp
-                res = res.union(expanded)
-            else:
-                self._checkSite(site, pnn)
-                res.add(site)
-        return list(res)
 
     @staticmethod
     def _checkOutLFN(kwargs, username):
@@ -206,35 +182,6 @@ class RESTUserWorkflow(RESTEntity):
             msg += " and should match the regular expression [a-zA-Z][a-zA-Z0-9\-_]*"
             raise InvalidParameter(msg) from AssertionError
 
-
-    def _checkASODestination(self, site):
-        """ Check that the ASO destination is correct and not among the banned ones
-        """
-        self._checkSite(site, pnn=True)
-        bannedDestinations = self._expandSites(
-            self.centralcfg.centralconfig.get('banned-out-destinations', []),
-            pnn=True)
-        if site in bannedDestinations:
-            excasync = ValueError("Remote output data site is banned")
-            invalidp = InvalidParameter("The output site you specified in the Site.storageSite parameter (%s) is blacklisted (banned sites: %s)" % \
-                            (site, self.centralcfg.centralconfig['banned-out-destinations']), errobj=excasync)
-            setattr(invalidp, 'trace', '')
-            raise invalidp
-
-    def _checkSite(self, site, pnn=False):
-        """ Check a single site like T2_IT_Something against known CMS site names
-        """
-        sites = self.allPNNNames.sites if pnn else self.allCMSNames.sites
-        if site not in sites:
-            excasync = ValueError("A site name you specified is not valid")
-            if pnn:
-                msg = "The parameter %s is not in the list of known CMS Storage nodes." % site
-            else:
-                msg = "The parameter %s is not in the list of known CMS Processing Site Names" % site
-            invalidp = InvalidParameter(msg, errobj=excasync)
-            setattr(invalidp, 'trace', '')
-            raise invalidp
-
     def _checkReleases(self, jobarch, jobsw):
         """ Check if the software needed by the user is available in the tag collector
             Uses allScramArchsAndVersions from WMCore. If an IOError is raised report an error message.
@@ -264,7 +211,7 @@ class RESTUserWorkflow(RESTEntity):
             #Need to log the message in the db for the users
             self.logger.warning(msg)
 
-    @conn_handler(services=['cric', 'centralconfig'])
+    @conn_handler(services=['centralconfig'])
     def validate(self, apiobj, method, api, param, safe): #pylint: disable=unused-argument
         """Validating all the input parameter as enforced by the WMCore.REST module"""
 

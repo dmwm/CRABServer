@@ -16,7 +16,6 @@ import cherrypy
 
 from WMCore.WMFactory import WMFactory
 from WMCore.REST.Error import ExecutionError, InvalidParameter
-from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.Services.pycurl_manager import ResponseHeader
 from WMCore.REST.Server import RESTArgs
 
@@ -169,10 +168,6 @@ def conn_handler(services):
     """
     def wrap(func):
         def wrapped_func(*args, **kwargs):
-            if 'cric' in services and (not args[0].allCMSNames.sites or \
-                                       (args[0].allCMSNames.cachetime + 1800 < mktime(gmtime()))):
-                args[0].allCMSNames = CMSSitesCache(sites=CRIC().getAllPSNs(), cachetime=mktime(gmtime()))
-                args[0].allPNNNames = CMSSitesCache(sites=CRIC().getAllPhEDExNodeNames(), cachetime=mktime(gmtime()))
             if ('centralconfig' in services and \
                     (not args[0].centralcfg.centralconfig or (args[0].centralcfg.cachetime + 1800 < mktime(gmtime())))):
                 args[0].centralcfg = ConfigCache(
