@@ -397,7 +397,8 @@ class DagmanCreator(TaskAction):
         # extra requirements that user may set when submitting
         jobSubmit['My.CRAB_RequestedMemory'] = str(task['tm_maxmemory'])
         jobSubmit['My.CRAB_RequestedCores'] = str(task['tm_numcores'])
-        jobSubmit['My.MaxWallTimeMins'] = str(task['tm_maxjobruntime'])
+        jobSubmit['My.MaxWallTimeMins'] = str(task['tm_maxjobruntime'])  # this will be used in gWms matching
+        jobSubmit['My.MaxWallTimeMinsRun'] = str(task['tm_maxjobruntime'])  # this will be used in PeriodicRemove
         ## Add group information (local groups in SITECONF via CMSGroupMapper, VOMS groups via task info in DB)
         groups = set.union(map_user_to_groups(task['tm_username']), task['user_groups'])
         groups = ','.join(groups)  # from the set {'g1','g2'...,'gN'} to the string 'g1,g2,..gN'
@@ -505,11 +506,11 @@ class DagmanCreator(TaskAction):
         # remove reasons are "ordered" in the following big IF starting from the less-conditial ones
         # order is relevant and getting it right is "an art"
         periodicRemoveReason = "ifThenElse("
-        periodicRemoveReason += "time() - EnteredCurrentStatus > 7 * 24 * 60 * 60 && isUndefined(MemoryUsage),"
+        periodicRemoveReason += "((time() - EnteredCurrentStatus) > (7 * 24 * 60 * 60)) && isUndefined(MemoryUsage),"
         periodicRemoveReason += "\"Removed due to idle time limit\","  # set this reasons. Else
         periodicRemoveReason += "ifThenElse(time() > x509UserProxyExpiration, \"Removed job due to proxy expiration\","
         periodicRemoveReason += "ifThenElse(MemoryUsage > RequestMemory, \"Removed due to memory use\","
-        periodicRemoveReason += "ifThenElse(MaxWallTimeMinsRun * 60 < time() - EnteredCurrentStatus, \"Removed due to wall clock limit\","
+        periodicRemoveReason += "ifThenElse(MaxWallTimeMinsRun * 60 < (time() - EnteredCurrentStatus), \"Removed due to wall clock limit\","
         periodicRemoveReason += f"ifThenElse(DiskUsage > {MAX_DISK_SPACE}, \"Removed due to disk usage\","
         periodicRemoveReason += "ifThenElse(time() > CRAB_TaskEndTime, \"Removed due to reached CRAB_TaskEndTime\","
         periodicRemoveReason += "\"Removed due to job being held\"))))))"  # one closed ")" for each "ifThenElse("
