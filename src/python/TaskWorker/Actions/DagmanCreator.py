@@ -21,7 +21,7 @@ import tempfile
 from ast import literal_eval
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import getLock, checkS3Object
+from ServerUtilities import getLock, checkS3Object, pythonListToClassAdExprTree
 
 import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
@@ -340,17 +340,16 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_PublishDBSURL'] = classad.quote(task['tm_publish_dbs_url'])
         jobSubmit['My.CRAB_ISB'] = classad.quote(task['tm_cache_url'])
 
-        def pythonListToClassAdValue(aList):
-            # python lists need special handling to become the string '{"a","b",...,"c"}'
-            quotedItems = json.dumps(aList)  # from [s1, s2] to the string '["s1","s2"]'
-            quotedItems = quotedItems.lstrip('[').rstrip(']')  # remove square brackets [ ]
-            value = "{" + quotedItems + "}"  # make final string adding the curly brackets { }
-            return value
-        jobSubmit['My.CRAB_SiteBlacklist'] = pythonListToClassAdValue(task['tm_site_blacklist'])
-        jobSubmit['My.CRAB_SiteWhitelist'] =  pythonListToClassAdValue(task['tm_site_whitelist'])
-        jobSubmit['My.CRAB_AdditionalOutputFiles'] = pythonListToClassAdValue(task['tm_outfiles'])
-        jobSubmit['My.CRAB_EDMOutputFiles'] =  pythonListToClassAdValue(task['tm_edm_outfiles'])
-        jobSubmit['My.CRAB_TFileOutputFiles'] = pythonListToClassAdValue(task['tm_outfiles'])
+
+        # note about Lists
+        # in the JDL everything is a string, we can't use the simple classAd[name]=somelist
+        # but need the ExprTree format (what classAd.lookup() would return)
+        jobSubmit['My.CRAB_SiteBlacklist'] = pythonListToClassAdExprTree(task['tm_site_blacklist'])
+        jobSubmit['My.CRAB_SiteWhitelist'] =  pythonListToClassAdExprTree(task['tm_site_whitelist'])
+        jobSubmit['My.CRAB_AdditionalOutputFiles'] = pythonListToClassAdExprTree(task['tm_outfiles'])
+        jobSubmit['My.CRAB_EDMOutputFiles'] =  pythonListToClassAdExprTree(task['tm_edm_outfiles'])
+        jobSubmit['My.CRAB_TFileOutputFiles'] = pythonListToClassAdExprTree(task['tm_outfiles'])
+
         jobSubmit['My.CRAB_UserDN'] = classad.quote(task['tm_user_dn'])
         jobSubmit['My.CRAB_UserHN'] = classad.quote(task['tm_username'])
         jobSubmit['My.CRAB_AsyncDest'] = classad.quote(task['tm_asyncdest'])
@@ -709,7 +708,6 @@ class DagmanCreator(TaskAction):
             argDict['eventsPerLumi'] = task['tm_events_per_lumi']  #
             argDict['maxRuntime'] = dagspec['maxRuntime']  # -1
             argDict['scriptArgs'] = task['tm_scriptargs']
-            argDict['CRAB_AdditionalOutputFiles'] = "{}"
             # following one are for bkw compat. with CRABClient v3.241218 or earlier, to be removed
             argDict['CRAB_Archive'] = argDict['userSandbox']
             argDict['CRAB_ISB'] = 'dummy'
