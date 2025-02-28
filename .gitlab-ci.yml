@@ -274,18 +274,6 @@ task_submission:
         - workdir/submitted_tasks_CCV
         - workdir/submitted_tasks_TS
       policy: push
-    - key: submitted_tasks_TS_latest
-      paths:
-        - workdir/submitted_tasks_TS
-      policy: push
-    - key: submitted_tasks_CV_latest
-      paths:
-        - workdir/submitted_tasks_CV
-      policy: push
-    - key: submitted_tasks_CCV_latest
-      paths:
-        - workdir/submitted_tasks_CCV
-      policy: push
 
 client_validation_suite:
   rules:
@@ -311,10 +299,6 @@ client_validation_suite:
     - bash -x cicd/gitlab/CV_config.sh
   cache:
     - key: $CI_PIPELINE_ID
-      paths:
-        - workdir/submitted_tasks_CV
-      policy: pull
-    - key: submitted_tasks_CV_latest
       paths:
         - workdir/submitted_tasks_CV
       policy: pull
@@ -346,10 +330,6 @@ client_configuration_validation:
       paths:
         - workdir/submitted_tasks_CCV
       policy: pull
-    - key: submitted_tasks_CCV_latest
-      paths:
-        - workdir/submitted_tasks_CCV
-      policy: pull
 
 check_status_tracking:
   rules:
@@ -373,10 +353,6 @@ check_status_tracking:
     - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
   cache:
     - key: $CI_PIPELINE_ID
-      paths:
-        - workdir/submitted_tasks_TS
-      policy: pull
-    - key: submitted_tasks_TS_latest
       paths:
         - workdir/submitted_tasks_TS
       policy: pull
