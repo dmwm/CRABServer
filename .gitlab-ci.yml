@@ -270,9 +270,9 @@ task_submission:
   cache:
     - key: $CI_PIPELINE_ID
       paths:
-        - workdir/submitted_tasks_CV
-        - workdir/submitted_tasks_CCV
-        - workdir/submitted_tasks_TS
+        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}
+        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}
+        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}
       policy: push
 
 client_validation_suite:
@@ -295,12 +295,12 @@ client_validation_suite:
     - export ROOT_DIR
     - export CMSSW_release=CMSSW_13_0_2
     - export Client_Validation_Suite=true
-    - ls workdir/submitted_tasks_CV
+    - ls workdir/submitted_tasks_CV_${CI_PIPELINE_ID}
     - bash -x cicd/gitlab/CV_config.sh
   cache:
     - key: $CI_PIPELINE_ID
       paths:
-        - workdir/submitted_tasks_CV
+        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}
       policy: pull
 
 client_configuration_validation:
@@ -323,12 +323,12 @@ client_configuration_validation:
     - export ROOT_DIR
     - export CMSSW_release=CMSSW_13_0_2
     - export Client_Configuration_Validation=true
-    - ls workdir/submitted_tasks_CCV
+    - ls workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}
     - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/CCV_config.sh
   cache:
     - key: $CI_PIPELINE_ID
       paths:
-        - workdir/submitted_tasks_CCV
+        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}
       policy: pull
 
 check_status_tracking:
@@ -354,7 +354,7 @@ check_status_tracking:
   cache:
     - key: $CI_PIPELINE_ID
       paths:
-        - workdir/submitted_tasks_TS
+        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}
       policy: pull
 
 # if test is pass, retag with `*-stable`
