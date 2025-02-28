@@ -19,13 +19,13 @@ source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
 python ${ROOT_DIR}/test/makeTests.py
 
 # Ensure the log files exist (creating successful_tests (if doesn't exist) and deleting/recreating retry_tests and failed_tests)
-touch ${WORK_DIR}/successful_tests
+touch ${WORK_DIR}/successful_tests_${CI_PIPELINE_ID}
 
 # Delete and recreate retry_tests and failed_tests (if they exist)
-rm -f ${WORK_DIR}/retry_tests ${WORK_DIR}/failed_tests
-touch ${WORK_DIR}/retry_tests ${WORK_DIR}/failed_tests
+rm -f ${WORK_DIR}/retry_tests ${WORK_DIR}/failed_tests_${CI_PIPELINE_ID}
+touch ${WORK_DIR}/retry_tests ${WORK_DIR}/failed_tests_${CI_PIPELINE_ID}
 
-if [ -f "${WORK_DIR}/submitted_tasks_CCV" ]; then
+if [ -f "${WORK_DIR}/submitted_tasks_CCV_${CI_PIPELINE_ID}" ]; then
   while read task; do
     echo "Processing task: $task"
 
@@ -38,15 +38,15 @@ if [ -f "${WORK_DIR}/submitted_tasks_CCV" ]; then
     echo "Exit Code: $retVal"
 
     if [ $retVal -eq 0 ]; then
-      echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/successful_tests
+      echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/successful_tests_${CI_PIPELINE_ID}
     elif [ $retVal -eq 2 ]; then
-      echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/retry_tests
+      echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/retry_tests_${CI_PIPELINE_ID}
     else
-      echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/failed_tests
+      echo ${test_to_execute}-check.sh ${task} - $retVal >> ${WORK_DIR}/failed_tests_${CI_PIPELINE_ID}
     fi
-  done <"${WORK_DIR}/submitted_tasks_CCV"
+  done <"${WORK_DIR}/submitted_tasks_CCV_${CI_PIPELINE_ID}"
 else
-  echo "Error: ${WORK_DIR}/submitted_tasks_CCV is not a file"
+  echo "Error: ${WORK_DIR}/submitted_tasks_CCV_${CI_PIPELINE_ID} is not a file"
   exit 1
 fi
 
