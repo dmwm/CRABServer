@@ -13,7 +13,7 @@ variables:
   # https://docs.docker.com/build/cache/backends/
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
-  STATUS_TRACKING: "true"
+  STATUS_TRACKING: "false"
   CLIENT_CONFIGURATION_VALIDATION: "true"
   CLIENT_VALIDATION: "true"
   SKIP_BUILD: "false"
