@@ -7,7 +7,6 @@ from WMCore.DataStructs.Run import Run
 from WMCore.DataStructs.File import File
 from WMCore.DataStructs.Fileset import Fileset
 from WMCore.DataStructs.LumiList import LumiList
-from WMCore.Services.CRIC.CRIC import CRIC
 
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.DataObjects.Result import Result
