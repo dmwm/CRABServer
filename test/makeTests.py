@@ -168,7 +168,7 @@ checkStatus ${taskName} COMPLETED
 statusCode=$?
 ([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getoutput "--jobids=1 --proxy=$PROXY"
-lookFor "Success in retrieving output_1.root " commandLog.txt || echo "outputFiles: Reetrieval failure output_1.root"
+lookFor "Success in retrieving output_1.root " commandLog.txt || echo "outputFiles: Retrieval failure output_1.root"
 lookFor "Success in retrieving My_output_1.txt " commandLog.txt  || echo "outputFiles: Retrieval failure My_output_1.txt"
 """
 if SL6:  # skip: singularity, no gfal_copy, crab getoutput can't work
