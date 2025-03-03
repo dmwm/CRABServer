@@ -28,7 +28,7 @@ config.Data.inputDataset = os.getenv('inputDataset','/GenericTTbar/HC-CMSSW_9_2_
 config.Data.splitting = 'LumiBased'
 config.Data.unitsPerJob = 1
 config.JobType.maxJobRuntimeMin = 60
-config.Data.totalUnits = 40
+config.Data.totalUnits = 10
 
 config.Data.publication = False
 testName = "ruciotransfers-%d" % int(time.time())
