@@ -439,7 +439,7 @@ class DagmanCreator(TaskAction):
         # from https://htcondor.readthedocs.io/en/latest/man-pages/condor_submit.html#submit-description-file-commands
         # The entire string representing the command line arguments is surrounded by double quote marks
         jobSubmit['Arguments'] = classad.quote("--jobId=$(count)")
-        jobSubmit['transfer_output_files'] = "jobReport.json.$(count), WMArchiveReport.json.$(count)"
+        jobSubmit['transfer_output_files'] = "jobReport.json.$(count)"
 
         additional_input_file = ""
         additional_environment_options = ""
