@@ -36,6 +36,7 @@ NODE_DEFAULTS = {
 
 STATUS_CACHE_FILE = "task_process/status_cache.txt"
 PKL_STATUS_CACHE_FILE = "task_process/status_cache.pkl"
+JSON_STATUS_CACHE_FILE = "task_process/status_cache.json"
 LOG_PARSING_POINTERS_DIR = "task_process/jel_pickles/"
 FJR_PARSE_RES_FILE = "task_process/fjr_parse_results.txt"
 
@@ -499,6 +500,21 @@ def storeNodesInfoInTxtFile(cacheDoc):
 
     move(tempFilename, STATUS_CACHE_FILE)
 
+def storeNodesInfoInJSONFile(cacheDoc):
+    """
+    takes as input an cacheDoc dictionary with keys
+      jobLogCheckpoint, fjrParseResCheckpoint, nodes, nodeMap
+    """
+
+    # First write a new cache file with a temporary name. Then replace old one with new.
+    tempFilename = (JSON_STATUS_CACHE_FILE + ".%s") % os.getpid()
+    # nodeMap keys are tuple, JSON does not like them. Anyhot this dict. appear useless
+    newDict = copy.deepcopy(cacheDoc)
+    del newDict['nodeMap']
+    with open(tempFilename, "w", encoding='utf-8') as fp:
+        json.dump(newDict, fp)
+    move(tempFilename, JSON_STATUS_CACHE_FILE)
+
 def summarizeFjrParseResults(checkpoint):
     """
     Reads the fjr_parse_results file line by line. The file likely contains multiple
@@ -546,16 +562,17 @@ def main():
     """
     try:
         # this is the old part
-        cacheDoc = storeNodesInfoInFile()
+        # cacheDoc = storeNodesInfoInFile()
         # this is new for the picke file but for the time being stick to using
         # cacheDoc information from old way. At some point shoudl carefull check code
         # and move on to the more strucutred 3-steps below, most likely when running
         # in python3 the old status_cache.txt file will be unusable, as we found in crab client
-        #infoN = readOldStatusCacheFile()
-        #infoN = parseCondorLog(info)
-        storeNodesInfoInPklFile(cacheDoc)
+        oldInfo = readOldStatusCacheFile()
+        updatedInfo = parseCondorLog(oldInfo)
+        storeNodesInfoInPklFile(updatedInfo)
         # to keep the txt file locally, useful for debugging, when we remove the old code:
-        # storeNodesInfoInTxtFile(cacheDoc)
+        storeNodesInfoInTxtFile(updatedInfo)
+        storeNodesInfoInJSONFile(updatedInfo)
 
     except Exception:  # pylint: disable=broad-except
         logging.exception("error during main loop")
