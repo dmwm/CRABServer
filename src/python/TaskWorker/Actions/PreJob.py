@@ -235,7 +235,7 @@ class PreJob:
         newJobSubmit = htcondor.Submit()
         msg = "Setting CRAB_Retry = %s" % (crab_retry)
         self.logger.info(msg)
-        newJobSubmit['CRAB_Retry'] = str(crab_retry)
+        newJobSubmit['My.CRAB_Retry'] = str(crab_retry)
         ## Add job and postjob log URLs
         job_retry = "%s.%s" % (self.job_id, crab_retry)
         newJobSubmit['My.CRAB_JobLogURL'] = classad.quote(os.path.join(self.userWebDirPrx, "job_out."+job_retry+".txt"))
@@ -325,7 +325,7 @@ class PreJob:
         if numcores is not None:
             newJobSubmit['RequestCpus'] = str(numcores)
         if priority is not None:
-            newJobSubmit['JobPrio'] = str(priority)
+            newJobSubmit['priority'] = str(priority)
 
         ## Within the schedd, order the first few jobs in the task before all other tasks of the same priority.
         pre_job_prio = '1'
