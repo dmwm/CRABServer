@@ -215,10 +215,8 @@ then
 fi
 
 touch jobReport.json
-touch WMArchiveReport.json
 #MM: Are these two lines needed?
 touch jobReport.json.$CRAB_Id
-touch WMArchiveReport.json.$CRAB_Id
 
 echo "======== PROXY INFORMATION START at $(TZ=GMT date) ========"
 voms-proxy-info -all
@@ -232,7 +230,6 @@ echo "CMSRunAnalysis.sh complete at $(TZ=GMT date) with (short) exit status $EXI
 echo "======== CMSRunAnalysis.sh at $(TZ=GMT date) FINISHING ========"
 
 mv jobReport.json jobReport.json.$CRAB_Id
-mv WMArchiveReport.json WMArchiveReport.json.$CRAB_Id
 
 
 if [[ $EXIT_STATUS == 137 ]]
