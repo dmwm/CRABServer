@@ -371,6 +371,7 @@ cleanup_rucio_rules:
   script:
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
+    - export DRY_RUN=false
     - bash cicd/rucio/cleanup.sh
 
 # if test is pass, retag with `*-stable`
