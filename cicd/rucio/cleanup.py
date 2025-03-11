@@ -63,15 +63,7 @@ print(f"cleanup {rucioClientInfo['account']} account")
 deleteRules(client=rucio, filters={'account': rucioClientInfo['account'], 'scope': f'user.{rucioClientInfo["account"]}'})
 # Cleanup crab_test_group group account
 rucioGroup=Client(account='crab_test_group')
-RUCIO_ACCOUNT=crab_test_group
 rucioClientInfo = rucio.whoami()
 print(rucioClientInfo)
 print("cleanup crab_test_group group account")
 deleteRules(client=rucioGroup, filters={'account': 'crab_test_group', 'scope': 'group.crab_test'})
-# Cleanup cmsbot account
-rucioGroup=Client(account='cmsbot')
-RUCIO_ACCOUNT=cmsbot
-rucioClientInfo = rucio.whoami()
-print(rucioClientInfo)
-print("cleanup cmsbot account")
-deleteRules(client=rucioGroup, filters={'account': 'cmsbot', 'scope': f'user.{rucioClientInfo["account"]}'})
