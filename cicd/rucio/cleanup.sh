@@ -11,10 +11,3 @@ rucio whoami
 
 export DRY_RUN=false
 python3 "${SCRIPT_DIR}"/cleanup.py
-
-export RUCIO_ACCOUNT=cmsbot
-source /cvmfs/cms.cern.ch/rucio/setup-py3.sh
-rucio whoami
-
-export DRY_RUN=false
-python3 "${SCRIPT_DIR}"/cleanup.py
