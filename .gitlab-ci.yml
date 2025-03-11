@@ -19,6 +19,7 @@ variables:
   SKIP_BUILD: "false"
   SKIP_DEPLOY: "false"
   SKIP_SUBMIT: "false"
+  SKIP_CLEANUP: "false"
 
 # This key define variables which are later used in `!reference` tag in `rules`.
 # Ref https://docs.gitlab.com/ee/ci/jobs/index.html#hide-jobs
@@ -50,6 +51,7 @@ stages:
   - run_testsuite_CV
   - run_testsuite_CCV
   - run_testsuite_TS
+  - cleanup
   - tagging_release
 
 get_env:
@@ -356,6 +358,20 @@ check_status_tracking:
       paths:
         - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}
       policy: pull
+
+cleanup_rucio_rules:
+  rules:
+    - if: '$SKIP_CLEANUP == "true"'
+      when: never
+    - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
+  stage: cleanup
+  tags:
+    - crab3-shell
+  script:
+    - source .env
+    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
+    - bash cicd/rucio/cleanup.sh
 
 # if test is pass, retag with `*-stable`
 release_stable:
