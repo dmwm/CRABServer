@@ -9,5 +9,5 @@ export RUCIO_ACCOUNT=${RUCIO_ACCOUNT:-crabint1}
 source /cvmfs/cms.cern.ch/rucio/setup-py3.sh
 rucio whoami
 
-#export DRY_RUN=${DRY_RUN:-true}
+export DRY_RUN=false
 python3 "${SCRIPT_DIR}"/cleanup.py
