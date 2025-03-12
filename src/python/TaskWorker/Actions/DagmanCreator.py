@@ -1262,8 +1262,7 @@ class DagmanCreator(TaskAction):
         numJobsHere =kw['task']['jobcount']
         # fetch previous value from DB
         data = {'subresource': 'search', 'workflow': taskname}
-        try:
-            taskDict, _, _ = self.crabserver.get(api='task', data=data)
+        taskDict, _, _ = self.crabserver.get(api='task', data=data)
         previousNumJobs = int(getColumn(taskDict, 'tm_num_jobs'))
         numJobs = previousNumJobs + numJobsHere
         data = {'subresource': 'edit', 'column': 'tm_num_jobs',
