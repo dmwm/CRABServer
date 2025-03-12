@@ -19,9 +19,10 @@ import tarfile
 import hashlib
 import tempfile
 from ast import literal_eval
+from urllib.parse import urlencode
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import getLock, checkS3Object, pythonListToClassAdExprTree
+from ServerUtilities import getLock, checkS3Object, getColumn, pythonListToClassAdExprTree
 
 import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
@@ -1255,6 +1256,18 @@ class DagmanCreator(TaskAction):
         filesForSched.append('splitting-summary.json')
 
         self.prepareTarballForSched(filesForSched, subdags)
+
+        # update numner of jobs in this task in task table.
+        # add to current value to properly deal with automatic splitting
+        numJobsHere =kw['task']['jobcount']
+        # fetch previous value from DB
+        data = {'subresource': 'search', 'workflow': taskname}
+        taskDict, _, _ = self.crabserver.get(api='task', data=data)
+        previousNumJobs = int(getColumn(taskDict, 'tm_num_jobs'))
+        numJobs = previousNumJobs + numJobsHere
+        data = {'subresource': 'edit', 'column': 'tm_num_jobs',
+                'value': numJobs, 'workflow': taskname}
+        self.crabserver.post(api='task', data=urlencode(data))
 
         return jobSubmit, params, ["InputFiles.tar.gz"], splitterResult
 
