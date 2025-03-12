@@ -393,10 +393,11 @@ def readOldStatusCacheFile():
             with open(PKL_STATUS_CACHE_FILE, "rb") as fp:
                 cacheDoc = pickle.load(fp)
             # protect against fake file with just bootstrapTime created by AdjustSites.py
-            jobLogCheckpoint = getattr(cacheDoc, 'jobLogCheckpoint', None)
-            fjrParseResCheckpoint = getattr(cacheDoc, 'fjrParseResCheckpoint', None)
-            nodes = getattr(cacheDoc, 'nodes', None)
-            nodeMap = getattr(cacheDoc, 'nodeMap', None)
+            # note: python's dictionary.get(key) returns None if key is not in dictionary
+            jobLogCheckpoint = cacheDoc.get('jobLogCheckpoint')
+            fjrParseResCheckpoint = cacheDoc.get('fjrParseResCheckpoint')
+            nodes = cacheDoc.get('nodes')
+            nodeMap = cacheDoc.get('nodeMap')
         except Exception:  # pylint: disable=broad-except
             logging.exception("error during status_cache handling")
             jobLogCheckpoint = None
