@@ -13,7 +13,7 @@ from ServerUtilities import PUBLICATIONDB_STATUSES
 from ServerUtilities import NUM_DAYS_FOR_RESUBMITDRAIN
 from ServerUtilities import getEpochFromDBTime
 
-from CRABInterface.Utilities import CMSSitesCache, conn_handler, getDBinstance
+from CRABInterface.Utilities import conn_handler, getDBinstance
 from CRABInterface.RESTExtensions import BadRequestException
 
 class DataWorkflow(object):
@@ -33,7 +33,6 @@ class DataWorkflow(object):
     def __init__(self, config):
         self.config = config
         self.logger = logging.getLogger("CRABLogger.DataWorkflow")
-        self.allCMSNames = CMSSitesCache(cachetime=0, sites={})
 
         self.splitArgMap = {
                         "Automatic": "minutes_per_job",
