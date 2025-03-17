@@ -5,12 +5,11 @@ function log {
 }
 
 function compare_status {
-  unset DiffTxt
-  unset DiffPkl
-  diff -q task_process/status_cache.txt task_process/status_cache_new.txt || DiffTxt=Y
-  diff -q task_process/status_cache.pkl task_process/status_cache_new.pkl || DiffPkl=Y
-  [ $DiffTxt ] && log "** status_cache.txt differs **"
-  [ $DiffPkl ] && log "** status_cache.pkl differs **"
+  cat task_process/status_cache.json | jq > task_process/status_cache.json.formatted
+  cat task_process/status_cache_new.json | jq > task_process/status_cache_new.json.formatted
+  diff -q task_process/status_cache.json.formatted task_process/status_cache_new.json.formatted
+  Differ=$?
+  [ $Differ -eq '1' ] && log "=* STATUS_CACHE.JSON DIFFERS *="
 }
 
 function cache_status {
