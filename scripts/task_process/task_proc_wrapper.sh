@@ -4,11 +4,11 @@ function log {
     echo "[$(date +"%F %R")]" $*
 }
 
-funciont compare_status {
-  DT=True
-  DP=True
-  diff -q task_process/status_cache.txt task_process/status_cache_new.txt || DiffTxt
-  diff -q task_process/status_cache.pkl task_process/status_cache_new.pkl || DiffPkl
+function compare_status {
+  unset DiffTxt
+  unset DiffPkl
+  diff -q task_process/status_cache.txt task_process/status_cache_new.txt || DiffTxt=Y
+  diff -q task_process/status_cache.pkl task_process/status_cache_new.pkl || DiffPkl=Y
   [ $DiffTxt ] && log "** status_cache.txt differs **"
   [ $DiffPkl ] && log "** status_cache.pkl differs **"
 }
