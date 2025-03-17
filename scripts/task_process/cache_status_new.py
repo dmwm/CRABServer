@@ -508,7 +508,7 @@ def storeNodesInfoInJSONFile(cacheDoc):
 
     # First write a new cache file with a temporary name. Then replace old one with new.
     tempFilename = (JSON_STATUS_CACHE_FILE + ".%s") % os.getpid()
-    # nodeMap keys are tuple, JSON does not like them. Anyhot this dict. appear useless
+    # nodeMap keys are tuple, JSON does not like them. Anyhot this dict. appears unused by other code
     newDict = copy.deepcopy(cacheDoc)
     del newDict['nodeMap']
     with open(tempFilename, "w", encoding='utf-8') as fp:

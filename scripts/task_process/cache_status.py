@@ -509,7 +509,7 @@ def storeNodesInfoInJSONFile(cacheDoc):
 
     # First write a new cache file with a temporary name. Then replace old one with new.
     tempFilename = (JSON_STATUS_CACHE_FILE + ".%s") % os.getpid()
-    # nodeMap keys are tuple, JSON does not like them. Anyhot this dict. appear useless
+    # nodeMap keys are tuple, JSON does not like them. Anyhot this dict. appears unused by other code
     newDict = copy.deepcopy(cacheDoc)
     del newDict['nodeMap']
     with open(tempFilename, "w", encoding='utf-8') as fp:
@@ -583,14 +583,14 @@ def main():
     """
     try:
         # this is the old part
-        # cacheDoc = storeNodesInfoInFile()
+        cacheDoc = storeNodesInfoInFile()
         # this is new for the picke file but for the time being stick to using
         # cacheDoc information from old way. At some point shoudl carefull check code
         # and move on to the more strucutred 3-steps below, most likely when running
         # in python3 the old status_cache.txt file will be unusable, as we found in crab client
-        oldInfo = readOldStatusCacheFile()
-        updatedInfo = parseCondorLog(oldInfo)
-        storeNodesInfoInPklFile(updatedInfo)
+        #infoN = readOldStatusCacheFile()
+        #infoN = parseCondorLog(info)
+        storeNodesInfoInPklFile(cacheDoc)
         # to keep the txt file locally, useful for debugging, when we remove the old code:
         storeNodesInfoInTxtFile(updatedInfo)
         storeNodesInfoInJSONFile(updatedInfo)
