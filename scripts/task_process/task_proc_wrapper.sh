@@ -4,9 +4,22 @@ function log {
     echo "[$(date +"%F %R")]" $*
 }
 
+funciont compare_status {
+  DT=True
+  DP=True
+  diff -q task_process/status_cache.txt task_process/status_cache_new.txt || DiffTxt
+  diff -q task_process/status_cache.pkl task_process/status_cache_new.pkl || DiffPkl
+  [ $DiffTxt ] && log "** status_cache.txt differs **"
+  [ $DiffPkl ] && log "** status_cache.pkl differs **"
+}
+
 function cache_status {
     log "Running cache_status.py"
     python3 task_process/cache_status.py
+    log "Running cache_status_new.py"
+    python3 task_process/cache_status_new.py
+    log "Comparing.."
+    compare_status
 }
 
 function manage_transfers {
