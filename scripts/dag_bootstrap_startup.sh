@@ -225,22 +225,26 @@ else
         echo "creating and executing task process daemon jdl"
         TASKNAME=`grep '^CRAB_ReqName =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
         USERNAME=`grep '^CRAB_UserHN =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
+        RESTHOST=`grep '^CRAB_RestHost =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
+        DBINSTANCE=`grep '^CRAB_DbInstance =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
         CMSTYPE=`grep '^CMS_Type =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
         CMSWMTOOL=`grep '^CMS_WMTool =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
         CMSTTASKYPE=`grep '^CMS_TaskType =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
         CMSSUBMISSIONTOOL=`grep '^CMS_SubmissionTool =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
 cat > task_process/daemon.jdl << EOF
-Universe      = local
-Executable    = task_process/task_proc_wrapper.sh
-Arguments     = $REQUEST_NAME
-Log           = task_process/daemon.PC.log
-Output        = task_process/daemon.out.\$(Cluster).\$(Process)
-Error         = task_process/daemon.err.\$(Cluster).\$(Process)
-+CRAB_ReqName = $TASKNAME
-+CRAB_UserHN  = $USERNAME
-+CMS_Type     = $CMSTYPE
-+CMS_WMTool   = $CMSWMTOOL
-+CMS_TaskType = $CMSTTASKYPE
+Universe   = local
+Executable = task_process/task_proc_wrapper.sh
+Arguments  = $REQUEST_NAME
+Log        = task_process/daemon.PC.log
+Output     = task_process/daemon.out.\$(Cluster).\$(Process)
+Error      = task_process/daemon.err.\$(Cluster).\$(Process)
++CRAB_ReqName     = $TASKNAME
++CRAB_UserHN      = $USERNAME
++CRAB_RestHost    = $RESTHOST
++CRAB_DbInstance  = $DBINSTANCE
++CMS_Type         = $CMSTYPE
++CMS_WMTool       = $CMSWMTOOL
++CMS_TaskType     = $CMSTTASKYPE
 +CMS_SubmissionTool = $CMSSUBMISSIONTOOL
 
 Queue 1
