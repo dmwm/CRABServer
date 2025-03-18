@@ -4,9 +4,21 @@ function log {
     echo "[$(date +"%F %R")]" $*
 }
 
+function compare_status {
+  cat task_process/status_cache.json | jq > task_process/status_cache.json.formatted
+  cat task_process/status_cache_new.json | jq > task_process/status_cache_new.json.formatted
+  diff -q task_process/status_cache.json.formatted task_process/status_cache_new.json.formatted
+  Differ=$?
+  [ $Differ -eq '1' ] && log "=* STATUS_CACHE.JSON DIFFERS *="
+}
+
 function cache_status {
     log "Running cache_status.py"
     python3 task_process/cache_status.py
+    log "Running cache_status_new.py"
+    python3 task_process/cache_status_new.py
+    log "Comparing.."
+    compare_status
 }
 
 function manage_transfers {

@@ -17,8 +17,7 @@ import json
 import htcondor2 as htcondor
 import classad2 as classad
 
-
-logging.basicConfig(filename='task_process/cache_status.log', level=logging.DEBUG)
+logging.basicConfig(filename='task_process/cache_status_new.log', level=logging.DEBUG)
 
 NODE_DEFAULTS = {
     'Retries': 0,
@@ -34,10 +33,10 @@ NODE_DEFAULTS = {
     'JobIds': []
 }
 
-STATUS_CACHE_FILE = "task_process/status_cache.txt"
-PKL_STATUS_CACHE_FILE = "task_process/status_cache.pkl"
-JSON_STATUS_CACHE_FILE = "task_process/status_cache.json"
-LOG_PARSING_POINTERS_DIR = "task_process/jel_pickles/"
+STATUS_CACHE_FILE = "task_process/status_cache_new.txt"
+PKL_STATUS_CACHE_FILE = "task_process/status_cache_new.pkl"
+JSON_STATUS_CACHE_FILE = "task_process/status_cache_new.json"
+LOG_PARSING_POINTERS_DIR = "task_process/jel_pickles_new/"
 FJR_PARSE_RES_FILE = "task_process/fjr_parse_results.txt"
 
 #
@@ -523,6 +522,7 @@ def storeNodesInfoInJSONFile(cacheDoc):
         json.dump(newDict, fp)
     move(tempFilename, JSON_STATUS_CACHE_FILE)
 
+
 def summarizeFjrParseResults(checkpoint):
     """
     Reads the fjr_parse_results file line by line. The file likely contains multiple
@@ -563,13 +563,96 @@ def summarizeFjrParseResults(checkpoint):
         return errDict, newCheckpoint
     return None, 0
 
-def reportDagStatusToDB(status):
+def reportDagStatusToDB(dagStatus):
     """
     argument
-    status : int: status of the DAG as per
-    https://htcondor.readthedocs.io/en/latest/automated-workflows/dagman-information-files.html#current-node-status-file
-    Most status values in there are only relevant for nodes.
-    For the DAG we usually expect to find 3 or 5 only
+    dagStatus : a dictionary. Example for normal (no autom. splitt.) task:
+     { "SubDagStatus": {}, "SubDags": {}, "Timestamp": 1741859306,
+      "NodesTotal": 30, "DagStatus": 6 }
+    this is the value of the `DagStatus' key in the 'nodes' dictionary
+    created inside parseNodeStateV2 function
+    """
+    statusName = collapseDAGStatus((dagStatus))
+
+    with open(os.environ['_CONDOR_JOB_AD'], 'r', encoding='utf-8') as fd:
+        ad = classad.parseOne(fd)
+    host = ad['CRAB_RestHost']
+    dbInstance = ad['CRAB_DbInstance']
+    cert = ad['X509UserProxy']
+    taskname = ad['CRAB_Reqname']
+    logging.info("UPDATE DAG STATUS IN TASK DB")
+    logging.info(f"host {host} dbInstance {dbInstance} cert {cert}")
+    logging.info(f"taskname {taskname}  DAGstatus {statusName}")
+    from RESTInteractions import CRABRest  # pylint: disable=import-outside-toplevel
+    from urllib.parse import urlencode  # pylint: disable=import-outside-toplevel
+    crabserver = CRABRest(host, cert, cert, retry=0, userAgent='CRABSchedd')
+    crabserver.setDbInstance(dbInstance)
+    data = {'subresource': 'edit', 'column': 'tm_dagman_status',
+            'value': statusName, 'workflow': taskname}
+    try:
+        R = crabserver.post(api='task', data=urlencode(data))
+    except Exception as ex:  # pylint: disable=broad-except
+        R = str(ex)
+    logging.info(f"HTTP POST returned {R}")
+
+    return
+
+def collapseDAGStatus(dagInfo):
+    """Collapse the status of one or several DAGs to a single one.
+
+    Take into account that subdags can be submitted to the queue on the
+    schedd, but not yet started.
+
+    moved here from CRABClient/Command/status.py with small adaptions to work
+    in the scheduler (HTCondor AP)
+    originally developed by Matthias Wolf
+    """
+    status_order = ['SUBMITTED', 'FAILED', 'FAILED (KILLED)', 'COMPLETED']
+
+    subDagInfos = dagInfo.get('SubDags', {})
+    subDagStatus = dagInfo.get('SubDagStatus', {})
+    if len(subDagInfos) == 0 and len(subDagStatus) == 0:
+        # Regular splitting, return status of DAG
+        return translateDagStatus(dagInfo['DagStatus'])
+
+    # for the time being do the simple thing also for automati splitting
+    return translateDagStatus(dagInfo['DagStatus'])
+
+    def check_queued(statusOrSUBMITTED):
+        # 99 is the status to expect a submitted DAG. If there are less
+        # actual DAG status informations than expected DAGs, at least one
+        # DAG has to be queued.
+        if len(subDagInfos) < len([k for k in subDagStatus if subDagStatus[k] == 99]):
+            return 'SUBMITTED'
+        return statusOrSUBMITTED
+
+    # From now one deal with automatic splitting and the presence if subdags
+
+    # If the processing DAG is still running, we are 'SUBMITTED',
+    # still.
+    if len(subDagInfos) > 0:
+        state = translateDagStatus(subDagInfos[0]['DagStatus'])
+        if state == 'SUBMITTED':
+            return state
+    # Tails active: return most active tail status according to
+    # `status_order`
+    if len(subDagInfos) > 1:
+        states = [translateDagStatus(subDagInfos[k]['DagStatus']) for k in subDagInfos if k > 0]
+        for iStatus in status_order:
+            if states.count(iStatus) > 0:
+                return check_queued(iStatus)
+    # If no tails are active, return the status of the processing DAG.
+    if len(subDagInfos) > 0:
+        return check_queued(translateDagStatus(subDagInfos[0]['DagStatus']))
+    return check_queued(translateDagStatus(dagInfo['DagStatus']))
+
+def translateDagStatus(status):
+    """
+    from a number to a string which CRAB people can understand
+    From
+    https://htcondor.readthedocs.io/en task_process/cache_status.py
+/latest/automated-workflows/dagman-information-files.html#current-node-status-file
+    Most status values in there semms only relevant for nodes, but documentation does not differentiate
     0 (STATUS_NOT_READY): At least one parent has not yet finished or the node is a FINAL node.
     1 (STATUS_READY): All parents have finished, but the node is not yet running.
     2 (STATUS_PRERUN): The node’s PRE script is running.
@@ -580,7 +663,21 @@ def reportDagStatusToDB(status):
     7 (STATUS_FUTILE): The node will never run because an ancestor node failed.
     """
 
-    # to be implemented
+    #
+    # N.B. separate status=5 in SUCCESS or FAILED based on whether all job succeeded or not ?
+    # or is already done by DAGMAN ?
+    DAG_STATUS_TO_STRING = {
+        0: 'SUBMITTED',  # clear for a node, but for DAG ? to be verified
+        1: 'SUBMITTED',  # clear for a node, but for DAG ? to be verified
+        3: 'RUNNING',
+        4: 'RUNNING',
+        5: 'COMPLETED',
+        6: 'FAILED',  # one ore more jobs (DAG nodes) failed
+        7: 'ERROR'  # as far as Stefano understand, this should never happen
+    }
+    # Do we report just DAG status, or a combined "global" status ?
+
+    statusName = DAG_STATUS_TO_STRING[status]
     return
 
 def main():
@@ -590,18 +687,20 @@ def main():
     """
     try:
         # this is the old part
-        cacheDoc = storeNodesInfoInFile()
+        # cacheDoc = storeNodesInfoInFile()
         # this is new for the picke file but for the time being stick to using
         # cacheDoc information from old way. At some point shoudl carefull check code
         # and move on to the more strucutred 3-steps below, most likely when running
         # in python3 the old status_cache.txt file will be unusable, as we found in crab client
-        #infoN = readOldStatusCacheFile()
-        #infoN = parseCondorLog(info)
-        storeNodesInfoInPklFile(cacheDoc)
+        oldInfo = readOldStatusCacheFile()
+        updatedInfo = parseCondorLog(oldInfo)
+        storeNodesInfoInPklFile(updatedInfo)
         # to keep the txt file locally, useful for debugging, when we remove the old code:
         storeNodesInfoInTxtFile(updatedInfo)
         storeNodesInfoInJSONFile(updatedInfo)
 
+        # make sure that we only do this when status has changed, not every 5 minutes, even if...all in all..
+        # isTimeToReport
         reportDagStatusToDB(updatedInfo['nodes']['DagStatus'])
 
     except Exception:  # pylint: disable=broad-except
