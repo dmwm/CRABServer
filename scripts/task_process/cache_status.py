@@ -512,6 +512,13 @@ def storeNodesInfoInJSONFile(cacheDoc):
     # nodeMap keys are tuple, JSON does not like them. Anyhot this dict. appears unused by other code
     newDict = copy.deepcopy(cacheDoc)
     del newDict['nodeMap']
+    # round floats to enable comparison with *new*
+    for node, nodeInfo in newDict['nodes'].items():
+        if node != 'DagStatus':
+            newDurations = [round(wd) for wd in nodeInfo['WallDurations']]
+            nodeInfo['WallDurations'] = newDurations
+    # remove checkpoints to enable comparison with *new*
+    del newDict['jobLogCheckpoint']
     with open(tempFilename, "w", encoding='utf-8') as fp:
         json.dump(newDict, fp)
     move(tempFilename, JSON_STATUS_CACHE_FILE)
