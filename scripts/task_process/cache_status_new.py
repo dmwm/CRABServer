@@ -581,13 +581,13 @@ def reportDagStatusToDB(dagStatus):
         ad = classad.parseOne(fd)
     host = ad['CRAB_RestHost']
     dbInstance = ad['CRAB_DbInstance']
-    cert = ad['X509UserProxy']
+    userProxy = ad['X509UserProxy']
     taskname = ad['CRAB_Reqname']
-    logging.debug(f"host {host} dbInstance {dbInstance} cert {cert}")
+    logging.debug(f"host {host} dbInstance {dbInstance} cert {userProxy}")
     logging.debug(f"taskname {taskname}  DAGstatus {statusName}")
     from RESTInteractions import CRABRest  # pylint: disable=import-outside-toplevel
     from urllib.parse import urlencode  # pylint: disable=import-outside-toplevel
-    crabserver = CRABRest(host, cert, cert, retry=0, userAgent='CRABSchedd')
+    crabserver = CRABRest(hostname=host, localcert=userProxy, localkey=userProxy, retry=0, userAgent='CRABSchedd')
     crabserver.setDbInstance(dbInstance)
     data = {'subresource': 'edit', 'column': 'tm_dagman_status',
             'value': statusName, 'workflow': taskname}
