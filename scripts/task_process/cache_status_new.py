@@ -573,6 +573,7 @@ def reportDagStatusToDB(dagStatus):
     created inside parseNodeStateV2 function
     """
     statusName = collapseDAGStatus((dagStatus))
+    logging.info(f"Reporting {statusName} to DB. Full dagStatus is {dagStatus}")
 
     with open(os.environ['_CONDOR_JOB_AD'], 'r', encoding='utf-8') as fd:
         ad = classad.parseOne(fd)
