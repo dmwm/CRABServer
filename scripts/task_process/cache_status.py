@@ -393,11 +393,10 @@ def readOldStatusCacheFile():
             with open(PKL_STATUS_CACHE_FILE, "rb") as fp:
                 cacheDoc = pickle.load(fp)
             # protect against fake file with just bootstrapTime created by AdjustSites.py
-            # note: python's dictionary.get(key) returns None if key is not in dictionary
-            jobLogCheckpoint = cacheDoc.get('jobLogCheckpoint')
-            fjrParseResCheckpoint = cacheDoc.get('fjrParseResCheckpoint')
-            nodes = cacheDoc.get('nodes')
-            nodeMap = cacheDoc.get('nodeMap')
+            jobLogCheckpoint = getattr(cacheDoc, 'jobLogCheckpoint', None)
+            fjrParseResCheckpoint = getattr(cacheDoc, 'fjrParseResCheckpoint', None)
+            nodes = getattr(cacheDoc, 'nodes', None)
+            nodeMap = getattr(cacheDoc, 'nodeMap', None)
         except Exception:  # pylint: disable=broad-except
             logging.exception("error during status_cache handling")
             jobLogCheckpoint = None
@@ -563,26 +562,6 @@ def summarizeFjrParseResults(checkpoint):
         return errDict, newCheckpoint
     return None, 0
 
-def reportDagStatusToDB(status):
-    """
-    argument
-    status : int: status of the DAG as per
-    https://htcondor.readthedocs.io/en/latest/automated-workflows/dagman-information-files.html#current-node-status-file
-    Most status values in there are only relevant for nodes.
-    For the DAG we usually expect to find 3 or 5 only
-    0 (STATUS_NOT_READY): At least one parent has not yet finished or the node is a FINAL node.
-    1 (STATUS_READY): All parents have finished, but the node is not yet running.
-    2 (STATUS_PRERUN): The node’s PRE script is running.
-    3 (STATUS_SUBMITTED): The node’s HTCondor job(s) are in the queue.
-    4 (STATUS_POSTRUN): The node’s POST script is running.
-    5 (STATUS_DONE): The node has completed successfully.
-    6 (STATUS_ERROR): The node has failed.
-    7 (STATUS_FUTILE): The node will never run because an ancestor node failed.
-    """
-
-    # to be implemented
-    return
-
 def main():
     """
     parse condor job_log from last checkpoint until now and write summary in status_cache files
@@ -599,10 +578,8 @@ def main():
         #infoN = parseCondorLog(info)
         storeNodesInfoInPklFile(cacheDoc)
         # to keep the txt file locally, useful for debugging, when we remove the old code:
-        storeNodesInfoInTxtFile(updatedInfo)
-        storeNodesInfoInJSONFile(updatedInfo)
-
-        reportDagStatusToDB(updatedInfo['nodes']['DagStatus'])
+        # storeNodesInfoInTxtFile(cacheDoc)
+        storeNodesInfoInJSONFile(cacheDoc)
 
     except Exception:  # pylint: disable=broad-except
         logging.exception("error during main loop")
