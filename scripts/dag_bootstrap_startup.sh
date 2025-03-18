@@ -238,14 +238,14 @@ Arguments  = $REQUEST_NAME
 Log        = task_process/daemon.PC.log
 Output     = task_process/daemon.out.\$(Cluster).\$(Process)
 Error      = task_process/daemon.err.\$(Cluster).\$(Process)
-+CRAB_ReqName     = $TASKNAME
-+CRAB_UserHN      = $USERNAME
-+CRAB_RestHost    = $RESTHOST
-+CRAB_DbInstance  = $DBINSTANCE
-+CMS_Type         = $CMSTYPE
-+CMS_WMTool       = $CMSWMTOOL
-+CMS_TaskType     = $CMSTTASKYPE
-+CMS_SubmissionTool = $CMSSUBMISSIONTOOL
+MY.CRAB_ReqName     = $TASKNAME
+MY.CRAB_UserHN      = $USERNAME
+MY.CRAB_RestHost    = $RESTHOST
+MY.CRAB_DbInstance  = $DBINSTANCE
+MY.CMS_Type         = $CMSTYPE
+MY.CMS_WMTool       = $CMSWMTOOL
+MY.CMS_TaskType     = $CMSTTASKYPE
+MY.CMS_SubmissionTool = $CMSSUBMISSIONTOOL
 
 Queue 1
 EOF
