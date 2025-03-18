@@ -573,7 +573,9 @@ def reportDagStatusToDB(dagStatus):
     created inside parseNodeStateV2 function
     """
     statusName = collapseDAGStatus((dagStatus))
-    logging.info(f"Reporting {statusName} to DB. Full dagStatus is {dagStatus}")
+    logging.info("UPDATE DAG STATUS IN TASK DB")
+    logging.info(f"Full dagStatus is {dagStatus}")
+    logging.info(f"Will report {statusName}")
 
     with open(os.environ['_CONDOR_JOB_AD'], 'r', encoding='utf-8') as fd:
         ad = classad.parseOne(fd)
@@ -581,9 +583,8 @@ def reportDagStatusToDB(dagStatus):
     dbInstance = ad['CRAB_DbInstance']
     cert = ad['X509UserProxy']
     taskname = ad['CRAB_Reqname']
-    logging.info("UPDATE DAG STATUS IN TASK DB")
-    logging.info(f"host {host} dbInstance {dbInstance} cert {cert}")
-    logging.info(f"taskname {taskname}  DAGstatus {statusName}")
+    logging.debug(f"host {host} dbInstance {dbInstance} cert {cert}")
+    logging.debug(f"taskname {taskname}  DAGstatus {statusName}")
     from RESTInteractions import CRABRest  # pylint: disable=import-outside-toplevel
     from urllib.parse import urlencode  # pylint: disable=import-outside-toplevel
     crabserver = CRABRest(host, cert, cert, retry=0, userAgent='CRABSchedd')
@@ -679,7 +680,7 @@ def translateDagStatus(status):
     # Do we report just DAG status, or a combined "global" status ?
 
     statusName = DAG_STATUS_TO_STRING[status]
-    return
+    return statusName
 
 def main():
     """
@@ -687,6 +688,7 @@ def main():
     :return:
     """
     try:
+        logging.info(f"Start at {time.strftime('%d/%m/%y %X',time.localtime())}")
         # this is the old part
         # cacheDoc = storeNodesInfoInFile()
         # this is new for the picke file but for the time being stick to using
@@ -709,4 +711,4 @@ def main():
 
 main()
 
-logging.debug("cache_status_jel.py exiting")
+logging.debug("cache_status_new.py exiting")

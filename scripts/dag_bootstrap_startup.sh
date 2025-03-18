@@ -242,6 +242,7 @@ MY.CRAB_ReqName     = $TASKNAME
 MY.CRAB_UserHN      = $USERNAME
 MY.CRAB_RestHost    = $RESTHOST
 MY.CRAB_DbInstance  = $DBINSTANCE
+MY.X509UserProxy    = $X509_USER_PROXY
 MY.CMS_Type         = $CMSTYPE
 MY.CMS_WMTool       = $CMSWMTOOL
 MY.CMS_TaskType     = $CMSTTASKYPE
