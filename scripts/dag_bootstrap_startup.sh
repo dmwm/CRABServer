@@ -223,9 +223,11 @@ else
     if [ ! -f task_process/task_process_running ];
     then
         echo "creating and executing task process daemon jdl"
+        # grepping from _CONDOR_JOB_AD give us double-quoted strings as needed for defining classAds in JDL
         TASKNAME=`grep '^CRAB_ReqName =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
         USERNAME=`grep '^CRAB_UserHN =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
         RESTHOST=`grep '^CRAB_RestHost =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
+        PROXYFILE=`grep '^x509userproxy =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
         DBINSTANCE=`grep '^CRAB_DbInstance =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
         CMSTYPE=`grep '^CMS_Type =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
         CMSWMTOOL=`grep '^CMS_WMTool =' $_CONDOR_JOB_AD | awk '{print $NF;}'`
@@ -242,7 +244,7 @@ MY.CRAB_ReqName     = $TASKNAME
 MY.CRAB_UserHN      = $USERNAME
 MY.CRAB_RestHost    = $RESTHOST
 MY.CRAB_DbInstance  = $DBINSTANCE
-MY.X509UserProxy    = $X509_USER_PROXY
+MY.X509UserProxy    = $PROXYFILE
 MY.CMS_Type         = $CMSTYPE
 MY.CMS_WMTool       = $CMSWMTOOL
 MY.CMS_TaskType     = $CMSTTASKYPE
