@@ -11,7 +11,8 @@ from WMCore.REST.Error import InvalidParameter, ExecutionError, NotAcceptable
 from CRABInterface.Utilities import conn_handler, getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match, authz_operator
 from CRABInterface.Regexps import RX_MANYLINES_SHORT, RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME,\
-    RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE, RX_DATASET, RX_ANYTHING_10K
+    RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE, RX_DATASET, RX_ANYTHING_10K, \
+    RX_TASK_COLUMN
 from ServerUtilities import getUsernameFromTaskname
 
 
@@ -42,6 +43,8 @@ class RESTTask(RESTEntity):
             validate_str("transfercontainer", param, safe, RX_DATASET, optional=True)
             validate_str("transferrule", param, safe, RX_RUCIORULE, optional=True)
             validate_str("publishrule", param, safe, RX_RUCIORULE, optional=True)
+            validate_str("column", param, safe, RX_TASK_COLUMN, optional=True)
+            validate_str("value", param, safe, RX_ANYTHING_10K, optional=True)
             # Save json string directly to tm_multipub_rule CLOB column.
             validate_str("multipubrulejson", param, safe, RX_ANYTHING_10K, optional=True)
         elif method in ['GET']:
@@ -63,6 +66,7 @@ class RESTTask(RESTEntity):
         rows = self.api.query(None, None, self.Task.ALLUSER_sql)
         return rows
 
+    # Stefano - 10 Mar 2025 : AFAICT this is not used anywhere
     def allinfo(self, **kwargs):
         rows = self.api.query(None, None, self.Task.IDAll_sql, taskname=kwargs['workflow'])
         return rows
@@ -107,10 +111,12 @@ class RESTTask(RESTEntity):
         result = {"submissionTime"   : '',
                   "username"         : '',
                   "status"           : '',
+                  "DAGstatus"        : '',
                   "command"          : '',
                   "taskFailureMsg"   : '',
                   "taskWarningMsg"   : [],
                   "splitting"        : '',
+                  "numJobs"          : '',
                   "schedd"           : '',
                   "taskWorker"       : '',
                   "webdirPath"       : '',
@@ -133,6 +139,8 @@ class RESTTask(RESTEntity):
             result['schedd'] = row.schedd
         if row.split_algo:
             result['splitting'] = row.split_algo
+        if row.numJobs:
+            result['numJobs'] = row.numJobs
         if row.twname:
             result['taskWorker'] = row.twname
         if row.user_webdir:
@@ -141,6 +149,8 @@ class RESTTask(RESTEntity):
             result['username'] = row.username
         if row.clusterid:
             result['clusterid'] = row.clusterid
+        if row.DAGstatus:
+            result['DAGstatus'] = row.DAGstatus
         return [result]
 
     #Quick search api
@@ -481,3 +491,37 @@ class RESTTask(RESTEntity):
             tm_multipub_rule=[multipubrulejson],
             tm_taskname=[taskname])
         return []
+    def edit(self, **kwargs):
+        """
+        edit one column in tasks table for the given Task Name
+        only operators or task owners can do
+
+        THis can be used by clients as the following
+        data={'subresource': 'edit', 'workflow': '250308_212448:belforte_crab_20250308_222239',
+           'column': 'tm_num_jobs', 'value': 33}
+        result = crabserver.post(api='task', data=urlencode(data))
+
+        CARE IS NEEDED FROM USERS, since checking of column and value is very limited
+        """
+        #check if the parameters are there (likely useless since it was
+        if 'workflow' not in kwargs or not kwargs['workflow']:
+            raise InvalidParameter("Task name not found in the input parameters")
+        if 'column' not in kwargs or not kwargs['column']:
+            raise InvalidParameter("Missing in the input parameter: column")
+        if 'value' not in kwargs or not kwargs['value']:
+            raise InvalidParameter("Missing input parameter: value")
+
+        #decoding and setting the parameters
+        workflow = kwargs['workflow']
+        column = kwargs['column']
+        value = kwargs['value']
+        # next line authrizes task owner and operators
+        authz_owner_match(self.api, [workflow], self.Task)
+        # create an ad-hoc SQL on the fly, so we can change any column w/o having to write one
+        # subresource and SQL for each
+        editOneColumn_sql = f"UPDATE TASKS SET {column} = :value WHERE tm_taskname = :workflow"
+        # do the change
+        self.api.modify(editOneColumn_sql, value=[value], workflow=[workflow])
+        return []
+
+

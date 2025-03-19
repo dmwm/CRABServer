@@ -145,5 +145,10 @@
 -- ALTER TABLE tasks DROP UNUSED COLUMNS;
 
 --Add support for scram microarchitecture
-alter table tasks add tm_job_min_microarch varchar(255) default 'any';
+-- alter table tasks add tm_job_min_microarch varchar(255) default 'any';
+
+--Add columns for DAG tracking and task UPLOADED
+ALTER TABLE tasks ADD tm_dagman_status VARCHAR(20) DEFAULT 'NOT_READY';
+ALTER TABLE tasks ADD tm_num_jobs NUMBER(6) DEFAULT 0;
+ALTER TABLE tasks ADD tm_uploaded VARCHAR(1) DEFAULT 'F';
 

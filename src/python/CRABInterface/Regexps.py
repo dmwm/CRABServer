@@ -89,7 +89,8 @@ RX_SUBRESTAT = re.compile(r"^(errors|report2|logs|data|logs2|data2|resubmit|resu
 
 #subresources of the ServerInfo (/info) and Task (/task) resources
 RX_SUBRES_SI = re.compile(r"^(delegatedn|backendurls|version|bannedoutdest|scheddaddress|ignlocalityblacklist)$")
-RX_SUBRES_TASK = re.compile(r"^(allinfo|allusers|summary|search|status|taskbystatus|taskbyddmreqid|getpublishurl|addwarning|deletewarnings|addwebdir|addoutputdatasets|addddmreqid|webdir|webdirprx|counttasksbystatus|counttasksbyuserandstatus|lastfailures|lastrefused|updateschedd|updatepublicationtime|addrucioasoinfo)$")
+RX_SUBRES_TASK = re.compile(r"^(allinfo|allusers|summary|search|status|taskbystatus|taskbyddmreqid|getpublishurl|addwarning|deletewarnings|addwebdir|addoutputdatasets|addddmreqid|webdir|webdirprx|counttasksbystatus|counttasksbyuserandstatus|lastfailures|lastrefused|updateschedd|updatepublicationtime|addrucioasoinfo|edit)$")
+RX_TASK_COLUMN = re.compile(r"^[a-z_]{1,50}$")  # ideally could like all table columns.... but how do we maintain it ?
 
 #subresources of Cache resource
 RX_SUBRES_CACHE = re.compile(r"^(upload|download|retrieve|list|used)$")
