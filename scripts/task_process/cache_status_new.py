@@ -514,7 +514,7 @@ def storeNodesInfoInJSONFile(cacheDoc):
     # round floats to enable comparison with *new*
     for node, nodeInfo in newDict['nodes'].items():
         if node != 'DagStatus':
-            newDurations = [round(wd) for wd in nodeInfo['WallDurations']]
+            newDurations = [round(wd/10) for wd in nodeInfo['WallDurations']]
             nodeInfo['WallDurations'] = newDurations
     # remove checkpoints to enable comparison with *new*
     del newDict['jobLogCheckpoint']
