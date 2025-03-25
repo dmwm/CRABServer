@@ -20,12 +20,8 @@ from TaskWorker.DataObjects import Result
 from TaskWorker.Actions import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedException
 
-if 'useHtcV2' in os.environ:
-    import htcondor2 as htcondor
-    import classad2 as classad
-else:
-    import htcondor
-    import classad
+import htcondor2 as htcondor
+import classad2 as classad
 
 
 def addJobSubmitInfoToDagJobJDL(dagJdl, jobSubmit):
@@ -500,12 +496,10 @@ class DagmanSubmitter(TaskAction.TaskAction):
         environmentString += " CONDOR_ID=$(ClusterId).$(ProcId)"
         environmentString += " CRAB_RUNTIME_TARBALL=local CRAB_TASKMANAGER_TARBALL=local"
         ##SB environmentString += " " + " ".join(task['additional_environment_options'].split(';'))
-        if 'useHtcV2' in os.environ:
-            environmentString += " useHtcV2=True"
         # Environment command in JDL requires proper quotes https://htcondor.readthedocs.io/en/latest/man-pages/condor_submit.html#environment
         dagJobJDL["Environment"] = classad.quote(environmentString)
-        dagJobJDL['+CRAB_TaskLifetimeDays'] = str(TASKLIFETIME // 24 // 60 // 60)
-        dagJobJDL['+CRAB_TaskEndTime'] = str(int(task['tm_start_time']) + TASKLIFETIME)
+        dagJobJDL['My.CRAB_TaskLifetimeDays'] = str(TASKLIFETIME // 24 // 60 // 60)
+        dagJobJDL['My.CRAB_TaskEndTime'] = str(int(task['tm_start_time']) + TASKLIFETIME)
         #For task management info see https://github.com/dmwm/CRABServer/issues/4681#issuecomment-302336451
         dagJobJDL["LeaveJobInQueue"] = "True"
         dagJobJDL["PeriodicHold"] = "time() > CRAB_TaskEndTime"
@@ -545,12 +539,8 @@ class DagmanSubmitter(TaskAction.TaskAction):
         try:
             submitResult = schedd.submit(description=dagJobJDL, count=1, spool=True)
             clusterId = submitResult.cluster()
-            numProcs = submitResult.num_procs()
-            if 'useHtcV2' in os.environ:
-                schedd.spool(submitResult)
-            else:
-                myjobs = dagJobJDL.jobs(count=numProcs, clusterid=clusterId)
-                schedd.spool(list(myjobs))
+            schedd.spool(submitResult)
+
         except Exception as hte:
             raise TaskWorkerException(f"Submission failed with:\n{hte}") from hte
 

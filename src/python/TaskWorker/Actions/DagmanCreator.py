@@ -21,7 +21,7 @@ import tempfile
 from ast import literal_eval
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import getLock, checkS3Object
+from ServerUtilities import getLock, checkS3Object, pythonListToClassAdExprTree
 
 import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
@@ -34,12 +34,9 @@ from WMCore import Lexicon
 from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS, SCRAM_TO_ARCH
 
-if 'useHtcV2' in os.environ:
-    import htcondor2 as htcondor
-    import classad2 as classad
-else:
-    import htcondor
-    import classad
+import htcondor2 as htcondor
+import classad2 as classad
+
 
 DAG_HEADER = """
 
@@ -343,17 +340,16 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_PublishDBSURL'] = classad.quote(task['tm_publish_dbs_url'])
         jobSubmit['My.CRAB_ISB'] = classad.quote(task['tm_cache_url'])
 
-        def pythonListToClassAdValue(aList):
-            # python lists need special handling to become the string '{"a","b",...,"c"}'
-            quotedItems = json.dumps(aList)  # from [s1, s2] to the string '["s1","s2"]'
-            quotedItems = quotedItems.lstrip('[').rstrip(']')  # remove square brackets [ ]
-            value = "{" + quotedItems + "}"  # make final string adding the curly brackets { }
-            return value
-        jobSubmit['My.CRAB_SiteBlacklist'] = pythonListToClassAdValue(task['tm_site_blacklist'])
-        jobSubmit['My.CRAB_SiteWhitelist'] =  pythonListToClassAdValue(task['tm_site_whitelist'])
-        jobSubmit['My.CRAB_AdditionalOutputFiles'] = pythonListToClassAdValue(task['tm_outfiles'])
-        jobSubmit['My.CRAB_EDMOutputFiles'] =  pythonListToClassAdValue(task['tm_edm_outfiles'])
-        jobSubmit['My.CRAB_TFileOutputFiles'] = pythonListToClassAdValue(task['tm_outfiles'])
+
+        # note about Lists
+        # in the JDL everything is a string, we can't use the simple classAd[name]=somelist
+        # but need the ExprTree format (what classAd.lookup() would return)
+        jobSubmit['My.CRAB_SiteBlacklist'] = pythonListToClassAdExprTree(task['tm_site_blacklist'])
+        jobSubmit['My.CRAB_SiteWhitelist'] =  pythonListToClassAdExprTree(task['tm_site_whitelist'])
+        jobSubmit['My.CRAB_AdditionalOutputFiles'] = pythonListToClassAdExprTree(task['tm_outfiles'])
+        jobSubmit['My.CRAB_EDMOutputFiles'] =  pythonListToClassAdExprTree(task['tm_edm_outfiles'])
+        jobSubmit['My.CRAB_TFileOutputFiles'] = pythonListToClassAdExprTree(task['tm_outfiles'])
+
         jobSubmit['My.CRAB_UserDN'] = classad.quote(task['tm_user_dn'])
         jobSubmit['My.CRAB_UserHN'] = classad.quote(task['tm_username'])
         jobSubmit['My.CRAB_AsyncDest'] = classad.quote(task['tm_asyncdest'])
@@ -400,7 +396,8 @@ class DagmanCreator(TaskAction):
         # extra requirements that user may set when submitting
         jobSubmit['My.CRAB_RequestedMemory'] = str(task['tm_maxmemory'])
         jobSubmit['My.CRAB_RequestedCores'] = str(task['tm_numcores'])
-        jobSubmit['My.MaxWallTimeMins'] = str(task['tm_maxjobruntime'])
+        jobSubmit['My.MaxWallTimeMins'] = str(task['tm_maxjobruntime'])  # this will be used in gWms matching
+        jobSubmit['My.MaxWallTimeMinsRun'] = str(task['tm_maxjobruntime'])  # this will be used in PeriodicRemove
         ## Add group information (local groups in SITECONF via CMSGroupMapper, VOMS groups via task info in DB)
         groups = set.union(map_user_to_groups(task['tm_username']), task['user_groups'])
         groups = ','.join(groups)  # from the set {'g1','g2'...,'gN'} to the string 'g1,g2,..gN'
@@ -442,7 +439,7 @@ class DagmanCreator(TaskAction):
         # from https://htcondor.readthedocs.io/en/latest/man-pages/condor_submit.html#submit-description-file-commands
         # The entire string representing the command line arguments is surrounded by double quote marks
         jobSubmit['Arguments'] = classad.quote("--jobId=$(count)")
-        jobSubmit['transfer_output_files'] = "jobReport.json.$(count), WMArchiveReport.json.$(count)"
+        jobSubmit['transfer_output_files'] = "jobReport.json.$(count)"
 
         additional_input_file = ""
         additional_environment_options = ""
@@ -498,7 +495,7 @@ class DagmanCreator(TaskAction):
         periodicRemove += "|| ( (JobStatus =?= 1) && (time() - EnteredCurrentStatus > 7*24*60*60) )"  # b)
         periodicRemove += "|| ( (JobStatus =?= 2) && ( "  # c)
         periodicRemove += "(MemoryUsage =!= UNDEFINED && MemoryUsage > RequestMemory)"  # c) 1)
-        periodicRemove += "|| (MaxWallTimeMinsRun * 60 < time() - EnteredCurrentStatus)"  # c) 2)
+        periodicRemove += "|| (MaxWallTimeMinsRun * 60 < (time() - EnteredCurrentStatus))"  # c) 2)
         periodicRemove += f"|| (DiskUsage > {MAX_DISK_SPACE})"  # c) 3)
         periodicRemove += "))"  # these parentheses close the "if running" condition, i.e. JobStatus==2
         periodicRemove += "|| (time() > CRAB_TaskEndTime)"  # d)
@@ -508,11 +505,11 @@ class DagmanCreator(TaskAction):
         # remove reasons are "ordered" in the following big IF starting from the less-conditial ones
         # order is relevant and getting it right is "an art"
         periodicRemoveReason = "ifThenElse("
-        periodicRemoveReason += "time() - EnteredCurrentStatus > 7 * 24 * 60 * 60 && isUndefined(MemoryUsage),"
+        periodicRemoveReason += "((time() - EnteredCurrentStatus) > (7 * 24 * 60 * 60)) && isUndefined(MemoryUsage),"
         periodicRemoveReason += "\"Removed due to idle time limit\","  # set this reasons. Else
         periodicRemoveReason += "ifThenElse(time() > x509UserProxyExpiration, \"Removed job due to proxy expiration\","
         periodicRemoveReason += "ifThenElse(MemoryUsage > RequestMemory, \"Removed due to memory use\","
-        periodicRemoveReason += "ifThenElse(MaxWallTimeMinsRun * 60 < time() - EnteredCurrentStatus, \"Removed due to wall clock limit\","
+        periodicRemoveReason += "ifThenElse(MaxWallTimeMinsRun * 60 < (time() - EnteredCurrentStatus), \"Removed due to wall clock limit\","
         periodicRemoveReason += f"ifThenElse(DiskUsage > {MAX_DISK_SPACE}, \"Removed due to disk usage\","
         periodicRemoveReason += "ifThenElse(time() > CRAB_TaskEndTime, \"Removed due to reached CRAB_TaskEndTime\","
         periodicRemoveReason += "\"Removed due to job being held\"))))))"  # one closed ")" for each "ifThenElse("
@@ -711,8 +708,7 @@ class DagmanCreator(TaskAction):
             argDict['eventsPerLumi'] = task['tm_events_per_lumi']  #
             argDict['maxRuntime'] = dagspec['maxRuntime']  # -1
             argDict['scriptArgs'] = task['tm_scriptargs']
-            argDict['CRAB_AdditionalOutputFiles'] = "{}"
-            # following one are for bkw compat. with CRABClient v3.241125, to be removed
+            # following one are for bkw compat. with CRABClient v3.241218 or earlier, to be removed
             argDict['CRAB_Archive'] = argDict['userSandbox']
             argDict['CRAB_ISB'] = 'dummy'
             argDict['CRAB_JobSW'] = argDict['cmsswVersion']

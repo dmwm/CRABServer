@@ -10,10 +10,8 @@ from collections import namedtuple
 from ServerUtilities import executeCommand, getLock
 from ServerUtilities import MAX_DISK_SPACE, MAX_WALLTIME, MAX_MEMORY
 
-if 'useHtcV2' in os.environ:
-    import classad2 as classad
-else:
-    import classad
+import classad2 as classad
+
 
 JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERROR')(0, 1, 2)
 

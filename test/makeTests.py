@@ -168,7 +168,7 @@ checkStatus ${taskName} COMPLETED
 statusCode=$?
 ([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getoutput "--jobids=1 --proxy=$PROXY"
-lookFor "Success in retrieving output_1.root " commandLog.txt || echo "outputFiles: Reetrieval failure output_1.root"
+lookFor "Success in retrieving output_1.root " commandLog.txt || echo "outputFiles: Retrieval failure output_1.root"
 lookFor "Success in retrieving My_output_1.txt " commandLog.txt  || echo "outputFiles: Retrieval failure My_output_1.txt"
 """
 if SL6:  # skip: singularity, no gfal_copy, crab getoutput can't work
@@ -561,7 +561,7 @@ confChangesList = []
 changeDict = {'param': name, 'section': 'Site',
               'value': "['T1_IT*','T1_DE*','T1_ES*','T1_FR*','T1_RU*','T1_UK*','T2_*','T3_*']"}
 confChangesList.append(changeDict)
-changeDict = {'section':'Debug', 'param': 'extraJDL', 'value': "['+CMS_ALLOW_OVERFLOW=False']"}
+changeDict = {'section':'Debug', 'param': 'extraJDL', 'value': "['My.CMS_ALLOW_OVERFLOW=False']"}
 confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
@@ -617,28 +617,24 @@ writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
 writeValidationScript(testName=name, validationScript=validationScript)
 
 # voGroup
-# this test is currently disabled since we now run tests in the crabint1 account
-# and its DN it is not visible in cms-auth page so Stefano has no way to
-# make it possible for it to be in cms:itcms group or any other group
-#name = 'voGroup'
-#changeDict = {'param': name, 'value': '"itcms"', 'section': 'User'}
-#confChangesList = [changeDict]
-#testSubmitScript = dummyTestScript
-#validationScript = """
-#checkStatus ${taskName} COMPLETED
-#statusCode=$?
-#([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
-#crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-#lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "voGroup: Retrieval failure job_out.1.*.txt"
-#lookFor "JOB AD: CRAB_UserGroup = \\"itcms\\"" "${workDir}/results/job_out.1.*.txt" || echo "voGroup: Retrieval failure JOB AD"
-#lookFor "attribute : /cms/itcms/Role=NULL/Capability=NULL" "${workDir}/results/job_out.1.*.txt" || echo "voGroup: Retrieval failure attribute"
-## now that condor does not fill x509UserProxyFirstFQAN anymore we lack a good way to check the FirstFQAN
-##lookFor "JOB AD: x509UserProxyFirstFQAN = \\"/cms/itcms/Role=NULL/Capability=NULL\\"" "${workDir}/results/job_out.1.*.txt"
-#"""
-#writeConfigFile(testName=name, listOfDicts=confChangesList)
-#writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
-#writeValidationScript(testName=name, validationScript=validationScript)
-# end of commented-out voGroup test
+name = 'voGroup'
+changeDict = {'param': name, 'value': '"itcms"', 'section': 'User'}
+confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
+validationScript = """
+checkStatus ${taskName} COMPLETED
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "voGroup: Retrieval failure job_out.1.*.txt"
+lookFor "JOB AD: CRAB_UserGroup = \\"itcms\\"" "${workDir}/results/job_out.1.*.txt" || echo "voGroup: Retrieval failure JOB AD"
+lookFor "attribute : /cms/itcms/Role=NULL/Capability=NULL" "${workDir}/results/job_out.1.*.txt" || echo "voGroup: Retrieval failure attribute"
+# now that condor does not fill x509UserProxyFirstFQAN anymore we lack a good way to check the FirstFQAN
+#lookFor "JOB AD: x509UserProxyFirstFQAN = \\"/cms/itcms/Role=NULL/Capability=NULL\\"" "${workDir}/results/job_out.1.*.txt"
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
 
 #=============================
 # SECTION DEBUG
@@ -678,7 +674,7 @@ writeValidationScript(testName=name, validationScript=validationScript)
 
 # extraJDL
 name = 'extraJDL'
-changeDict = {'param': name, 'value': "['+CMS_ALLOW_OVERFLOW=False', '+CRAB_StageoutPolicy=\"remote\"']", 'section': 'Debug'}
+changeDict = {'param': name, 'value': "['My.CMS_ALLOW_OVERFLOW=False', 'My.CRAB_StageoutPolicy=\"remote\"']", 'section': 'Debug'}
 confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """

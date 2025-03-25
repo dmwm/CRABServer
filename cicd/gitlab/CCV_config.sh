@@ -58,7 +58,7 @@ TEST_RESULT='FAILED'
 MESSAGE='Test failed. Investigate manually'
 
 # Define an associative array to hold the test results
-declare -A results=( ["SUCCESSFUL"]="successful_tests" ["FAILED"]="failed_tests" ["RETRY"]="retry_tests" )
+declare -A results=( ["SUCCESSFUL"]="successful_tests_${CI_PIPELINE_ID}" ["FAILED"]="failed_tests_${CI_PIPELINE_ID}" ["RETRY"]="retry_tests_${CI_PIPELINE_ID}" )
 
 for result in "${!results[@]}"; do
 	if [ -s "${results[$result]}" ]; then
@@ -66,7 +66,7 @@ for result in "${!results[@]}"; do
 		echo -e "\n${result} TESTS:\n${test_result}" >> message_CCVResult_interim
 
 		# Handle retry logic
-		if [ "${results[$result]}" == "retry_tests" ]; then
+		if [ "${results[$result]}" == "retry_tests_${CI_PIPELINE_ID}" ]; then
             TEST_RESULT='FULL-STATUS-UNKNOWN'
             if [ "$RETRY" -ge "$MAX_RETRY" ]; then
                 MESSAGE='Exceeded configured retries. If needed restart manually.'
@@ -80,11 +80,11 @@ for result in "${!results[@]}"; do
 done
 
 # Check if the tests passed or failed
-if [ -s "failed_tests" ]; then
+if [ -s "failed_tests_${CI_PIPELINE_ID}" ]; then
     TEST_RESULT='FAILED'
-elif [ -s "retry_tests" ]; then
+elif [ -s "retry_tests_${CI_PIPELINE_ID}" ]; then
     TEST_RESULT='FULL-STATUS-UNKNOWN'
-elif [ -s "successful_tests" ]; then
+elif [ -s "successful_tests_${CI_PIPELINE_ID}" ]; then
     TEST_RESULT='SUCCEEDED'
     MESSAGE='Test is done.'
 fi

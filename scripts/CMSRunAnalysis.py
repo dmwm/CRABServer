@@ -348,6 +348,10 @@ def parseArgs():
     if not hasattr(opts, 'oneEventMode'):
         setattr(opts, 'oneEventMode', 0)
 
+    # next lines are for backward compatibility with Client v3.241218 or earlier, to be removed
+    opts.userSandbox = opts.userSandbox if opts.userSandbox else opts.archiveJob
+    opts.inputFileList = opts.inputFileList if opts.inputFileList else opts.inputFile
+
     try:
         print(f"==== Parameters Dump at {UTCNow()} ===")
         print("userSandbox:   ", opts.userSandbox)
@@ -755,9 +759,6 @@ if __name__ == "__main__":
                 except Exception:  # pylint: disable=broad-except
                     jobExitCode = EC_CMSRunWrapper
                 rep = rep.__to_json__(None)
-                # save the virgin WMArchive report
-                with open('WMArchiveReport.json', 'w', encoding='utf-8') as of:
-                    json.dump(rep, of)
                 StripReport(rep)
                 rep['jobExitCode'] = jobExitCode
                 with open('jobReport.json', 'w', encoding='utf-8') as of:
@@ -803,8 +804,7 @@ if __name__ == "__main__":
                 print('CONDITION FOR REPORTING READ BRANCHES WAS FALSE')
         except Exception:  # pylint: disable=broad-except
             pass
-        with open('WMArchiveReport.json', 'w', encoding='utf-8') as of:
-            json.dump(rep, of)
+            
         StripReport(rep)
         # Record the payload process's exit code separately; that way, we can distinguish
         # cmsRun failures from stageout failures.  The initial use case of this is to

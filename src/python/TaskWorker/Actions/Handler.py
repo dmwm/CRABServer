@@ -29,10 +29,8 @@ from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetExcep
 from CRABUtils.TaskUtils import updateTaskStatus, uploadWarning
 from ServerUtilities import uploadToS3
 
-if 'useHtcV2' in os.environ:
-    import htcondor2 as htcondor
-else:
-    import htcondor
+import htcondor2 as htcondor
+
 
 class TaskHandler():
     """Handling the set of operations to be performed."""

@@ -14,12 +14,8 @@ from shutil import move
 import pickle
 import json
 
-if 'useHtcV2' in os.environ:
-    import htcondor2 as htcondor
-    import classad2 as classad
-else:
-    import htcondor
-    import classad
+import htcondor2 as htcondor
+import classad2 as classad
 
 
 logging.basicConfig(filename='task_process/cache_status.log', level=logging.DEBUG)
@@ -459,7 +455,7 @@ def parseCondorLog(cacheDoc):
     except IOError:
         logging.exception("error during error_summary file handling")
 
-    # collect all cache info in a single dictionary and return it to called
+    # collect all cache info in a single dictionary and return it to caller
     newCacheDoc = {}
     newCacheDoc['jobLogCheckpoint'] = newJobLogCheckpoint
     newCacheDoc['fjrParseResCheckpoint'] = newFjrParseResCheckpoint
@@ -479,6 +475,7 @@ def storeNodesInfoInPklFile(cacheDoc):
     # persist cache info in py2-compatible pickle format
     with open(tempFilename, "wb") as fp:
         pickle.dump(cacheDoc, fp, protocol=2)
+    # replace old file with new one
     move(tempFilename, PKL_STATUS_CACHE_FILE)
 
 def storeNodesInfoInTxtFile(cacheDoc):
@@ -500,8 +497,10 @@ def storeNodesInfoInTxtFile(cacheDoc):
         nodesStorage.write(str(nodes) + "\n")
         nodesStorage.write(str(nodeMap) + "\n")
 
+    move(tempFilename, STATUS_CACHE_FILE)
+
 def summarizeFjrParseResults(checkpoint):
-    '''
+    """
     Reads the fjr_parse_results file line by line. The file likely contains multiple
     errors for the same jobId coming from different retries, we only care about
     the last error for each jobId. Since each postjob writes this information
@@ -512,14 +511,20 @@ def summarizeFjrParseResults(checkpoint):
     fjr_parse_results file was read so that we can store it and
     don't have t re-read the same information next time the cache_status.py runs.
 
-    SB: what this does is to convert a JSON file with a list of dictionaries [{job:msg},...] which
-    may have the same jobId as key, into a single dictionay with for each jobId key contains only the
-    last value of msg
+    SB: what this does is to convert file with one "JSON string per line"
+    which represent a dictionary {jobid:errorDictionary}
+    e.g.
+    {"134": {"0": [50115, "BadFWJRXML", {}]}}
+    {"1": {"0": [0, "OK", {}]}}
+    ...
+    where the same jobId may be repeated, into a single dictionay which for each
+    jobId key contains only the last value of the errorDictionary
     for d in content:
       for k,v in d.items():
         errDict[k] = v
 
-    '''
+    Format and content of errorDictionary is described in parseErrorReport() method
+    """
 
     if os.path.exists(FJR_PARSE_RES_FILE):
         with open(FJR_PARSE_RES_FILE, "r", encoding='utf-8') as f:
@@ -549,8 +554,9 @@ def main():
         #infoN = readOldStatusCacheFile()
         #infoN = parseCondorLog(info)
         storeNodesInfoInPklFile(cacheDoc)
-        # in case we still need the text file (e.g. for the UI) when we remove the old code:
+        # to keep the txt file locally, useful for debugging, when we remove the old code:
         # storeNodesInfoInTxtFile(cacheDoc)
+
     except Exception:  # pylint: disable=broad-except
         logging.exception("error during main loop")
 

@@ -103,7 +103,6 @@ from requests.auth import HTTPBasicAuth
 
 from WMCore import Lexicon
 from WMCore.DataStructs.LumiList import LumiList
-from WMCore.Services.WMArchive.DataMap import createArchiverDoc
 
 from TaskWorker import __version__
 from TaskWorker.Actions.RetryJob import RetryJob
@@ -112,18 +111,13 @@ from ServerUtilities import isFailurePermanent, mostCommon, TRANSFERDB_STATES, P
 from ServerUtilities import getLock, getHashLfn
 from RESTInteractions import CRABRest
 
-if 'useHtcV2' in os.environ:
-    import htcondor2 as htcondor
-    import classad2 as classad
-else:
-    import htcondor
-    import classad
+import htcondor2 as htcondor
+import classad2 as classad
+
 
 ASO_JOB = None
 G_JOB_REPORT_NAME = None
 G_JOB_REPORT_NAME_NEW = None
-G_WMARCHIVE_REPORT_NAME = None
-G_WMARCHIVE_REPORT_NAME_NEW = None
 G_ERROR_SUMMARY_FILE_NAME = "error_summary.json"
 G_FJR_PARSE_RESULTS_FILE_NAME = "task_process/fjr_parse_results.txt"
 G_FAKE_OUTDATASET = '/FakeDataset/fakefile-FakePublish-5b6a581e4ddd41b130711a045d5fecb9/USER'
@@ -1648,10 +1642,6 @@ class PostJob():
         G_JOB_REPORT_NAME = "jobReport.json.%s" % (self.job_id)
         global G_JOB_REPORT_NAME_NEW
         G_JOB_REPORT_NAME_NEW = "job_fjr.%s.%s.json" % (self.job_id, self.crab_retry)
-        global G_WMARCHIVE_REPORT_NAME
-        G_WMARCHIVE_REPORT_NAME = "WMArchiveReport.json.%s" % (self.job_id)
-        global G_WMARCHIVE_REPORT_NAME_NEW
-        G_WMARCHIVE_REPORT_NAME_NEW = "WMArchiveReport.%s.%s.json" % (self.job_id, self.crab_retry)
 
         if first_pj_execution():
             self.handle_webdir()
@@ -1727,16 +1717,6 @@ class PostJob():
             msg = "Unknown error while preparing the error report."
             self.logger.exception(msg)
         self.logger.info("====== Finished to prepare error report.")
-
-        # Prepare the WMArchive report and put it in the direcotry to be processes
-        self.logger.info("====== Starting to prepare WMArchive report.")
-        try:
-            self.processWMArchive(retval)
-        except Exception:
-            msg = "Unknown error while preparing the WMArchive report."
-            self.logger.exception(msg)
-        self.logger.info("====== Finished to prepare WMArchive report.")
-
 
         # Decide if the whole task should be aborted (in case a significant fraction of
         # the jobs has failed).
@@ -3086,88 +3066,6 @@ class PostJob():
             return rval  # pylint: disable=lost-exception
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
-    def processWMArchive(self, retval):
-        try:
-            with open("/etc/wmarchive.json") as wma:
-                WMARCHIVE_BASE_LOCATION = json.load(wma).get("BASE_DIR", "/data/wmarchive")
-        except Exception:
-            self.logger.exception("Can not load the WM archive json. Exception follows:")
-            return
-        WMARCHIVE_BASE_LOCATION = os.path.join(WMARCHIVE_BASE_LOCATION, 'new')
-
-        now = int(time.time())
-        archiveDoc = {}
-        with open(G_WMARCHIVE_REPORT_NAME) as fd:
-            job = {}
-            job['id'] = '%s-%s' % (self.job_id, self.crab_retry)
-            job['doc'] = {}
-            job['doc']["fwjr"] = json.load(fd)
-            job['doc']["jobtype"] = 'CRAB3'
-            job['doc']["jobstate"] = 'success' if retval == 0 else 'failed'
-            job['doc']["timestamp"] = now
-            archiveDoc = createArchiverDoc(job)
-            archiveDoc['task'] = self.reqname
-            archiveDoc["meta_data"]['crab_id'] = self.job_id
-            archiveDoc["meta_data"]['crab_exit_code'] = self.job_report.get('exitCode', -1)
-            archiveDoc["steps"].append(
-                {
-                    "errors": [
-                        {
-                            "details": str(getattr(ASO_JOB, 'failures', "")),
-                            "exitCode": 0,
-                            "type": ""
-                        }
-                    ],
-                    "input": [
-                        {
-                            "inputLFNs": [],
-                            "inputPFNs": [],
-                            "runs": [
-                                {
-                                    "eventsPerLumi": [],
-                                    "lumis": []
-                                }
-                            ]
-                        }
-                    ],
-                    "name": "aso",
-                    "output": [
-                        {
-                            "inputLFNs": [],
-                            "inputPFNs": [],
-                            "outputLFNs": [],
-                            "outputPFNs": [],
-                            "runs": [
-                                {
-                                    "eventsPerLumi": [],
-                                    "lumis": []
-                                }
-                            ]
-                        }
-                    ],
-                    "performance": {
-                        "multicore": {},
-                        "storage": {},
-                        "cpu": {},
-                        "memory": {}
-                    },
-                    "site": self.dest_site,
-                    "start": self.aso_start_timestamp or 0,
-                    "status": 0,
-                    "stop": now
-                }
-            )
-
-
-
-        with open(G_WMARCHIVE_REPORT_NAME_NEW, 'w') as fd:
-            json.dump(archiveDoc, fd)
-        if not os.path.isdir(WMARCHIVE_BASE_LOCATION):
-            os.makedirs(os.path.join(WMARCHIVE_BASE_LOCATION))
-        #not using shutil.move because I want to move the file in the same disk
-        self.logger.info("%s , %s", G_WMARCHIVE_REPORT_NAME_NEW, os.path.join(WMARCHIVE_BASE_LOCATION, "%s_%s" % (self.reqname, G_WMARCHIVE_REPORT_NAME_NEW)))
-        os.rename(G_WMARCHIVE_REPORT_NAME_NEW, os.path.join(WMARCHIVE_BASE_LOCATION, "%s_%s" % (self.reqname, G_WMARCHIVE_REPORT_NAME_NEW)))
 
 # ==============================================================================
 

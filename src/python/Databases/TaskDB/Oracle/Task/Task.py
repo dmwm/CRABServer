@@ -11,11 +11,13 @@ class Task(object):
     ID_tuple = namedtuple("ID", ["taskname", "task_status", "task_command", "user_role", "user_group", \
              "task_failure", "split_algo", "split_args", "save_logs", "username", \
              "user_dn", "arguments", "input_dataset", "dbs_url", "task_warnings", "publication", "user_webdir", \
-             "output_dataset", "collector", "schedd", "dry_run", "clusterid", "start_time", "twname"])
+             "output_dataset", "collector", "schedd", "dry_run", "clusterid", "start_time", "twname", \
+             "DAGstatus", "numJobs", "uploaded"])
     ID_sql = "SELECT tm_taskname, tm_task_status, tm_task_command, tm_user_role, tm_user_group, \
              tm_task_failure, tm_split_algo, tm_split_args, tm_save_logs, tm_username, \
              tm_user_dn, tm_arguments, tm_input_dataset, tm_dbs_url, tm_task_warnings, tm_publication, tm_user_webdir, \
-             tm_output_dataset, tm_collector, tm_schedd, tm_dry_run, clusterid, tm_start_time, tw_name \
+             tm_output_dataset, tm_collector, tm_schedd, tm_dry_run, clusterid, tm_start_time, tw_name, \
+             tm_dagman_status, tm_num_jobs, tm_uploaded \
              FROM tasks WHERE tm_taskname=:taskname"
 
     IDAll_sql = "SELECT tm_taskname, tm_task_status, tm_task_command, tm_user_role, tm_user_group, \
