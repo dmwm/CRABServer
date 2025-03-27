@@ -312,8 +312,6 @@ client_validation_suite:
           - CMSSW_9_4_21
           - CMSSW_8_0_36
   script:
-    - echo "Waiting for 20 minutes after task submission..."
-    - sleep 1200 
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
     - export CRABClient_version  # from .env
@@ -352,8 +350,6 @@ client_configuration_validation:
           - CMSSW_9_4_21
           - CMSSW_8_0_36
   script:
-    # - echo "Waiting for 20 minutes after task submission..."
-    # - sleep 1200 
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
     - export CRABClient_version  # from .env
@@ -402,7 +398,6 @@ check_status_tracking:
     - export SCRAM_ARCH=el8_amd64_gcc11
     - export Check_Publication_Status=Yes
     - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
-  allow_failure: true
   cache:
     - key: $CI_PIPELINE_ID
       paths:
