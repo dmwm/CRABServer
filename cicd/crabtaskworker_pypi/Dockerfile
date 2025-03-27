@@ -138,12 +138,14 @@ COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/Publisher/manage.sh \
 COPY --chown=${USER}:${USER} cicd/crabserver_pypi/start.sh \
      cicd/crabserver_pypi/env.sh \
      cicd/crabserver_pypi/stop.sh \
+     cicd/crabserver_pypi/status.sh \
      cicd/crabserver_pypi/manage.py \
      ${WDIR}/srv/TaskManager/
 
 COPY --chown=${USER}:${USER} cicd/crabserver_pypi/start.sh \
      cicd/crabserver_pypi/env.sh \
      cicd/crabserver_pypi/stop.sh \
+     cicd/crabserver_pypi/status.sh \
      cicd/crabserver_pypi/manage.py \
      ${WDIR}/srv/Publisher/
 

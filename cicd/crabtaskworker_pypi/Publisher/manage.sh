@@ -121,7 +121,10 @@ status_srv() {
         exit 1
     fi
     echo "Publisher's Master process is running with PID ${pid}"
-    cat /proc/"${pid}"/environ | tr '\0' '\n' | grep PYTHONPATH
+    pypath=$(cat /proc/"${pid}"/environ | tr '\0' '\n' | grep PYTHONPATH | cut -d= -f2-)
+    echo "PYTHONPATH=$pypath"
+    export PYTHONPATH="$pypath"
+    python -c 'from TaskWorker import __version__; print(f"Runnning version {__version__}")'
     exit 0
 }
 
