@@ -50,7 +50,7 @@ if $ERR ; then
     echo -e "Something went wrong during task submission. None of the downstream jobs were triggered."
     exit 1
 else
-    declare -A tests=( ["Task_Submission_Status_Tracking"]=submitted_tasks_TS_${CI_PIPELINE_ID} ["Client_Validation_Suite"]=submitted_tasks_CV_${CI_PIPELINE_ID} ["Client_Configuration_Validation"]=submitted_tasks_CCV_${CI_PIPELINE_ID})
+    declare -A tests=( ["Task_Submission_Status_Tracking"]=submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release} ["Client_Validation_Suite"]=submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release} ["Client_Configuration_Validation"]=submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release})
     for test in "${!tests[@]}";
     do
         path="${WORK_DIR}/${tests[$test]}"
