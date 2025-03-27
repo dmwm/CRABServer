@@ -256,6 +256,7 @@ task_submission:
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: submit_testsuite
+  resource_group: crab3  # Only one job runs at a time
   tags:
     - crab3-shell
   parallel:
@@ -269,8 +270,6 @@ task_submission:
           - CMSSW_10_1_0
           - CMSSW_9_4_21
           - CMSSW_8_0_36
-          - CMSSW_7_6_7
-          - CMSSW_7_1_29
   script:
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
@@ -282,13 +281,12 @@ task_submission:
     - export Client_Configuration_Validation=$CLIENT_CONFIGURATION_VALIDATION
     - export Client_Validation_Suite=$CLIENT_VALIDATION
     - bash -x cicd/gitlab/executeTests.sh
-  allow_failure: true
   cache:
     - key: $CI_PIPELINE_ID
       paths:
-        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}
-        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}
-        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}
+        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: push
 
 client_validation_suite:
@@ -299,6 +297,7 @@ client_validation_suite:
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: run_testsuite_CV
+  resource_group: crab3  # Only one job runs at a time
   tags:
     - crab3-shell
   parallel:
@@ -312,8 +311,6 @@ client_validation_suite:
           - CMSSW_10_1_0
           - CMSSW_9_4_21
           - CMSSW_8_0_36
-          - CMSSW_7_6_7
-          - CMSSW_7_1_29
   script:
     - echo "Waiting for 20 minutes after task submission..."
     - sleep 1200 
@@ -324,13 +321,12 @@ client_validation_suite:
     - export ROOT_DIR
     - export CMSSW_release=$CMSSW_release
     - export Client_Validation_Suite=true
-    - ls workdir/submitted_tasks_CV_${CI_PIPELINE_ID}
+    - ls workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
     - bash -x cicd/gitlab/CV_config.sh
-  allow_failure: true
   cache:
     - key: $CI_PIPELINE_ID
       paths:
-        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}
+        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: pull
 
 client_configuration_validation:
@@ -341,6 +337,7 @@ client_configuration_validation:
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: run_testsuite_CCV
+  resource_group: crab3  # Only one job runs at a time
   tags:
     - crab3-shell
   parallel:
@@ -354,8 +351,6 @@ client_configuration_validation:
           - CMSSW_10_1_0
           - CMSSW_9_4_21
           - CMSSW_8_0_36
-          - CMSSW_7_6_7
-          - CMSSW_7_1_29
   script:
     # - echo "Waiting for 20 minutes after task submission..."
     # - sleep 1200 
@@ -366,13 +361,13 @@ client_configuration_validation:
     - export ROOT_DIR
     - export CMSSW_release=$CMSSW_release
     - export Client_Configuration_Validation=true
-    - ls workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}
+    - ls workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
     - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/CCV_config.sh
   allow_failure: true
   cache:
     - key: $CI_PIPELINE_ID
       paths:
-        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}
+        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: pull
 
 check_status_tracking:
@@ -383,6 +378,7 @@ check_status_tracking:
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: run_testsuite_TS
+  resource_group: crab3  # Only one job runs at a time
   tags:
     - crab3-shell
   parallel:
@@ -396,8 +392,6 @@ check_status_tracking:
           - CMSSW_10_1_0
           - CMSSW_9_4_21
           - CMSSW_8_0_36
-          - CMSSW_7_6_7
-          - CMSSW_7_1_29
   script:
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
@@ -412,7 +406,7 @@ check_status_tracking:
   cache:
     - key: $CI_PIPELINE_ID
       paths:
-        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}
+        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: pull
 
 cleanup_rucio_rules:
