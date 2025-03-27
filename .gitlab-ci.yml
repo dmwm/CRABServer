@@ -282,7 +282,7 @@ task_submission:
     - export Client_Validation_Suite=$CLIENT_VALIDATION
     - bash -x cicd/gitlab/executeTests.sh
   cache:
-    - key: $CI_PIPELINE_ID
+    - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
         - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
         - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
@@ -322,7 +322,7 @@ client_validation_suite:
     - ls workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
     - bash -x cicd/gitlab/CV_config.sh
   cache:
-    - key: $CI_PIPELINE_ID
+    - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
         - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: pull
@@ -359,9 +359,8 @@ client_configuration_validation:
     - export Client_Configuration_Validation=true
     - ls workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
     - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/CCV_config.sh
-  allow_failure: true
   cache:
-    - key: $CI_PIPELINE_ID
+    - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
         - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: pull
@@ -399,7 +398,7 @@ check_status_tracking:
     - export Check_Publication_Status=Yes
     - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
   cache:
-    - key: $CI_PIPELINE_ID
+    - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
         - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: pull
