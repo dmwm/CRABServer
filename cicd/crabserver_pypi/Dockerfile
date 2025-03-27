@@ -79,6 +79,7 @@ COPY --chown=${USER}:${USER} cicd/crabserver_pypi/run.sh \
      cicd/crabserver_pypi/env.sh \
      cicd/crabserver_pypi/start.sh \
      cicd/crabserver_pypi/stop.sh \
+     cicd/crabserver_pypi/status.sh \
      /data
 
 USER ${USER}
