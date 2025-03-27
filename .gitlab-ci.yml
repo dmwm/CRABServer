@@ -289,6 +289,18 @@ task_submission:
         - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: push
 
+sleep_before_validation:
+  rules:
+    - !reference [.default_rules, skip_submit]
+    - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
+  stage: run_testsuite_CV
+  tags:
+    - crab3-shell
+  script:
+    - echo "Sleeping for 20 minutes after task submission"
+    - sleep 1200
+
 client_validation_suite:
   rules:
     - if: '$CLIENT_VALIDATION == "false"'
