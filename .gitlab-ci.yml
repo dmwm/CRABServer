@@ -48,6 +48,7 @@ stages:
   - build_docker
   - deploy
   - submit_testsuite
+  - sleep
   - run_testsuite_CV
   - run_testsuite_CCV
   - run_testsuite_TS
@@ -294,7 +295,7 @@ sleep_before_validation:
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
-  stage: run_testsuite_CV
+  stage: sleep
   tags:
     - crab3-shell
   parallel:
