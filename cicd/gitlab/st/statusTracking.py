@@ -142,7 +142,7 @@ def main():
     # Read all tasks from the specified files into a single list
     tasks = [
     line 
-    for file_name in [f"submitted_tasks_TS_{os.environ['CI_PIPELINE_ID']}"]
+    for file_name in [f"submitted_tasks_TS_{os.environ['CI_PIPELINE_ID']}_{os.environ['CMSSW_release']}"]
     if os.path.exists(f'{work_dir}/{file_name}')
     for line in open(f'{work_dir}/{file_name}').readlines()
     ]

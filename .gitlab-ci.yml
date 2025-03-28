@@ -297,9 +297,25 @@ sleep_before_validation:
   stage: run_testsuite_CV
   tags:
     - crab3-shell
+  parallel:
+    matrix:
+      - CMSSW_release: 
+          - CMSSW_13_0_2
+          - CMSSW_12_6_4
+          - CMSSW_12_5_0
+          - CMSSW_11_3_4
+          - CMSSW_10_6_26
+          - CMSSW_10_1_0
+          - CMSSW_9_4_21
+          - CMSSW_8_0_36
   script:
     - echo "Sleeping for 20 minutes after task submission"
     - sleep 1200
+  cache:
+    - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
+      paths:
+        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
+      policy: pull
 
 client_validation_suite:
   rules:
@@ -385,7 +401,6 @@ check_status_tracking:
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
   stage: run_testsuite_TS
-  resource_group: crab3  # Only one job runs at a time
   tags:
     - crab3-shell
   parallel:
