@@ -315,6 +315,8 @@ sleep_before_validation:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
         - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: pull
 
 client_validation_suite:
