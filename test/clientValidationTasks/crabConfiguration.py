@@ -29,4 +29,4 @@ config.section_("Site")
 config.Site.storageSite = 'T2_CH_CERN'
 
 config.section_("Debug")
-config.Debug.scheddName = 'crab3@vocms059.cern.ch'
+config.Debug.scheddName = 'crab3@vocms0144.cern.ch'
