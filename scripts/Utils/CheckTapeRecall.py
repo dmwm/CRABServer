@@ -200,7 +200,7 @@ def createRulesJson(df):
     df = df[['id', 'state', 'user', 'locks', 'days', 'tape', 'size', 'dataset', 'tasks']]
 
     # logger.info('compute a short Url for each task')
-    df['task0'] = df.apply(lambda x: x.tasks[-1] if len(x.tasks) > 0 else None, axis=1)
+    df['task0'] = df.apply(lambda x: x.tasks[-1] if x.tasks else None, axis=1)
     df['tasks_1toN'] = df.apply(lambda x: x.tasks[:-1] if len(x.tasks) >= 2 else [], axis=1)
     df['tasks_num'] = df.apply(lambda x: len(x.tasks), axis=1)
 
