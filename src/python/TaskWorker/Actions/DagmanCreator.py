@@ -40,7 +40,7 @@ import classad2 as classad
 
 DAG_HEADER = """
 
-NODE_STATUS_FILE node_state{nodestate} 30 ALWAYS-UPDATE
+NODE_STATUS_FILE node_state{nodestate} 120
 
 # NOTE: a file must be present, but 'noop' makes it not be read.
 #FINAL FinalCleanup Job.1.submit NOOP
