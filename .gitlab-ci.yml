@@ -55,6 +55,22 @@ stages:
   - cleanup
   - tagging_release
 
+cmssw_matrix_template: &cmssw_matrix
+  matrix:
+    - CMSSW_release: 
+        - if: '!reference [.default_rules, release]'
+          then:
+            - CMSSW_13_0_2
+            - CMSSW_12_6_4
+            - CMSSW_12_5_0
+            - CMSSW_11_3_4
+            - CMSSW_10_6_26
+            - CMSSW_10_1_0
+            - CMSSW_9_4_21
+            - CMSSW_8_0_36
+          else: 
+            - ${CMSSW_release:-CMSSW_13_0_2}
+
 get_env:
   # NB rules are evaluated like python `any()`. If there is no rule the job runs all of the times.
   rules:
@@ -261,16 +277,7 @@ task_submission:
   tags:
     - crab3-shell
   parallel:
-    matrix:
-      - CMSSW_release: 
-          - CMSSW_13_0_2
-          - CMSSW_12_6_4
-          - CMSSW_12_5_0
-          - CMSSW_11_3_4
-          - CMSSW_10_6_26
-          - CMSSW_10_1_0
-          - CMSSW_9_4_21
-          - CMSSW_8_0_36
+    <<: *cmssw_matrix
   script:
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
@@ -299,16 +306,7 @@ sleep_before_validation:
   tags:
     - crab3-shell
   parallel:
-    matrix:
-      - CMSSW_release: 
-          - CMSSW_13_0_2
-          - CMSSW_12_6_4
-          - CMSSW_12_5_0
-          - CMSSW_11_3_4
-          - CMSSW_10_6_26
-          - CMSSW_10_1_0
-          - CMSSW_9_4_21
-          - CMSSW_8_0_36
+    <<: *cmssw_matrix
   script:
     - echo "Sleeping for 20 minutes after task submission"
     - sleep 1200
@@ -332,16 +330,7 @@ client_validation_suite:
   tags:
     - crab3-shell
   parallel:
-    matrix:
-      - CMSSW_release: 
-          - CMSSW_13_0_2
-          - CMSSW_12_6_4
-          - CMSSW_12_5_0
-          - CMSSW_11_3_4
-          - CMSSW_10_6_26
-          - CMSSW_10_1_0
-          - CMSSW_9_4_21
-          - CMSSW_8_0_36
+    <<: *cmssw_matrix
   script:
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
@@ -370,16 +359,7 @@ client_configuration_validation:
   tags:
     - crab3-shell
   parallel:
-    matrix:
-      - CMSSW_release: 
-          - CMSSW_13_0_2
-          - CMSSW_12_6_4
-          - CMSSW_12_5_0
-          - CMSSW_11_3_4
-          - CMSSW_10_6_26
-          - CMSSW_10_1_0
-          - CMSSW_9_4_21
-          - CMSSW_8_0_36
+    <<: *cmssw_matrix
   script:
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
@@ -407,16 +387,7 @@ check_status_tracking:
   tags:
     - crab3-shell
   parallel:
-    matrix:
-      - CMSSW_release: 
-          - CMSSW_13_0_2
-          - CMSSW_12_6_4
-          - CMSSW_12_5_0
-          - CMSSW_11_3_4
-          - CMSSW_10_6_26
-          - CMSSW_10_1_0
-          - CMSSW_9_4_21
-          - CMSSW_8_0_36
+    <<: *cmssw_matrix
   script:
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
