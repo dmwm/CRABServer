@@ -7,7 +7,8 @@ from TaskWorker.DataObjects.Result import Result
 def handleRecurring(resthost, dbInstance, config, task, procnum, action):
     actionClass = action.split('.')[-1]
     mod = __import__(action, fromlist=actionClass)
-    getattr(mod, actionClass)(config.TaskWorker.logsDir).execute(resthost, dbInstance, config, task, procnum)
+    result = getattr(mod, actionClass)(config.TaskWorker.logsDir).execute(resthost, dbInstance, config, task, procnum)
+    return result
 
 class BaseRecurringAction:
     def __init__(self, logsDir):
@@ -33,8 +34,8 @@ class BaseRecurringAction:
         try:
             self.logger.info("Executing %s", task)
             self._execute(config, task)
-            return Result(task=task['tm_taskname'], result="OK")
+            return Result(task=task, result="OK")
         except Exception as ex:
             self.logger.error("Error while runnig recurring action.")
             self.logger.exception(ex)
-            return Result(task=task['tm_taskname'], err="RecurringAction FAILED")
+            return Result(task=task, err="RecurringAction FAILED")
