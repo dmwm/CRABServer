@@ -140,7 +140,7 @@ def processWorkerLoop(inputs, results, resthost, dbInstance, procnum, logger, lo
             out, _, _ = executeCommand("ps u -p %s | awk '{sum=sum+$6}; END {print sum/1024}'" % os.getpid())
             msg = "RSS after finishing %s: %s MB" % (task['tm_taskname'], out.strip())
             logger.debug(msg)
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             logger.exception("Problem getting worker RSS:")
 
         removeTaskLogHandler(logger, taskhandler)
