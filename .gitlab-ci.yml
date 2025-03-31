@@ -267,7 +267,6 @@ deploy_publisher_rucio:
 task_submission:
   rules:
     - !reference [.default_rules, skip_submit]
-    - if: '$STATUS_TRACKING == "true" || $CLIENT_VALIDATION == "true" || $CLIENT_CONFIGURATION_VALIDATION == "true"'
     - !reference [.default_rules, skip_check]
     - !reference [.default_rules, default]
   stage: submit_testsuite
