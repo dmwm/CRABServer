@@ -9,7 +9,7 @@ config.section_("General")
 config.General.instance = os.getenv('REST_Instance','test2')
 config.General.restHost = ''
 config.General.dbInstance = ''
-config.General.workArea = '/tmp/crabStatusTracking'
+config.General.workArea = '/tmp/crabStatusTracking_{}'.format(os.environ["CMSSW_release"])
 
 config.section_("JobType")
 config.JobType.pluginName = 'PrivateMC'

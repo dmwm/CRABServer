@@ -40,7 +40,7 @@ import classad2 as classad
 
 DAG_HEADER = """
 
-NODE_STATUS_FILE node_state{nodestate} 30 ALWAYS-UPDATE
+NODE_STATUS_FILE node_state{nodestate} 120
 
 # NOTE: a file must be present, but 'noop' makes it not be read.
 #FINAL FinalCleanup Job.1.submit NOOP
@@ -362,7 +362,11 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_TaskWorker'] = classad.quote(getattr(self.config.TaskWorker, 'name', 'unknown'))
         retry_aso = "1" if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else "0"
         jobSubmit['My.CRAB_RetryOnASOFailures'] = retry_aso
-        jobSubmit['My.CRAB_ASOTimeout'] = str(getattr(self.config.TaskWorker, 'ASORucioTimeout', 0))
+        if task['tm_output_lfn'].startswith('/store/user/rucio') or \
+                task['tm_output_lfn'].startswith('/store/group/rucio'):
+            jobSubmit['My.CRAB_ASOTimeout'] = str(getattr(self.config.TaskWorker, 'ASORucioTimeout', 0))
+        else:
+            jobSubmit['My.CRAB_ASOTimeout'] = str(getattr(self.config.TaskWorker, 'ASOTimeout', 0))
         jobSubmit['My.CRAB_RestHost'] = classad.quote(task['resthost'])
         jobSubmit['My.CRAB_DbInstance'] = classad.quote(task['dbinstance'])
         jobSubmit['My.CRAB_NumAutomJobRetries'] = str(task['numautomjobretries'])
