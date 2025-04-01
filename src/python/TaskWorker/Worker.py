@@ -140,15 +140,18 @@ def processWorkerLoop(inputs, results, resthost, dbInstance, procnum, logger, lo
             out, _, _ = executeCommand("ps u -p %s | awk '{sum=sum+$6}; END {print sum/1024}'" % os.getpid())
             msg = "RSS after finishing %s: %s MB" % (task['tm_taskname'], out.strip())
             logger.debug(msg)
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             logger.exception("Problem getting worker RSS:")
 
         removeTaskLogHandler(logger, taskhandler)
 
+        logger.debug("About to put out message in results queue for workid %s", workid)
+        logger.debug(" out.result: %s - out.task: %s ", outputs.result, outputs.task)
         results.put({
                      'workid': workid,
                      'out' : outputs
                     })
+        logger.debug("Done")
 
 
 def processWorker(inputs, results, resthost, dbInstance, logsDir, procnum):
@@ -284,7 +287,7 @@ class Worker(object):
                     self.logger.debug('Completed work %d on %s', workid, taskname)
                 else:
                     # recurring actions do not return a Result object
-                    self.logger.debug('Completed work %s', str(out))
+                    self.logger.debug('Completed work %d %s', workid, str(out))
 
                 if isinstance(out['out'], list):
                     allout.extend(out['out'])
@@ -306,6 +309,15 @@ class Worker(object):
 
         :return int: number of working slaves."""
         return len(self.working)
+
+    def listQueuedTasks(self):
+        """ list tasks being worked on """
+        tasks = [ v['workflow'] for v in self.working.values() ]
+        return tasks
+
+    def listWorks(self):
+        """ list what's being worked on"""
+        return self.working
 
     def queueableTasks(self):
         """Depending on the queue size limit
