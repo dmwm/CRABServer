@@ -2,12 +2,14 @@
 Common functions to be reused around TW and Publisher
 """
 
+import logging
+import functools
 from http.client import HTTPException
 from urllib.parse import urlencode
 
-from ServerUtilities import truncateError
-from ServerUtilities import SERVICE_INSTANCES
+from ServerUtilities import truncateError, tempSetLogLevel, SERVICE_INSTANCES
 from RESTInteractions import CRABRest
+from WMCore.Services.CRIC.CRIC import CRIC
 from TaskWorker.WorkerExceptions import ConfigException
 
 def getCrabserver(restConfig=None, agentName='crabtest', logger=None):
@@ -86,3 +88,47 @@ def deleteWarnings(taskname=None, crabserver=None, logger=None):
     except HTTPException as hte:
         logger.error("Error deleting warnings: %s", str(hte))
         logger.warning("Can not delete warnings from REST interface.")
+
+
+def safe_get(obj, key, default=None):
+    """
+    Try dictionary-style access first, otherwise try attribute access.
+    """
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
+def suppress_external_service_logging(func):
+    """
+    Suppress logging of any given function of external service class instance that have logger bound to self.
+    """
+
+    @functools.wraps(func)
+    def _wrapper(self, *args, **kwargs):
+        with tempSetLogLevel(
+            logger=safe_get(self, "logger", default=logging.getLogger()),
+            level=logging.ERROR,
+        ):
+            return func(self, *args, **kwargs)
+
+    return _wrapper
+
+
+class CRICService(CRIC):
+    """
+    WMCore's CRIC Service with logging suppressed.
+    """
+
+    def __init__(self, *args, **kwargs):
+        with tempSetLogLevel(logger=kwargs["logger"], level=logging.ERROR):
+            super().__init__(*args, **kwargs)
+
+    @suppress_external_service_logging
+    def _getResult(self, *args, **kwargs):
+        return super()._getResult(*args, **kwargs)
+
+    @suppress_external_service_logging
+    def PNNstoPSNs(self, *args, **kwargs):
+        return super().PNNstoPSNs(*args, **kwargs)
+
