@@ -480,20 +480,32 @@ def AddPsetHash(report=None, fjr_filename=None):
     if 'output' not in report['steps']['cmsRun']:
         return
 
-    # Parse the FrameworkJobReport.xml
-    tree = ET.parse(fjr_filename)
-    root = tree.getroot()
+    try:
+        tree = ElementTree.parse(fjr_filename)
+        root = tree.getroot()
+        
+        # Verify root is FrameworkJobReport
+        if root.tag != 'FrameworkJobReport':
+            raise ValueError("Root element is not FrameworkJobReport")
 
-    # Find the first occurrence of ParameterSetID
-    pset_id = None
-    for process in root.findall(".//Process"):
-        pset_id_elem = process.find("ParameterSetID")
-        if pset_id_elem is not None:
-            pset_id = pset_id_elem.text
-            break  # Assuming we take the first valid ParameterSetID
+        # Find the Process element directly under FrameworkJobReport
+        process = root.find('Process')
+        if process is None:
+            raise ValueError("Process element not found under FrameworkJobReport")
 
-    if not pset_id:
-        raise ValueError(f"ParameterSetID not found in {fjr_filename}")
+        # Find the ParameterSetID element
+        pset_id_element = process.find('ParameterSetID')
+        if pset_id_element is None:
+            raise ValueError("ParameterSetID element not found under Process")
+
+        pset_id = pset_id_element.text.strip()
+        if not pset_id:
+            raise ValueError("ParameterSetID value is empty")
+
+    except ElementTree.ParseError as e:
+        raise ValueError(f"Error parsing XML file: {str(e)}")
+    except Exception as e:
+        raise ValueError(f"Error processing XML file: {str(e)}")
 
     print(f"Extracted ParameterSetID (PSet Hash): {pset_id}")
 
