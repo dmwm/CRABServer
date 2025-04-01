@@ -106,6 +106,14 @@ def processWorkerLoop(inputs, results, resthost, dbInstance, procnum, logger, lo
                 workOutput = startChildWorker(WORKER_CONFIG, work, args, logger)
             else:
                 workOutput = work(resthost, dbInstance, WORKER_CONFIG, task, procnum, inputargs)
+            # note that the output of the "work" is assigned to a variable only to allow
+            # inspection for debugging purposes, but we do not want to put it in the
+            # multiprocess.Queue since in case it contains non-pickleable objects (htcondo.Submit e.g.)
+            # the put fails silently, see https://github.com/python/cpython/issues/84376
+            # for the purpose of the Worker processing we do not need to pass around all the
+            # info anyhow, so we only put the task Dictionart which
+            # a) is safe b) can be used for debugging inside Worker or MasterWorker
+            # reference: https://github.com/dmwm/CRABServer/pull/9026
             outputs = Result(task=task, result="OK")
         except TapeDatasetException as tde:
             outputs = Result(task=task, err=str(tde))
