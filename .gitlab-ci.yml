@@ -68,7 +68,7 @@ stages:
 
 .cmssw_matrix_default: &cmssw_matrix_default
   - CMSSW_release:
-    - ${CMSSW_release:-CMSSW_13_0_2}
+    - CMSSW_13_0_2
 
 get_env:
   # NB rules are evaluated like python `any()`. If there is no rule the job runs all of the times.
