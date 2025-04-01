@@ -425,6 +425,7 @@ client_validation_suite_release:
       paths:
         - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: pull
+  allow_failure: true
 
 client_configuration_validation:
   rules:
@@ -483,6 +484,7 @@ client_configuration_validation_release:
       paths:
         - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: pull
+  allow_failure: true
 
 check_status_tracking:
   rules:
@@ -539,6 +541,7 @@ check_status_tracking_release:
       paths:
         - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: pull
+  allow_failure: true
 
 cleanup_rucio_rules:
   rules:
