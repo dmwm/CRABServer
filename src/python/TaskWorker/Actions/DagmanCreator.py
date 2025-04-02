@@ -1347,7 +1347,7 @@ if __name__ == '__main__':
     ###
 
     import logging
-    from TaskWorker.ExternalService import CachedCRICService
+    from TaskWorker.WorkerUtilities import CRICService
     from WMCore.Configuration import loadConfigurationFile
     from ServerUtilities import newX509env
     config = loadConfigurationFile('/data/srv/TaskManager/cfg/TaskWorkerConfig.py')
@@ -1356,7 +1356,7 @@ if __name__ == '__main__':
 
     MOCK_BANNED_OUT_DESTINATIONS = ['T2_UK_SGrid_Bristol', 'T2_US_MIT']
     with envForCMSWEB:
-        resourceCatalog = CachedCRICService(logger=logging.getLogger(), configDict={"cacheduration": 1, "pycurl": True})
+        resourceCatalog = CRICService(logger=logging.getLogger(), configDict={"cacheduration": 1, "pycurl": True, "usestalecache": True})
         creator = DagmanCreator(config, crabserver=None, resourceCatalog=resourceCatalog)
 
         assert creator._checkSite('T2_US_Florida', pnn=False) is None, 'Site T2_US_Florida is valid'
