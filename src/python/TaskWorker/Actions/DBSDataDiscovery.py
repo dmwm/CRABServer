@@ -30,8 +30,8 @@ class DBSDataDiscovery(DataDiscovery):
 
     # disable pylint warning in next line since they refer to conflict with the main()
     # at the bottom of this file which is only used for testing
-    def __init__(self, config, crabserver='', procnum=-1, rucioClient=None): # pylint: disable=redefined-outer-name
-        DataDiscovery.__init__(self, config, crabserver, procnum)
+    def __init__(self, *args, rucioClient=None, **kwargs): # pylint: disable=redefined-outer-name
+        DataDiscovery.__init__(self, *args, **kwargs)
         self.rucioClient = rucioClient
 
     def checkDatasetStatus(self, dataset, kwargs):
@@ -610,6 +610,7 @@ if __name__ == '__main__':
     # Example: python3 DBSDataDiscovery.py prod/global /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
     ###
     import json
+    from TaskWorker.ExternalService import CachedCRICService
     from ServerUtilities import newX509env
 
     dbsInstance = sys.argv[1]
@@ -651,11 +652,11 @@ if __name__ == '__main__':
     config.Services.Rucio_key = '/data/certs/robotkey.pem'
 
     rucioClient = getNativeRucioClient(config=config, logger=logging.getLogger())
-
     resourceCatalog = None
     with config.TaskWorker.envForCMSWEB:
         resourceCatalog = CachedCRICService(logger=logging.getLogger(),
                                         configDict={"cacheduration": 1, "pycurl": True})
+
     discovery = DBSDataDiscovery(config=config, 
                                  resourceCatalog=resourceCatalog, rucioClient=rucioClient)
     userConfig = {'partialdataset':False,
