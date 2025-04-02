@@ -202,11 +202,12 @@ class DagmanCreator(TaskAction):
     into HTCondor
     """
 
-    def __init__(self, config, crabserver, procnum=-1, rucioClient=None):
+    def __init__(self, config, crabserver, resourceCatalog=None, procnum=-1, rucioClient=None):
         """ need a comment line here """
         TaskAction.__init__(self, config, crabserver, procnum)
         self.rucioClient = rucioClient
         self.runningInTW = crabserver is not None
+        self.resourceCatalog = resourceCatalog
 
     def populateGlideinMatching(self, task):
         """ actually simply set the required arch and microarch
@@ -909,18 +910,15 @@ class DagmanCreator(TaskAction):
                 continue
 
             if ignoreLocality:
-                with self.config.TaskWorker.envForCMSWEB:
-                    configDict = {"cacheduration": 1, "pycurl": True} # cache duration is in hours
-                    resourceCatalog = CRIC(logger=self.logger, configDict=configDict)
-                    try:
-                        possiblesites = set(resourceCatalog.getAllPSNs())
-                    except Exception as ex:
-                        msg = "The CRAB3 server backend could not contact the Resource Catalog to get the list of all CMS sites."
-                        msg += " This could be a temporary Resource Catalog glitch."
-                        msg += " Please try to submit a new task (resubmit will not work)"
-                        msg += " and contact the experts if the error persists."
-                        msg += f"\nError reason: {ex}"
-                        raise TaskWorkerException(msg) from ex
+                try:
+                    possiblesites = set(self.resourceCatalog.getAllPSNs())
+                except Exception as ex:
+                    msg = "The CRAB3 server backend could not contact the Resource Catalog to get the list of all CMS sites."
+                    msg += " This could be a temporary Resource Catalog glitch."
+                    msg += " Please try to submit a new task (resubmit will not work)"
+                    msg += " and contact the experts if the error persists."
+                    msg += f"\nError reason: {ex}"
+                    raise TaskWorkerException(msg) from ex
             else:
                 possiblesites = locations
             ## At this point 'possiblesites' should never be empty.
