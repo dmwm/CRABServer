@@ -262,7 +262,7 @@ deploy_publisher_rucio:
 
 task_submission:
   variables:
-    CMSSW_release: "${CMSSW_release:-CMSSW_13_0_2}" 
+    CMSSW_release: CMSSW_13_0_2 
   rules:
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, skip_check]
@@ -323,7 +323,7 @@ task_submission_release:
 
 sleep_before_validation:
   variables:
-    CMSSW_release: "${CMSSW_release:-CMSSW_13_0_2}" 
+    CMSSW_release: CMSSW_13_0_2
   rules:
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
@@ -364,7 +364,7 @@ sleep_before_validation_release:
 
 client_validation_suite:
   variables:
-    CMSSW_release: "${CMSSW_release:-CMSSW_13_0_2}"
+    CMSSW_release: CMSSW_13_0_2
   rules:
     - if: '$CLIENT_VALIDATION == "false"'
       when: never
@@ -422,7 +422,7 @@ client_validation_suite_release:
 
 client_configuration_validation:
   variables:
-    CMSSW_release: "${CMSSW_release:-CMSSW_13_0_2}" 
+    CMSSW_release: CMSSW_13_0_2
   rules:
     - if: '$CLIENT_CONFIGURATION_VALIDATION == "false"'
       when: never
@@ -480,7 +480,7 @@ client_configuration_validation_release:
 
 check_status_tracking:
   variables:
-    CMSSW_release: "${CMSSW_release:-CMSSW_13_0_2}" 
+    CMSSW_release: CMSSW_13_0_2
   rules:
     - if: '$STATUS_TRACKING == "false"'
       when: never
