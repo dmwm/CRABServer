@@ -313,7 +313,7 @@ class PreDAG():
             parent = self.prefix if self.stage == 'tail' else None
             rucioClient = getNativeRucioClient(config=config, logger=self.logger)
             with config.TaskWorker.envForCMSWEB:
-                resourceCatalog = CRICService(logger=self.logger, configDict={"cacheduration": 1, "pycurl": True})
+                resourceCatalog = CRICService(logger=self.logger, configDict={"cacheduration": 1, "pycurl": True, "usestalecache": True})
                 creator = DagmanCreator(
                     config,
                     crabserver=None,

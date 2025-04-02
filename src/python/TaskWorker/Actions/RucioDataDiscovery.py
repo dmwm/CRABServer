@@ -195,7 +195,7 @@ if __name__ == '__main__':
     rucioDid = f"{scope}:{container}"
 
     logging.basicConfig(level=logging.DEBUG)
-    from TaskWorker.ExternalService import CachedCRICService
+    from TaskWorker.WorkerUtilities import CRICService
     from WMCore.Configuration import ConfigurationEx
     from ServerUtilities import newX509env
 
@@ -225,7 +225,7 @@ if __name__ == '__main__':
     rucioClient = getNativeRucioClient(config=config, logger=logging.getLogger())
     resourceCatalog = None
     with config.TaskWorker.envForCMSWEB:
-        resourceCatalog = CachedCRICService(logger=logging.getLogger(), configDict={"cacheduration": 1, "pycurl": True})
+        resourceCatalog = CRICService(logger=logging.getLogger(), configDict={"cacheduration": 1, "pycurl": True, "usestalecache": True})
 
     fileset = RucioDataDiscovery(config=config, resourceCatalog=resourceCatalog, rucioClient=rucioClient)
     fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, 'user_proxy': 'None',
