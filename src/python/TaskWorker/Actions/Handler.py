@@ -175,7 +175,7 @@ def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
     rucioClient = getNativeRucioClient(config=config, logger=handler.logger)
     resourceCatalog = None
     with config.TaskWorker.envForCMSWEB:
-        resourceCatalog = CRICService(logger=handler.logger, configDict={"cacheduration": 1, "pycurl": True})
+        resourceCatalog = CRICService(logger=handler.logger, configDict={"cacheduration": 1, "pycurl": True, "usestalecache": True})
     # Temporary use `crab_input` account to checking other account quota.
     # See discussion in https://mattermost.web.cern.ch/cms-o-and-c/pl/ej7zwkr747rifezzcyyweisx9r
     tmpConfig = copy.deepcopy(config)
