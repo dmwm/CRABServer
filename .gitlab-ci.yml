@@ -66,10 +66,6 @@ stages:
     - CMSSW_9_4_21
     - CMSSW_8_0_36
 
-.cmssw_matrix_default: &cmssw_matrix_default
-  - CMSSW_release:
-    - CMSSW_13_0_2
-
 get_env:
   # NB rules are evaluated like python `any()`. If there is no rule the job runs all of the times.
   rules:
@@ -265,15 +261,13 @@ deploy_publisher_rucio:
     SERVICE: Publisher_rucio
 
 task_submission:
+  variables:
+    CMSSW_release: "${CMSSW_release:-CMSSW_13_0_2}" 
   rules:
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, skip_check]
     - !reference [.default_rules, default]
   stage: submit_testsuite
-  parallel:
-    matrix:
-      *cmssw_matrix_default
-  name: "task_submission[$CMSSW_release]"
   resource_group: crab3  # Only one job runs at a time
   tags:
     - crab3-shell
@@ -328,14 +322,12 @@ task_submission_release:
       policy: push
 
 sleep_before_validation:
+  variables:
+    CMSSW_release: "${CMSSW_release:-CMSSW_13_0_2}" 
   rules:
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
   stage: sleep
-  parallel:
-    matrix:
-      *cmssw_matrix_default
-  name: "sleep_before_validation[$CMSSW_release]"
   tags:
     - crab3-shell
   script:
@@ -371,16 +363,14 @@ sleep_before_validation_release:
       policy: pull
 
 client_validation_suite:
+  variables:
+    CMSSW_release: "${CMSSW_release:-CMSSW_13_0_2}"
   rules:
     - if: '$CLIENT_VALIDATION == "false"'
       when: never
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
   stage: run_testsuite_CV
-  parallel:
-    matrix:
-      *cmssw_matrix_default
-  name: "client_validation_suite[$CMSSW_release]"
   resource_group: crab3  # Only one job runs at a time
   tags:
     - crab3-shell
@@ -431,16 +421,14 @@ client_validation_suite_release:
   allow_failure: true
 
 client_configuration_validation:
+  variables:
+    CMSSW_release: "${CMSSW_release:-CMSSW_13_0_2}" 
   rules:
     - if: '$CLIENT_CONFIGURATION_VALIDATION == "false"'
       when: never
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
   stage: run_testsuite_CCV
-  parallel:
-    matrix:
-      *cmssw_matrix_default
-  name: "client_configuration_validation[$CMSSW_release]"
   resource_group: crab3  # Only one job runs at a time
   tags:
     - crab3-shell
@@ -491,16 +479,14 @@ client_configuration_validation_release:
   allow_failure: true
 
 check_status_tracking:
+  variables:
+    CMSSW_release: "${CMSSW_release:-CMSSW_13_0_2}" 
   rules:
     - if: '$STATUS_TRACKING == "false"'
       when: never
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
   stage: run_testsuite_TS
-  parallel:
-    matrix:
-      *cmssw_matrix_default
-  name: "check_status_tracking[$CMSSW_release]"
   tags:
     - crab3-shell
   script:
