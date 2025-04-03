@@ -16,7 +16,7 @@ function compare_status {
 }
 
 function report_difference {
-  diff task_process/status_cache.json.formatted task_process/status_cache_new.json.formatted > task_process/status_cache_diff
+  diff -y task_process/status_cache.json.formatted task_process/status_cache_new.json.formatted > task_process/status_cache_diff
   echo -e "HOST = $HOSTNAME\nCWD =  $PWD" | mail -s "Status difference in $REQUEST_NAME" stefano.belforte@cern.ch
   touch difference-already-reported
 }
