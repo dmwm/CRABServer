@@ -87,7 +87,7 @@ if [ "X$MAX_IDLE_TMP" != "X" ]; then
     MAX_IDLE=$MAX_IDLE_TMP
 fi
 
-MAX_POST=20
+MAX_POST=10
 MAX_POST_TMP=`grep '^CRAB_MaxPost =' $_CONDOR_JOB_AD | tr -d '"' | awk '{print $NF;}'`
 if [ "X$MAX_POST_TMP" != "X" ]; then
     MAX_POST=$MAX_POST_TMP
