@@ -57,7 +57,7 @@ class ReportRecallQuota(BaseRecurringAction):
             jsonDoc[account['tag']] = report['totalTB']
 
         # sends this document to Elastic Search via MONIT
-        response = requests.post('http://monit-metrics:10012/', data=json.dumps(jsonDoc),
+        response = requests.post('http://monit-metrics.cern.ch:10012/', data=json.dumps(jsonDoc),
                                   headers={"Content-Type": "application/json; charset=UTF-8"})
         if response.status_code == 200:
             self.logger.info("Report successfully sent to Monit")
