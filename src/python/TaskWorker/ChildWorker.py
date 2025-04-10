@@ -59,7 +59,7 @@ def startChildWorker(config, work, workArgs, logger):
         except Exception as e:
             raise e
 
-    return {"status": "Child Worker successfully started"}
+    return {"status": "Child Worker successfully completed"}
 
 def _signalHandler(signum, frame):
     """
