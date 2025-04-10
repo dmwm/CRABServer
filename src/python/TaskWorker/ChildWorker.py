@@ -50,7 +50,7 @@ def startChildWorker(config, work, workArgs, logger):
     with ProcessPoolExecutor(max_workers=1, mp_context=mp.get_context('fork')) as executor:
         future = executor.submit(_runChildWorker, work, workArgs, procTimeout, logger)
         try:
-            # We don't return the result; just wait for completion
+            # We don't return the result; just wait for completion; outputs variable helps debugging/inspection
             outputs = future.result(timeout=procTimeout + 1)
         except BrokenProcessPool as e:
             raise ChildUnexpectedExitException('Child process exited unexpectedly.') from e
@@ -92,6 +92,6 @@ def _runChildWorker(work, workArgs, timeout, logger):
     logger.debug(f'Installing SIGALARM with timeout {timeout} seconds.')
     signal.signal(signal.SIGALRM, _signalHandler)
     signal.alarm(timeout)
-    outputs = work(*workArgs) # Run but don't return result (to avoid pickling issues)
+    outputs = work(*workArgs) # Run but don't return result (to avoid pickling issues); outputs variable helps debugging/inspection
     logger.debug('Uninstalling SIGALARM.')
     signal.alarm(0)
