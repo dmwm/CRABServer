@@ -1205,7 +1205,7 @@ class DagmanCreator(TaskAction):
             self.logger.info(f"host {host} dbInstance {dbInstance} cert {cert}")
             self.logger.info(f"taskname {taskname}  reqname {reqname}")
             from RESTInteractions import CRABRest  # pylint: disable=import-outside-toplevel
-            crabserver = CRABRest(host, cert, cert, retry=3, userAgent='CRABSchedd')
+            crabserver = CRABRest(host, localcert=cert, localkey=cert, retry=3, userAgent='CRABSchedd')
             crabserver.setDbInstance(dbInstance)
             # fetch previous value from DB and  add to current value
             data = {'subresource': 'search', 'workflow': taskname}
