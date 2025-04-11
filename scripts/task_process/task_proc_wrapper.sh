@@ -4,9 +4,30 @@ function log {
     echo "[$(date +"%F %R")]" $*
 }
 
+function compare_status {
+  cat task_process/status_cache.json | jq > task_process/status_cache.json.formatted
+  cat task_process/status_cache_new.json | jq > task_process/status_cache_new.json.formatted
+  diff -q task_process/status_cache.json.formatted task_process/status_cache_new.json.formatted
+  Differ=$?
+  if  [ $Differ -eq '1' ]; then
+    log "=* STATUS_CACHE.JSON DIFFERS *="
+    [ -f difference-already-reported ] || report_difference
+  fi
+}
+
+function report_difference {
+  diff -y task_process/status_cache.json.formatted task_process/status_cache_new.json.formatted > task_process/status_cache_diff
+  echo -e "HOST = $HOSTNAME\nCWD =  $PWD\n`cat status_cache_diff`" | mail -s "Status difference in $REQUEST_NAME" stefano.belforte@cern.ch
+  touch difference-already-reported
+}
+
 function cache_status {
     log "Running cache_status.py"
     python3 task_process/cache_status.py
+    log "Running cache_status_new.py"
+    python3 task_process/cache_status_new.py
+    log "Comparing.."
+    compare_status
 }
 
 function manage_transfers {
