@@ -284,9 +284,9 @@ def parseNodeStateV2(fp, nodes, level):
                 info['State'] = 'cooloff'
         elif status == 3: # STATUS_SUBMITTED
             if msg == 'not_idle':
-                info.setdefault('State', 'running')
+                info['State'] = 'running'
             else:
-                info.setdefault('State', 'idle')
+                info['State'] = 'idle'
         elif status == 4: # STATUS_POSTRUN
             if info.get("State") != "cooloff":
                 info['State'] = 'transferring'

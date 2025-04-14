@@ -80,7 +80,9 @@ def parseJobLog(jel, nodes, nodeMap):
     parses new events in condor job log file and updates nodeMap
     :param jel: a condor JobEventLog object which provides an iterator over events
     :param nodes: the structure where we collect one job info for cache_status file
-    :param nodeMap: the structure where collect summary of all events
+    :param nodeMap: a structure to map DAG node id (i.e. CRAB_Id) to condor jobid Cluster.Proc
+                    first (Submit) event in job_log has a LogNotes attribute with the DAG id,
+                    but subsequent ones are only identified via Cluster and Proc
     :return: nothing
     """
     count = 0
@@ -88,11 +90,11 @@ def parseJobLog(jel, nodes, nodeMap):
         count += 1
         eventtime = time.mktime(time.strptime(event['EventTime'], "%Y-%m-%dT%H:%M:%S"))
         if event['MyType'] == 'SubmitEvent':
-            m = nodeNameRe.match(event['LogNotes'])
+            m = nodeNameRe.match(event['LogNotes'])  # True if LogNotes is like 'DAG Node: Job13'
             if m:
-                node = m.groups()[0]
-                proc = event['Cluster'], event['Proc']
-                info = nodes.setdefault(node, copy.deepcopy(NODE_DEFAULTS))
+                node = m.groups()[0]  # the number after 'DAG Node: Job' e.g. '13' (as a string), i.e. CRAB_Id
+                proc = event['Cluster'], event['Proc']  # SB: why a tuple instead of a string  like '10210368.0' ?
+                info = nodes.setdefault(node, copy.deepcopy(NODE_DEFAULTS))  # adds key "node" and makes info=NODE_DEFAULTS
                 info['State'] = 'idle'
                 info['JobIds'].append("%d.%d" % proc)
                 info['RecordedSite'] = False
@@ -102,7 +104,7 @@ def parseJobLog(jel, nodes, nodeMap):
                 info['WallDurations'].append(0)
                 info['ResidentSetSize'].append(0)
                 info['Retries'] = len(info['SubmitTimes'])-1
-                nodeMap[proc] = node
+                nodeMap[proc] = node  # nodeMap maps CRAB_Id '13' to (cluster, proc) i.e. condor jobId
         elif event['MyType'] == 'ExecuteEvent':
             node = nodeMap[event['Cluster'], event['Proc']]
             nodes[node]['StartTimes'].append(eventtime)
@@ -283,9 +285,9 @@ def parseNodeStateV2(fp, nodes, level):
                 info['State'] = 'cooloff'
         elif status == 3: # STATUS_SUBMITTED
             if msg == 'not_idle':
-                info.setdefault('State', 'running')
+                info['State'] = 'running'
             else:
-                info.setdefault('State', 'idle')
+                info['State'] = 'idle'
         elif status == 4: # STATUS_POSTRUN
             if info.get("State") != "cooloff":
                 info['State'] = 'transferring'
