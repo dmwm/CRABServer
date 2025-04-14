@@ -17,8 +17,7 @@ import json
 import htcondor2 as htcondor
 import classad2 as classad
 
-
-logging.basicConfig(filename='task_process/cache_status.log', level=logging.DEBUG)
+logging.basicConfig(filename='task_process/cache_status_new.log', level=logging.DEBUG)
 
 NODE_DEFAULTS = {
     'Retries': 0,
@@ -34,10 +33,10 @@ NODE_DEFAULTS = {
     'JobIds': []
 }
 
-STATUS_CACHE_FILE = "task_process/status_cache.txt"
-PKL_STATUS_CACHE_FILE = "task_process/status_cache.pkl"
-JSON_STATUS_CACHE_FILE = "task_process/status_cache.json"
-LOG_PARSING_POINTERS_DIR = "task_process/jel_pickles/"
+STATUS_CACHE_FILE = "task_process/status_cache_new.txt"
+PKL_STATUS_CACHE_FILE = "task_process/status_cache_new.pkl"
+JSON_STATUS_CACHE_FILE = "task_process/status_cache_new.json"
+LOG_PARSING_POINTERS_DIR = "task_process/jel_pickles_new/"
 FJR_PARSE_RES_FILE = "task_process/fjr_parse_results.txt"
 
 #
@@ -393,10 +392,11 @@ def readOldStatusCacheFile():
             with open(PKL_STATUS_CACHE_FILE, "rb") as fp:
                 cacheDoc = pickle.load(fp)
             # protect against fake file with just bootstrapTime created by AdjustSites.py
-            jobLogCheckpoint = getattr(cacheDoc, 'jobLogCheckpoint', None)
-            fjrParseResCheckpoint = getattr(cacheDoc, 'fjrParseResCheckpoint', None)
-            nodes = getattr(cacheDoc, 'nodes', None)
-            nodeMap = getattr(cacheDoc, 'nodeMap', None)
+            # note: python's dictionary.get(key) returns None if key is not in dictionary
+            jobLogCheckpoint = cacheDoc.get('jobLogCheckpoint')
+            fjrParseResCheckpoint = cacheDoc.get('fjrParseResCheckpoint')
+            nodes = cacheDoc.get('nodes')
+            nodeMap = cacheDoc.get('nodeMap')
         except Exception:  # pylint: disable=broad-except
             logging.exception("error during status_cache handling")
             jobLogCheckpoint = None
@@ -521,6 +521,7 @@ def storeNodesInfoInJSONFile(cacheDoc):
         json.dump(newDict, fp)
     move(tempFilename, JSON_STATUS_CACHE_FILE)
 
+
 def summarizeFjrParseResults(checkpoint):
     """
     Reads the fjr_parse_results file line by line. The file likely contains multiple
@@ -561,28 +562,152 @@ def summarizeFjrParseResults(checkpoint):
         return errDict, newCheckpoint
     return None, 0
 
+def reportDagStatusToDB(dagStatus):
+    """
+    argument
+    dagStatus : a dictionary. Example for normal (no autom. splitt.) task:
+     { "SubDagStatus": {}, "SubDags": {}, "Timestamp": 1741859306,
+      "NodesTotal": 30, "DagStatus": 6 }
+    this is the value of the `DagStatus' key in the 'nodes' dictionary
+    created inside parseNodeStateV2 function
+    """
+    statusName = collapseDAGStatus((dagStatus))
+    logging.info("UPDATE DAG STATUS IN TASK DB")
+    logging.info(f"Full dagStatus is {dagStatus}")
+    logging.info(f"Will report {statusName}")
+
+    with open(os.environ['_CONDOR_JOB_AD'], 'r', encoding='utf-8') as fd:
+        ad = classad.parseOne(fd)
+    host = ad['CRAB_RestHost']
+    dbInstance = ad['CRAB_DbInstance']
+    userProxy = ad['X509UserProxy']
+    taskname = ad['CRAB_Reqname']
+    logging.debug(f"host {host} dbInstance {dbInstance} cert {userProxy}")
+    logging.debug(f"taskname {taskname}  DAGstatus {statusName}")
+    from RESTInteractions import CRABRest  # pylint: disable=import-outside-toplevel
+    from urllib.parse import urlencode  # pylint: disable=import-outside-toplevel
+    crabserver = CRABRest(hostname=host, localcert=userProxy, localkey=userProxy, retry=0, userAgent='CRABSchedd')
+    crabserver.setDbInstance(dbInstance)
+    data = {'subresource': 'edit', 'column': 'tm_dagman_status',
+            'value': statusName, 'workflow': taskname}
+    try:
+        R = crabserver.post(api='task', data=urlencode(data))
+    except Exception as ex:  # pylint: disable=broad-except
+        R = str(ex)
+    logging.info(f"HTTP POST returned {R}")
+
+    return
+
+def collapseDAGStatus(dagInfo):
+    """Collapse the status of one or several DAGs to a single one.
+
+    Take into account that subdags can be submitted to the queue on the
+    schedd, but not yet started.
+
+    moved here from CRABClient/Command/status.py with small adaptions to work
+    in the scheduler (HTCondor AP)
+    originally developed by Matthias Wolf
+    """
+    status_order = ['SUBMITTED', 'FAILED', 'FAILED (KILLED)', 'COMPLETED']
+
+    subDagInfos = dagInfo.get('SubDags', {})
+    subDagStatus = dagInfo.get('SubDagStatus', {})
+    if len(subDagInfos) == 0 and len(subDagStatus) == 0:
+        # Regular splitting, return status of DAG
+        return translateDagStatus(dagInfo['DagStatus'])
+
+    # for the time being do the simple thing also for automati splitting
+    return translateDagStatus(dagInfo['DagStatus'])
+
+    def check_queued(statusOrSUBMITTED):
+        # 99 is the status to expect a submitted DAG. If there are less
+        # actual DAG status informations than expected DAGs, at least one
+        # DAG has to be queued.
+        if len(subDagInfos) < len([k for k in subDagStatus if subDagStatus[k] == 99]):
+            return 'SUBMITTED'
+        return statusOrSUBMITTED
+
+    # From now one deal with automatic splitting and the presence if subdags
+
+    # If the processing DAG is still running, we are 'SUBMITTED',
+    # still.
+    if len(subDagInfos) > 0:
+        state = translateDagStatus(subDagInfos[0]['DagStatus'])
+        if state == 'SUBMITTED':
+            return state
+    # Tails active: return most active tail status according to
+    # `status_order`
+    if len(subDagInfos) > 1:
+        states = [translateDagStatus(subDagInfos[k]['DagStatus']) for k in subDagInfos if k > 0]
+        for iStatus in status_order:
+            if states.count(iStatus) > 0:
+                return check_queued(iStatus)
+    # If no tails are active, return the status of the processing DAG.
+    if len(subDagInfos) > 0:
+        return check_queued(translateDagStatus(subDagInfos[0]['DagStatus']))
+    return check_queued(translateDagStatus(dagInfo['DagStatus']))
+
+def translateDagStatus(status):
+    """
+    from a number to a string which CRAB people can understand
+    From
+    https://htcondor.readthedocs.io/en task_process/cache_status.py
+/latest/automated-workflows/dagman-information-files.html#current-node-status-file
+    Most status values in there semms only relevant for nodes, but documentation does not differentiate
+    0 (STATUS_NOT_READY): At least one parent has not yet finished or the node is a FINAL node.
+    1 (STATUS_READY): All parents have finished, but the node is not yet running.
+    2 (STATUS_PRERUN): The node’s PRE script is running.
+    3 (STATUS_SUBMITTED): The node’s HTCondor job(s) are in the queue.
+    4 (STATUS_POSTRUN): The node’s POST script is running.
+    5 (STATUS_DONE): The node has completed successfully.
+    6 (STATUS_ERROR): The node has failed.
+    7 (STATUS_FUTILE): The node will never run because an ancestor node failed.
+    """
+
+    #
+    # N.B. separate status=5 in SUCCESS or FAILED based on whether all job succeeded or not ?
+    # or is already done by DAGMAN ?
+    DAG_STATUS_TO_STRING = {
+        0: 'SUBMITTED',  # clear for a node, but for DAG ? to be verified
+        1: 'SUBMITTED',  # clear for a node, but for DAG ? to be verified
+        3: 'RUNNING',
+        4: 'RUNNING',
+        5: 'COMPLETED',
+        6: 'FAILED',  # one ore more jobs (DAG nodes) failed
+        7: 'ERROR'  # as far as Stefano understand, this should never happen
+    }
+    # Do we report just DAG status, or a combined "global" status ?
+
+    statusName = DAG_STATUS_TO_STRING[status]
+    return statusName
+
 def main():
     """
     parse condor job_log from last checkpoint until now and write summary in status_cache files
     :return:
     """
     try:
+        logging.info(f"Start at {time.strftime('%d/%m/%y %X',time.localtime())}")
         # this is the old part
-        cacheDoc = storeNodesInfoInFile()
+        # cacheDoc = storeNodesInfoInFile()
         # this is new for the picke file but for the time being stick to using
         # cacheDoc information from old way. At some point shoudl carefull check code
         # and move on to the more strucutred 3-steps below, most likely when running
         # in python3 the old status_cache.txt file will be unusable, as we found in crab client
-        #infoN = readOldStatusCacheFile()
-        #infoN = parseCondorLog(info)
-        storeNodesInfoInPklFile(cacheDoc)
+        oldInfo = readOldStatusCacheFile()
+        updatedInfo = parseCondorLog(oldInfo)
+        storeNodesInfoInPklFile(updatedInfo)
         # to keep the txt file locally, useful for debugging, when we remove the old code:
-        # storeNodesInfoInTxtFile(cacheDoc)
-        storeNodesInfoInJSONFile(cacheDoc)
+        storeNodesInfoInTxtFile(updatedInfo)
+        storeNodesInfoInJSONFile(updatedInfo)
+
+        # make sure that we only do this when status has changed, not every 5 minutes, even if...all in all..
+        # isTimeToReport
+        reportDagStatusToDB(updatedInfo['nodes']['DagStatus'])
 
     except Exception:  # pylint: disable=broad-except
         logging.exception("error during main loop")
 
 main()
 
-logging.debug("cache_status_jel.py exiting")
+logging.debug("cache_status_new.py exiting")

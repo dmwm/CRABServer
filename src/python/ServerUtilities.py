@@ -76,7 +76,7 @@ MAX_MEMORY_SINGLE_CORE = 5000
 MAX_DISK_SPACE = 20000000  # Disk usage is not used from .job.ad as CRAB3 is not seeting it. 20GB is max.
 
 MAX_IDLE_JOBS = 1000
-MAX_POST_JOBS = 20
+MAX_POST_JOBS = 10
 
 # Parameter used to set the LeaveJobInQueue and the PeriodicRemoveclassads.
 # It's also used during resubmissions since we don't allow a resubmission during the last week

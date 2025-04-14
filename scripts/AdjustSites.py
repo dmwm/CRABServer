@@ -499,7 +499,7 @@ def main():
     host = ad['CRAB_RestHost']
     dbInstance = ad['CRAB_DbInstance']
     cert = ad['X509UserProxy']
-    crabserver = CRABRest(host, cert, cert, retry=3, userAgent='CRABSchedd')
+    crabserver = CRABRest(host, localcert=cert, localkey=cert, retry=3, userAgent='CRABSchedd')
     crabserver.setDbInstance(dbInstance)
 
     printLog("Sleeping 60 seconds to give TW time to update taskDB")

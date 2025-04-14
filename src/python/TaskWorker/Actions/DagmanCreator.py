@@ -19,9 +19,10 @@ import tarfile
 import hashlib
 import tempfile
 from ast import literal_eval
+from urllib.parse import urlencode
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import getLock, checkS3Object, pythonListToClassAdExprTree
+from ServerUtilities import getLock, checkS3Object, getColumn, pythonListToClassAdExprTree
 
 import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
@@ -36,7 +37,6 @@ from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS, SCRAM_TO_ARCH
 
 import htcondor2 as htcondor
 import classad2 as classad
-
 
 DAG_HEADER = """
 
@@ -768,6 +768,7 @@ class DagmanCreator(TaskAction):
 
         # SB should have a createDagSpects() methos to move away a lot of following code
 
+        task = kwargs['task']
         startjobid = kwargs.get('startjobid', 0)
         # parentDag below is only used during automatic splitting
         # possible values in each stage are:  probe: 0, tail: 1/2/3, processing: None
@@ -1160,6 +1161,9 @@ class DagmanCreator(TaskAction):
         elif int(jobSubmit['My.CRAB_FailedNodeLimit']) < 0:
             jobSubmit['My.CRAB_FailedNodeLimit'] = "-1"
 
+        # last thing, update number of jobs in this task in Task table
+        # using the numer of jobs in this (sub)DAGta
+        self.reportNumJobToDB(task, len(dagSpecs))
 
         return jobSubmit, splitterResult, subdags
 
@@ -1177,6 +1181,44 @@ class DagmanCreator(TaskAction):
             self.logger.error(msg)
             return []
         return highPrioUsers
+
+    def reportNumJobToDB(self, task, nJobs):
+        # update numner of jobs in this task in task table.
+        numJobsHere = nJobs
+        taskname = task['tm_taskname']
+        if self.runningInTW:
+            # things are easy
+            self.logger.info('Reporting numJobs from TW: %s', numJobsHere)
+            data = {'subresource': 'edit', 'column': 'tm_num_jobs',
+                    'value': numJobsHere, 'workflow': taskname}
+            self.crabserver.post(api='task', data=urlencode(data))
+        else:
+            # running in HTC AP host, i.e. automatic splitting, running inside PreDAG
+            # in the HTC AP there is no crabserver from "the TW slave process" so create one now
+            self.logger.info('Reporting numJobs from AP (preDag)')
+            with open(os.environ['_CONDOR_JOB_AD'], 'r', encoding='utf-8') as fd:
+                ad = classad.parseOne(fd)
+            host = ad['CRAB_RestHost']
+            dbInstance = ad['CRAB_DbInstance']
+            cert = ad['X509UserProxy']
+            reqname = ad['CRAB_Reqname']
+            self.logger.info(f"host {host} dbInstance {dbInstance} cert {cert}")
+            self.logger.info(f"taskname {taskname}  reqname {reqname}")
+            from RESTInteractions import CRABRest  # pylint: disable=import-outside-toplevel
+            crabserver = CRABRest(host, localcert=cert, localkey=cert, retry=3, userAgent='CRABSchedd')
+            crabserver.setDbInstance(dbInstance)
+            # fetch previous value from DB and  add to current value
+            data = {'subresource': 'search', 'workflow': taskname}
+            taskDict, _, _ = crabserver.get(api='task', data=data)
+            previousNumJobs = int(getColumn(taskDict, 'tm_num_jobs'))
+            self.logger.info(f"previousNumJobs {previousNumJobs}")
+            self.logger.info(f"numJobsHere {numJobsHere}")
+            numJobs = previousNumJobs + numJobsHere
+            # report
+            data = {'subresource': 'edit', 'column': 'tm_num_jobs',
+                    'value': numJobs, 'workflow': taskname}
+            R = crabserver.post(api='task', data=urlencode(data))
+            self.logger.info(f"HTTP POST returned {R}")
 
     def executeInternal(self, *args, **kw):
         """ all real work is done here """

@@ -103,9 +103,18 @@ def processWorkerLoop(inputs, results, resthost, dbInstance, procnum, logger, lo
                WORKER_CONFIG.FeatureFlags.childWorker:
                 logger.debug(f'Run {work.__name__} in childWorker.')
                 args = (resthost, dbInstance, WORKER_CONFIG, task, procnum, inputargs)
-                outputs = startChildWorker(WORKER_CONFIG, work, args, logger)
+                workOutput = startChildWorker(WORKER_CONFIG, work, args, logger)
             else:
-                outputs = work(resthost, dbInstance, WORKER_CONFIG, task, procnum, inputargs)
+                workOutput = work(resthost, dbInstance, WORKER_CONFIG, task, procnum, inputargs)
+            # note that the output of the "work" is assigned to a variable only to allow
+            # inspection for debugging purposes, but we do not want to put it in the
+            # multiprocess.Queue since in case it contains non-pickleable objects (htcondo.Submit e.g.)
+            # the put fails silently, see https://github.com/python/cpython/issues/84376
+            # for the purpose of the Worker processing we do not need to pass around all the
+            # info anyhow, so we only put the task Dictionart which
+            # a) is safe b) can be used for debugging inside Worker or MasterWorker
+            # reference: https://github.com/dmwm/CRABServer/pull/9026
+            outputs = Result(task=task, result="OK")
         except TapeDatasetException as tde:
             outputs = Result(task=task, err=str(tde))
         except SubmissionRefusedException as sre:
@@ -146,11 +155,15 @@ def processWorkerLoop(inputs, results, resthost, dbInstance, procnum, logger, lo
         removeTaskLogHandler(logger, taskhandler)
 
         logger.debug("About to put out message in results queue for workid %s", workid)
-        logger.debug(" out.result: %s - out.task: %s ", outputs.result, outputs.task)
-        results.put({
-                     'workid': workid,
-                     'out' : outputs
-                    })
+        logger.debug(" out.result: %s  ", outputs.result)
+        logger.debug(" out.task: %s ", outputs.task)
+        try:
+            results.put({
+                'workid': workid,
+                'out' : outputs
+            })
+        except Exception as ex:  # pylint: disable=broad-except
+            logger.error(f"Unable to push worker result to shared queue:\n{ex}")
         logger.debug("Done")
 
 
