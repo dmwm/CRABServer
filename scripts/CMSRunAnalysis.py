@@ -467,8 +467,7 @@ def AddChecksums(report):
                   + f"- FileSize: {float(fileInfo['size'])/(1024*1024)}.3f MBytes")
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
 
-
-def AddPsetHash(report=None, scramTool=None):
+def AddPsetHashEdmProvDump(report=None, scramTool=None):
     """
     Example relevant output from edmProvDump:
 
@@ -537,6 +536,64 @@ def AddPsetHash(report=None, scramTool=None):
                 print(lines)
                 raise Exception("PSet hash missing from edmProvDump output.")
 
+def AddPsetHashFjr(report=None, fjr_filename=None):
+    """
+    Extracts ParameterSetID from FrameworkJobReport.xml and assigns it
+    to the corresponding output files in the report.
+    """
+
+    if 'steps' not in report:
+        return
+    if 'cmsRun' not in report['steps']:
+        return
+    if 'output' not in report['steps']['cmsRun']:
+        return
+
+    try:
+        tree = ElementTree.parse(fjr_filename)
+        root = tree.getroot()
+        
+        # Verify root is FrameworkJobReport
+        if root.tag != 'FrameworkJobReport':
+            raise ValueError("Root element is not FrameworkJobReport")
+
+        # Find the Process element directly under FrameworkJobReport
+        process = root.find('Process')
+        if process is None:
+            raise ValueError("Process element not found under FrameworkJobReport")
+
+        # Find the ParameterSetID element
+        pset_id_element = process.find('ParameterSetID')
+        if pset_id_element is None:
+            raise ValueError("ParameterSetID element not found under Process")
+
+        pset_id = pset_id_element.text.strip()
+        if not pset_id:
+            raise ValueError("ParameterSetID value is empty")
+
+    except ElementTree.ParseError as e:
+        raise ValueError(f"Error parsing XML file: {str(e)}")
+    except Exception as e:
+        raise ValueError(f"Error processing XML file: {str(e)}")
+
+    print(f"Extracted ParameterSetID (PSet Hash): {pset_id}")
+
+    # Assign psetHash to relevant output files
+    for outputMod in report['steps']['cmsRun']['output'].values():
+        for fileInfo in outputMod:
+            if fileInfo.get('output_module_class', '') != 'PoolOutputModule':
+                continue
+            if 'pfn' not in fileInfo:
+                continue
+
+            print(f"== Adding PSet Hash for filename: {fileInfo['pfn']}")
+
+            if not os.path.exists(fileInfo['pfn']):
+                print("== Output file missing!")
+                continue
+
+            print(f"== Assigning PSet Hash {pset_id} to {fileInfo['pfn']}")
+            fileInfo['pset_hash'] = pset_id
 
 def StripReport(report):
     if 'steps' not in report:
@@ -840,7 +897,11 @@ if __name__ == "__main__":
             # only if application succeeded compute output stats
             AddChecksums(rep)
             try:
-                AddPsetHash(report=rep, scramTool=scram)
+                AddPsetHashFjr(report=rep, fjr_filename='FrameworkJobReport.xml')
+            except Exception as e:
+                print(f"Error: {e}")
+                print("PsetHash could not be extracted from FrameworkJobReport. Trying to extract from EdmProvDump...")
+                AddPsetHashEdmProvDump(report=rep, scramTool=scram)
             except Exception as ex:  # pylint: disable=broad-except
                 exmsg = "Unable to compute pset hash for job output. Got exception:"
                 exmsg += "\n" + str(ex) + "\n"
