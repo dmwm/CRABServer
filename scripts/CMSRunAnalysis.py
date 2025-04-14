@@ -467,7 +467,76 @@ def AddChecksums(report):
                   + f"- FileSize: {float(fileInfo['size'])/(1024*1024)}.3f MBytes")
             fileInfo['checksums'] = {'adler32': adler32, 'cksum': cksum}
 
-def AddPsetHash(report=None, fjr_filename=None):
+def AddPsetHashEdmProvDump(report=None, scramTool=None):
+    """
+    Example relevant output from edmProvDump:
+
+    Processing History:
+  LHC '' '"CMSSW_5_2_7_ONLINE"' [1]  (3d65e8b9ad872f46fe020c68d75d79ab)
+    HLT '' '"CMSSW_5_2_7_ONLINE"' [1]  (5b994f2a1c1c3f9dcafe27bcfa8f085f)
+      RECO '' '"CMSSW_5_3_7_patch6"' [1]  (c186b1d0b14a7353cd3d6e46639ccbbc)
+        PAT '' '"CMSSW_5_3_11"' [1]  (8daee065cbf6da0cee1c034eb3f8af28)
+    HLT '' '"CMSSW_5_2_7_ONLINE"' [2]  (d019fbf5930638478d250e8c8d5257cc)
+      RECO '' '"CMSSW_5_3_7_patch6"' [1]  (c186b1d0b14a7353cd3d6e46639ccbbc)
+  LHC '' '"CMSSW_5_2_7_onlpatch3_ONLINE"' [2]  (3d65e8b9ad872f46fe020c68d75d79ab)
+    HLT '' '"CMSSW_5_2_7_onlpatch3_ONLINE"' [1]  (cd9d2672f701d636e7873de078595fcf)
+      RECO '' '"CMSSW_5_3_7_patch6"' [1]  (c186b1d0b14a7353cd3d6e46639ccbbc)
+
+    We want to take the line with the deepest prefix (PAT line above)
+    """
+
+    if 'steps' not in report:
+        return
+    if 'cmsRun' not in report['steps']:
+        return
+    if 'output' not in report['steps']['cmsRun']:
+        return
+
+    pset_re = re.compile(r"(\s+).*\(([a-f0-9]{32,32})\)$")
+    processing_history_re = re.compile("^Processing History:$")
+    for outputMod in report['steps']['cmsRun']['output'].values():
+        for fileInfo in outputMod:
+            if not fileInfo.get('output_module_class', '') == 'PoolOutputModule':
+                continue
+            if 'pfn' not in fileInfo:
+                continue
+            print(f"== Adding PSet Hash for filename: {fileInfo['pfn']}")
+            if not os.path.exists(fileInfo['pfn']):
+                print("== Output file missing!")
+                continue
+            m = re.match(r"^[A-Za-z0-9\-._]+$", fileInfo['pfn'])
+            if not m:
+                print(f"== EDM output filename ({fileInfo['pfn']}) must match RE ^[A-Za-z0-9\\-._]+$")
+                continue
+            print(f"==== PSet Hash computation STARTING at {UTCNow()} ====")
+            lines = getProv(filename=fileInfo['pfn'], scramTool=scramTool)
+            found_history = False
+            matches = {}
+            for aLine in lines.splitlines():
+                if not found_history:
+                    if processing_history_re.match(aLine):
+                        found_history = True
+                    continue
+                m = pset_re.match(aLine)
+                if m:
+                    # Note we want the deepest entry in the hierarchy
+                    depth, pset_hash = m.groups()
+                    depth = len(depth)
+                    matches[depth] = pset_hash
+                else:
+                    break
+            print(f"==== PSet Hash computation FINISHED at {UTCNow()} ====")
+            if matches:
+                max_depth = max(matches.keys())
+                pset_hash = matches[max_depth]
+                print(f"== edmProvDump pset hash {pset_hash}")
+                fileInfo['pset_hash'] = pset_hash
+            else:
+                print("ERROR: PSet Hash missing from edmProvDump output.  Full dump below.")
+                print(lines)
+                raise Exception("PSet hash missing from edmProvDump output.")
+
+def AddPsetHashFjr(report=None, fjr_filename=None):
     """
     Extracts ParameterSetID from FrameworkJobReport.xml and assigns it
     to the corresponding output files in the report.
@@ -828,7 +897,11 @@ if __name__ == "__main__":
             # only if application succeeded compute output stats
             AddChecksums(rep)
             try:
-                AddPsetHash(report=rep, fjr_filename='FrameworkJobReport.xml')
+                AddPsetHashFjr(report=rep, fjr_filename='FrameworkJobReport.xml')
+            except Exception as e:
+                print(f"Error: {e}")
+                print("PsetHash could not be extracted from FrameworkJobReport. Trying to extract from EdmProvDump...")
+                AddPsetHashEdmProvDump(report=rep, scramTool=scram)
             except Exception as ex:  # pylint: disable=broad-except
                 exmsg = "Unable to compute pset hash for job output. Got exception:"
                 exmsg += "\n" + str(ex) + "\n"
