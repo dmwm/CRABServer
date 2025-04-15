@@ -273,10 +273,10 @@ def parseNodeStateV2(fp, nodes, level):
         msg = ad.get("StatusDetails", "")
         info = nodes.setdefault(nodeid, copy.deepcopy(NODE_DEFAULTS))
         if status == 1: # STATUS_READY
-            if info.get("State") == "transferring":
-                info["State"] = "cooloff"
-            elif info.get('State') != "cooloff":
+            if retry == 0:
                 info['State'] = 'unsubmitted'
+            else:
+                info['State'] = 'cooloff'
         elif status == 2: # STATUS_PRERUN
             if retry == 0:
                 info['State'] = 'unsubmitted'
