@@ -18,7 +18,7 @@ import htcondor2 as htcondor
 import classad2 as classad
 
 
-logging.basicConfig(filename='task_process/cache_status.log', level=logging.DEBUG)
+logging.basicConfig(filename='task_process/cache_status_old.log', level=logging.DEBUG)
 
 NODE_DEFAULTS = {
     'Retries': 0,

@@ -9,7 +9,7 @@ function compare_status {
   Differ=$?
   if  [ $Differ -eq '1' ]; then
     log "=* STATUS_CACHE.JSON DIFFERS *="
-    [ -f difference-already-reported ] || report_difference
+    #[ -f difference-already-reported ] || report_difference
   fi
 }
 
