@@ -21,8 +21,8 @@ function report_difference {
 function cache_status {
     log "Running cache_status.py"
     python3 task_process/cache_status.py
-    log "Running cache_status_new.py"
-    python3 task_process/cache_status_new.py
+    log "Running cache_status_old.py"
+    python3 task_process/cache_status_old.py
     log "Comparing.."
     compare_status
 }
