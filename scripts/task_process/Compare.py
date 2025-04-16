@@ -6,8 +6,8 @@ temporary utility to compare ost relevant info from new and old cache_status.jso
 import sys
 import json
 
-old = 'task_process/status_cache.json'
-new = 'task_process/status_cache_new.json'
+new = 'task_process/status_cache.json'
+old = 'task_process/status_cache_old.json'
 with open(old) as fp:
     oldJson = json.load(fp)
 with open(new) as fp:
