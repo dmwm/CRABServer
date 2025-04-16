@@ -5,9 +5,7 @@ function log {
 }
 
 function compare_status {
-  cat task_process/status_cache.json | jq > task_process/status_cache.json.formatted
-  cat task_process/status_cache_new.json | jq > task_process/status_cache_new.json.formatted
-  diff -q task_process/status_cache.json.formatted task_process/status_cache_new.json.formatted
+  python3 task_process/Compare.py > task_process/status_cache_diff
   Differ=$?
   if  [ $Differ -eq '1' ]; then
     log "=* STATUS_CACHE.JSON DIFFERS *="
@@ -16,8 +14,7 @@ function compare_status {
 }
 
 function report_difference {
-  diff -y task_process/status_cache.json.formatted task_process/status_cache_new.json.formatted > task_process/status_cache_diff
-  echo -e "HOST = $HOSTNAME\nCWD =  $PWD\n`cat status_cache_diff`" | mail -s "Status difference in $REQUEST_NAME" stefano.belforte@cern.ch
+  echo -e "HOST = $HOSTNAME\nCWD =\n  $PWD\n`cat task_process/status_cache_diff`" | mail -s "Status difference in $REQUEST_NAME" stefano.belforte@cern.ch
   touch difference-already-reported
 }
 
