@@ -34,10 +34,10 @@ NODE_DEFAULTS = {
     'JobIds': []
 }
 
-STATUS_CACHE_FILE = "task_process/status_cache.txt"
-PKL_STATUS_CACHE_FILE = "task_process/status_cache.pkl"
-JSON_STATUS_CACHE_FILE = "task_process/status_cache.json"
-LOG_PARSING_POINTERS_DIR = "task_process/jel_pickles/"
+STATUS_CACHE_FILE = "task_process/status_cache_old.txt"
+PKL_STATUS_CACHE_FILE = "task_process/status_cache_old.pkl"
+JSON_STATUS_CACHE_FILE = "task_process/status_cache_old.json"
+LOG_PARSING_POINTERS_DIR = "task_process/jel_pickles_old/"
 FJR_PARSE_RES_FILE = "task_process/fjr_parse_results.txt"
 
 #
