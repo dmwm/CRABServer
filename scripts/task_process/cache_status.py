@@ -235,6 +235,7 @@ def parseNodeStateV2(fp, nodes, level):
     This is a more flexible format that allows future extensions but, unfortunately,
     also requires a separate parser.
     """
+    # note that when nodes was read from cache, setdefault returns the current value
     dagStatus = nodes.setdefault("DagStatus", {})
     dagStatus.setdefault("SubDagStatus", {})
     subDagStatus = dagStatus.setdefault("SubDags", {})
@@ -254,10 +255,17 @@ def parseNodeStateV2(fp, nodes, level):
             continue
         node = ad.get("Node", "")
         if node.endswith("SubJobs"):
+            # DagmanCreator uses Job{count}SubJobs as JobName for sub-dags
+            # ref https://htcondor.readthedocs.io/en/latest/automated-workflows/dagman-using-other-dags.html#composing-workflows-from-dags
+            # and https://htcondor.readthedocs.io/en/latest/automated-workflows/dagman-using-other-dags.html#a-dag-within-a-dag-is-a-subdag
             status = ad.get('NodeStatus', -1)
             dagname = "RunJobs{0}.subdag".format(nodeName2Re.match(node).group(1))
             # Add special state where we *expect* a submitted DAG for the
-            # status command on the client
+            # status command on the client. Note: our subdags are submitted with NOOP so
+            # they complete immediately and the running Dag ends (status=5), the actual
+            # submission of the subdags happens inside the PRE step in PreDag.py
+            # Therefore we use the following set-status-to-99 trick to say
+            #  "this dag is done, so look at subdags to tell if something is still running"
             if status == 5 and os.path.exists(dagname) and os.stat(dagname).st_size > 0:
                 status = 99
             dagStatus["SubDagStatus"][node] = status
@@ -485,6 +493,10 @@ def reportDagStatusToDB(dagStatus):
     dagStatus : a dictionary. Example for normal (no autom. splitt.) task:
      { "SubDagStatus": {}, "SubDags": {}, "Timestamp": 1741859306,
       "NodesTotal": 30, "DagStatus": 6 }
+       Example for an automatic splitting task with not tails:
+     {'SubDagStatus': {'Job0SubJobs': 99, 'Job1SubJobs': 5},
+      'SubDags': {0: {'Timestamp': 1744826643, 'NodesTotal': 26, 'DagStatus': 5}},
+       'Timestamp': 1744823021, 'NodesTotal': 6, 'DagStatus': 5}
     this is the value of the `DagStatus' key in the 'nodes' dictionary
     created inside parseNodeStateV2 function
     """
@@ -540,6 +552,9 @@ def collapseDAGStatus(dagInfo):
         # 99 is the status to expect a submitted DAG. If there are less
         # actual DAG status informations than expected DAGs, at least one
         # DAG has to be queued.
+        # Stefano: now that we run in the AP we can possibly do better for detecting
+        # that a condor_submit_dag has been issued but job did not start yet.
+        # condor_dagmans run as job in scheduler universe (7) and e.g. expose CRAB_Reqname ad
         if len(subDagInfos) < len([k for k in subDagStatus if subDagStatus[k] == 99]):
             return 'SUBMITTED'
         return statusOrSUBMITTED
