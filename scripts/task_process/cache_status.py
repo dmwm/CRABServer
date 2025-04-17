@@ -555,8 +555,8 @@ def collapseDAGStatus(dagInfo):
     return translateDagStatus(dagInfo['DagStatus'])
 
     def check_queued(statusOrSUBMITTED):
-        # 99 is the status to expect a submitted DAG. If there are less
-        # actual DAG status informations than expected DAGs, at least one
+        # 99 is the status of a DAG which submitted one ore more subdags.
+        # If there are less actual DAG status informations than expected DAGs, at least one
         # DAG has to be queued.
         # Stefano: now that we run in the AP we can possibly do better for detecting
         # that a condor_submit_dag has been issued but job did not start yet.
