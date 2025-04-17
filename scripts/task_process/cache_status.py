@@ -267,7 +267,7 @@ def parseNodeStateV2(fp, nodes, level):
             # Therefore we use the following set-status-to-99 trick to say
             #  "this dag is done, so look at subdags to tell if something is still running"
             if status == 5 and os.path.exists(dagname) and os.stat(dagname).st_size > 0:
-                status = 99
+                status = 99  # means: DAG completed after submitting a new DAG
             dagStatus["SubDagStatus"][node] = status
             continue
         if not node.startswith("Job"):
@@ -539,7 +539,13 @@ def collapseDAGStatus(dagInfo):
     """
     status_order = ['SUBMITTED', 'FAILED', 'FAILED (KILLED)', 'COMPLETED']
 
+    # subDagInfos is a dictionary with key the dag level ({count}) e.g.
+    # {0: {'Timestamp': 1744883488, 'NodesTotal': 94, 'DagStatus': 3}}
+    # indiates a running processing dag with 94 nodes
     subDagInfos = dagInfo.get('SubDags', {})
+    # subDagStatus is a dictionary with key Job{count}SunJobs and value the status
+    # e.g. {'Job0SubJobs': 99, 'Job1SubJobs': 2}q
+
     subDagStatus = dagInfo.get('SubDagStatus', {})
     if len(subDagInfos) == 0 and len(subDagStatus) == 0:
         # Regular splitting, return status of DAG
