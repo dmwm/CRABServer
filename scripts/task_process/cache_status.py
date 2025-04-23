@@ -551,9 +551,6 @@ def collapseDAGStatus(dagInfo):
         # Regular splitting, return status of DAG
         return translateDagStatus(dagInfo['DagStatus'])
 
-    # for the time being do the simple thing also for automati splitting
-    return translateDagStatus(dagInfo['DagStatus'])
-
     def check_queued(statusOrSUBMITTED):
         # 99 is the status of a DAG which submitted one ore more subdags.
         # If there are less actual DAG status informations than expected DAGs, at least one
