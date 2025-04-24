@@ -563,7 +563,6 @@ def main():
     schedd = htcondor.Schedd()
     taskNameAd = classad.quote(ad.get("CRAB_ReqName"))
     tailconst = f"(CRAB_DAGType =?= \"TAIL\" && CRAB_ReqName =?= {taskNameAd})"
-    tailconst += " || (TaskType =?= \"TAIL\" && CRAB_ReqName =?= {taskNameAd})"
     if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
         printLog("Holding processing and tail DAGs")
         schedd.edit(tailconst, "HoldKillSig", 'SIGKILL')

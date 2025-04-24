@@ -63,7 +63,6 @@ class DagmanKiller(TaskAction):
             raise TaskWorkerException(msg) from exp
         taskName = classad.quote(self.workflow)
         const = f'(CRAB_ReqName =?= {taskName} && CRAB_DAGType=?="Job")'
-        const += f' || (CRAB_ReqName =?= {taskName} && TaskType=?="Job")'
 
         # Note that we can not send kills for jobs not in queue at this time; we'll need the
         # DAG FINAL node to be fixed and the node status to include retry number.
