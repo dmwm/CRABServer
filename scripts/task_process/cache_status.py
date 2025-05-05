@@ -213,21 +213,21 @@ def parseJobLog(jel, nodes, nodeMap):
         while len(info['WallDurations']) > len(info['SiteHistory']):
             info['SiteHistory'].append("Unknown")
 
-def parseErrorReport(data, nodes):
+
+def parseErrorReport(fjrReports, nodes):
     """
     iterate over the jobs and set the error dict for those which are failed
-    :param data: a dictionary as returned by summarizeFjrParseResults() : {jobid:errdict}
+    :param fjrReports: a dictionary as returned by summarizeFjrParseResults() : {jobid:errdict}
                  errdict is {crab_retry:error_summary} from PostJob/prepareErrorSummary
                  which writes one line for PostJoun run: {job_id : {crab_retry : error_summary}}
-                 where crab_retry is a string and error_summary a list [exitcode, errorMsg, {}]
-    :param nodes: a dictionary with format {jobid:statedict}
-    :return: nothing, modifies nodes in place
+                 in which crab_retry is a string and error_summary is a list [exitcode, errorMsg, {}]
+    :param nodes: a dictionary with format {jobid:dictionary}
+    :return: nothing
+    : SIDE ACTION: modifies nodes in place by adding the Error key to the dictionary of matching jobs
     """
-    for jobid, statedict in nodes.items():
-        if 'State' in statedict and statedict['State'] == 'failed' and jobid in data:
-            # pick error info from last retry (SB: AFAICT only last retry is listed anyhow)
-            for key in data[jobid]:
-                statedict['Error'] = data[jobid][key]
+    for jobid, errdict in fjrReports.items():
+        if jobid in nodes:
+            nodes[jobid]['Error'] = errdict
 
 def parseNodeStateV2(fp, nodes, level):
     """
