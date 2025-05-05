@@ -267,6 +267,7 @@ if [ $STAGEOUT_EXIT_STATUS -ne 0 ]; then
     #set -x
     if [ $EXIT_STATUS -eq 0 ]; then
         EXIT_STATUS=$STAGEOUT_EXIT_STATUS
+        echo $EXIT_STATUS > jobReport.exitCode.txt
     fi
 fi
 echo "======== Stageout at $(TZ=GMT date) FINISHING (short status $STAGEOUT_EXIT_STATUS) ========"
