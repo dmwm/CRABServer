@@ -10,10 +10,10 @@ import os
 import os.path
 import re
 import shutil
-from distutils.core import setup, Command
-from distutils.command.build import build
-from distutils.command.install import install
-from distutils.spawn import spawn
+from setuptools import setup, Command
+from setuptools.command.build import build
+from setuptools.command.install import install
+from setuptools._distutils.spawn import spawn
 
 
 systems = \
