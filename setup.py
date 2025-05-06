@@ -122,22 +122,64 @@ def get_relative_path():
     return os.path.dirname(os.path.abspath(os.path.join(os.getcwd(), sys.argv[0])))
 
 def define_the_build(dist, system_name, patch_x=''):
-    # Expand various sources.
-    docroot = "doc/build/html"
-    system = systems[system_name]
-    #binsrc = sum((glob("bin/%s" % x) for x in system['bin']), [])
+    """
+    Define the build configuration for the specified system.
+    
+    Args:
+        dist: The distribution object
+        system_name: Name of the system to build
+        patch_x: Prefix for patched installations (default: '')
+    
+    Raises:
+        ValueError: If system_name is not recognized
+        IOError: If docroot directory doesn't exist
+    """
+    try:
+        # Initialize data_files if missing or None
+        if not hasattr(dist, 'data_files') or dist.data_files is None:
+            dist.data_files = []
+            print(f"Initialized data_files for {system_name} build")
 
-    dist.py_modules = system['py_modules']
-    dist.packages = system['python']
-    #dist.data_files = [('%sbin' % patch_x, binsrc)]
-    #dist.data_files = [ ("%sdata" % (patch_x, ), "scripts/%s" % (x,))
-    #				for x in ['CMSRunAnalysis.sh']]
-    #dist.data_files = ['scripts/CMSRunAnalysis.sh']
-    if os.path.exists(docroot):
-        for dirpath, _, files in os.walk(docroot):
-            dist.data_files.append(("%sdoc%s" % (patch_x, dirpath[len(docroot):]),
-                                    ["%s/%s" % (dirpath, fname) for fname in files
-                                     if fname != '.buildinfo']))
+        # Validate system name
+        if system_name not in systems:
+            raise ValueError(f"System {system_name} not recognized. Available systems: {list(systems.keys())}")
+
+        # Get system configuration
+        system = systems[system_name]
+        print(f"Configuring build for system: {system_name}")
+
+        # Set py_modules and packages
+        dist.py_modules = system['py_modules']
+        dist.packages = system['python']
+        print(f"Set py_modules: {dist.py_modules}")
+        print(f"Set packages: {dist.packages}")
+
+        # Handle documentation files
+        docroot = "doc/build/html"
+        if os.path.exists(docroot):
+            print(f"Processing documentation from: {docroot}")
+            for dirpath, _, files in os.walk(docroot):
+                if files:  # Only add directories with files
+                    doc_files = [
+                        os.path.join(dirpath, fname) 
+                        for fname in files 
+                        if fname != '.buildinfo'
+                    ]
+                    install_dir = f"{patch_x}doc{dirpath[len(docroot):]}"
+                    dist.data_files.append((install_dir, doc_files))
+                    print(f"Added {len(doc_files)} docs to {install_dir}")
+        else:
+            print(f"Warning: Documentation directory {docroot} not found")
+
+    except Exception as e:
+        print(f"\nERROR in define_the_build for {system_name}:")
+        print(f"Type: {type(e).__name__}")
+        print(f"Message: {str(e)}")
+        print("Current distribution attributes:")
+        print(f"data_files: {getattr(dist, 'data_files', 'NOT SET')}")
+        print(f"py_modules: {getattr(dist, 'py_modules', 'NOT SET')}")
+        print(f"packages: {getattr(dist, 'packages', 'NOT SET')}")
+        raise  # Re-raise the exception after logging
 
 class BuildCommand(build):
     """Build python modules for a specific system."""
