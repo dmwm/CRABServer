@@ -120,6 +120,9 @@ def get_relative_path():
     return os.path.dirname(os.path.abspath(os.path.join(os.getcwd(), sys.argv[0])))
 
 def define_the_build(dist, system_name, patch_x=''):
+    # Initialize data_files if it doesn't exist
+    if not hasattr(dist, 'data_files') or dist.data_files is None:
+        dist.data_files = []
     # Expand various sources.
     docroot = "doc/build/html"
     system = systems[system_name]
