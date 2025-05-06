@@ -15,6 +15,17 @@ from setuptools.command.build import build
 from setuptools.command.install import install
 from setuptools.command.install_lib import install_lib
 from distutils.spawn import spawn  # This can stay as is from distutils
+from setuptools import Distribution
+
+# Create a custom Distribution class that ensures data_files is always initialized
+class CRABDistribution(Distribution):
+    def __init__(self, attrs=None):
+        # Initialize data_files as empty list if not provided
+        if attrs is None:
+            attrs = {}
+        if 'data_files' not in attrs:
+            attrs['data_files'] = []
+        Distribution.__init__(self, attrs)
 
 
 systems = \
@@ -216,6 +227,9 @@ class BuildCommand(build):
             spawn(['make', '-C', 'doc', 'html', 'PROJECT=%s' % 'crabserver'])
 
     def run(self):
+        # Ensure data_files is initialized before any build steps
+        if not hasattr(self.distribution, 'data_files') or self.distribution.data_files is None:
+            self.distribution.data_files = []
         command = 'build'
         if self.distribution.have_run.get(command):
             return
@@ -315,14 +329,15 @@ def getWebDir():
             res.append((root[4:], [os.path.join(root, x) for x in files])) #4: for removing src
     return res
 
-setup(name='crabserver',
+setup(
+      distclass=CRABDistribution,
+      name='crabserver',
       version='3.2.0',
       maintainer_email='hn-cms-crabdevelopment@cern.ch',
       cmdclass={
           'build_system': BuildCommand,
           'install_system': InstallCommand,
-          'test': TestCommand,
-          'package': PackageCommand
+          'test': TestCommand
       },
       #include_package_data=True,  # Uncomment if you have MANIFEST.in or want to include non-Python files
       #base directory for all the packages
