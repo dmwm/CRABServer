@@ -2,7 +2,7 @@
 #pylint: disable=C0103,W0105,broad-except,logging-not-lazy,W0702,C0301,R0902,R0914,R0912,R0915,W0201,W0621
 
 """
-    NOTE: This is intended to run automagically. Keep the deps minimal
+    NOTE: This is intended to run automatically. Keep the deps minimal
 """
 from __future__ import print_function
 import sys
@@ -10,23 +10,10 @@ import os
 import os.path
 import re
 import shutil
+import subprocess
 from setuptools import setup, Command
-from setuptools.command.build import build
+from setuptools.command.build_py import build_py
 from setuptools.command.install import install
-from setuptools.command.install_lib import install_lib
-from distutils.spawn import spawn  # This can stay as is from distutils
-from setuptools import Distribution
-
-# Create a custom Distribution class that ensures data_files is always initialized
-class CRABDistribution(Distribution):
-    def __init__(self, attrs=None):
-        # Initialize data_files as empty list if not provided
-        if attrs is None:
-            attrs = {}
-        if 'data_files' not in attrs:
-            attrs['data_files'] = []
-        Distribution.__init__(self, attrs)
-
 
 systems = \
 {
@@ -127,84 +114,40 @@ class PackageCommand(Command):
         """
             Need to do a few things here:
         """
-        pass
 
 def get_relative_path():
     return os.path.dirname(os.path.abspath(os.path.join(os.getcwd(), sys.argv[0])))
 
 def define_the_build(dist, system_name, patch_x=''):
-    """
-    Define the build configuration for the specified system.
-    
-    Args:
-        dist: The distribution object
-        system_name: Name of the system to build
-        patch_x: Prefix for patched installations (default: '')
-    
-    Raises:
-        ValueError: If system_name is not recognized
-        IOError: If docroot directory doesn't exist
-    """
-    try:
-        # Initialize data_files if missing or None
-        if not hasattr(dist, 'data_files') or dist.data_files is None:
-            dist.data_files = []
-            print(f"Initialized data_files for {system_name} build")
+    # Expand various sources.
+    docroot = "doc/build/html"
+    system = systems[system_name]
+    #binsrc = sum((glob("bin/%s" % x) for x in system['bin']), [])
 
-        # Validate system name
-        if system_name not in systems:
-            raise ValueError(f"System {system_name} not recognized. Available systems: {list(systems.keys())}")
+    dist.py_modules = system['py_modules']
+    dist.packages = system['python']
+    #dist.data_files = [('%sbin' % patch_x, binsrc)]
+    #dist.data_files = [ ("%sdata" % (patch_x, ), "scripts/%s" % (x,))
+    #				for x in ['CMSRunAnalysis.sh']]
+    #dist.data_files = ['scripts/CMSRunAnalysis.sh']
+    if os.path.exists(docroot):
+        for dirpath, _, files in os.walk(docroot):
+            dist.data_files.append(("%sdoc%s" % (patch_x, dirpath[len(docroot):]),
+                                    ["%s/%s" % (dirpath, fname) for fname in files
+                                     if fname != '.buildinfo']))
 
-        # Get system configuration
-        system = systems[system_name]
-        print(f"Configuring build for system: {system_name}")
-
-        # Set py_modules and packages
-        dist.py_modules = system['py_modules']
-        dist.packages = system['python']
-        print(f"Set py_modules: {dist.py_modules}")
-        print(f"Set packages: {dist.packages}")
-
-        # Handle documentation files
-        docroot = "doc/build/html"
-        if os.path.exists(docroot):
-            print(f"Processing documentation from: {docroot}")
-            for dirpath, _, files in os.walk(docroot):
-                if files:  # Only add directories with files
-                    doc_files = [
-                        os.path.join(dirpath, fname) 
-                        for fname in files 
-                        if fname != '.buildinfo'
-                    ]
-                    install_dir = f"{patch_x}doc{dirpath[len(docroot):]}"
-                    dist.data_files.append((install_dir, doc_files))
-                    print(f"Added {len(doc_files)} docs to {install_dir}")
-        else:
-            print(f"Warning: Documentation directory {docroot} not found")
-
-    except Exception as e:
-        print(f"\nERROR in define_the_build for {system_name}:")
-        print(f"Type: {type(e).__name__}")
-        print(f"Message: {str(e)}")
-        print("Current distribution attributes:")
-        print(f"data_files: {getattr(dist, 'data_files', 'NOT SET')}")
-        print(f"py_modules: {getattr(dist, 'py_modules', 'NOT SET')}")
-        print(f"packages: {getattr(dist, 'packages', 'NOT SET')}")
-        raise  # Re-raise the exception after logging
-
-class BuildCommand(build):
+class BuildCommand(build_py):
     """Build python modules for a specific system."""
     description = \
         "Build python modules for the specified system. The supported system(s)\n" + \
         "\t\t   at the moment are 'CRABInterface' . Use with --force \n" + \
         "\t\t   to ensure a clean build of only the requested parts.\n"
-    user_options = build.user_options + [
+    user_options = build_py.user_options + [
         ('system=', 's', 'build the specified system (default: CRABInterface)'),
         ('skip-docs=', 'd', 'skip documentation')
     ]
 
     def initialize_options(self):
-        super(BuildCommand, self).initialize_options()
         self.system = "CRABInterface,TaskWorker"
         self.skip_docs = False
 
@@ -224,12 +167,9 @@ class BuildCommand(build):
         if not self.skip_docs:
             os.environ["PYTHONPATH"] = "%s/../WMCore/src/python/:%s" % (os.getcwd(), os.environ["PYTHONPATH"])
             os.environ["PYTHONPATH"] = "%s/build/lib:%s" % (os.getcwd(), os.environ["PYTHONPATH"])
-            spawn(['make', '-C', 'doc', 'html', 'PROJECT=%s' % 'crabserver'])
+            subprocess.run(['make', '-C', 'doc', 'html', 'PROJECT=%s' % 'crabserver'], check=True)
 
     def run(self):
-        # Ensure data_files is initialized before any build steps
-        if not hasattr(self.distribution, 'data_files') or self.distribution.data_files is None:
-            self.distribution.data_files = []
         command = 'build'
         if self.distribution.have_run.get(command):
             return
@@ -252,7 +192,7 @@ class InstallCommand(install):
     ]
 
     def initialize_options(self):
-        super(InstallCommand, self).initialize_options()
+        install.initialize_options(self)
         self.system = "CRABInterface"
         self.patch = None
         self.skip_docs = False
@@ -274,7 +214,7 @@ class InstallCommand(install):
         assert self.distribution.get_name() == self.system
 
         # Pass to base class.
-        super(InstallCommand, self).finalize_options()
+        install.finalize_options(self)
 
         # Mangle paths if we are patching. Most of the mangling occurs
         # already in define_the_build(), but we need to fix up others.
@@ -329,28 +269,18 @@ def getWebDir():
             res.append((root[4:], [os.path.join(root, x) for x in files])) #4: for removing src
     return res
 
-setup(
-      distclass=CRABDistribution,
-      name='crabserver',
+setup(name='crabserver',
       version='3.2.0',
       maintainer_email='hn-cms-crabdevelopment@cern.ch',
-      cmdclass={
-          'build_system': BuildCommand,
-          'install_system': InstallCommand,
-          'test': TestCommand
-      },
-      #include_package_data=True,  # Uncomment if you have MANIFEST.in or want to include non-Python files
+      cmdclass={'build_system': BuildCommand,
+                'install_system': InstallCommand,
+                'test' : TestCommand},
+      #include_package_data=True,
       #base directory for all the packages
       package_dir={'': 'src/python'},
-      packages=find_packages(where='src/python'),  # Add this to automatically find packages
-      py_modules=['ServerUtilities', 'CRABQuality', 'HTCondorLocator', 'RESTInteractions', 
-                 'MultiProcessingLog', 'CMSGroupMapper', 'RucioUtils', 'cache_status', 'utils'],  # Explicitly list py_modules
-      data_files=[
-          ('scripts', ['scripts/%s' % x for x in 
-                      ['CMSRunAnalysis.sh', 'cmscp.py', 'cmscp.sh',
-                       'gWMS-CMSRunAnalysis.sh', 'submit_env.sh',
-                       'dag_bootstrap_startup.sh',
-                       'dag_bootstrap.sh', 'AdjustSites.py']])
-      ] + getWebDir(),
-      zip_safe=False,  # Typically False for systems with data files
+      data_files=['scripts/%s' % x for x in \
+                        ['CMSRunAnalysis.sh', 'cmscp.py', 'cmscp.sh',
+                         'gWMS-CMSRunAnalysis.sh', 'submit_env.sh',
+                         'dag_bootstrap_startup.sh',
+                         'dag_bootstrap.sh', 'AdjustSites.py']] + getWebDir(),
      )
