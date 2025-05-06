@@ -7,7 +7,6 @@ import re
 import time
 import logging
 import os
-import ast
 import glob
 import copy
 from shutil import move
@@ -68,6 +67,7 @@ def insertCpu(event, info):
 nodeNameRe = re.compile(r"DAG Node: Job(\d+(?:-\d+)?)")
 nodeName2Re = re.compile(r"Job(\d+(?:-\d+)?)")
 
+
 # this now takes as input an htcondor.JobEventLog object
 # which as of HTCondor 8.9 can be saved/restored with memory of
 # where it had reached in processing the job log file
@@ -99,7 +99,7 @@ def parseJobLog(jel, nodes, nodeMap):
                 info['TotalSysCpuTimeHistory'].append(0)
                 info['WallDurations'].append(0)
                 info['ResidentSetSize'].append(0)
-                info['Retries'] = len(info['SubmitTimes'])-1
+                info['Retries'] = len(info['SubmitTimes']) - 1
                 nodeMap[proc] = node  # nodeMap maps CRAB_Id '13' to (cluster, proc) i.e. condor jobId
         elif event['MyType'] == 'ExecuteEvent':
             node = nodeMap[event['Cluster'], event['Proc']]
@@ -189,8 +189,8 @@ def parseJobLog(jel, nodes, nodeMap):
                 nodes[node]['WallDurations'][-1] = eventtime - nodes[node]['StartTimes'][-1]
             insertCpu(event, nodes[node])
         elif event["MyType"] == "JobDisconnectedEvent" \
-             or event["MyType"] == "JobReconnectedEvent" \
-             or event["MyType"] == "FileTransferEvent" :
+                or event["MyType"] == "JobReconnectedEvent" \
+                or event["MyType"] == "FileTransferEvent":
             # These events don't really affect the node status
             pass
         else:
@@ -213,21 +213,22 @@ def parseJobLog(jel, nodes, nodeMap):
         while len(info['WallDurations']) > len(info['SiteHistory']):
             info['SiteHistory'].append("Unknown")
 
-def parseErrorReport(data, nodes):
+
+def parseErrorReport(fjrReports, nodes):
     """
     iterate over the jobs and set the error dict for those which are failed
-    :param data: a dictionary as returned by summarizeFjrParseResults() : {jobid:errdict}
+    :param fjrReports: a dictionary as returned by summarizeFjrParseResults() : {jobid:errdict}
                  errdict is {crab_retry:error_summary} from PostJob/prepareErrorSummary
                  which writes one line for PostJoun run: {job_id : {crab_retry : error_summary}}
-                 where crab_retry is a string and error_summary a list [exitcode, errorMsg, {}]
-    :param nodes: a dictionary with format {jobid:statedict}
-    :return: nothing, modifies nodes in place
+                 in which crab_retry is a string and error_summary is a list [exitcode, errorMsg, {}]
+    :param nodes: a dictionary with format {jobid:dictionary}
+    :return: nothing
+    : SIDE ACTION: modifies nodes in place by adding the Error key to the dictionary of matching jobs
     """
-    for jobid, statedict in nodes.items():
-        if 'State' in statedict and statedict['State'] == 'failed' and jobid in data:
-            # pick error info from last retry (SB: AFAICT only last retry is listed anyhow)
-            for key in data[jobid]:
-                statedict['Error'] = data[jobid][key]
+    for jobid, errdict in fjrReports.items():
+        if jobid in nodes:
+            nodes[jobid]['Error'] = errdict
+
 
 def parseNodeStateV2(fp, nodes, level):
     """
@@ -259,7 +260,8 @@ def parseNodeStateV2(fp, nodes, level):
             # ref https://htcondor.readthedocs.io/en/latest/automated-workflows/dagman-using-other-dags.html#composing-workflows-from-dags
             # and https://htcondor.readthedocs.io/en/latest/automated-workflows/dagman-using-other-dags.html#a-dag-within-a-dag-is-a-subdag
             status = ad.get('NodeStatus', -1)
-            dagname = "RunJobs{0}.subdag".format(nodeName2Re.match(node).group(1))
+            subDagNumber = nodeName2Re.match(node).group(1)
+            dagname = f"RunJobs{subDagNumber}.subdag"
             # Add special state where we *expect* a submitted DAG for the
             # status command on the client. Note: our subdags are submitted with NOOP so
             # they complete immediately and the running Dag ends (status=5), the actual
@@ -362,7 +364,7 @@ def parseCondorLog(cacheDoc):
 
     parseJobLog(jel, nodes, nodeMap)
     # save jel object in a pickle file made unique by a timestamp
-    newJelPickleName = 'jel-%d.pkl' % int(time.time())
+    newJelPickleName = f"jel-{int(time.time())}.pkl"
     if not os.path.exists(LOG_PARSING_POINTERS_DIR):
         os.mkdir(LOG_PARSING_POINTERS_DIR)
     with open((LOG_PARSING_POINTERS_DIR+newJelPickleName), 'wb') as f:
@@ -389,6 +391,7 @@ def parseCondorLog(cacheDoc):
     newCacheDoc['nodeMap'] = nodeMap
     return newCacheDoc
 
+
 def storeNodesInfoInPklFile(cacheDoc):
     """
     takes as input an cacheDoc dictionary with keys
@@ -403,6 +406,7 @@ def storeNodesInfoInPklFile(cacheDoc):
         pickle.dump(cacheDoc, fp, protocol=2)
     # replace old file with new one
     move(tempFilename, PKL_STATUS_CACHE_FILE)
+
 
 def storeNodesInfoInTxtFile(cacheDoc):
     """
@@ -424,6 +428,7 @@ def storeNodesInfoInTxtFile(cacheDoc):
         nodesStorage.write(str(nodeMap) + "\n")
 
     move(tempFilename, STATUS_CACHE_FILE)
+
 
 def storeNodesInfoInJSONFile(cacheDoc):
     """
@@ -482,10 +487,11 @@ def summarizeFjrParseResults(checkpoint):
         errDict = {}
         for line in content:
             fjrResult = json.loads(line)
-            for jobId,msg in fjrResult.items():
+            for jobId, msg in fjrResult.items():
                 errDict[jobId] = msg
         return errDict, newCheckpoint
     return None, 0
+
 
 def reportDagStatusToDB(dagStatus):
     """
@@ -520,12 +526,11 @@ def reportDagStatusToDB(dagStatus):
     data = {'subresource': 'edit', 'column': 'tm_dagman_status',
             'value': statusName, 'workflow': taskname}
     try:
-        R = crabserver.post(api='task', data=urlencode(data))
+        ret = crabserver.post(api='task', data=urlencode(data))
     except Exception as ex:  # pylint: disable=broad-except
-        R = str(ex)
-    logging.info(f"HTTP POST returned {R}")
+        ret = str(ex)
+    logging.info(f"HTTP POST returned {ret}")
 
-    return
 
 def collapseDAGStatus(dagInfo):
     """Collapse the status of one or several DAGs to a single one.
@@ -537,7 +542,7 @@ def collapseDAGStatus(dagInfo):
     in the scheduler (HTCondor AP)
     originally developed by Matthias Wolf
     """
-    status_order = ['SUBMITTED', 'FAILED', 'FAILED (KILLED)', 'COMPLETED']
+    statusOrder = ['SUBMITTED', 'FAILED', 'FAILED (KILLED)', 'COMPLETED']
 
     # subDagInfos is a dictionary with key the dag level ({count}) e.g.
     # {0: {'Timestamp': 1744883488, 'NodesTotal': 94, 'DagStatus': 3}}
@@ -551,7 +556,7 @@ def collapseDAGStatus(dagInfo):
         # Regular splitting, return status of DAG
         return translateDagStatus(dagInfo['DagStatus'])
 
-    def check_queued(statusOrSUBMITTED):
+    def checkQueued(statusOrSUBMITTED):
         # 99 is the status of a DAG which submitted one ore more subdags.
         # If there are less actual DAG status informations than expected DAGs, at least one
         # DAG has to be queued.
@@ -570,17 +575,17 @@ def collapseDAGStatus(dagInfo):
         state = translateDagStatus(subDagInfos[0]['DagStatus'])
         if state == 'SUBMITTED':
             return state
-    # Tails active: return most active tail status according to
-    # `status_order`
+    # Tails active: return most active tail status according to `statusOrder`
     if len(subDagInfos) > 1:
         states = [translateDagStatus(subDagInfos[k]['DagStatus']) for k in subDagInfos if k > 0]
-        for iStatus in status_order:
+        for iStatus in statusOrder:
             if states.count(iStatus) > 0:
-                return check_queued(iStatus)
+                return checkQueued(iStatus)
     # If no tails are active, return the status of the processing DAG.
     if len(subDagInfos) > 0:
-        return check_queued(translateDagStatus(subDagInfos[0]['DagStatus']))
-    return check_queued(translateDagStatus(dagInfo['DagStatus']))
+        return checkQueued(translateDagStatus(subDagInfos[0]['DagStatus']))
+    return checkQueued(translateDagStatus(dagInfo['DagStatus']))
+
 
 def translateDagStatus(status):
     """
@@ -602,7 +607,7 @@ def translateDagStatus(status):
     #
     # N.B. separate status=5 in SUCCESS or FAILED based on whether all job succeeded or not ?
     # or is already done by DAGMAN ?
-    DAG_STATUS_TO_STRING = {
+    dagStatusToString = {
         0: 'SUBMITTED',  # clear for a node, but for DAG ? to be verified
         1: 'SUBMITTED',  # clear for a node, but for DAG ? to be verified
         3: 'RUNNING',
@@ -613,8 +618,9 @@ def translateDagStatus(status):
     }
     # Do we report just DAG status, or a combined "global" status ?
 
-    statusName = DAG_STATUS_TO_STRING[status]
+    statusName = dagStatusToString[status]
     return statusName
+
 
 def main():
     """
@@ -638,6 +644,7 @@ def main():
 
     except Exception:  # pylint: disable=broad-except
         logging.exception("error during main loop")
+
 
 main()
 
