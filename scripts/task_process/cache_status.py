@@ -224,9 +224,18 @@ def parseErrorReport(fjrReports, nodes):
     :param nodes: a dictionary with format {jobid:dictionary}
     :return: nothing
     : SIDE ACTION: modifies nodes in place by adding the Error key to the dictionary of matching jobs
+                   with content = error_summary
+    explicitely:
+     fjrReports = {jobid (strig): errdict(dict)}
+     errdict = {retry(string): error_Summary(list)}
+    example:
+       fjrReports['2'] = {'0': [5, 'Error while running CMSSW:\n', {}]}
+    in node[jobid]['Error'] we want the list  [5, 'Error while running CMSSW:\n', {}]
+    which is what CRAB CLient status command expects.
     """
     for jobid, errdict in fjrReports.items():
         if jobid in nodes:
+            # this is wrong, we do no want errdict = {retry:error_summary} but only error_summary
             nodes[jobid]['Error'] = errdict
 
 
