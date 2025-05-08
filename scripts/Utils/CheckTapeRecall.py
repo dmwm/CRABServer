@@ -47,7 +47,8 @@ def send(document):
                         auth=HTTPBasicAuth(MONITUSER, MONITPWD),
                          data=json.dumps(document),
                          headers={"Content-Type": "application/json; charset=UTF-8"},
-                         verify=False
+                         verify=False,
+                         timeout=1800,
                          )
 
 
@@ -59,7 +60,7 @@ def sendAndCheck(document):
     # print(type(document), document)
     # PROD
     response = send(document)
-    msg = 'With document: {0}. Status code: {1}. Message: {2}'.format(document, response.status_code, response.text)
+    msg = f"With document: {document}.\nStatus code: {response.status.code}. Message: {response.text}"
     print(msg)
 
 def main():
@@ -156,6 +157,10 @@ def createRulesDataframe(pending, rucio, crab, logger=None):
     logger.info("finding tape source for all pending rules (takes some time...)")
     pending['tape'] = pending.apply(lambda x: findTapesForRule(rucio, x.id), axis=1)
 
+    # add target (destination) locations
+    logger.info("finding target RSE for all pending rules (takes some time...)")
+    pending['dest'] = pending.apply(lambda x: findDestForRule(rucio, x.id), axis=1)
+
     logger.info('Add (DBS) dataset name ...')
     pending['dataset'] = pending.apply(lambda x: findDatasetForRule(rucio, x.id), axis=1)
     logger.info('... and size')
@@ -165,7 +170,7 @@ def createRulesDataframe(pending, rucio, crab, logger=None):
     # logger.info('compute a short Url for each dataset')
     # pending['datasetUrl'] = pending.apply(lambda x: createDatasetUrl(x.dataset), axis=1)
 
-    logger.info('find tasks using these rules')
+    logger.info('find tasks using these rules (takes a longish time...)')
     pending['tasks'] = pending.apply(lambda x: findTasksForRule(crab, x.id), axis=1)
     logger.info("Done!")
 
@@ -180,6 +185,7 @@ def createRulesDataframe(pending, rucio, crab, logger=None):
     return pending
 
 def createRulesHtmlTable(df):
+    """ name says what it does """
     # add and URL pointing to rule in Rucio UI
     urlBase = '<a href="https://cms-rucio-webui.cern.ch/rule?rule_id=%s">%s</a>'
     df['idUrl'] = df.apply(lambda x: (urlBase % (x.id, x.id)), axis=1)
@@ -190,14 +196,15 @@ def createRulesHtmlTable(df):
     # logger.info('compute a short Url for each dataset')
     df['datasetUrl'] = df.apply(lambda x: createDatasetUrlHtml(x.dataset), axis=1)
 
-    selected = df[['idUrl', 'state', 'user', 'locks', 'days', 'tape', 'size', 'datasetUrl', 'taskUrls']]
+    selected = df[['idUrl', 'state', 'user', 'locks', 'days', 'tape', 'dest', 'size', 'datasetUrl', 'taskUrls']]
     pendingCompact = selected.rename(columns={'locks': 'locks ok/rep/st', 'size': 'size TB'})
     _ = selected.rename(columns={'locks': 'locks ok/rep/st', 'size': 'size TB'})
 
     return pendingCompact.to_html(escape=False)
 
 def createRulesJson(df):
-    df = df[['id', 'state', 'user', 'locks', 'days', 'tape', 'size', 'dataset', 'tasks']]
+    """ name says what it does """
+    df = df[['id', 'state', 'user', 'locks', 'days', 'tape', 'dest', 'size', 'dataset', 'tasks']]
 
     # logger.info('compute a short Url for each task')
     df['task0'] = df.apply(lambda x: x.tasks[-1] if x.tasks else None, axis=1)
@@ -210,11 +217,9 @@ def createRulesJson(df):
     rulesDict = json.loads(rulesString)
     rulesOpensearch = []
     for rule in rulesDict["data"]:
-        ruleOpensearch = dict(
-            producer=MONITUSER,
-            type='checktaperecall',
-            hostname=gethostname(),
-        )
+        ruleOpensearch = {
+            'producer': MONITUSER, 'type': 'checktaperecall', 'hostname': gethostname(),
+        }
         for key, value in zip(rulesDict["columns"], rule):
             ruleOpensearch[key] = value
         rulesOpensearch.append(ruleOpensearch)
@@ -321,6 +326,17 @@ def findTapesForRule(rucioClient=None, ruleId=None):
     return tapes
 
 
+def findDestForRule(rucioClient=None, ruleId=None):
+    """
+    Returns the target RSE's where the files which are object of the rule are going to
+    Assumes that all files in the container described in the rule have the same destination
+    so it will be enough to look up the first file
+    """
+    aLock = next(rucioClient.list_replica_locks(ruleId))
+    dest = aLock['rse']
+    return dest
+
+
 def findDatasetForRule(rucioClient=None, ruleId=None):
     """
     returns the DBS dataset name
@@ -378,7 +394,7 @@ def ensureEnvironment(logger=None):
     make sure we can run Rucio client and talk with CRAB
     """
     try:
-        from rucio.client import Client
+        from rucio.client import Client  # pylint: disable=import-outside-toplevel
     except ModuleNotFoundError:
         logger.info("Setup Rucio first via:\n" +
               "export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/\n" +
