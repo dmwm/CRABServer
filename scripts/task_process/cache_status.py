@@ -226,18 +226,20 @@ def parseErrorReport(fjrReports, nodes):
     : SIDE ACTION: modifies nodes in place by adding the Error key to the dictionary of matching jobs
                    with content = error_summary
     explicitely:
-     fjrReports = {jobid (strig): errdict(dict)}
+     fjrReports = {jobid (string): errdict(dict)}
      errdict = {retry(string): error_Summary(list)}
     example:
        fjrReports['2'] = {'0': [5, 'Error while running CMSSW:\n', {}]}
     in node[jobid]['Error'] we want the list  [5, 'Error while running CMSSW:\n', {}]
     which is what CRAB CLient status command expects.
     """
-    for jobid, errdict in fjrReports.items():
+    for jobid in fjrReports:
         if jobid in nodes:
-            # this is wrong, we do no want errdict = {retry:error_summary} but only error_summary
-            nodes[jobid]['Error'] = errdict
-
+            # there should be only one retry, but anyhow ... find the last retry attempt
+            # by taking the maximum key (retry number).
+            last_retry = max(fjrReports[jobid], key=int)  # Get the latest retry (largest key).
+            # Set the error summary from the last retry attempt.
+            nodes[jobid]['Error'] = fjrReports[jobid][last_retry]
 
 def parseNodeStateV2(fp, nodes, level):
     """
