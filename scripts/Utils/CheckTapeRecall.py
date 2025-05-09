@@ -60,7 +60,7 @@ def sendAndCheck(document):
     # print(type(document), document)
     # PROD
     response = send(document)
-    msg = f"With document: {document}.\nStatus code: {response.status.code}. Message: {response.text}"
+    msg = f"With document: {document}.\nStatus code: {response.status_code}. Message: {response.text}"
     print(msg)
 
 def main():
