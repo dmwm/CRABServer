@@ -153,7 +153,7 @@ class Task(object):
                         WHERE tm_task_status = :get_status AND rownum <= :limit"
 
     # UpdateUploaded
-    UpdateUploaded_sql = "UPDATE tasks SET tm_uploaded = :task_uploaded WHERE tm_taskname = :taskname"
+    UpdateUploaded_sql = "UPDATE tasks SET tm_uploaded = 'T' WHERE tm_taskname = :taskname"
 
     #UpdateOutDataset
     SetUpdateOutDataset_sql = """UPDATE tasks SET tm_output_dataset = :tm_output_dataset \

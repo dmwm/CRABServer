@@ -11,7 +11,7 @@ from ServerUtilities import getEpochFromDBTime
 from CRABInterface.Utilities import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import (RX_MANYLINES_SHORT, RX_TASKNAME, RX_WORKER_NAME, RX_STATUS, RX_SUBPOSTWORKER,
-                                  RX_JOBID, RX_BOOL)
+                                  RX_JOBID)
 
 # external dependecies here
 from ast import literal_eval
@@ -40,7 +40,6 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_strlist("resubmittedjobs", param, safe, RX_JOBID)
             validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
             validate_str("subresource", param, safe, RX_SUBPOSTWORKER, optional=True)
-            validate_str("uploadvalue", param, safe, RX_BOOL, optional=True)
             validate_num("limit", param, safe, optional=True)
             validate_num("clusterid", param, safe, optional=True) #clusterid of the dag
             # possible combinations to check
@@ -60,7 +59,7 @@ class RESTWorkerWorkflow(RESTEntity):
 
 
     @restcall
-    def post(self, workflow, status, command, subresource, failure, resubmittedjobs, getstatus, workername, limit, clusterid, uploadvalue):
+    def post(self, workflow, status, command, subresource, failure, resubmittedjobs, getstatus, workername, limit, clusterid):
         """ Updates task information """
         methodmap = {"state": {"args": (self.Task.SetStatusTask_sql,), "method": self.api.modify, "kwargs": {"status": [status],
                      "command": [command], "taskname": [workflow]}},
@@ -74,8 +73,7 @@ class RESTWorkerWorkflow(RESTEntity):
                                  "tm_taskname": [workflow], "clusterid": [clusterid]}},
                      "process": {"args": (self.Task.UpdateWorker_sql,), "method": self.api.modifynocheck, "kwargs": {"tw_name": [workername],
                                   "get_status": [getstatus], "limit": [limit], "set_status": [status]}},
-                     "uploaded": {"args": (self.Task.UpdateUploaded_sql,), "method": self.api.modifynocheck, "kwargs": {"task_uploaded": [uploadvalue],
-                     "taskname": [workflow]}},
+                     "uploaded": {"args": (self.Task.UpdateUploaded_sql,), "method": self.api.modifynocheck, "kwargs": {"taskname": [workflow]}},
         }
 
         if subresource is None:
