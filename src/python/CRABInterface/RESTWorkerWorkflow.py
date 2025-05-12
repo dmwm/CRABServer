@@ -59,7 +59,7 @@ class RESTWorkerWorkflow(RESTEntity):
 
 
     @restcall
-    def post(self, workflow, status, command, subresource, failure, resubmittedjobs, getstatus, workername, limit, clusterid):
+    def post(self, workflow, status, command, subresource, failure, resubmittedjobs, getstatus, workername, limit, clusterid, uploadvalue):
         """ Updates task information """
         methodmap = {"state": {"args": (self.Task.SetStatusTask_sql,), "method": self.api.modify, "kwargs": {"status": [status],
                      "command": [command], "taskname": [workflow]}},
@@ -73,7 +73,7 @@ class RESTWorkerWorkflow(RESTEntity):
                                  "tm_taskname": [workflow], "clusterid": [clusterid]}},
                      "process": {"args": (self.Task.UpdateWorker_sql,), "method": self.api.modifynocheck, "kwargs": {"tw_name": [workername],
                                   "get_status": [getstatus], "limit": [limit], "set_status": [status]}},
-                     "uploaded": {"args": (self.Task.UpdateUploaded_sql,), "method": self.api.modifynocheck, "kwargs": {"task_uploaded": ['T'],
+                     "uploaded": {"args": (self.Task.UpdateUploaded_sql,), "method": self.api.modifynocheck, "kwargs": {"task_uploaded": [uploadvalue],
                      "taskname": [workflow]}},
         }
 
