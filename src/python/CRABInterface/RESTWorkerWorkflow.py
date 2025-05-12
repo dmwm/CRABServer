@@ -11,7 +11,7 @@ from ServerUtilities import getEpochFromDBTime
 from CRABInterface.Utilities import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import (RX_MANYLINES_SHORT, RX_TASKNAME, RX_WORKER_NAME, RX_STATUS, RX_SUBPOSTWORKER,
-                                  RX_JOBID)
+                                  RX_JOBID, RX_BOOL)
 
 # external dependecies here
 from ast import literal_eval
@@ -40,6 +40,7 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_strlist("resubmittedjobs", param, safe, RX_JOBID)
             validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
             validate_str("subresource", param, safe, RX_SUBPOSTWORKER, optional=True)
+            validate_str("uploadvalue", param, safe, RX_BOOL, optional=True)
             validate_num("limit", param, safe, optional=True)
             validate_num("clusterid", param, safe, optional=True) #clusterid of the dag
             # possible combinations to check

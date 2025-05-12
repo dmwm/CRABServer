@@ -63,6 +63,7 @@ RX_LUMIRANGE = re.compile(r"^\d+,\d+(,\d+,\d+)*$")
 RX_RUCIORULE = re.compile(r"^(?=.{32}$)[A-Za-z0-9]*$")
 RX_RUCIODID =  re.compile(r"^.*:.*$")  # Rucio has no limitations: scope:name is a valid DID
 RX_RUCIOSCOPE = re.compile(r"^(cms)|(logs)|(user\.[a-z0-9-_]{1,20})$|(group\.[a-z0-9-_]{1,19})$")
+RX_BOOL = re.compile(r"^[TF]$")
 
 # Supports two formats for backward compatibility:
 # '1,4,6,8,9,10...' (old format which is still present in old postjobs)
@@ -85,7 +86,7 @@ RX_CLUSTERID = re.compile(r"^[0-9.]+$")
 RX_CERT = re.compile(r'^[-]{5}BEGIN CERTIFICATE[-]{5}[\w\W]+[-]{5}END CERTIFICATE[-]{5}\n$')
 
 #subresourced of DataUserWorkflow (/workflow) resource
-RX_SUBRESTAT = re.compile(r"^(errors|report2|logs|data|logs2|data2|resubmit|resubmit2|proceed|publicationstatus|taskads)$")
+RX_SUBRESTAT = re.compile(r"^(errors|report2|logs|data|logs2|data2|resubmit|resubmit2|proceed|publicationstatus|taskads|uploaded)$")
 
 #subresources of the ServerInfo (/info) and Task (/task) resources
 RX_SUBRES_SI = re.compile(r"^(delegatedn|backendurls|version|bannedoutdest|scheddaddress|ignlocalityblacklist)$")
