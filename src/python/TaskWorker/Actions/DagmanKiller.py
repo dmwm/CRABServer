@@ -82,11 +82,12 @@ class DagmanKiller(TaskAction):
         # and this must be done separately
         # --------------------------------------
         # From HTCondor documentation
-        # http://research.cs.wisc.edu/htcondor/manual/v8.3/2_10DAGMan_Applications.html#SECTION003107000000000000000
+        # https://htcondor.readthedocs.io/en/latest/automated-workflows/dagman-interaction.html#suspending-a-running-dag
         # --------------------------------------
         # After placing the condor_dagman job on hold, no new node jobs will be submitted,
         # and no PRE or POST scripts will be run. Any node jobs already in the HTCondor queue
-        # will continue undisturbed. If the condor_dagman job is left on hold, it will remain
+        # will continue undisturbed. Any running PRE or POST scripts will be killed.
+        # If the condor_dagman job is left on hold, it will remain
         # in the HTCondor queue after all of the currently running node jobs are finished.
         # --------------------------------------
 
