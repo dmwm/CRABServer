@@ -108,7 +108,7 @@ RX_DATE = re.compile(r"^(19|20)\d\d[- /.](0[1-9]|1[012])[- /.](0[1-9]|[12][0-9]|
 ## user dn
 RX_DN = re.compile(r"^/(?:C|O|DC)=.*/CN=.")
 ## worker subresources
-RX_SUBPOSTWORKER = re.compile(r"^(state|start|failure|success|process|lumimask)$")
+RX_SUBPOSTWORKER = re.compile(r"^(state|start|failure|success|process|lumimask|uploaded)$")
 
 # Schedulers
 RX_SCHEDULER = re.compile(r"^(condor)$")
