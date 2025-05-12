@@ -73,7 +73,6 @@ class RESTWorkerWorkflow(RESTEntity):
                                  "tm_taskname": [workflow], "clusterid": [clusterid]}},
                      "process": {"args": (self.Task.UpdateWorker_sql,), "method": self.api.modifynocheck, "kwargs": {"tw_name": [workername],
                                   "get_status": [getstatus], "limit": [limit], "set_status": [status]}},
-                     "uploaded": {"args": (self.Task.UpdateUploaded_sql,), "method": self.api.modifynocheck, "kwargs": {"taskname": [workflow]}},
         }
 
         if subresource is None:

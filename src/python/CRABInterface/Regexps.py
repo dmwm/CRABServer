@@ -85,7 +85,7 @@ RX_CLUSTERID = re.compile(r"^[0-9.]+$")
 RX_CERT = re.compile(r'^[-]{5}BEGIN CERTIFICATE[-]{5}[\w\W]+[-]{5}END CERTIFICATE[-]{5}\n$')
 
 #subresourced of DataUserWorkflow (/workflow) resource
-RX_SUBRESTAT = re.compile(r"^(errors|report2|logs|data|logs2|data2|resubmit|resubmit2|proceed|publicationstatus|taskads|uploaded)$")
+RX_SUBRESTAT = re.compile(r"^(errors|report2|logs|data|logs2|data2|resubmit|resubmit2|proceed|publicationstatus|taskads)$")
 
 #subresources of the ServerInfo (/info) and Task (/task) resources
 RX_SUBRES_SI = re.compile(r"^(delegatedn|backendurls|version|bannedoutdest|scheddaddress|ignlocalityblacklist)$")
@@ -108,7 +108,7 @@ RX_DATE = re.compile(r"^(19|20)\d\d[- /.](0[1-9]|1[012])[- /.](0[1-9]|[12][0-9]|
 ## user dn
 RX_DN = re.compile(r"^/(?:C|O|DC)=.*/CN=.")
 ## worker subresources
-RX_SUBPOSTWORKER = re.compile(r"^(state|start|failure|success|process|lumimask|uploaded)$")
+RX_SUBPOSTWORKER = re.compile(r"^(state|start|failure|success|process|lumimask)$")
 
 # Schedulers
 RX_SCHEDULER = re.compile(r"^(condor)$")

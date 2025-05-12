@@ -74,6 +74,6 @@ def updateTaskUploaded(crabserver=None, taskName=None, logger=None):
     """ change task uploaded value to 'T' in the DB """
     msg = f"Will set uploadvalue to 'T' for {taskName}"
     logger.info(msg)
-    configreq = {'subresource': 'uploaded', 'workflow': taskName}
+    configreq = {'subresource': 'edit', 'workflow': taskName, 'column': 'tm_uploaded', 'value': 'T'}
     data = urlencode(configreq)
-    crabserver.post(api='workflowdb', data=data)
+    crabserver.post(api='task', data=data)

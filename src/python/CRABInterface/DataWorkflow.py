@@ -423,7 +423,7 @@ class DataWorkflow(object):
             raise ExecutionError(msg)
         else:
             self.api.modify(self.Task.SetDryRun_sql, taskname=[workflow], dry_run=['F'])
-            self.api.modify(self.Task.UpdateUploaded_sql, taskname=[workflow])
+            self.api.modify(self.Task.UpdateUploaded_sql, taskname=[workflow], uploaded=['T'])
             self.api.modify(self.Task.SetStatusTask_sql, taskname=[workflow], status=['NEW'], command=['SUBMIT'])
 
         return [{'result': 'ok'}]

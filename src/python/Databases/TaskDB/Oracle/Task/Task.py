@@ -63,7 +63,7 @@ class Task(object):
               :split_algo, :split_args, :total_units, :user_sandbox, :debug_files, :cache_url, :username, :user_dn, \
               :user_vo, :user_role, :user_group, :publish_name, :asyncdest, :dbs_url, :publish_dbs_url, \
               :publication, :outfiles, :tfile_outfiles, :edm_outfiles, :job_type, :generator, :arguments, \
-              :save_logs, :tw_name, :task_uploaded, :user_infiles, :maxjobruntime, :numcores, :maxmemory, :priority, \
+              :save_logs, :tw_name, :tm_uploaded, :user_infiles, :maxjobruntime, :numcores, :maxmemory, :priority, \
               :scriptexe, :scriptargs, :extrajdl, :events_per_lumi, :collector, :schedd_name, :dry_run, \
               :user_files, :transfer_outputs, :output_lfn, :ignore_locality, :fail_limit, :one_event_mode, :submitter_ip_addr, :ignore_global_blacklist, \
               :user_config)"
@@ -153,7 +153,7 @@ class Task(object):
                         WHERE tm_task_status = :get_status AND rownum <= :limit"
 
     # UpdateUploaded
-    UpdateUploaded_sql = "UPDATE tasks SET tm_uploaded = 'T' WHERE tm_taskname = :taskname"
+    UpdateUploaded_sql = """UPDATE tasks SET tm_uploaded = :uploaded WHERE tm_taskname = :taskname"""
 
     #UpdateOutDataset
     SetUpdateOutDataset_sql = """UPDATE tasks SET tm_output_dataset = :tm_output_dataset \
