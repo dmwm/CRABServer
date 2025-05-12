@@ -7,7 +7,7 @@ from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from ServerUtilities import uploadToS3
-from CRABUtils.TaskUtils import updateTaskStatus
+from CRABUtils.TaskUtils import updateTaskStatus, updateTaskUploaded
 
 
 class Uploader(TaskAction):
@@ -21,7 +21,8 @@ class Uploader(TaskAction):
                    objecttype='runtimefiles', taskname=task,
                    logger=self.logger)
         # report that all tarballs are now in S3
-        updateTaskStatus(crabserver=self.crabserver, taskName=task, status='UPLOADED', logger=self.logger)
+        updateTaskStatus(crabserver=self.crabserver, taskName=task, status='UPLOADED', logger=self.logger) 
+        updateTaskUploaded(crabserver=self.crabserver, taskName=task, logger=self.logger)
         return Result(task=kw['task'], result=args[0])
 
     def execute(self, *args, **kw):
