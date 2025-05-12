@@ -77,7 +77,6 @@ class DagmanKiller(TaskAction):
         # This is needed in case user wants to resubmit.
         taskName = classad.quote(self.workflow)
         rootConst = f'(stringListMember(CRAB_DAGType, "BASE PROCESSING TAIL", " ") && CRAB_ReqName =?= {taskName})'
-        rootConst += f' || (stringListMember(CRAB_DAGType, "BASE PROCESSING TAIL", " ") && CRAB_ReqName =?= {taskName})'
 
         # Holding DAG job does not mean that it will remove all jobs
         # and this must be done separately
