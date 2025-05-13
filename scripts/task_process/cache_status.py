@@ -607,7 +607,7 @@ def collapseDAGStatus(dagInfo):
 
 def translateDagStatus(status):
     """
-    from a number to a string which CRAB people can understand
+    Translate from a number to a string which CRAB people can understand
     From
     https://htcondor.readthedocs.io/en task_process/cache_status.py
 /latest/automated-workflows/dagman-information-files.html#current-node-status-file
