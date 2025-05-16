@@ -1,4 +1,4 @@
 # THIS FILE IS DEPRECATED.
 # PLEASE USE cicd/crabserver_pypi/wmcore_requirements.txt INSTEAD.
 # https://github.com/dmwm/CRABServer/blob/master/cicd/crabserver_pypi/wmcore_requirements.txt
-wmcver==2.3.10rc1
+wmcver==2.3.3
