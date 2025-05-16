@@ -73,26 +73,21 @@ class DagmanKiller(TaskAction):
 
         """ submit the proper commands to condor """
 
-        # We need to keep BASE, PROCESSING, and TAIL DAGs in hold until periodic remove kicks in.
-        # This is needed in case user wants to resubmit.
+        # In May 2025 we decided not to allow anymore resubmission of killed tasks
+        # https://github.com/dmwm/CRABServer/issues/9076
+
         taskName = classad.quote(self.workflow)
         rootConst = f'(stringListMember(CRAB_DAGType, "BASE PROCESSING TAIL", " ") && CRAB_ReqName =?= {taskName})'
 
-        # Holding DAG job does not mean that it will remove all jobs
+        # Doing condor_rm of DAGs does not mean that it will remove all jobs, this happens to
+        # DAG's submitted via condor_dagman_submit, i.e. sub-dags for automatic splitting,
+        # but normal (BASE) DAGs are run by starting condor_dagman inside the dagman_bootstrap_startup.sh script
+        # so the dagman scheduler will simply be signaled. In this case it is better to do a condor_rm of
+        # all vanilla universe jobs, also to ensure that node_state file reports the DAG_Status as FAILED
         # and this must be done separately
-        # --------------------------------------
-        # From HTCondor documentation
-        # https://htcondor.readthedocs.io/en/latest/automated-workflows/dagman-interaction.html#suspending-a-running-dag
-        # --------------------------------------
-        # After placing the condor_dagman job on hold, no new node jobs will be submitted,
-        # and no PRE or POST scripts will be run. Any node jobs already in the HTCondor queue
-        # will continue undisturbed. Any running PRE or POST scripts will be killed.
-        # If the condor_dagman job is left on hold, it will remain
-        # in the HTCondor queue after all of the currently running node jobs are finished.
-        # --------------------------------------
 
         try:
-            self.schedd.act(htcondor.JobAction.Hold, rootConst)
+            self.schedd.act(htcondor.JobAction.Remove, rootConst)
             self.schedd.act(htcondor.JobAction.Remove, jobConst)
         except  Exception as hte:
             msg = "The CRAB server backend was not able to kill the task,"
