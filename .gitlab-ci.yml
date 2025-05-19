@@ -498,6 +498,7 @@ check_status_tracking:
     - export CMSSW_release=$CMSSW_release
     - export SCRAM_ARCH=el8_amd64_gcc11
     - export Check_Publication_Status=Yes
+    - export RETRY_SLEEP_SECONDS=1800
     - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
