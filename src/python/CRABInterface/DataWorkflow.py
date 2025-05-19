@@ -249,8 +249,7 @@ class DataWorkflow(object):
         return publicationInfo
 
     @conn_handler(services=[])
-    def resubmit2(self, workflow, publication, jobids, siteblacklist, sitewhitelist, maxjobruntime, maxmemory,
-                  numcores, priority):
+    def resubmit2(self, workflow, publication, jobids, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, priority):
         """Request to reprocess what the workflow hasn't finished to reprocess.
            This needs to create a new workflow in the same campaign
         """
@@ -280,7 +279,7 @@ class DataWorkflow(object):
         ## task was never submitted.
         if publication or task_status == 'SUBMITFAILED':
             jobids = None
-            siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority = None, None, None, None, None, None
+            siteblacklist, sitewhitelist, maxjobruntime, maxmemory, priority = None, None, None, None, None
 
         # We only allow resubmission of tasks that are in a final state, listed here:
         allowedTaskStates = ['SUBMITTED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']
@@ -326,8 +325,8 @@ class DataWorkflow(object):
 
             ## If these parameters are not set, give them the same values they had in the
             ## original task submission.
-            if (siteblacklist is None) or (sitewhitelist is None) or (maxjobruntime is None) or (maxmemory is None) or (numcores is None) or (priority is None):
-                ## origValues = [orig_siteblacklist, orig_sitewhitelist, orig_maxjobruntime, orig_maxmemory, orig_numcores, orig_priority]
+            if (siteblacklist is None) or (sitewhitelist is None) or (maxjobruntime is None) or (maxmemory is None) or (priority is None):
+                ## origValues = [orig_siteblacklist, orig_sitewhitelist, orig_maxjobruntime, orig_maxmemory, orig_priority]
                 origValues = next(self.api.query(None, None, self.Task.GetResubmitParams_sql, taskname = workflow))
                 if siteblacklist is None:
                     siteblacklist = literal_eval(origValues[0])
@@ -337,11 +336,9 @@ class DataWorkflow(object):
                     maxjobruntime = origValues[2]
                 if maxmemory is None:
                     maxmemory = origValues[3]
-                if numcores is None:
-                    numcores = origValues[4]
                 if priority is None:
                     priority = origValues[5]
-            ## These are the parameters that we want to writte down in the 'tm_arguments'
+            ## These are the parameters that we want to write down in the 'tm_arguments'
             ## column of the Tasks DB each time a resubmission is done.
             ## DagmanResubmitter will read these parameters and write them into the task ad.
             arguments = {'resubmit_jobids' : jobids,
@@ -349,7 +346,6 @@ class DataWorkflow(object):
                          'site_whitelist'  : sitewhitelist,
                          'maxjobruntime'   : maxjobruntime,
                          'maxmemory'       : maxmemory,
-                         'numcores'        : numcores,
                          'priority'        : priority
                         }
             ## Change the 'tm_arguments' column of the Tasks DB for this task to contain the
