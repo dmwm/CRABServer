@@ -7,18 +7,14 @@ from urllib.parse import urlencode
 
 import HTCondorLocator
 
-from ServerUtilities import FEEDBACKMAIL
+from ServerUtilities import FEEDBACKMAIL, pythonListToClassAdExprTree
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.Actions.DagmanSubmitter import checkMemoryWalltime
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from TaskWorker.DataObjects import  Result
 
-if 'useHtcV2' in os.environ:
-    import htcondor2 as htcondor
-    import classad2 as classad
-else:
-    import htcondor
-    import classad
+import htcondor2 as htcondor
+import classad2 as classad
 
 
 class DagmanResubmitter(TaskAction):
@@ -70,11 +66,9 @@ class DagmanResubmitter(TaskAction):
         # Processing and tail DAGs will be restarted by these scrips on the
         # schedd after the modifications are made.
         rootConst = f"(CRAB_DAGType =?= \"BASE\" && CRAB_ReqName =?= {classad.quote(workflow)})"
-        rootConst += f" || (TaskType =?= \"ROOT\" && CRAB_ReqName =?= {classad.quote(workflow)})"
 
         ## Calculate new parameters for resubmitted jobs. These parameters will
         ## be (re)written in the _CONDOR_JOB_AD when we do schedd.edit() below.
-        ad = classad.ClassAd()
         params = {'CRAB_ResubmitList'  : 'jobids',
                   'CRAB_SiteBlacklist' : 'site_blacklist',
                   'CRAB_SiteWhitelist' : 'site_whitelist',
@@ -83,13 +77,7 @@ class DagmanResubmitter(TaskAction):
                   'CRAB_RequestedCpus'        : 'numcores',
                   'JobPrio'            : 'priority'
                  }
-        for taskparam in params.values():
-            if ('resubmit_'+taskparam in task) and task['resubmit_'+taskparam] is not None:
-                # the following seems to Stefano a very complicated way to handle
-                # in different (proper) way the cases where resubmit_xxxx is list and
-                # where it is a number. Should be verified and simplified
-                if isinstance(task['resubmit_'+taskparam], list):
-                    ad[taskparam] = task['resubmit_'+taskparam]
+
         if ('resubmit_jobids' in task) and task['resubmit_jobids']:
             self.logger.debug("Resubmitting when JOBIDs were specified")
             try:
@@ -98,12 +86,18 @@ class DagmanResubmitter(TaskAction):
                 # all the jobs, not only the ones we want to resubmit. That's why the pre-job
                 # is saving the values of the parameters for each job retry in text files (the
                 # files are in the directory resubmit_info in the schedd).
+                # We use classAds here as way to pass informations to PreJobs.
+                # Value in schedd.exit(const, ad, value) can be string or ExprTree
+                # https://htcondor.readthedocs.io/en/latest/apis/python-bindings/api/version2/htcondor2/schedd.html#htcondor2.Schedd.edit
+                # We need ExprTree when the ad correspond to a python list
                 for adparam, taskparam in params.items():
-                    if taskparam in ad:
-                        schedd.edit(rootConst, adparam, ad.lookup(taskparam))
-                    elif task['resubmit_' + taskparam] is not None:
-                        # param values set in this case are numbers, need to convert to strings
-                        schedd.edit(rootConst, adparam, str(task['resubmit_' + taskparam]))
+                    if task['resubmit_' + taskparam] is not None:
+                        if isinstance(task['resubmit_'+taskparam], list):
+                            newAdValue = pythonListToClassAdExprTree(task['resubmit_'+taskparam])
+                        else:
+                            newAdValue = str(task['resubmit_'+taskparam])
+                        schedd.edit(rootConst, adparam, newAdValue)
+                # finally restart the dagman with the 3 lines below
                 schedd.act(htcondor.JobAction.Hold, rootConst)
                 schedd.edit(rootConst, "HoldKillSig", 'SIGUSR1')
                 schedd.act(htcondor.JobAction.Release, rootConst)

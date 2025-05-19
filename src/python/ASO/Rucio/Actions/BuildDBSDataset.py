@@ -81,7 +81,10 @@ class BuildDBSDataset():
                 'name': container,
                 'type': "CONTAINER",
             }
-            ruleID = self.rucioClient.add_replication_rule([containerDID], 1, self.transfer.destination)[0]
+            ruleID = self.rucioClient.add_replication_rule(
+                [containerDID], 1, self.transfer.destination,
+                ignore_availability=False
+            )[0]
         except DuplicateRule:
             # TODO: it is possible that someone will create the rule for container, need better filter rule to match rules we create
             self.logger.info("Rule already exists. Get rule ID from Rucio.")

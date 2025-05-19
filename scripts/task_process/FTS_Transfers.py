@@ -83,8 +83,6 @@ if os.path.exists('task_process/RestInfoForFileTransfers.json'):
 #        print("Proxy: %s" % proxy)
 
 asoworker = 'schedd'
-ftsReuse = os.path.exists('USE_FTS_REUSE')
-
 
 def chunks(l, n):
     """
@@ -348,7 +346,7 @@ def submitToFTS(logger, ftsContext, files, jobids, toUpdate):
                        # so retry=3 means each transfer has 4 chances at most during the 6h
                        # max_time_in_queue
                        retry=3,
-                       reuse=ftsReuse,
+                       reuse=True,
                        # seconds after which the transfer is retried
                        # this is a transfer that fails, gets put to SUBMITTED right away,
                        # but the scheduler will avoid it until NOW() > last_retry_finish_time + retry_delay
@@ -477,7 +475,7 @@ def submit(rucioClient, ftsContext, toTrans, crabserver):
             xfer = [src_pfn, dst_pfn, jobid, source, dst_rse, username, taskname, size, checksums['adler32'].rjust(8, '0')]
             tx_from_source.append(xfer)
 
-        xfersPerFTSJob = 50 if ftsReuse else 200
+        xfersPerFTSJob = 50
         for files in chunks(tx_from_source, xfersPerFTSJob):
             ftsJobId = submitToFTS(logging, ftsContext, files, jobids, to_update)
             # save oracleIds of files in this job in a local file

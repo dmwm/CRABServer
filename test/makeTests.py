@@ -168,7 +168,7 @@ checkStatus ${taskName} COMPLETED
 statusCode=$?
 ([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
 crabCommand getoutput "--jobids=1 --proxy=$PROXY"
-lookFor "Success in retrieving output_1.root " commandLog.txt || echo "outputFiles: Reetrieval failure output_1.root"
+lookFor "Success in retrieving output_1.root " commandLog.txt || echo "outputFiles: Retrieval failure output_1.root"
 lookFor "Success in retrieving My_output_1.txt " commandLog.txt  || echo "outputFiles: Retrieval failure My_output_1.txt"
 """
 if SL6:  # skip: singularity, no gfal_copy, crab getoutput can't work
@@ -597,24 +597,6 @@ writeValidationScript(testName=name, validationScript=validationScript)
 #=============================
 # SECTION USER
 #=============================
-
-# voRole
-name = 'voRole'
-changeDict = {'param': name, 'value': '"production"', 'section': 'User'}
-confChangesList = [changeDict]
-testSubmitScript = dummyTestScript
-validationScript = """
-checkStatus ${taskName} COMPLETED
-statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "voRole: Retrieval failure job_out.1.*.txt"
-lookFor "JOB AD: CRAB_UserRole = \\"production\\"" "${workDir}/results/job_out.1.*.txt" || echo "voRole: Retrieval failure JOB AD"
-lookFor "attribute : /cms/Role=production/Capability=NULL" "${workDir}/results/job_out.1.*.txt" || echo "voRole: Retrieval failure attribute"
-"""
-writeConfigFile(testName=name, listOfDicts=confChangesList)
-writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
-writeValidationScript(testName=name, validationScript=validationScript)
 
 # voGroup
 name = 'voGroup'

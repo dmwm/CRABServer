@@ -19,9 +19,10 @@ import tarfile
 import hashlib
 import tempfile
 from ast import literal_eval
+from urllib.parse import urlencode
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import getLock, checkS3Object
+from ServerUtilities import getLock, checkS3Object, getColumn, pythonListToClassAdExprTree
 
 import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
@@ -34,16 +35,12 @@ from WMCore import Lexicon
 from WMCore.Services.CRIC.CRIC import CRIC
 from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS, SCRAM_TO_ARCH
 
-if 'useHtcV2' in os.environ:
-    import htcondor2 as htcondor
-    import classad2 as classad
-else:
-    import htcondor
-    import classad
+import htcondor2 as htcondor
+import classad2 as classad
 
 DAG_HEADER = """
 
-NODE_STATUS_FILE node_state{nodestate} 30 ALWAYS-UPDATE
+NODE_STATUS_FILE node_state{nodestate} 120
 
 # NOTE: a file must be present, but 'noop' makes it not be read.
 #FINAL FinalCleanup Job.1.submit NOOP
@@ -343,17 +340,16 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_PublishDBSURL'] = classad.quote(task['tm_publish_dbs_url'])
         jobSubmit['My.CRAB_ISB'] = classad.quote(task['tm_cache_url'])
 
-        def pythonListToClassAdValue(aList):
-            # python lists need special handling to become the string '{"a","b",...,"c"}'
-            quotedItems = json.dumps(aList)  # from [s1, s2] to the string '["s1","s2"]'
-            quotedItems = quotedItems.lstrip('[').rstrip(']')  # remove square brackets [ ]
-            value = "{" + quotedItems + "}"  # make final string adding the curly brackets { }
-            return value
-        jobSubmit['My.CRAB_SiteBlacklist'] = pythonListToClassAdValue(task['tm_site_blacklist'])
-        jobSubmit['My.CRAB_SiteWhitelist'] =  pythonListToClassAdValue(task['tm_site_whitelist'])
-        jobSubmit['My.CRAB_AdditionalOutputFiles'] = pythonListToClassAdValue(task['tm_outfiles'])
-        jobSubmit['My.CRAB_EDMOutputFiles'] =  pythonListToClassAdValue(task['tm_edm_outfiles'])
-        jobSubmit['My.CRAB_TFileOutputFiles'] = pythonListToClassAdValue(task['tm_outfiles'])
+
+        # note about Lists
+        # in the JDL everything is a string, we can't use the simple classAd[name]=somelist
+        # but need the ExprTree format (what classAd.lookup() would return)
+        jobSubmit['My.CRAB_SiteBlacklist'] = pythonListToClassAdExprTree(task['tm_site_blacklist'])
+        jobSubmit['My.CRAB_SiteWhitelist'] =  pythonListToClassAdExprTree(task['tm_site_whitelist'])
+        jobSubmit['My.CRAB_AdditionalOutputFiles'] = pythonListToClassAdExprTree(task['tm_outfiles'])
+        jobSubmit['My.CRAB_EDMOutputFiles'] =  pythonListToClassAdExprTree(task['tm_edm_outfiles'])
+        jobSubmit['My.CRAB_TFileOutputFiles'] = pythonListToClassAdExprTree(task['tm_outfiles'])
+
         jobSubmit['My.CRAB_UserDN'] = classad.quote(task['tm_user_dn'])
         jobSubmit['My.CRAB_UserHN'] = classad.quote(task['tm_username'])
         jobSubmit['My.CRAB_AsyncDest'] = classad.quote(task['tm_asyncdest'])
@@ -366,7 +362,11 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_TaskWorker'] = classad.quote(getattr(self.config.TaskWorker, 'name', 'unknown'))
         retry_aso = "1" if getattr(self.config.TaskWorker, 'retryOnASOFailures', True) else "0"
         jobSubmit['My.CRAB_RetryOnASOFailures'] = retry_aso
-        jobSubmit['My.CRAB_ASOTimeout'] = str(getattr(self.config.TaskWorker, 'ASORucioTimeout', 0))
+        if task['tm_output_lfn'].startswith('/store/user/rucio') or \
+                task['tm_output_lfn'].startswith('/store/group/rucio'):
+            jobSubmit['My.CRAB_ASOTimeout'] = str(getattr(self.config.TaskWorker, 'ASORucioTimeout', 0))
+        else:
+            jobSubmit['My.CRAB_ASOTimeout'] = str(getattr(self.config.TaskWorker, 'ASOTimeout', 0))
         jobSubmit['My.CRAB_RestHost'] = classad.quote(task['resthost'])
         jobSubmit['My.CRAB_DbInstance'] = classad.quote(task['dbinstance'])
         jobSubmit['My.CRAB_NumAutomJobRetries'] = str(task['numautomjobretries'])
@@ -400,7 +400,8 @@ class DagmanCreator(TaskAction):
         # extra requirements that user may set when submitting
         jobSubmit['My.CRAB_RequestedMemory'] = str(task['tm_maxmemory'])
         jobSubmit['My.CRAB_RequestedCores'] = str(task['tm_numcores'])
-        jobSubmit['My.MaxWallTimeMins'] = str(task['tm_maxjobruntime'])
+        jobSubmit['My.MaxWallTimeMins'] = str(task['tm_maxjobruntime'])  # this will be used in gWms matching
+        jobSubmit['My.MaxWallTimeMinsRun'] = str(task['tm_maxjobruntime'])  # this will be used in PeriodicRemove
         ## Add group information (local groups in SITECONF via CMSGroupMapper, VOMS groups via task info in DB)
         groups = set.union(map_user_to_groups(task['tm_username']), task['user_groups'])
         groups = ','.join(groups)  # from the set {'g1','g2'...,'gN'} to the string 'g1,g2,..gN'
@@ -442,7 +443,7 @@ class DagmanCreator(TaskAction):
         # from https://htcondor.readthedocs.io/en/latest/man-pages/condor_submit.html#submit-description-file-commands
         # The entire string representing the command line arguments is surrounded by double quote marks
         jobSubmit['Arguments'] = classad.quote("--jobId=$(count)")
-        jobSubmit['transfer_output_files'] = "jobReport.json.$(count), WMArchiveReport.json.$(count)"
+        jobSubmit['transfer_output_files'] = "jobReport.json.$(count)"
 
         additional_input_file = ""
         additional_environment_options = ""
@@ -498,7 +499,7 @@ class DagmanCreator(TaskAction):
         periodicRemove += "|| ( (JobStatus =?= 1) && (time() - EnteredCurrentStatus > 7*24*60*60) )"  # b)
         periodicRemove += "|| ( (JobStatus =?= 2) && ( "  # c)
         periodicRemove += "(MemoryUsage =!= UNDEFINED && MemoryUsage > RequestMemory)"  # c) 1)
-        periodicRemove += "|| (MaxWallTimeMinsRun * 60 < time() - EnteredCurrentStatus)"  # c) 2)
+        periodicRemove += "|| (MaxWallTimeMinsRun * 60 < (time() - EnteredCurrentStatus))"  # c) 2)
         periodicRemove += f"|| (DiskUsage > {MAX_DISK_SPACE})"  # c) 3)
         periodicRemove += "))"  # these parentheses close the "if running" condition, i.e. JobStatus==2
         periodicRemove += "|| (time() > CRAB_TaskEndTime)"  # d)
@@ -508,11 +509,11 @@ class DagmanCreator(TaskAction):
         # remove reasons are "ordered" in the following big IF starting from the less-conditial ones
         # order is relevant and getting it right is "an art"
         periodicRemoveReason = "ifThenElse("
-        periodicRemoveReason += "time() - EnteredCurrentStatus > 7 * 24 * 60 * 60 && isUndefined(MemoryUsage),"
+        periodicRemoveReason += "((time() - EnteredCurrentStatus) > (7 * 24 * 60 * 60)) && isUndefined(MemoryUsage),"
         periodicRemoveReason += "\"Removed due to idle time limit\","  # set this reasons. Else
         periodicRemoveReason += "ifThenElse(time() > x509UserProxyExpiration, \"Removed job due to proxy expiration\","
         periodicRemoveReason += "ifThenElse(MemoryUsage > RequestMemory, \"Removed due to memory use\","
-        periodicRemoveReason += "ifThenElse(MaxWallTimeMinsRun * 60 < time() - EnteredCurrentStatus, \"Removed due to wall clock limit\","
+        periodicRemoveReason += "ifThenElse(MaxWallTimeMinsRun * 60 < (time() - EnteredCurrentStatus), \"Removed due to wall clock limit\","
         periodicRemoveReason += f"ifThenElse(DiskUsage > {MAX_DISK_SPACE}, \"Removed due to disk usage\","
         periodicRemoveReason += "ifThenElse(time() > CRAB_TaskEndTime, \"Removed due to reached CRAB_TaskEndTime\","
         periodicRemoveReason += "\"Removed due to job being held\"))))))"  # one closed ")" for each "ifThenElse("
@@ -711,7 +712,6 @@ class DagmanCreator(TaskAction):
             argDict['eventsPerLumi'] = task['tm_events_per_lumi']  #
             argDict['maxRuntime'] = dagspec['maxRuntime']  # -1
             argDict['scriptArgs'] = task['tm_scriptargs']
-            argDict['CRAB_AdditionalOutputFiles'] = "{}"
             # following one are for bkw compat. with CRABClient v3.241218 or earlier, to be removed
             argDict['CRAB_Archive'] = argDict['userSandbox']
             argDict['CRAB_ISB'] = 'dummy'
@@ -768,6 +768,7 @@ class DagmanCreator(TaskAction):
 
         # SB should have a createDagSpects() methos to move away a lot of following code
 
+        task = kwargs['task']
         startjobid = kwargs.get('startjobid', 0)
         # parentDag below is only used during automatic splitting
         # possible values in each stage are:  probe: 0, tail: 1/2/3, processing: None
@@ -1160,6 +1161,9 @@ class DagmanCreator(TaskAction):
         elif int(jobSubmit['My.CRAB_FailedNodeLimit']) < 0:
             jobSubmit['My.CRAB_FailedNodeLimit'] = "-1"
 
+        # last thing, update number of jobs in this task in Task table
+        # using the numer of jobs in this (sub)DAGta
+        self.reportNumJobToDB(task, len(dagSpecs))
 
         return jobSubmit, splitterResult, subdags
 
@@ -1177,6 +1181,44 @@ class DagmanCreator(TaskAction):
             self.logger.error(msg)
             return []
         return highPrioUsers
+
+    def reportNumJobToDB(self, task, nJobs):
+        # update numner of jobs in this task in task table.
+        numJobsHere = nJobs
+        taskname = task['tm_taskname']
+        if self.runningInTW:
+            # things are easy
+            self.logger.info('Reporting numJobs from TW: %s', numJobsHere)
+            data = {'subresource': 'edit', 'column': 'tm_num_jobs',
+                    'value': numJobsHere, 'workflow': taskname}
+            self.crabserver.post(api='task', data=urlencode(data))
+        else:
+            # running in HTC AP host, i.e. automatic splitting, running inside PreDAG
+            # in the HTC AP there is no crabserver from "the TW slave process" so create one now
+            self.logger.info('Reporting numJobs from AP (preDag)')
+            with open(os.environ['_CONDOR_JOB_AD'], 'r', encoding='utf-8') as fd:
+                ad = classad.parseOne(fd)
+            host = ad['CRAB_RestHost']
+            dbInstance = ad['CRAB_DbInstance']
+            cert = ad['X509UserProxy']
+            reqname = ad['CRAB_Reqname']
+            self.logger.info(f"host {host} dbInstance {dbInstance} cert {cert}")
+            self.logger.info(f"taskname {taskname}  reqname {reqname}")
+            from RESTInteractions import CRABRest  # pylint: disable=import-outside-toplevel
+            crabserver = CRABRest(host, localcert=cert, localkey=cert, retry=3, userAgent='CRABSchedd')
+            crabserver.setDbInstance(dbInstance)
+            # fetch previous value from DB and  add to current value
+            data = {'subresource': 'search', 'workflow': taskname}
+            taskDict, _, _ = crabserver.get(api='task', data=data)
+            previousNumJobs = int(getColumn(taskDict, 'tm_num_jobs'))
+            self.logger.info(f"previousNumJobs {previousNumJobs}")
+            self.logger.info(f"numJobsHere {numJobsHere}")
+            numJobs = previousNumJobs + numJobsHere
+            # report
+            data = {'subresource': 'edit', 'column': 'tm_num_jobs',
+                    'value': numJobs, 'workflow': taskname}
+            R = crabserver.post(api='task', data=urlencode(data))
+            self.logger.info(f"HTTP POST returned {R}")
 
     def executeInternal(self, *args, **kw):
         """ all real work is done here """

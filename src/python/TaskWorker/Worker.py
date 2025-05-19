@@ -103,9 +103,18 @@ def processWorkerLoop(inputs, results, resthost, dbInstance, procnum, logger, lo
                WORKER_CONFIG.FeatureFlags.childWorker:
                 logger.debug(f'Run {work.__name__} in childWorker.')
                 args = (resthost, dbInstance, WORKER_CONFIG, task, procnum, inputargs)
-                outputs = startChildWorker(WORKER_CONFIG, work, args, logger)
+                workOutput = startChildWorker(WORKER_CONFIG, work, args, logger)
             else:
-                outputs = work(resthost, dbInstance, WORKER_CONFIG, task, procnum, inputargs)
+                workOutput = work(resthost, dbInstance, WORKER_CONFIG, task, procnum, inputargs)
+            # note that the output of the "work" is assigned to a variable only to allow
+            # inspection for debugging purposes, but we do not want to put it in the
+            # multiprocess.Queue since in case it contains non-pickleable objects (htcondo.Submit e.g.)
+            # the put fails silently, see https://github.com/python/cpython/issues/84376
+            # for the purpose of the Worker processing we do not need to pass around all the
+            # info anyhow, so we only put the task Dictionart which
+            # a) is safe b) can be used for debugging inside Worker or MasterWorker
+            # reference: https://github.com/dmwm/CRABServer/pull/9026
+            outputs = Result(task=task, result="OK")
         except TapeDatasetException as tde:
             outputs = Result(task=task, err=str(tde))
         except SubmissionRefusedException as sre:
@@ -140,15 +149,22 @@ def processWorkerLoop(inputs, results, resthost, dbInstance, procnum, logger, lo
             out, _, _ = executeCommand("ps u -p %s | awk '{sum=sum+$6}; END {print sum/1024}'" % os.getpid())
             msg = "RSS after finishing %s: %s MB" % (task['tm_taskname'], out.strip())
             logger.debug(msg)
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             logger.exception("Problem getting worker RSS:")
 
         removeTaskLogHandler(logger, taskhandler)
 
-        results.put({
-                     'workid': workid,
-                     'out' : outputs
-                    })
+        logger.debug("About to put out message in results queue for workid %s", workid)
+        logger.debug(" out.result: %s  ", outputs.result)
+        logger.debug(" out.task: %s ", outputs.task)
+        try:
+            results.put({
+                'workid': workid,
+                'out' : outputs
+            })
+        except Exception as ex:  # pylint: disable=broad-except
+            logger.error(f"Unable to push worker result to shared queue:\n{ex}")
+        logger.debug("Done")
 
 
 def processWorker(inputs, results, resthost, dbInstance, logsDir, procnum):
@@ -284,7 +300,7 @@ class Worker(object):
                     self.logger.debug('Completed work %d on %s', workid, taskname)
                 else:
                     # recurring actions do not return a Result object
-                    self.logger.debug('Completed work %s', str(out))
+                    self.logger.debug('Completed work %d %s', workid, str(out))
 
                 if isinstance(out['out'], list):
                     allout.extend(out['out'])
@@ -306,6 +322,15 @@ class Worker(object):
 
         :return int: number of working slaves."""
         return len(self.working)
+
+    def listQueuedTasks(self):
+        """ list tasks being worked on """
+        tasks = [ v['workflow'] for v in self.working.values() ]
+        return tasks
+
+    def listWorks(self):
+        """ list what's being worked on"""
+        return self.working
 
     def queueableTasks(self):
         """Depending on the queue size limit

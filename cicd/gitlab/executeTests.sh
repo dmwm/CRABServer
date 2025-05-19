@@ -16,6 +16,7 @@ echo "(DEBUG) Client_Validation_Suite: ${Client_Validation_Suite}"
 echo "(DEBUG) Client_Configuration_Validation: ${Client_Configuration_Validation}"
 echo "(DEBUG) Task_Submission_Status_Tracking: ${Task_Submission_Status_Tracking}"
 echo "(DEBUG) Check_Publication_Status: ${Check_Publication_Status}"
+echo "(DEBUG) CI_PIPELINE_ID: ${CI_PIPELINE_ID}"
 
 # always run inside ./workdir
 export ROOT_DIR=$PWD
@@ -49,7 +50,7 @@ if $ERR ; then
     echo -e "Something went wrong during task submission. None of the downstream jobs were triggered."
     exit 1
 else
-    declare -A tests=( ["Task_Submission_Status_Tracking"]=submitted_tasks_TS ["Client_Validation_Suite"]=submitted_tasks_CV ["Client_Configuration_Validation"]=submitted_tasks_CCV)
+    declare -A tests=( ["Task_Submission_Status_Tracking"]=submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release} ["Client_Validation_Suite"]=submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release} ["Client_Configuration_Validation"]=submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release})
     for test in "${!tests[@]}";
     do
         path="${WORK_DIR}/${tests[$test]}"

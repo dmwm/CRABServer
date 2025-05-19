@@ -13,15 +13,12 @@ import errno
 import logging
 from ast import literal_eval
 
-from ServerUtilities import getWebdirForDb, insertJobIdSid
+from ServerUtilities import getWebdirForDb, insertJobIdSid, pythonListToClassAdExprTree
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
-if 'useHtcV2' in os.environ:
-    import htcondor2 as htcondor
-    import classad2 as classad
-else:
-    import htcondor
-    import classad
+import htcondor2 as htcondor
+import classad2 as classad
+
 
 class PreJob:
     """
@@ -41,6 +38,7 @@ class PreJob:
         self.resubmit_info = {}
         self.prejob_exit_code = None
         self.logger = logging.getLogger()
+
 
     def calculate_crab_retry(self):
         """
@@ -149,14 +147,14 @@ class PreJob:
                   'resubmitter': self.task_ad['CRAB_UserHN'],
                   'exe': 'cmsRun',
                   'broker': self.backend,
-                  'bossId': str(self.job_id),
+                  'bossId': self.job_id,
                   'localId': '',
                   'SyncGridJobId': 'https://glidein.cern.ch/%s/%s' % (self.job_id, self.task_ad['CRAB_ReqName'].replace("_", ":")),
                  }
 
         if not self.userWebDirPrx:
             storage_rules = htcondor.param['CRAB_StorageRules']
-            self.userWebDirPrx = getWebdirForDb(str(self.task_ad.get('CRAB_ReqName')), storage_rules)
+            self.userWebDirPrx = getWebdirForDb(self.task_ad['CRAB_ReqName'], storage_rules)
 
         self.logger.info("User web dir: %s", self.userWebDirPrx)
 
@@ -166,7 +164,6 @@ class PreJob:
         """
         Need a doc string here.
         """
-        self.task_ad = {}
         try:
             self.logger.info("Loading classads from: %s", os.environ['_CONDOR_JOB_AD'])
             self.task_ad = classad.parseOne(open(os.environ['_CONDOR_JOB_AD'], 'r', encoding='utf-8'))
@@ -227,40 +224,35 @@ class PreJob:
             return {}
         return results
 
-
-    def calculate_blacklist(self):
-        """
-        Need a doc string here.
-        """
-        # TODO: before we can do this, we need a more reliable way to pass
-        # the site list to the prejob.
-        return []
-
-
     def alter_submit(self, crab_retry):
         """
         Copy the content of the generic file Job.submit into a job-specific file
-        Job.<job_id>.submit and add attributes that are job-specific (e.g. CRAB_Retry).
-        Add also parameters that can be overwritten at each manual job resubmission
+        Job.<job_id>.submit . While adding attributes that are job-specific (e.g. CRAB_Retry).
+        Add overwrite as proper attributes which change at each manual job resubmission
         (e.g. MaxWallTimeMins, RequestMemory, RequestCores, JobPrio, DESIRED_SITES).
         """
         ## Start the Job.<job_id>.submit content with the CRAB_Retry.
-        new_submit_text = 'My.CRAB_Retry = %d\n' % (crab_retry)
+        newJobSubmit = htcondor.Submit()
         msg = "Setting CRAB_Retry = %s" % (crab_retry)
         self.logger.info(msg)
+        newJobSubmit['My.CRAB_Retry'] = str(crab_retry)
         ## Add job and postjob log URLs
         job_retry = "%s.%s" % (self.job_id, crab_retry)
-        new_submit_text += 'My.CRAB_JobLogURL = %s\n' % classad.quote(os.path.join(self.userWebDirPrx, "job_out."+job_retry+".txt"))
-        new_submit_text += 'My.CRAB_PostJobLogURL = %s\n' % classad.quote(os.path.join(self.userWebDirPrx, "postjob."+job_retry+".txt"))
+        newJobSubmit['My.CRAB_JobLogURL'] = classad.quote(os.path.join(self.userWebDirPrx, "job_out."+job_retry+".txt"))
+        newJobSubmit['My.CRAB_PostJobLogURL'] = classad.quote(os.path.join(self.userWebDirPrx, "postjob."+job_retry+".txt"))
         ## For the parameters that can be overwritten at each manual job resubmission,
         ## read them from the task ad, unless there is resubmission information there
         ## and this job is not one that has to be resubmitted, in which case we should
         ## use the same parameters (site black- and whitelists, requested memory, etc)
         ## as used by the previous job retry (which are saved in self.resubmit_info).
-        CRAB_ResubmitList_in_taskad = ('CRAB_ResubmitList' in self.task_ad)
+
+        ## SB: yes, it would be great to have a different way to pass resbumit information from
+        ## TaskWorker than modify the dagman job classAds !
+        CRAB_ResubmitList_in_taskad = 'CRAB_ResubmitList' in self.task_ad
         use_resubmit_info = False
         resubmit_jobids = []
         if 'CRAB_ResubmitList' in self.task_ad:
+            # SB this map is most likley useless, keep it in "Works/Don't Touch" spirit
             resubmit_jobids = map(str, self.task_ad['CRAB_ResubmitList'])
             try:
                 resubmit_jobids = set(resubmit_jobids)
@@ -282,20 +274,23 @@ class PreJob:
             #        maxjobruntime = self.task_ad.lookup('MaxWallTimeMins_RAW')
             #        self.resubmit_info['maxjobruntime'] = maxjobruntime
             if 'MaxWallTimeMinsProbe' in self.task_ad and self.stage == 'probe':
-                maxjobruntime = int(str(self.task_ad.lookup('MaxWallTimeMinsProbe')))
+                maxjobruntime = self.task_ad['MaxWallTimeMinsProbe']
             elif 'MaxWallTimeMinsTail' in self.task_ad and self.stage == 'tail':
-                maxjobruntime = int(str(self.task_ad.lookup('MaxWallTimeMinsTail')))
+                maxjobruntime = self.task_ad['MaxWallTimeMinsTail']
             elif 'MaxWallTimeMinsRun' in self.task_ad:
-                maxjobruntime = int(str(self.task_ad.lookup('MaxWallTimeMinsRun')))
+                maxjobruntime = self.task_ad['MaxWallTimeMinsRun']
             if 'CRAB_RequestedMemory' in self.task_ad:
-                maxmemory = int(str(self.task_ad.lookup('CRAB_RequestedMemory')))
+                maxmemory = self.task_ad['CRAB_RequestedMemory']
             if 'CRAB_RequestedCores' in self.task_ad:
-                numcores = int(str(self.task_ad.lookup('CRAB_RequestedCores')))
+                numcores = self.task_ad['CRAB_RequestedCores']
             if 'JobPrio' in self.task_ad:
-                priority = int(str(self.task_ad['JobPrio']))
-            if str(self.job_id) == '0': #jobids can be like 1-1 for subjobs
+                priority = self.task_ad['JobPrio']
+            ## SB following if is never going to work ! but maybe it is worth to understand
+            ## what it was the intention and fix it ?
+            if self.job_id == '0': #jobids can be like 1-1 for subjobs
                 priority = 20 #the maximum for splitting jobs
         else:   # means we resubmit with same params as previous try
+            ## SB most likely much (all) of this string/int conversions can be simplified
             inkey = str(crab_retry) if crab_retry == 0 else str(crab_retry - 1)
             while inkey not in self.resubmit_info and int(inkey) > 0:
                 inkey = str(int(inkey) -  1)
@@ -316,118 +311,124 @@ class PreJob:
         self.resubmit_info[outkey]['CRAB_ResubmitList_in_taskad'] = CRAB_ResubmitList_in_taskad
 
         ## Add the resubmission parameters to the Job.<job_id>.submit content.
-        savelogs = 0 if self.stage == 'probe' else self.task_ad.lookup('CRAB_SaveLogsFlag')
-        saveoutputs = 0 if self.stage == 'probe' else self.task_ad.lookup('CRAB_TransferOutputs')
-        new_submit_text += 'My.CRAB_TransferOutputs = {0}\n+CRAB_SaveLogsFlag = {1}\n'.format(saveoutputs, savelogs)
+        ##
+        if self.stage == "probe":
+            newJobSubmit['My.CRAB_TransferOutputs'] = '0'
+            newJobSubmit['My.CRAB_SaveLogsFlag'] = '0'
         if maxjobruntime is not None:
-            new_submit_text += 'My.EstimatedWallTimeMins = %s\n' % str(maxjobruntime)
-            new_submit_text += 'My.MaxWallTimeMinsRun = %s\n' % str(maxjobruntime)  # how long it can run
-            new_submit_text += 'My.MaxWallTimeMins = %s\n' % str(maxjobruntime)     # how long a slot can it match to
+            newJobSubmit['My.EstimatedWallTimeMins'] = str(maxjobruntime)
+            newJobSubmit['My.MaxWallTimeMinsRun'] = str(maxjobruntime)  # how long it can run
+            newJobSubmit['My.MaxWallTimeMins'] = str(maxjobruntime)     # how long a slot can it match to
         # no plus sign for next 3 attributes, since those are Condor standard ones
         if maxmemory is not None:
-            new_submit_text += 'RequestMemory = %s\n' % (str(maxmemory))
+            newJobSubmit['RequestMemory'] = str(maxmemory)
         if numcores is not None:
-            new_submit_text += 'RequestCpus = %s\n' % (str(numcores))
+            newJobSubmit['RequestCpus'] = str(numcores)
         if priority is not None:
-            new_submit_text += 'JobPrio = %s\n' % (str(priority))
+            newJobSubmit['priority'] = str(priority)
 
         ## Within the schedd, order the first few jobs in the task before all other tasks of the same priority.
-        pre_job_prio = 1
+        pre_job_prio = '1'
         if int(self.job_id.split('-')[0]) <= 5:
-            pre_job_prio = 0
-        new_submit_text += 'My.PreJobPrio1 = %d\n' % pre_job_prio
+            pre_job_prio = '0'
+        newJobSubmit['My.PreJobPrio1'] = pre_job_prio
 
         ## The schedd will use PostJobPrio1 as a secondary job-priority sorting key: it
         ## will first run jobs by JobPrio; then, for jobs with the same JobPrio, it will
         ## run the job with the higher PostJobPrio1.
-        new_submit_text += 'My.PostJobPrio1 = -%s\n' % str(self.task_ad.lookup('QDate'))
+        newJobSubmit['My.PostJobPrio1'] = str(self.task_ad['QDate'])
 
         ## Order retries before all other jobs in this task
-        new_submit_text += 'My.PostJobPrio2 = %d\n' % crab_retry
+        newJobSubmit['My.PostJobPrio2'] = str(crab_retry)
 
         ## Add the site black- and whitelists and the DESIRED_SITES to the
         ## Job.<job_id>.submit content.
-        new_submit_text = self.redo_sites(new_submit_text, crab_retry, use_resubmit_info)
+        blackList, whiteList, desiredSites, dataLocations = self.redoSites(crab_retry, use_resubmit_info)
+        # this one is used in glideinWms matchmaking. MUST be the string 'site1,site2,site3....'
+        newJobSubmit['My.DESIRED_SITES'] = classad.quote(','.join(desiredSites))
+        # these are simply "for us" to e.g. use same format as in the ads coming from DAG submission
+        # i.e. a classAd corresponding to a python list.
+        newJobSubmit['My.CRAB_SiteBlacklist'] = pythonListToClassAdExprTree(blackList)
+        newJobSubmit['My.CRAB_SiteWhitelist'] = pythonListToClassAdExprTree(whiteList)
+        # for next one, use same format as DESIRED_Sites. In case one day gWms uses it to match
+        newJobSubmit['My.DESIRED_CMSDataLocations'] = classad.quote(','.join(dataLocations))
 
-        ## Finally add (copy) all the content of the generic Job.submit file.
+        ## Finally read in the content of the generic Job.submit file as a string
         with open("Job.submit", 'r', encoding='utf-8') as fd:
-            new_submit_text += fd.read()
-        ## Write the Job.<job_id>.submit file.
+            jobSubmitFileContent = fd.read()
+        ## and turn it into a submit object
+        jobSubmit = htcondor.Submit(jobSubmitFileContent)
+        # add modifications and additions
+        for k,v in newJobSubmit.items():
+            jobSubmit[k] = v
+        ## Write the Job.<job_id>.submit file. the htcondor.Submit streaming method will take
+        ## care of putting 'queue' statement at the enbd
         with open("Job.%s.submit" % (self.job_id), 'w', encoding='utf-8') as fd:
-            fd.write(new_submit_text)
+            print(jobSubmit, file=fd)
 
-
-    def redo_sites(self, new_submit_text, crab_retry, use_resubmit_info):
+    def redoSites(self, crab_retry, use_resubmit_info):
         """
         Re-define the set of sites where the job can run on by taking into account
         any site-white-list and site-black-list.
+        returns: blackList, whiteList, desiredSites, dataLocations (python lists of strings, could be [], never None)
+        SIDE EFFECT: modifies self.resubmit_info
         """
-        ## If there is an automatic site blacklist, add it to the Job.<job_id>.submit
-        ## content.
-        automatic_siteblacklist = self.calculate_blacklist()
-        if automatic_siteblacklist:
-            self.task_ad['CRAB_SiteAutomaticBlacklist'] = automatic_siteblacklist
-            new_submit_text += 'My.CRAB_SiteAutomaticBlacklist = %s\n' % str(self.task_ad.lookup('CRAB_SiteAutomaticBlacklist'))
-        ## Get the site black- and whitelists either from the task ad or from
-        ## self.resubmit_info.
-        siteblacklist = set()
-        sitewhitelist = set()
+        ## Get the site black- and whitelists either from the task ad or from self.resubmit_info.
+        ## site lists can be lists or sets (for easy manipulation) so we use "type-explicit" names
+
+        siteBlackList = []
+        siteWhiteList = []
+        siteBlackSet = set()
+        siteWhiteSet = set()
         if not use_resubmit_info:
             if 'CRAB_SiteBlacklist' in self.task_ad:
-                siteblacklist = set(self.task_ad['CRAB_SiteBlacklist'])
+                if self.task_ad['CRAB_SiteBlacklist']:  # skip ad=''
+                    siteBlackList = self.task_ad['CRAB_SiteBlacklist']
+                    siteBlackSet = set(siteBlackList)
             if 'CRAB_SiteWhitelist' in self.task_ad:
-                sitewhitelist = set(self.task_ad['CRAB_SiteWhitelist'])
+                if self.task_ad['CRAB_SiteWhitelist']:
+                    siteWhiteList = self.task_ad['CRAB_SiteWhitelist']
+                    siteWhiteSet = set(siteWhiteList)
         else:
             inkey = str(crab_retry) if crab_retry == 0 else str(crab_retry - 1)
             while inkey not in self.resubmit_info and int(inkey) > 0:
                 inkey = str(int(inkey) -  1)
-            siteblacklist = set(self.resubmit_info[inkey].get('site_blacklist', []))
-            sitewhitelist = set(self.resubmit_info[inkey].get('site_whitelist', []))
+            siteBlackSet = set(self.resubmit_info[inkey].get('site_blacklist', []))
+            siteWhiteSet = set(self.resubmit_info[inkey].get('site_whitelist', []))
         ## Save the current site black- and whitelists in self.resubmit_info for the
         ## current job retry number.
         outkey = str(crab_retry)
         if outkey not in self.resubmit_info:
             self.resubmit_info[outkey] = {}
-        self.resubmit_info[outkey]['site_blacklist'] = list(siteblacklist)
-        self.resubmit_info[outkey]['site_whitelist'] = list(sitewhitelist)
-        ## Add the current site black- and whitelists to the Job.<job_id>.submit
-        ## content.
-        if siteblacklist:
-            new_submit_text += 'My.CRAB_SiteBlacklist = {"%s"}\n' % ('", "'.join(siteblacklist))
-        else:
-            new_submit_text += 'My.CRAB_SiteBlacklist = {}\n'
-        if sitewhitelist:
-            new_submit_text += 'My.CRAB_SiteWhitelist = {"%s"}\n' % ('", "'.join(sitewhitelist))
-        else:
-            new_submit_text += 'My.CRAB_SiteWhitelist = {}\n'
+        self.resubmit_info[outkey]['site_blacklist'] = siteBlackList
+        self.resubmit_info[outkey]['site_whitelist'] = siteWhiteList
+
         ## Get the list of available sites (the sites where this job could run).
         with open("site.ad.json", 'r', encoding='utf-8') as fd:
             site_info = json.load(fd)
         group = site_info[self.job_id]
-        available = set(site_info['group_sites'][str(group)])
-        datasites = set(site_info['group_datasites'][str(group)])
+        availableSet = set(site_info['group_sites'][str(group)])
+        datasitesSet = set(site_info['group_datasites'][str(group)])
         ## Take the intersection between the available sites and the site whitelist.
         ## This is the new set of available sites.
-        if sitewhitelist:
-            available &= sitewhitelist
+        if siteWhiteList:
+            availableSet &= siteWhiteSet
         ## Remove from the available sites the ones that are in the site blacklist,
         ## unless they are also in the site whitelist (i.e. never blacklist something
         ## on the whitelist).
-        siteblacklist.update(automatic_siteblacklist)
-        available -= (siteblacklist - sitewhitelist)
-        if not available:
+        availableSet -= (siteBlackSet - siteWhiteSet)
+        if not availableSet:
             self.logger.error("Can not submit since DESIRED_Sites list is empty")
             self.prejob_exit_code = 1
             sys.exit(self.prejob_exit_code)
         ## Make sure that attributest which will be used in MatchMaking are SORTED lists
-        available = list(available)
+        available = list(availableSet)
         available.sort()
-        datasites = list(datasites)
+        datasites = list(datasitesSet)
         datasites.sort()
-        ## Add DESIRED_SITES to the Job.<job_id>.submit content.
-        new_submit_text = 'My.DESIRED_SITES="%s"\n%s' % (",".join(available), new_submit_text)
-        new_submit_text = 'My.DESIRED_CMSDataLocations="%s"\n%s' % (",".join(datasites), new_submit_text)
-        return new_submit_text
+        desiredSites = available
+        dataLocations = datasites
+        return siteBlackList, siteWhiteList, desiredSites, dataLocations
 
     def touch_logs(self, crab_retry):
         """
@@ -455,7 +456,7 @@ class PreJob:
         except Exception:
             msg = "Exception executing touch_logs()."
             self.logger.exception(msg)
-
+        return None
 
     def needsDefer(self):
         """ Check if the Prejob needs to be deferred, feature useful for some use cases that requires
@@ -467,15 +468,15 @@ class PreJob:
         if deferTime:
             self.logger.info('Release timeout specified in extraJDL:')
             totalDefer = deferTime * int(self.job_id)
-            submitTime = int(self.task_ad.get("CRAB_TaskSubmitTime"))
+            submitTime = int(self.task_ad["CRAB_TaskSubmitTime"])
             currentTime = time.time()
             if currentTime < (submitTime + totalDefer):
-                self.logger.info('  Defer time of this job (%s seconds since initial task submission) not elapsed yet, deferring for %s seconds', totalDefer, totalDefer)
+                msg = f"  Defer time of this job ({totalDefer} seconds since initial task submission)"
+                msg += f" not elapsed yet, deferring for {totalDefer} seconds"
+                self.logger.info(msg)
                 return True
-            else:
-                self.logger.info('  Continuing normally since current time is greater than requested starttime of the job')
+            self.logger.info('  Continuing normally since current time is greater than requested starttime of the job')
         return False
-
 
     def execute(self, *args):
         """
@@ -557,3 +558,4 @@ class PreJob:
         msg = "Finished pre-job execution. Sleeping %s seconds..." % (sleep_time)
         self.logger.info(msg)
         time.sleep(sleep_time)
+        return 0

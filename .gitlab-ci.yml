@@ -13,12 +13,13 @@ variables:
   # https://docs.docker.com/build/cache/backends/
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
-  STATUS_TRACKING: "true"
+  STATUS_TRACKING: "false"
   CLIENT_CONFIGURATION_VALIDATION: "true"
   CLIENT_VALIDATION: "true"
   SKIP_BUILD: "false"
   SKIP_DEPLOY: "false"
   SKIP_SUBMIT: "false"
+  SKIP_CLEANUP: "false"
 
 # This key define variables which are later used in `!reference` tag in `rules`.
 # Ref https://docs.gitlab.com/ee/ci/jobs/index.html#hide-jobs
@@ -47,10 +48,23 @@ stages:
   - build_docker
   - deploy
   - submit_testsuite
+  - sleep
   - run_testsuite_CV
   - run_testsuite_CCV
   - run_testsuite_TS
+  - cleanup
   - tagging_release
+
+.cmssw_matrix_release: &cmssw_matrix_release
+  - CMSSW_release:
+    - CMSSW_13_0_2
+    - CMSSW_12_6_4
+    - CMSSW_12_5_0
+    - CMSSW_11_3_4
+    - CMSSW_10_6_26
+    - CMSSW_10_1_0
+    - CMSSW_9_4_21
+    - CMSSW_8_0_36
 
 get_env:
   # NB rules are evaluated like python `any()`. If there is no rule the job runs all of the times.
@@ -92,7 +106,6 @@ set_version_name:
 
 build_rest_image:
   rules:
-    - if: $BUILD || $BUILD_DEPLOY || $ONLY_BUILD_RELEASE
     - !reference [.default_rules, skip_build]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -117,7 +130,6 @@ build_rest_image:
 
 build_tw_image:
   rules:
-    - if: $BUILD || $BUILD_DEPLOY || $ONLY_BUILD_RELEASE
     - !reference [.default_rules, skip_build]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -140,7 +152,6 @@ build_tw_image:
 
 build_monit_image:
   rules:
-    - if: $BUILD
     - !reference [.default_rules, skip_build]
     - !reference [.default_rules, release]
   stage: build_docker
@@ -163,7 +174,6 @@ build_monit_image:
 
 build_crabtwfilebeat_image:
   rules:
-    - if: $BUILD
     - !reference [.default_rules, skip_build]
     - !reference [.default_rules, release]
   stage: build_docker
@@ -185,7 +195,6 @@ build_crabtwfilebeat_image:
 
 build_spark_image:
   rules:
-    - if: $BUILD
     - !reference [.default_rules, skip_build]
     - !reference [.default_rules, release]
   stage: build_docker
@@ -203,7 +212,6 @@ build_spark_image:
 
 deploy_server:
   rules:
-    - if: $BUILD_DEPLOY
     - !reference [.default_rules, skip_deploy]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -222,7 +230,6 @@ deploy_server:
 
 .deploy_tw_template:
   rules:
-    - if: $BUILD_DEPLOY
     - !reference [.default_rules, skip_deploy]
     - !reference [.default_rules, default]
     - !reference [.default_rules, release]
@@ -254,13 +261,14 @@ deploy_publisher_rucio:
     SERVICE: Publisher_rucio
 
 task_submission:
+  variables:
+    CMSSW_release: CMSSW_13_0_2 
   rules:
-    - if: '$STATUS_TRACKING == "true" || $CLIENT_VALIDATION == "true" || $CLIENT_CONFIGURATION_VALIDATION == "true"'
-    - !reference [.default_rules, skip_check]
     - !reference [.default_rules, skip_submit]
+    - !reference [.default_rules, skip_check]
     - !reference [.default_rules, default]
-    - !reference [.default_rules, release]
   stage: submit_testsuite
+  resource_group: crab3  # Only one job runs at a time
   tags:
     - crab3-shell
   script:
@@ -269,103 +277,215 @@ task_submission:
     - export CRABClient_version  # from .env
     - export REST_Instance  # from .env
     - export ROOT_DIR
-    - export CMSSW_release=CMSSW_13_0_2
+    - export CMSSW_release=$CMSSW_release
     - export Task_Submission_Status_Tracking=$STATUS_TRACKING
     - export Client_Configuration_Validation=$CLIENT_CONFIGURATION_VALIDATION
     - export Client_Validation_Suite=$CLIENT_VALIDATION
     - bash -x cicd/gitlab/executeTests.sh
   cache:
-    - key: $CI_PIPELINE_ID
+    - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
-        - workdir/submitted_tasks_CV
-        - workdir/submitted_tasks_CCV
-        - workdir/submitted_tasks_TS
-      policy: push
-    - key: submitted_tasks_TS_latest
-      paths:
-        - workdir/submitted_tasks_TS
-      policy: push
-    - key: submitted_tasks_CV_latest
-      paths:
-        - workdir/submitted_tasks_CV
-      policy: push
-    - key: submitted_tasks_CCV_latest
-      paths:
-        - workdir/submitted_tasks_CCV
+        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: push
 
+task_submission_release:
+  rules:
+    - !reference [.default_rules, skip_submit]
+    - !reference [.default_rules, skip_check]
+    - !reference [.default_rules, release]
+  stage: submit_testsuite
+  parallel:
+    matrix:
+      *cmssw_matrix_release
+  resource_group: crab3  # Only one job runs at a time
+  tags:
+    - crab3-shell
+  script:
+    - source .env
+    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
+    - export CRABClient_version  # from .env
+    - export REST_Instance  # from .env
+    - export ROOT_DIR
+    - export CMSSW_release=$CMSSW_release
+    - export Task_Submission_Status_Tracking=$STATUS_TRACKING
+    - export Client_Configuration_Validation=$CLIENT_CONFIGURATION_VALIDATION
+    - export Client_Validation_Suite=$CLIENT_VALIDATION
+    - bash -x cicd/gitlab/executeTests.sh
+  cache:
+    - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
+      paths:
+        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
+      policy: push
+
+sleep_before_validation:
+  variables:
+    CMSSW_release: CMSSW_13_0_2
+  rules:
+    - !reference [.default_rules, skip_submit]
+    - !reference [.default_rules, default]
+  stage: sleep
+  tags:
+    - crab3-shell
+  script:
+    - echo "Sleeping for 20 minutes after task submission"
+    - sleep 1200
+  cache:
+    - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
+      paths:
+        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
+      policy: pull
+
+sleep_before_validation_release:
+  rules:
+    - !reference [.default_rules, skip_submit]
+    - !reference [.default_rules, release]
+  stage: sleep
+  parallel:
+    matrix:
+      *cmssw_matrix_release
+  tags:
+    - crab3-shell
+  script:
+    - echo "Sleeping for 20 minutes after task submission"
+    - sleep 1200
+  cache:
+    - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
+      paths:
+        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
+      policy: pull
+
 client_validation_suite:
+  variables:
+    CMSSW_release: CMSSW_13_0_2
   rules:
     - if: '$CLIENT_VALIDATION == "false"'
       when: never
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
-    - !reference [.default_rules, release]
   stage: run_testsuite_CV
+  resource_group: crab3  # Only one job runs at a time
   tags:
     - crab3-shell
   script:
-    - echo "Waiting for 20 minutes after task submission..."
-    - sleep 1200 
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
     - export CRABClient_version  # from .env
     - export REST_Instance  # from .env
     - export ROOT_DIR
-    - export CMSSW_release=CMSSW_13_0_2
+    - export CMSSW_release=$CMSSW_release
     - export Client_Validation_Suite=true
-    - ls workdir/submitted_tasks_CV
+    - ls workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
     - bash -x cicd/gitlab/CV_config.sh
   cache:
-    - key: $CI_PIPELINE_ID
+    - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
-        - workdir/submitted_tasks_CV
-      policy: pull
-    - key: submitted_tasks_CV_latest
-      paths:
-        - workdir/submitted_tasks_CV
+        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: pull
 
+client_validation_suite_release:
+  rules:
+    - if: '$CLIENT_VALIDATION == "false"'
+      when: never
+    - !reference [.default_rules, skip_submit]
+    - !reference [.default_rules, release]
+  stage: run_testsuite_CV
+  parallel:
+    matrix:
+      *cmssw_matrix_release
+  resource_group: crab3  # Only one job runs at a time
+  tags:
+    - crab3-shell
+  script:
+    - source .env
+    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
+    - export CRABClient_version  # from .env
+    - export REST_Instance  # from .env
+    - export ROOT_DIR
+    - export CMSSW_release=$CMSSW_release
+    - export Client_Validation_Suite=true
+    - ls workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
+    - bash -x cicd/gitlab/CV_config.sh
+  cache:
+    - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
+      paths:
+        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
+      policy: pull
+  allow_failure: true
+
 client_configuration_validation:
+  variables:
+    CMSSW_release: CMSSW_13_0_2
   rules:
     - if: '$CLIENT_CONFIGURATION_VALIDATION == "false"'
       when: never
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
-    - !reference [.default_rules, release]
   stage: run_testsuite_CCV
+  resource_group: crab3  # Only one job runs at a time
   tags:
     - crab3-shell
   script:
-    # - echo "Waiting for 20 minutes after task submission..."
-    # - sleep 1200 
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
     - export CRABClient_version  # from .env
     - export REST_Instance  # from .env
     - export ROOT_DIR
-    - export CMSSW_release=CMSSW_13_0_2
+    - export CMSSW_release=$CMSSW_release
     - export Client_Configuration_Validation=true
-    - ls workdir/submitted_tasks_CCV
+    - ls workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
     - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/CCV_config.sh
   cache:
-    - key: $CI_PIPELINE_ID
+    - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
-        - workdir/submitted_tasks_CCV
-      policy: pull
-    - key: submitted_tasks_CCV_latest
-      paths:
-        - workdir/submitted_tasks_CCV
+        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: pull
 
+client_configuration_validation_release:
+  rules:
+    - if: '$CLIENT_CONFIGURATION_VALIDATION == "false"'
+      when: never
+    - !reference [.default_rules, skip_submit]
+    - !reference [.default_rules, release]
+  stage: run_testsuite_CCV
+  parallel:
+    matrix:
+      *cmssw_matrix_release
+  resource_group: crab3  # Only one job runs at a time
+  tags:
+    - crab3-shell
+  script:
+    - source .env
+    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
+    - export CRABClient_version  # from .env
+    - export REST_Instance  # from .env
+    - export ROOT_DIR
+    - export CMSSW_release=$CMSSW_release
+    - export Client_Configuration_Validation=true
+    - ls workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
+    - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/CCV_config.sh
+  cache:
+    - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
+      paths:
+        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
+      policy: pull
+  allow_failure: true
+
 check_status_tracking:
+  variables:
+    CMSSW_release: CMSSW_13_0_2
   rules:
     - if: '$STATUS_TRACKING == "false"'
       when: never
-    - !reference [.default_rules, skip_check]
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
-    - !reference [.default_rules, release]
   stage: run_testsuite_TS
   tags:
     - crab3-shell
@@ -375,19 +495,59 @@ check_status_tracking:
     - export REST_Instance  # from .env
     - export CRABClient_version  # from .env
     - export ROOT_DIR
-    - export CMSSW_release=CMSSW_13_0_2
+    - export CMSSW_release=$CMSSW_release
     - export SCRAM_ARCH=el8_amd64_gcc11
     - export Check_Publication_Status=Yes
     - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
   cache:
-    - key: $CI_PIPELINE_ID
+    - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
-        - workdir/submitted_tasks_TS
+        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: pull
-    - key: submitted_tasks_TS_latest
+
+check_status_tracking_release:
+  rules:
+    - if: '$STATUS_TRACKING == "false"'
+      when: never
+    - !reference [.default_rules, skip_submit]
+    - !reference [.default_rules, release]
+  stage: run_testsuite_TS
+  parallel:
+    matrix:
+      *cmssw_matrix_release
+  tags:
+    - crab3-shell
+  script:
+    - source .env
+    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
+    - export REST_Instance  # from .env
+    - export CRABClient_version  # from .env
+    - export ROOT_DIR
+    - export CMSSW_release=$CMSSW_release
+    - export SCRAM_ARCH=el8_amd64_gcc11
+    - export Check_Publication_Status=Yes
+    - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
+  cache:
+    - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
-        - workdir/submitted_tasks_TS
+        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
       policy: pull
+  allow_failure: true
+
+cleanup_rucio_rules:
+  rules:
+    - if: '$SKIP_CLEANUP == "true"'
+      when: never
+    - !reference [.default_rules, default]
+    - !reference [.default_rules, release]
+  stage: cleanup
+  tags:
+    - crab3-shell
+  script:
+    - source .env
+    - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
+    - export DRY_RUN=false
+    - bash cicd/rucio/cleanup.sh
 
 # if test is pass, retag with `*-stable`
 release_stable:

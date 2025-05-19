@@ -7,6 +7,7 @@ import re
 import time
 import logging
 import os
+import ast
 import glob
 import copy
 from shutil import move
@@ -16,7 +17,8 @@ import json
 import htcondor2 as htcondor
 import classad2 as classad
 
-logging.basicConfig(filename='task_process/cache_status.log', level=logging.DEBUG)
+
+logging.basicConfig(filename='task_process/cache_status_old.log', level=logging.DEBUG)
 
 NODE_DEFAULTS = {
     'Retries': 0,
@@ -32,12 +34,16 @@ NODE_DEFAULTS = {
     'JobIds': []
 }
 
-STATUS_CACHE_FILE = "task_process/status_cache.txt"
-PKL_STATUS_CACHE_FILE = "task_process/status_cache.pkl"
-JSON_STATUS_CACHE_FILE = "task_process/status_cache.json"
-LOG_PARSING_POINTERS_DIR = "task_process/jel_pickles/"
+STATUS_CACHE_FILE = "task_process/status_cache_old.txt"
+PKL_STATUS_CACHE_FILE = "task_process/status_cache_old.pkl"
+JSON_STATUS_CACHE_FILE = "task_process/status_cache_old.json"
+LOG_PARSING_POINTERS_DIR = "task_process/jel_pickles_old/"
 FJR_PARSE_RES_FILE = "task_process/fjr_parse_results.txt"
 
+#
+# insertCpu, parseJobLog, parsNodeStateV2 and parseErrorReport
+# code copied from the backend HTCondorDataWorkflow.py with minimal changes.
+#
 
 cpuRe = re.compile(r"Usr \d+ (\d+):(\d+):(\d+), Sys \d+ (\d+):(\d+):(\d+)")
 
@@ -67,7 +73,6 @@ def insertCpu(event, info):
 nodeNameRe = re.compile(r"DAG Node: Job(\d+(?:-\d+)?)")
 nodeName2Re = re.compile(r"Job(\d+(?:-\d+)?)")
 
-
 # this now takes as input an htcondor.JobEventLog object
 # which as of HTCondor 8.9 can be saved/restored with memory of
 # where it had reached in processing the job log file
@@ -76,9 +81,7 @@ def parseJobLog(jel, nodes, nodeMap):
     parses new events in condor job log file and updates nodeMap
     :param jel: a condor JobEventLog object which provides an iterator over events
     :param nodes: the structure where we collect one job info for cache_status file
-    :param nodeMap: a structure to map DAG node id (i.e. CRAB_Id) to condor jobid Cluster.Proc
-                    first (Submit) event in job_log has a LogNotes attribute with the DAG id,
-                    but subsequent ones are only identified via Cluster and Proc
+    :param nodeMap: the structure where collect summary of all events
     :return: nothing
     """
     count = 0
@@ -86,11 +89,11 @@ def parseJobLog(jel, nodes, nodeMap):
         count += 1
         eventtime = time.mktime(time.strptime(event['EventTime'], "%Y-%m-%dT%H:%M:%S"))
         if event['MyType'] == 'SubmitEvent':
-            m = nodeNameRe.match(event['LogNotes'])  # True if LogNotes is like 'DAG Node: Job13'
+            m = nodeNameRe.match(event['LogNotes'])
             if m:
-                node = m.groups()[0]  # the number after 'DAG Node: Job' e.g. '13' (as a string), i.e. CRAB_Id
-                proc = event['Cluster'], event['Proc']  # SB: why a tuple instead of a string  like '10210368.0' ?
-                info = nodes.setdefault(node, copy.deepcopy(NODE_DEFAULTS))  # adds key "node" and makes info=NODE_DEFAULTS
+                node = m.groups()[0]
+                proc = event['Cluster'], event['Proc']
+                info = nodes.setdefault(node, copy.deepcopy(NODE_DEFAULTS))
                 info['State'] = 'idle'
                 info['JobIds'].append("%d.%d" % proc)
                 info['RecordedSite'] = False
@@ -99,8 +102,8 @@ def parseJobLog(jel, nodes, nodeMap):
                 info['TotalSysCpuTimeHistory'].append(0)
                 info['WallDurations'].append(0)
                 info['ResidentSetSize'].append(0)
-                info['Retries'] = len(info['SubmitTimes']) - 1
-                nodeMap[proc] = node  # nodeMap maps CRAB_Id '13' to (cluster, proc) i.e. condor jobId
+                info['Retries'] = len(info['SubmitTimes'])-1
+                nodeMap[proc] = node
         elif event['MyType'] == 'ExecuteEvent':
             node = nodeMap[event['Cluster'], event['Proc']]
             nodes[node]['StartTimes'].append(eventtime)
@@ -189,8 +192,8 @@ def parseJobLog(jel, nodes, nodeMap):
                 nodes[node]['WallDurations'][-1] = eventtime - nodes[node]['StartTimes'][-1]
             insertCpu(event, nodes[node])
         elif event["MyType"] == "JobDisconnectedEvent" \
-                or event["MyType"] == "JobReconnectedEvent" \
-                or event["MyType"] == "FileTransferEvent":
+             or event["MyType"] == "JobReconnectedEvent" \
+             or event["MyType"] == "FileTransferEvent" :
             # These events don't really affect the node status
             pass
         else:
@@ -213,33 +216,21 @@ def parseJobLog(jel, nodes, nodeMap):
         while len(info['WallDurations']) > len(info['SiteHistory']):
             info['SiteHistory'].append("Unknown")
 
-
-def parseErrorReport(fjrReports, nodes):
+def parseErrorReport(data, nodes):
     """
     iterate over the jobs and set the error dict for those which are failed
-    :param fjrReports: a dictionary as returned by summarizeFjrParseResults() : {jobid:errdict}
+    :param data: a dictionary as returned by summarizeFjrParseResults() : {jobid:errdict}
                  errdict is {crab_retry:error_summary} from PostJob/prepareErrorSummary
                  which writes one line for PostJoun run: {job_id : {crab_retry : error_summary}}
-                 in which crab_retry is a string and error_summary is a list [exitcode, errorMsg, {}]
-    :param nodes: a dictionary with format {jobid:dictionary}
-    :return: nothing
-    : SIDE ACTION: modifies nodes in place by adding the Error key to the dictionary of matching jobs
-                   with content = error_summary
-    explicitely:
-     fjrReports = {jobid (string): errdict(dict)}
-     errdict = {retry(string): error_Summary(list)}
-    example:
-       fjrReports['2'] = {'0': [5, 'Error while running CMSSW:\n', {}]}
-    in node[jobid]['Error'] we want the list  [5, 'Error while running CMSSW:\n', {}]
-    which is what CRAB CLient status command expects.
+                 where crab_retry is a string and error_summary a list [exitcode, errorMsg, {}]
+    :param nodes: a dictionary with format {jobid:statedict}
+    :return: nothing, modifies nodes in place
     """
-    for jobid in fjrReports:
-        if jobid in nodes:
-            # there should be only one retry, but anyhow ... find the last retry attempt
-            # by taking the maximum key (retry number).
-            last_retry = max(fjrReports[jobid], key=int)  # Get the latest retry (largest key).
-            # Set the error summary from the last retry attempt.
-            nodes[jobid]['Error'] = fjrReports[jobid][last_retry]
+    for jobid, statedict in nodes.items():
+        if 'State' in statedict and statedict['State'] == 'failed' and jobid in data:
+            # pick error info from last retry (SB: AFAICT only last retry is listed anyhow)
+            for key in data[jobid]:
+                statedict['Error'] = data[jobid][key]
 
 def parseNodeStateV2(fp, nodes, level):
     """
@@ -247,7 +238,6 @@ def parseNodeStateV2(fp, nodes, level):
     This is a more flexible format that allows future extensions but, unfortunately,
     also requires a separate parser.
     """
-    # note that when nodes was read from cache, setdefault returns the current value
     dagStatus = nodes.setdefault("DagStatus", {})
     dagStatus.setdefault("SubDagStatus", {})
     subDagStatus = dagStatus.setdefault("SubDags", {})
@@ -267,20 +257,12 @@ def parseNodeStateV2(fp, nodes, level):
             continue
         node = ad.get("Node", "")
         if node.endswith("SubJobs"):
-            # DagmanCreator uses Job{count}SubJobs as JobName for sub-dags
-            # ref https://htcondor.readthedocs.io/en/latest/automated-workflows/dagman-using-other-dags.html#composing-workflows-from-dags
-            # and https://htcondor.readthedocs.io/en/latest/automated-workflows/dagman-using-other-dags.html#a-dag-within-a-dag-is-a-subdag
             status = ad.get('NodeStatus', -1)
-            subDagNumber = nodeName2Re.match(node).group(1)
-            dagname = f"RunJobs{subDagNumber}.subdag"
+            dagname = "RunJobs{0}.subdag".format(nodeName2Re.match(node).group(1))
             # Add special state where we *expect* a submitted DAG for the
-            # status command on the client. Note: our subdags are submitted with NOOP so
-            # they complete immediately and the running Dag ends (status=5), the actual
-            # submission of the subdags happens inside the PRE step in PreDag.py
-            # Therefore we use the following set-status-to-99 trick to say
-            #  "this dag is done, so look at subdags to tell if something is still running"
+            # status command on the client
             if status == 5 and os.path.exists(dagname) and os.stat(dagname).st_size > 0:
-                status = 99  # means: DAG completed after submitting a new DAG
+                status = 99
             dagStatus["SubDagStatus"][node] = status
             continue
         if not node.startswith("Job"):
@@ -318,6 +300,87 @@ def parseNodeStateV2(fp, nodes, level):
             # observed; STATUS_ERROR is terminal.
             info['State'] = 'failed'
 
+def storeNodesInfoInFile():
+    """
+    Open cache file and get the location until which the jobs_log was parsed last time
+    returns: a dictionary with keys: jobLogCheckpoint, fjrParseResCheckpoint, nodes, nodeMap
+    """
+    jobLogCheckpoint = None
+    if os.path.exists(STATUS_CACHE_FILE) and os.stat(STATUS_CACHE_FILE).st_size > 0:
+        logging.debug("cache file found, opening")
+        try:
+            with open(STATUS_CACHE_FILE, "r", encoding='utf-8') as nodesStorage:
+                jobLogCheckpoint = nodesStorage.readline().strip()
+                if jobLogCheckpoint.startswith('#') :
+                    logging.debug("cache file contains initial comments, skipping")
+                    # comment line indicates a place-holder file created at DAG bootstrap time
+                    jobLogCheckpoint = None
+                else:
+                    logging.debug("reading cache file")
+                    fjrParseResCheckpoint = int(nodesStorage.readline())
+                    nodes = ast.literal_eval(nodesStorage.readline())
+                    nodeMap = ast.literal_eval(nodesStorage.readline())
+        except Exception:  # pylint: disable=broad-except
+            logging.exception("error during status_cache handling")
+            jobLogCheckpoint = None
+
+    if not jobLogCheckpoint:
+        logging.debug("no usable cache file found, creating")
+        fjrParseResCheckpoint = 0
+        nodes = {}
+        nodeMap = {}
+
+    if jobLogCheckpoint:
+        # resume log parsing where we left
+        with open((LOG_PARSING_POINTERS_DIR+jobLogCheckpoint), 'rb') as f:
+            jel = pickle.load(f)
+    else:
+        # parse log from beginning
+        jel = htcondor.JobEventLog('job_log')
+    #jobsLog = open("job_log", "r")
+    #jobsLog.seek(jobLogCheckpoint)
+
+    parseJobLog(jel, nodes, nodeMap)
+    # save jel object in a pickle file made unique by a timestamp
+    newJelPickleName = 'jel-%d.pkl' % int(time.time())
+    if not os.path.exists(LOG_PARSING_POINTERS_DIR):
+        os.mkdir(LOG_PARSING_POINTERS_DIR)
+    with open((LOG_PARSING_POINTERS_DIR+newJelPickleName), 'wb') as f:
+        pickle.dump(jel, f)
+    newJobLogCheckpoint = newJelPickleName
+
+    for fn in glob.glob("node_state*"):
+        level = re.match(r'(\w+)(?:.(\w+))?', fn).group(2)
+        with open(fn, 'r', encoding='utf-8') as nodeState:
+            parseNodeStateV2(nodeState, nodes, level)
+
+    try:
+        errorSummary, newFjrParseResCheckpoint = summarizeFjrParseResults(fjrParseResCheckpoint)
+        if errorSummary and newFjrParseResCheckpoint:
+            parseErrorReport(errorSummary, nodes)
+    except IOError:
+        logging.exception("error during error_summary file handling")
+
+    # First write the new cache file under a temporary name, so that other processes
+    # don't get an incomplete result. Then replace the old one with the new one.
+    tempFilename = (STATUS_CACHE_FILE + ".%s") % os.getpid()
+
+    with open(tempFilename, "w", encoding='utf-8') as nodesStorage:
+        nodesStorage.write(str(newJobLogCheckpoint) + "\n")
+        nodesStorage.write(str(newFjrParseResCheckpoint) + "\n")
+        nodesStorage.write(str(nodes) + "\n")
+        nodesStorage.write(str(nodeMap) + "\n")
+
+    move(tempFilename, STATUS_CACHE_FILE)
+
+    # collect all cache info in a single dictionary and return it to called
+    cacheDoc = {}
+    cacheDoc['jobLogCheckpoint'] = newJobLogCheckpoint
+    cacheDoc['fjrParseResCheckpoint'] = newFjrParseResCheckpoint
+    cacheDoc['nodes'] = nodes
+    cacheDoc['nodeMap'] = nodeMap
+    return cacheDoc
+
 def readOldStatusCacheFile():
     """
     it is enough to read the Pickle version, since we want to transition to that
@@ -330,11 +393,10 @@ def readOldStatusCacheFile():
             with open(PKL_STATUS_CACHE_FILE, "rb") as fp:
                 cacheDoc = pickle.load(fp)
             # protect against fake file with just bootstrapTime created by AdjustSites.py
-            # note: python's dictionary.get(key) returns None if key is not in dictionary
-            jobLogCheckpoint = cacheDoc.get('jobLogCheckpoint')
-            fjrParseResCheckpoint = cacheDoc.get('fjrParseResCheckpoint')
-            nodes = cacheDoc.get('nodes')
-            nodeMap = cacheDoc.get('nodeMap')
+            jobLogCheckpoint = getattr(cacheDoc, 'jobLogCheckpoint', None)
+            fjrParseResCheckpoint = getattr(cacheDoc, 'fjrParseResCheckpoint', None)
+            nodes = getattr(cacheDoc, 'nodes', None)
+            nodeMap = getattr(cacheDoc, 'nodeMap', None)
         except Exception:  # pylint: disable=broad-except
             logging.exception("error during status_cache handling")
             jobLogCheckpoint = None
@@ -375,7 +437,7 @@ def parseCondorLog(cacheDoc):
 
     parseJobLog(jel, nodes, nodeMap)
     # save jel object in a pickle file made unique by a timestamp
-    newJelPickleName = f"jel-{int(time.time())}.pkl"
+    newJelPickleName = 'jel-%d.pkl' % int(time.time())
     if not os.path.exists(LOG_PARSING_POINTERS_DIR):
         os.mkdir(LOG_PARSING_POINTERS_DIR)
     with open((LOG_PARSING_POINTERS_DIR+newJelPickleName), 'wb') as f:
@@ -402,7 +464,6 @@ def parseCondorLog(cacheDoc):
     newCacheDoc['nodeMap'] = nodeMap
     return newCacheDoc
 
-
 def storeNodesInfoInPklFile(cacheDoc):
     """
     takes as input an cacheDoc dictionary with keys
@@ -417,7 +478,6 @@ def storeNodesInfoInPklFile(cacheDoc):
         pickle.dump(cacheDoc, fp, protocol=2)
     # replace old file with new one
     move(tempFilename, PKL_STATUS_CACHE_FILE)
-
 
 def storeNodesInfoInTxtFile(cacheDoc):
     """
@@ -440,7 +500,6 @@ def storeNodesInfoInTxtFile(cacheDoc):
 
     move(tempFilename, STATUS_CACHE_FILE)
 
-
 def storeNodesInfoInJSONFile(cacheDoc):
     """
     takes as input an cacheDoc dictionary with keys
@@ -461,7 +520,6 @@ def storeNodesInfoInJSONFile(cacheDoc):
     with open(tempFilename, "w", encoding='utf-8') as fp:
         json.dump(newDict, fp)
     move(tempFilename, JSON_STATUS_CACHE_FILE)
-
 
 def summarizeFjrParseResults(checkpoint):
     """
@@ -498,140 +556,10 @@ def summarizeFjrParseResults(checkpoint):
         errDict = {}
         for line in content:
             fjrResult = json.loads(line)
-            for jobId, msg in fjrResult.items():
+            for jobId,msg in fjrResult.items():
                 errDict[jobId] = msg
         return errDict, newCheckpoint
     return None, 0
-
-
-def reportDagStatusToDB(dagStatus):
-    """
-    argument
-    dagStatus : a dictionary. Example for normal (no autom. splitt.) task:
-     { "SubDagStatus": {}, "SubDags": {}, "Timestamp": 1741859306,
-      "NodesTotal": 30, "DagStatus": 6 }
-       Example for an automatic splitting task with not tails:
-     {'SubDagStatus': {'Job0SubJobs': 99, 'Job1SubJobs': 5},
-      'SubDags': {0: {'Timestamp': 1744826643, 'NodesTotal': 26, 'DagStatus': 5}},
-       'Timestamp': 1744823021, 'NodesTotal': 6, 'DagStatus': 5}
-    this is the value of the `DagStatus' key in the 'nodes' dictionary
-    created inside parseNodeStateV2 function
-    """
-    statusName = collapseDAGStatus((dagStatus))
-    logging.info("UPDATE DAG STATUS IN TASK DB")
-    logging.info(f"Full dagStatus is {dagStatus}")
-    logging.info(f"Will report {statusName}")
-
-    with open(os.environ['_CONDOR_JOB_AD'], 'r', encoding='utf-8') as fd:
-        ad = classad.parseOne(fd)
-    host = ad['CRAB_RestHost']
-    dbInstance = ad['CRAB_DbInstance']
-    userProxy = ad['X509UserProxy']
-    taskname = ad['CRAB_Reqname']
-    logging.debug(f"host {host} dbInstance {dbInstance} cert {userProxy}")
-    logging.debug(f"taskname {taskname}  DAGstatus {statusName}")
-    from RESTInteractions import CRABRest  # pylint: disable=import-outside-toplevel
-    from urllib.parse import urlencode  # pylint: disable=import-outside-toplevel
-    crabserver = CRABRest(hostname=host, localcert=userProxy, localkey=userProxy, retry=0, userAgent='CRABSchedd')
-    crabserver.setDbInstance(dbInstance)
-    data = {'subresource': 'edit', 'column': 'tm_dagman_status',
-            'value': statusName, 'workflow': taskname}
-    try:
-        ret = crabserver.post(api='task', data=urlencode(data))
-    except Exception as ex:  # pylint: disable=broad-except
-        ret = str(ex)
-    logging.info(f"HTTP POST returned {ret}")
-
-
-def collapseDAGStatus(dagInfo):
-    """Collapse the status of one or several DAGs to a single one.
-
-    Take into account that subdags can be submitted to the queue on the
-    schedd, but not yet started.
-
-    moved here from CRABClient/Command/status.py with small adaptions to work
-    in the scheduler (HTCondor AP)
-    originally developed by Matthias Wolf
-    """
-    statusOrder = ['SUBMITTED', 'FAILED', 'FAILED (KILLED)', 'COMPLETED']
-
-    # subDagInfos is a dictionary with key the dag level ({count}) e.g.
-    # {0: {'Timestamp': 1744883488, 'NodesTotal': 94, 'DagStatus': 3}}
-    # indiates a running processing dag with 94 nodes
-    subDagInfos = dagInfo.get('SubDags', {})
-    # subDagStatus is a dictionary with key Job{count}SunJobs and value the status
-    # e.g. {'Job0SubJobs': 99, 'Job1SubJobs': 2}q
-
-    subDagStatus = dagInfo.get('SubDagStatus', {})
-    if len(subDagInfos) == 0 and len(subDagStatus) == 0:
-        # Regular splitting, return status of DAG
-        return translateDagStatus(dagInfo['DagStatus'])
-
-    def checkQueued(statusOrSUBMITTED):
-        # 99 is the status of a DAG which submitted one ore more subdags.
-        # If there are less actual DAG status informations than expected DAGs, at least one
-        # DAG has to be queued.
-        # Stefano: now that we run in the AP we can possibly do better for detecting
-        # that a condor_submit_dag has been issued but job did not start yet.
-        # condor_dagmans run as job in scheduler universe (7) and e.g. expose CRAB_Reqname ad
-        if len(subDagInfos) < len([k for k in subDagStatus if subDagStatus[k] == 99]):
-            return 'SUBMITTED'
-        return statusOrSUBMITTED
-
-    # From now one deal with automatic splitting and the presence if subdags
-
-    # If the processing DAG is still running, we are 'SUBMITTED',
-    # still.
-    if len(subDagInfos) > 0:
-        state = translateDagStatus(subDagInfos[0]['DagStatus'])
-        if state == 'SUBMITTED':
-            return state
-    # Tails active: return most active tail status according to `statusOrder`
-    if len(subDagInfos) > 1:
-        states = [translateDagStatus(subDagInfos[k]['DagStatus']) for k in subDagInfos if k > 0]
-        for iStatus in statusOrder:
-            if states.count(iStatus) > 0:
-                return checkQueued(iStatus)
-    # If no tails are active, return the status of the processing DAG.
-    if len(subDagInfos) > 0:
-        return checkQueued(translateDagStatus(subDagInfos[0]['DagStatus']))
-    return checkQueued(translateDagStatus(dagInfo['DagStatus']))
-
-
-def translateDagStatus(status):
-    """
-    from a number to a string which CRAB people can understand
-    From
-    https://htcondor.readthedocs.io/en task_process/cache_status.py
-/latest/automated-workflows/dagman-information-files.html#current-node-status-file
-    Most status values in there semms only relevant for nodes, but documentation does not differentiate
-    0 (STATUS_NOT_READY): At least one parent has not yet finished or the node is a FINAL node.
-    1 (STATUS_READY): All parents have finished, but the node is not yet running.
-    2 (STATUS_PRERUN): The node’s PRE script is running.
-    3 (STATUS_SUBMITTED): The node’s HTCondor job(s) are in the queue.
-    4 (STATUS_POSTRUN): The node’s POST script is running.
-    5 (STATUS_DONE): The node has completed successfully.
-    6 (STATUS_ERROR): The node has failed.
-    7 (STATUS_FUTILE): The node will never run because an ancestor node failed.
-    """
-
-    #
-    # N.B. separate status=5 in SUCCESS or FAILED based on whether all job succeeded or not ?
-    # or is already done by DAGMAN ?
-    dagStatusToString = {
-        0: 'SUBMITTED',  # clear for a node, but for DAG ? to be verified
-        1: 'SUBMITTED',  # clear for a node, but for DAG ? to be verified
-        3: 'RUNNING',
-        4: 'RUNNING',
-        5: 'COMPLETED',
-        6: 'FAILED',  # one ore more jobs (DAG nodes) failed
-        7: 'ERROR'  # as far as Stefano understand, this should never happen
-    }
-    # Do we report just DAG status, or a combined "global" status ?
-
-    statusName = dagStatusToString[status]
-    return statusName
-
 
 def main():
     """
@@ -639,24 +567,22 @@ def main():
     :return:
     """
     try:
-        logging.info(f"Start at {time.strftime('%d/%m/%y %X',time.localtime())}")
-
-        oldInfo = readOldStatusCacheFile()
-        updatedInfo = parseCondorLog(oldInfo)
-        storeNodesInfoInPklFile(updatedInfo)
+        # this is the old part
+        cacheDoc = storeNodesInfoInFile()
+        # this is new for the picke file but for the time being stick to using
+        # cacheDoc information from old way. At some point shoudl carefull check code
+        # and move on to the more strucutred 3-steps below, most likely when running
+        # in python3 the old status_cache.txt file will be unusable, as we found in crab client
+        #infoN = readOldStatusCacheFile()
+        #infoN = parseCondorLog(info)
+        storeNodesInfoInPklFile(cacheDoc)
         # to keep the txt file locally, useful for debugging, when we remove the old code:
-        storeNodesInfoInTxtFile(updatedInfo)
-        storeNodesInfoInJSONFile(updatedInfo)
-
-        # make sure that we only do this when status has changed, not every 5 minutes
-        # even if...all in all.. one call per task every 5min is a drop in the ocean
-        # isTimeToReport
-        reportDagStatusToDB(updatedInfo['nodes']['DagStatus'])
+        # storeNodesInfoInTxtFile(cacheDoc)
+        storeNodesInfoInJSONFile(cacheDoc)
 
     except Exception:  # pylint: disable=broad-except
         logging.exception("error during main loop")
 
-
 main()
 
-logging.debug("cache_status.py exiting")
+logging.debug("cache_status_jel.py exiting")

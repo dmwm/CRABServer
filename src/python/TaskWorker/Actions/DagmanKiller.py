@@ -1,5 +1,4 @@
 """ need a doc string here """
-import os
 import re
 from http.client import HTTPException
 from urllib.parse import urlencode
@@ -11,12 +10,9 @@ from TaskWorker.DataObjects import Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import TaskWorkerException
 
-if 'useHtcV2' in os.environ:
-    import htcondor2 as htcondor
-    import classad2 as classad
-else:
-    import htcondor
-    import classad
+import htcondor2 as htcondor
+import classad2 as classad
+
 
 WORKFLOW_RE = re.compile("[a-z0-9_]+")
 
@@ -67,7 +63,6 @@ class DagmanKiller(TaskAction):
             raise TaskWorkerException(msg) from exp
         taskName = classad.quote(self.workflow)
         const = f'(CRAB_ReqName =?= {taskName} && CRAB_DAGType=?="Job")'
-        const += f' || (CRAB_ReqName =?= {taskName} && TaskType=?="Job")'
 
         # Note that we can not send kills for jobs not in queue at this time; we'll need the
         # DAG FINAL node to be fixed and the node status to include retry number.
@@ -82,7 +77,6 @@ class DagmanKiller(TaskAction):
         # This is needed in case user wants to resubmit.
         taskName = classad.quote(self.workflow)
         rootConst = f'(stringListMember(CRAB_DAGType, "BASE PROCESSING TAIL", " ") && CRAB_ReqName =?= {taskName})'
-        rootConst += f' || (stringListMember(CRAB_DAGType, "BASE PROCESSING TAIL", " ") && CRAB_ReqName =?= {taskName})'
 
         # Holding DAG job does not mean that it will remove all jobs
         # and this must be done separately

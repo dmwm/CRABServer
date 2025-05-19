@@ -15,7 +15,7 @@ config.General.instance = os.getenv('REST_Instance','test12')
 #config.General.restHost = ''
 #config.General.dbInstance = ''
 config.General.requestName = filename_nopy + '_' + now_str
-config.General.workArea = '/tmp/crabStatusTracking'
+config.General.workArea = '/tmp/crabStatusTracking_{}'.format(os.environ["CMSSW_release"])
 config.General.transferLogs=False
 
 config.section_("JobType")
@@ -30,7 +30,7 @@ config.Data.inputDataset = os.getenv('inputDataset','/GenericTTbar/HC-CMSSW_9_2_
 config.Data.splitting = 'LumiBased'
 config.Data.unitsPerJob = 1
 config.JobType.maxJobRuntimeMin = 60
-config.Data.totalUnits = 40
+config.Data.totalUnits = 10
 
 config.Data.publication = False
 testName = "ruciotransfers-%d" % int(time.time())

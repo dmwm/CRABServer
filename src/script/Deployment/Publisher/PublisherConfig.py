@@ -27,8 +27,8 @@ config.General.pollInterval = 1800
 config.General.block_closure_timeout = 9400
 config.General.max_files_per_block = 100
 config.General.max_slaves = 5
-config.General.serviceCert = '/data/certs/servicecert.pem'
-config.General.serviceKey = '/data/certs/servicekey.pem'
+config.General.serviceCert = '/data/certs/robotcert.pem'
+config.General.serviceKey = '/data/certs/robotkey.pem'
 config.General.taskFilesDir = '/data/srv/Publisher_files/'
 config.General.logsDir = '/data/srv/Publisher/logs'
 config.General.logMsgFormat = '%(asctime)s:%(levelname)s:%(module)s:%(name)s: %(message)s'
@@ -40,12 +40,12 @@ config.REST.instance = 'test2'
 
 #config.REST.restHost = ''
 #config.REST.dbInstance = ''
-config.REST.cert = '/data/certs/servicecert.pem'
-config.REST.key = '/data/certs/servicekey.pem'
+config.REST.cert = '/data/certs/robotcert.pem'
+config.REST.key = '/data/certs/robotkey.pem'
 
 config.section_('TaskPublisher')
 config.TaskPublisher.DBShost = 'cmsweb-prod.cern.ch'
 config.TaskPublisher.logMsgFormat = '%(asctime)s:%(levelname)s: %(message)s'
 config.TaskPublisher.dryRun = False
-config.TaskPublisher.cert = '/data/certs/servicecert.pem'
-config.TaskPublisher.key = '/data/certs/servicekey.pem'
+config.TaskPublisher.cert = '/data/certs/robotcert.pem'
+config.TaskPublisher.key = '/data/certs/robotkey.pem'

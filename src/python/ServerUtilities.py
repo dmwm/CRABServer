@@ -76,7 +76,7 @@ MAX_MEMORY_SINGLE_CORE = 5000
 MAX_DISK_SPACE = 20000000  # Disk usage is not used from .job.ad as CRAB3 is not seeting it. 20GB is max.
 
 MAX_IDLE_JOBS = 1000
-MAX_POST_JOBS = 20
+MAX_POST_JOBS = 10
 
 # Parameter used to set the LeaveJobInQueue and the PeriodicRemoveclassads.
 # It's also used during resubmissions since we don't allow a resubmission during the last week
@@ -1168,3 +1168,22 @@ def getRucioAccountFromLFN(lfn):
             return "{0}_group".format(account)
         return account
     raise Exception("Expected /store/(user,group)/rucio/<account>, got {0}".format(lfn))
+
+
+def pythonListToClassAdExprTree(aList):
+    # arg: aList : list of strings
+    # return: value : a string representing the classAd value
+    # transforms a python list of strings into a string containing the
+    # internal (ExprTree) representation of a ClassAd such that the ad
+    # will be converted to a python list when used like : myList = ad['myAd']
+    # https://htcondor.readthedocs.io/en/latest/apis/python-bindings/api/version2/classad2/classad.html#classad2.ClassAd
+    # inside python we can simply do ad['myAd'] = myList but if we want
+    # to create the ad in a submitted job via the JDL MY.<attribute> command
+    # https://htcondor.readthedocs.io/en/latest/man-pages/condor_submit.html#submit-description-file-commands
+    # the python list [a, b, c] needs to become '{"a","b","c"}'
+    # i.e. a string with the ExprTree representatio of a ClassAd list
+    import json
+    quotedItems = json.dumps(aList)  # from [s1, s2] to the string '["s1","s2"]'
+    quotedItems = quotedItems.lstrip('[').rstrip(']')  # remove square brackets [ ]
+    value = "{" + quotedItems + "}"  # make final string adding the curly brackets { }
+    return value

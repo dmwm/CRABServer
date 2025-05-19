@@ -45,10 +45,7 @@ from TaskWorker.Actions.Recurring.BanDestinationSites import CRAB3BanDestination
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from TaskWorker.Worker import failTask
 
-if 'useHtcV2' in os.environ:
-    import classad2 as classad
-else:
-    import classad
+import classad2 as classad
 
 
 class PreDAG():
