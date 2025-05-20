@@ -15,7 +15,6 @@ from ServerUtilities import getEpochFromDBTime
 
 from CRABInterface.Utilities import CMSSitesCache, conn_handler, getDBinstance
 from CRABInterface.RESTExtensions import BadRequestException
-from CRABUtils.TaskUtils import updateTaskUploaded
 
 class DataWorkflow(object):
     """Entity that allows to operate on workflow resources.
@@ -423,8 +422,7 @@ class DataWorkflow(object):
             raise ExecutionError(msg)
         else:
             self.api.modify(self.Task.SetDryRun_sql, taskname=[workflow], dry_run=['F'])
-            #self.api.modify(self.Task.UpdateUploaded_sql, taskname=[workflow], uploaded=['T'])  
-            updateTaskUploaded(crabserver=self.crabserver, taskName=workflow, logger=self.logger)
+            self.api.modify(self.Task.UpdateUploaded_sql, taskname=[workflow], uploaded=['T'])  
             self.api.modify(self.Task.SetStatusTask_sql, taskname=[workflow], status=['NEW'], command=['SUBMIT'])
 
         return [{'result': 'ok'}]
