@@ -506,7 +506,7 @@ class RetryJob():
         # add pointers to logs
         schedHostname = socket.gethostname().split('.')[0]
         schedId = schedHostname.removeprefix('vocms')  # vomcs059 -> 059, vocms0106 -> 0106 etc,
-        webDirUrl = f"https://cmsweb.cern.ch:8443/scheddmon/{schedId}/{username}/{taskName}"
+        webDirUrl = f"https://cmsweb.cern.ch/scheddmon/{schedId}/{username}/{taskName}"
         stdoutUrl = f"{webDirUrl}/job_out.{jobId}.txt"
         postJobUrl = f"{webDirUrl}/postjob.{jobId}.txt"
         corruptionMessage['errorLines'].append(f"stdout: {stdoutUrl}")
