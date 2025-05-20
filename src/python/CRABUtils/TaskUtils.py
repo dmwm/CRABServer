@@ -70,10 +70,10 @@ def updateTaskStatus(crabserver=None, taskName=None, status=None, logger=None):
     data = urlencode(configreq)
     crabserver.post(api='workflowdb', data=data)
 
-def updateTaskUploaded(crabserver=None, taskName=None, logger=None):
+def updateTaskUploaded(crabserver=None, taskName=None, logger=None, uploadedValue='T'):
     """ change task uploaded value to 'T' in the DB """
     msg = f"Will set uploadvalue to 'T' for {taskName}"
     logger.info(msg)
-    configreq = {'subresource': 'edit', 'workflow': taskName, 'column': 'tm_uploaded', 'value': 'T'}
+    configreq = {'subresource': 'edit', 'workflow': taskName, 'column': 'tm_uploaded', 'value': uploadedValue}
     data = urlencode(configreq)
     crabserver.post(api='task', data=data)
