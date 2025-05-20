@@ -289,14 +289,7 @@ def parseArgs():
 
     (opts, _) = parser.parse_args(sys.argv[1:])
 
-    # sanitize input options
-    # Note about options: default value is None for all, but if, like it usually happens,
-    # CRAB code calls this with inputs like --seeding=None
-    # the option variable is set to the string 'None', not to the python type None
-    # let's make life easier by replacing 'None' with None.
-    for name, value in vars(opts).items():
-        if value == 'None':
-            setattr(opts, name, None)
+    jobId = None if opts.jobId is 'None' else opts.jobId
 
     # allow for arguments simply be the jobId (a string because automtic splitting has format like N-M
     if getattr(opts, 'jobId', None):
