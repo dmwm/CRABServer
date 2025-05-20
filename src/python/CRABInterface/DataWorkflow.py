@@ -421,8 +421,7 @@ class DataWorkflow(object):
             msg = 'Can only proceed if task is in the UPLOADED status, but it is in the %s status.' % row.task_status
             raise ExecutionError(msg)
         else:
-            self.api.modify(self.Task.SetDryRun_sql, taskname=[workflow], dry_run=['F'])
-            self.api.modify(self.Task.UpdateUploaded_sql, taskname=[workflow], uploaded=['T'])  
+            self.api.modify(self.Task.SetDryRun_sql, taskname=[workflow], dry_run=['F'])  
             self.api.modify(self.Task.SetStatusTask_sql, taskname=[workflow], status=['NEW'], command=['SUBMIT'])
 
         return [{'result': 'ok'}]
