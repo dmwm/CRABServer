@@ -524,7 +524,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         with open('subdag.jdl', 'w', encoding='utf-8') as fd:
             print(subdag, file=fd)
 
-        dagJobJDL["+CRAB_DAGType"] = classad.quote("BASE")  # we want the ad value to be "BASE", not BASE
+        dagJobJDL["My.CRAB_DAGType"] = classad.quote("BASE")  # we want the ad value to be "BASE", not BASE
         dagJobJDL["output"] = os.path.join(task['scratch'], "request.out")
         dagJobJDL["error"] = os.path.join(task['scratch'], "request.err")
         dagJobJDL["Executable"] = cmd
