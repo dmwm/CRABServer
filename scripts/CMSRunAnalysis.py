@@ -291,61 +291,62 @@ def parseArgs():
 
     jobId = None if opts.jobId is 'None' else opts.jobId
 
+    input_params = {}
     # allow for arguments simply be the jobId (a string because automtic splitting has format like N-M
-    if getattr(opts, 'jobId', None):
+    if jobId:
         arguments = {}
         with open('input_args.json', 'r', encoding='UTF-8') as fh:
             allArgs = json.load(fh)  # read file prepared by DagmanCreator
         for args in allArgs:
-            if args['CRAB_Id'] == opts.jobId:
+            if args['CRAB_Id'] == jobId:
                 arguments = args  # pick the arguments for this job
                 break
         if not arguments:
             raise Exception("input jobId not found in input_args.json")
         for key, value in arguments.items():
-            setattr(opts, key, value)
+            setattr(input_params, key, value)
 
     # allow for most input arguments to be passed via a (job specific) JSON file
-    if getattr(opts, 'jsonArgFile', None):
+    if getattr(input_params, 'jsonArgFile', None):
         arguments = {}
-        with open(opts.jsonArgFile, 'r', encoding='UTF-8') as fh:
+        with open(input_params.jsonArgFile, 'r', encoding='UTF-8') as fh:
             arguments = json.load(fh)
         for key, value in arguments.items():
-            setattr(opts, key, value)
+            setattr(input_params, key, value)
 
     # JSON file has the string "None" to mean no value, we like python None better
-    for name, value in vars(opts).items():
+    for name, value in vars(input_params).items():
         if value == 'None':
-            setattr(opts, name, None)
+            setattr(input_params, name, None)
 
     # set default values for args which may be missing in the JSON file
-    if not hasattr(opts, 'oneEventMode'):
-        setattr(opts, 'oneEventMode', 0)
+    if not hasattr(input_params, 'oneEventMode'):
+        setattr(input_params, 'oneEventMode', 0)
 
     # next lines are for backward compatibility with Client v3.241218 or earlier, to be removed
-    opts.userSandbox = opts.userSandbox if opts.userSandbox else opts.archiveJob
-    opts.inputFileList = opts.inputFileList if opts.inputFileList else opts.inputFile
+    input_params.userSandbox = input_params.userSandbox if input_params.userSandbox else input_params.archiveJob
+    input_params.inputFileList = input_params.inputFileList if input_params.inputFileList else input_params.inputFile
 
     try:
         print(f"==== Parameters Dump at {UTCNow()} ===")
-        print("userSandbox:   ", opts.userSandbox)
-        print("jobNumber:     ", opts.jobNumber)
-        print("cmsswVersion:  ", opts.cmsswVersion)
-        print("scramArch:     ", opts.scramArch)
-        print("inputFileList  ", opts.inputFileList)
-        print("runAndLumis:   ", opts.runAndLumis)
-        print("lheInputFiles: ", opts.lheInputFiles)
-        print("firstEvent:    ", opts.firstEvent)
-        print("firstLumi:     ", opts.firstLumi)
-        print("eventsPerLumi: ", opts.eventsPerLumi)
-        print("lastEvent:     ", opts.lastEvent)
-        print("firstRun:      ", opts.firstRun)
-        print("seeding:       ", opts.seeding)
-        print("userFiles:     ", opts.userFiles)
-        print("oneEventMode:  ", opts.oneEventMode)
-        print("scriptExe:     ", opts.scriptExe)
-        print("scriptArgs:    ", opts.scriptArgs)
-        print("maxRuntime:    ", opts.maxRuntime)
+        print("userSandbox:   ", input_params.userSandbox)
+        print("jobNumber:     ", input_params.jobNumber)
+        print("cmsswVersion:  ", input_params.cmsswVersion)
+        print("scramArch:     ", input_params.scramArch)
+        print("inputFileList  ", input_params.inputFileList)
+        print("runAndLumis:   ", input_params.runAndLumis)
+        print("lheInputFiles: ", input_params.lheInputFiles)
+        print("firstEvent:    ", input_params.firstEvent)
+        print("firstLumi:     ", input_params.firstLumi)
+        print("eventsPerLumi: ", input_params.eventsPerLumi)
+        print("lastEvent:     ", input_params.lastEvent)
+        print("firstRun:      ", input_params.firstRun)
+        print("seeding:       ", input_params.seeding)
+        print("userFiles:     ", input_params.userFiles)
+        print("oneEventMode:  ", input_params.oneEventMode)
+        print("scriptExe:     ", input_params.scriptExe)
+        print("scriptArgs:    ", input_params.scriptArgs)
+        print("maxRuntime:    ", input_params.maxRuntime)
         print("===================")
     except NameError:
         name, value, _ = sys.exc_info()
@@ -354,7 +355,7 @@ def parseArgs():
         mintime()
         sys.exit(EC_MissingArg)
 
-    return opts
+    return input_params
 
 
 def extractUserSandbox(sandbox):
