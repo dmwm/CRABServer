@@ -14,6 +14,19 @@ set -x
 echo "Beginning dag_bootstrap.sh (stdout)"
 echo "Beginning dag_bootstrap.sh (stderr)" 1>&2
 
+# in case of POSTJOB and ASO-Rucio check if we want to exit immediately w/o running python
+if [[ $1 == "POSTJOB" ]] && [[ $9 =~ "/rucio/" ]] ; then
+  pjlog=postjob.$7.$4.txt
+  defers=`grep -c DEFERRING $pjlog`
+  prob=1
+  [[ $defers -ge 8 ]] && prob=$(($defer/4))  # see https://github.com/dmwm/CRABServer/issues/9079
+  test=`shuf -i 1-$prob -n 1`  # a random integer in [`1...$prob]
+  if [ $test -ne 1 ] ; then
+    echo `date` "dag_boostrap.sh DEFERRING. PostJob will run again after 30 min" >> $pjlog
+    exit 4  # tells Dagman to re-run me after DEFER time indicated in Dagman file
+  fi
+fi
+
 source /etc/os-release
 OS_Version=`echo $VERSION_ID | cut -d. -f1`  # e.g. 7 or 9
 
