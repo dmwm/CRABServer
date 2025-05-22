@@ -19,6 +19,7 @@ git remote add stefano https://github.com/belforte/CRABServer.git
 git remote add dario https://github.com/mapellidario/CRABServer.git
 git remote add wa https://github.com/novicecpp/CRABServer.git
 git remote add vchakrav https://github.com/aspiringmind-code/CRABServer.git
+git remote add krittin https://github.com/sinonkt/CRABServer
 
 popd
 pushd WMCore
