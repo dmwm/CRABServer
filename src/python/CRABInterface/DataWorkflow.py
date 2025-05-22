@@ -283,7 +283,7 @@ class DataWorkflow(object):
             siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority = None, None, None, None, None, None
 
         # We only allow resubmission of tasks that are in a final state, listed here:
-        allowedTaskStates = ['SUBMITTED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']
+        allowedTaskStates = ['SUBMITTED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']
 
         # Do not resubmit publication for tasks that were not submitted since they don't have any output.
         if not publication:
