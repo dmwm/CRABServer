@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build data files of TaskWorker.
-# This script needs:
+# This script needs
 #   - RUNTIME_WORKDIR:   Working directory to build tar files
 #   - DATAFILES_WORKDIR: Working directory to build data files
 #   - CRABSERVERDIR:     CRABServer repository path.
@@ -23,52 +23,31 @@ DATAFILES_WORKDIR="${DATAFILES_WORKDIR:-./data_files}"
 CRABSERVERDIR="${CRABSERVERDIR:-./}"
 WMCOREDIR="${WMCOREDIR:-./WMCore}"
 
-# Get absolute paths
+# get absolute path
 RUNTIME_WORKDIR="$(realpath "${RUNTIME_WORKDIR}")"
 DATAFILES_WORKDIR="$(realpath "${DATAFILES_WORKDIR}")"
 CRABSERVERDIR="$(realpath "${CRABSERVERDIR}")"
 WMCOREDIR="$(realpath "${WMCOREDIR}")"
 
-# Cleanup $DATAFILES_WORKDIR
-rm -rf "${DATAFILES_WORKDIR}/data"
-mkdir -p "${DATAFILES_WORKDIR}/data"
+# cleanup $DATAFILES_WORKDIR
+rm -rf "${DATAFILES_WORKDIR}"/data
+mkdir -p "${DATAFILES_WORKDIR}"
 
-# Build tar files
+# build tar files
+# passing args
 export RUNTIME_WORKDIR
 export CRABSERVERDIR
 export WMCOREDIR
-# assume new_htcondor_make_runtime.sh is in the same directory
-bash "${SCRIPT_DIR}/buildTWTarballs.sh"
-
-# Install the package in a temporary location to extract data files
-TMP_INSTALL_DIR="$(mktemp -d)"
+# assume new_htcondor_make_runtime.sh live in the same directory of this script.
+bash "${SCRIPT_DIR}"/buildTWTarballs.sh
+# build script files
 pushd "${CRABSERVERDIR}"
-python3 setup.py install_system -s TaskWorker --prefix="${TMP_INSTALL_DIR}" --root=/
+python3 setup.py install_system -s TaskWorker --prefix="${DATAFILES_WORKDIR}"
 popd
-
-# Copy installed package data files to DATAFILES_WORKDIR
-PKG_DATA_DIR="${TMP_INSTALL_DIR}/lib/python*/site-packages/crabserver"
-if [[ -d "${PKG_DATA_DIR}" ]]; then
-    # Copy scripts
-    cp -r "${PKG_DATA_DIR}/scripts" "${DATAFILES_WORKDIR}/data/"
-    # Copy web files (css, html, script)
-    for dir in css html script; do
-        if [[ -d "${PKG_DATA_DIR}/${dir}" ]]; then
-            cp -r "${PKG_DATA_DIR}/${dir}" "${DATAFILES_WORKDIR}/data/"
-        fi
-    done
-else
-    echo "ERROR: Package data not found in ${PKG_DATA_DIR}" >&2
-    exit 1
-fi
-
-# Copy tar files
+# copy tar files to the same directory as script files
 cp "${RUNTIME_WORKDIR}/CMSRunAnalysis.tar.gz" \
    "${RUNTIME_WORKDIR}/TaskManagerRun.tar.gz" \
-   "${DATAFILES_WORKDIR}/data/"
+   "${DATAFILES_WORKDIR}/data"
 
-# Cleanup temporary install
-rm -rf "${TMP_INSTALL_DIR}"
+# remove unuse lib dir from `install_system`
 rm -rf "${DATAFILES_WORKDIR:?}/lib"
-
-echo "Data files successfully built in ${DATAFILES_WORKDIR}/data"
