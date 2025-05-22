@@ -262,12 +262,30 @@ class TestCommand(Command):
         sys.exit(CRABQuality.runTests(mode=mode,
                                     integrationHost=self.integrationHost))
 
-def getWebDir():
-    res = []
+def get_package_data():
+    # Handle script files
+    package_data = {
+        '': [
+            'scripts/CMSRunAnalysis.sh',
+            'scripts/cmscp.py',
+            'scripts/cmscp.sh',
+            'scripts/gWMS-CMSRunAnalysis.sh',
+            'scripts/submit_env.sh',
+            'scripts/dag_bootstrap_startup.sh',
+            'scripts/dag_bootstrap.sh',
+            'scripts/AdjustSites.py',
+        ]
+    }
+    
+    # Handle web directories (css, html, script)
     for directory in ['css', 'html', 'script']:
-        for root, _, files in os.walk('src/'+directory):
-            res.append((root[4:], [os.path.join(root, x) for x in files])) #4: for removing src
-    return res
+        for root, _, files in os.walk('src/' + directory):
+            rel_path = root[4:]  # Remove 'src/'
+            package_data.setdefault('', []).extend(
+                os.path.join(rel_path, x) for x in files
+            )
+    
+    return package_data
 
 setup(name='crabserver',
       version='3.2.0',
@@ -275,12 +293,8 @@ setup(name='crabserver',
       cmdclass={'build_system': BuildCommand,
                 'install_system': InstallCommand,
                 'test' : TestCommand},
-      #include_package_data=True,
+      include_package_data=True,
       #base directory for all the packages
       package_dir={'': 'src/python'},
-      data_files=['scripts/%s' % x for x in \
-                        ['CMSRunAnalysis.sh', 'cmscp.py', 'cmscp.sh',
-                         'gWMS-CMSRunAnalysis.sh', 'submit_env.sh',
-                         'dag_bootstrap_startup.sh',
-                         'dag_bootstrap.sh', 'AdjustSites.py']] + getWebDir(),
+      package_data=get_package_data(),
      )
