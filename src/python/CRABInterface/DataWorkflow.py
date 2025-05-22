@@ -283,7 +283,7 @@ class DataWorkflow(object):
             siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority = None, None, None, None, None, None
 
         # We only allow resubmission of tasks that are in a final state, listed here:
-        allowedTaskStates = ['SUBMITTED', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']
+        allowedTaskStates = ['SUBMITTED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']
 
         # Do not resubmit publication for tasks that were not submitted since they don't have any output.
         if not publication:
@@ -421,7 +421,7 @@ class DataWorkflow(object):
             msg = 'Can only proceed if task is in the UPLOADED status, but it is in the %s status.' % row.task_status
             raise ExecutionError(msg)
         else:
-            self.api.modify(self.Task.SetDryRun_sql, taskname=[workflow], dry_run=['F'])
+            self.api.modify(self.Task.SetDryRun_sql, taskname=[workflow], dry_run=['F'])  
             self.api.modify(self.Task.SetStatusTask_sql, taskname=[workflow], status=['NEW'], command=['SUBMIT'])
 
         return [{'result': 'ok'}]

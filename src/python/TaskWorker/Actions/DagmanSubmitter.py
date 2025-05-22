@@ -481,7 +481,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         """
 
         # NOTE: Changes here must be synchronized with the job_submit in DagmanCreator.py in CAFTaskWorker
-        dagJobJDL["+CMS_SubmissionTool"] = classad.quote("CRAB")
+        dagJobJDL["My.CMS_SubmissionTool"] = classad.quote("CRAB")
         # We switched from local to scheduler universe.  Why?  It seems there's no way in the
         # local universe to change the hold signal at runtime.  That's fairly important for our
         # resubmit implementation.
@@ -524,7 +524,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         with open('subdag.jdl', 'w', encoding='utf-8') as fd:
             print(subdag, file=fd)
 
-        dagJobJDL["+CRAB_DAGType"] = classad.quote("BASE")  # we want the ad value to be "BASE", not BASE
+        dagJobJDL["My.CRAB_DAGType"] = classad.quote("BASE")  # we want the ad value to be "BASE", not BASE
         dagJobJDL["output"] = os.path.join(task['scratch'], "request.out")
         dagJobJDL["error"] = os.path.join(task['scratch'], "request.err")
         dagJobJDL["Executable"] = cmd
