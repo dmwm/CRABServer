@@ -74,7 +74,6 @@ class DagmanResubmitter(TaskAction):
                   'CRAB_SiteWhitelist' : 'site_whitelist',
                   'MaxWallTimeMinsRun' : 'maxjobruntime',
                   'CRAB_RequestedMemory'      : 'maxmemory',
-                  'CRAB_RequestedCpus'        : 'numcores',
                   'JobPrio'            : 'priority'
                  }
 
@@ -154,5 +153,5 @@ if __name__ == "__main__":
     resubmitter = DagmanResubmitter(config, server_)
     resubmitter.execute(task={'tm_taskname':'141129_110306_crab3test-5:atanasi_crab_test_resubmit', 'user_proxy' : os.environ["X509_USER_PROXY"],
                               'resubmit_site_whitelist' : ['T2_IT_Bari'], 'resubmit_site_blacklist' : ['T2_IT_Legnaro'], 'resubmit_priority' : 2,
-                              'resubmit_numcores' : 1, 'resubmit_maxjobruntime' : 1000, 'resubmit_maxmemory' : 1000
+                              'resubmit_maxjobruntime' : 1000, 'resubmit_maxmemory' : 1000
                              })
