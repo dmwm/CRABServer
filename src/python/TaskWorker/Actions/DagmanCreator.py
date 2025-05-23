@@ -364,7 +364,7 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_RetryOnASOFailures'] = retry_aso
         if task['tm_output_lfn'].startswith('/store/user/rucio') or \
                 task['tm_output_lfn'].startswith('/store/group/rucio'):
-            jobSubmit['My.CRAB_ASOTimeout'] = str(getattr(self.config.TaskWorker, 'ASORucioTimeout', 0))
+            jobSubmit['My.CRAB_ASOTimeout'] = str(2 * TASKLIFETIME)  # effectivley infinite
         else:
             jobSubmit['My.CRAB_ASOTimeout'] = str(getattr(self.config.TaskWorker, 'ASOTimeout', 0))
         jobSubmit['My.CRAB_RestHost'] = classad.quote(task['resthost'])
