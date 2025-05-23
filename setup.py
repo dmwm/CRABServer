@@ -2,7 +2,7 @@
 #pylint: disable=C0103,W0105,broad-except,logging-not-lazy,W0702,C0301,R0902,R0914,R0912,R0915,W0201,W0621
 
 """
-    NOTE: This is intended to run automagically. Keep the deps minimal
+    NOTE: This is intended to run automatically. Keep the deps minimal
 """
 from __future__ import print_function
 import sys
@@ -10,11 +10,10 @@ import os
 import os.path
 import re
 import shutil
-from distutils.core import setup, Command
-from distutils.command.build import build
-from distutils.command.install import install
-from distutils.spawn import spawn
-
+import subprocess
+from setuptools import setup, Command
+from setuptools.command.build_py import build_py
+from setuptools.command.install import install
 
 systems = \
 {
@@ -80,17 +79,17 @@ class PackageCommand(Command):
         command line options give the user the option to ovveride the different
         repositories with either different GH tags or a local directory.
         """
-    user_options = []
-    user_options.append(("targets=", None,
-                         "Package specified systems (default: CRABClient,CRABServer,TaskWorker)"))
-    user_options.append(("crabServerPath=", None, "Override CRABServer repo location"))
-    user_options.append(("crabClientPath=", None, "Override CRABClient repo location"))
-    user_options.append(("wmCorePath=", None, "Override WMCore repo location"))
-
-    user_options.append(("pkgToolsRepo=", None, "Path to existing pkgtools repo"))
-    user_options.append(("pkgToolsRef=", None, "If pkgToolsPath is a git url, what ref to get"))
-    user_options.append(("cmsdistRepo=", None, "Override cmsdist repo location"))
-    user_options.append(("cmsdistRef=", None, "If cmsdistPath is a git url, what ref to get"))
+    user_options = [
+        ("targets=", None,
+         "Package specified systems (default: CRABClient,CRABServer,TaskWorker)"),
+        ("crabServerPath=", None, "Override CRABServer repo location"),
+        ("crabClientPath=", None, "Override CRABClient repo location"),
+        ("wmCorePath=", None, "Override WMCore repo location"),
+        ("pkgToolsRepo=", None, "Path to existing pkgtools repo"),
+        ("pkgToolsRef=", None, "If pkgToolsPath is a git url, what ref to get"),
+        ("cmsdistRepo=", None, "Override cmsdist repo location"),
+        ("cmsdistRef=", None, "If cmsdistPath is a git url, what ref to get")
+    ]
 
     def initialize_options(self):
         self.targets = "CRABClient,CRABServer,TaskWorker"
@@ -137,15 +136,16 @@ def define_the_build(dist, system_name, patch_x=''):
                                     ["%s/%s" % (dirpath, fname) for fname in files
                                      if fname != '.buildinfo']))
 
-class BuildCommand(Command):
+class BuildCommand(build_py):
     """Build python modules for a specific system."""
     description = \
         "Build python modules for the specified system. The supported system(s)\n" + \
         "\t\t   at the moment are 'CRABInterface' . Use with --force \n" + \
         "\t\t   to ensure a clean build of only the requested parts.\n"
-    user_options = build.user_options
-    user_options.append(('system=', 's', 'build the specified system (default: CRABInterface)'))
-    user_options.append(('skip-docs=', 'd', 'skip documentation'))
+    user_options = build_py.user_options + [
+        ('system=', 's', 'build the specified system (default: CRABInterface)'),
+        ('skip-docs=', 'd', 'skip documentation')
+    ]
 
     def initialize_options(self):
         self.system = "CRABInterface,TaskWorker"
@@ -153,7 +153,7 @@ class BuildCommand(Command):
 
     def finalize_options(self):
         if self.system not in systems:
-            print ("System %s unrecognised, please use '-s CRABInterface'" % self.system)
+            print("System %s unrecognised, please use '-s CRABInterface'" % self.system)
             sys.exit(1)
 
         # Expand various sources and maybe do the c++ build.
@@ -167,7 +167,7 @@ class BuildCommand(Command):
         if not self.skip_docs:
             os.environ["PYTHONPATH"] = "%s/../WMCore/src/python/:%s" % (os.getcwd(), os.environ["PYTHONPATH"])
             os.environ["PYTHONPATH"] = "%s/build/lib:%s" % (os.getcwd(), os.environ["PYTHONPATH"])
-            spawn(['make', '-C', 'doc', 'html', 'PROJECT=%s' % 'crabserver'])
+            subprocess.run(['make', '-C', 'doc', 'html', 'PROJECT=%s' % 'crabserver'], check=True)
 
     def run(self):
         command = 'build'
@@ -185,10 +185,11 @@ class InstallCommand(install):
     description = \
         "Install a specific system. You can patch an existing\n" + \
         "\t\tinstallation instead of normal full installation using the '-p' option.\n"
-    user_options = install.user_options
-    user_options.append(('system=', 's', 'install the specified system (default: CRABInterface)'))
-    user_options.append(('patch', None, 'patch an existing installation (default: no patch)'))
-    user_options.append(('skip-docs=', 'd', 'skip documentation'))
+    user_options = install.user_options + [
+        ('system=', 's', 'install the specified system (default: CRABInterface)'),
+        ('patch', None, 'patch an existing installation (default: no patch)'),
+        ('skip-docs=', 'd', 'skip documentation')
+    ]
 
     def initialize_options(self):
         install.initialize_options(self)
@@ -199,10 +200,10 @@ class InstallCommand(install):
     def finalize_options(self):
         # Check options.
         if self.system not in systems:
-            print ("System %s unrecognised, please use '-s CRABInterface'" % self.system)
+            print("System %s unrecognised, please use '-s CRABInterface'" % self.system)
             sys.exit(1)
         if self.patch and not os.path.isdir("%s/xbin" % self.prefix):
-            print ("Patch destination %s does not look like a valid location." % self.prefix)
+            print("Patch destination %s does not look like a valid location." % self.prefix)
             sys.exit(1)
 
         # Expand various sources, but don't build anything from c++ now.
@@ -240,15 +241,18 @@ class TestCommand(Command):
     Test harness entry point
     """
     description = "Runs tests"
-    user_options = []
-    user_options.append(("integration", None, "Run integration tests"))
-    user_options.append(("integrationHost", None,
-                         "Host to run integration tests against"))
+    user_options = [
+        ("integration", None, "Run integration tests"),
+        ("integrationHost", None, "Host to run integration tests against")
+    ]
+
     def initialize_options(self):
         self.integration = False
         self.integrationHost = "crab3-gwms-1.cern.ch"
+
     def finalize_options(self):
         pass
+
     def run(self):
         #import here, cause we don't want to bomb if nose doesn't exist
         import CRABQuality
@@ -256,7 +260,7 @@ class TestCommand(Command):
         if self.integration:
             mode = 'integration'
         sys.exit(CRABQuality.runTests(mode=mode,
-                                      integrationHost=self.integrationHost))
+                                    integrationHost=self.integrationHost))
 
 def getWebDir():
     res = []
