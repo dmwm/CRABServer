@@ -1752,6 +1752,7 @@ class PostJob():
         if retval == 3:
             msg += " : FATAL GLOBAL FAIL. Full DAG will stop"
         if retval == 4:
+            # do not remove DEFERRING from this message. dag_boostrap.sh relies on it
             msg += " : DEFERRING. PostJob will run again after 30 min"
         self.logger.info(msg)
 
