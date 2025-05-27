@@ -117,6 +117,7 @@ if [[ -z "$HOST_IP" ]]; then
   exit 1
 fi
 DOCKER_DNS="--dns ${HOST_IP}"
+DOCKER_VOL="${DOCKER_VOL} -v /etc/resolv.conf:/etc/resolv.conf"
 
 docker run --name ${SERVICE} -t --net host --privileged $DOCKER_DNS $DOCKER_OPT $DOCKER_VOL $DOCKER_IMAGE $COMMAND > $tmpfile
 if [[ "${SERVICE}" == TaskWorker_monit_*  ]]; then
