@@ -111,8 +111,14 @@ else
   DOCKER_IMAGE=${TW_REPO:-registry.cern.ch/cmscrab}/crabtaskworker:${TW_VERSION}
 fi
 
+HOST_IP=$(ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+if [[ -z "$HOST_IP" ]]; then
+  echo "Could not determine host IP. Exiting."
+  exit 1
+fi
+DOCKER_DNS="--dns ${HOST_IP}"
 
-docker run --name ${SERVICE} -t --net host --privileged $DOCKER_OPT $DOCKER_VOL $DOCKER_IMAGE $COMMAND > $tmpfile
+docker run --name ${SERVICE} -t --net host --privileged $DOCKER_DNS $DOCKER_OPT $DOCKER_VOL $DOCKER_IMAGE $COMMAND > $tmpfile
 if [[ "${SERVICE}" == TaskWorker_monit_*  ]]; then
   echo "TaskWorker_monit_* detected, waiting for it to finish..."
   docker_wait_return=$(docker wait ${SERVICE})
