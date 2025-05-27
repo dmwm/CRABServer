@@ -111,6 +111,7 @@ else
   DOCKER_IMAGE=${TW_REPO:-registry.cern.ch/cmscrab}/crabtaskworker:${TW_VERSION}
 fi
 
+
 docker run --name ${SERVICE} -t --net host --privileged $DOCKER_OPT $DOCKER_VOL $DOCKER_IMAGE $COMMAND > $tmpfile
 if [[ "${SERVICE}" == TaskWorker_monit_*  ]]; then
   echo "TaskWorker_monit_* detected, waiting for it to finish..."

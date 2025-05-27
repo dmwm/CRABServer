@@ -502,7 +502,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         dagJobJDL['My.CRAB_TaskEndTime'] = str(int(task['tm_start_time']) + TASKLIFETIME)
         #For task management info see https://github.com/dmwm/CRABServer/issues/4681#issuecomment-302336451
         dagJobJDL["LeaveJobInQueue"] = "True"
-        dagJobJDL["PeriodicHold"] = "time() > CRAB_TaskEndTime"
+        dagJobJDL["PeriodicRemove"] = "time() > CRAB_TaskEndTime"
         dagJobJDL["OnExitHold"] = "(ExitCode =!= UNDEFINED && ExitCode != 0)"
         dagJobJDL["OnExitRemove"] = "( ExitSignal =?= 11 || (ExitCode =!= UNDEFINED && ExitCode >=0 && ExitCode <= 2))"
         # dagJobJDL["OtherJobRemoveRequirements"] = "DAGManJobId =?= ClusterId"  # appears unused SB
