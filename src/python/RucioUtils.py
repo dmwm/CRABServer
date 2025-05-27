@@ -1,10 +1,37 @@
 """ a small set of utilities to work with Rucio used in various places """
 import logging
+import time
 
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from rucio.client import Client
 from rucio.common.exception import RSENotFound, RuleNotFound
 
+def retry_call(name, func, retries=3, delay=180, logger=None):
+    """
+    Generic retry wrapper for any function.
+    :param name: Name of the operation (for logging).
+    :param func: A callable with no arguments.
+    :param retries: Number of retry attempts.
+    :param delay: Delay between attempts (in seconds).
+    :param logger: Logger instance (optional).
+    :return: The result of the function call.
+    """
+    attempt = 0
+    while attempt < retries:
+        try:
+            return func()
+        except Exception as e:
+            if logger:
+                logger.warning("Failed to execute '%s' (attempt %d/%d): %s", name, attempt+1, retries, str(e))
+            else:
+                print(f"Warning: Failed to execute '{name}' (attempt {attempt+1}/{retries}): {e}")
+            attempt += 1
+            if attempt < retries:
+                time.sleep(delay)
+            else:
+                if logger:
+                    logger.error("Operation '%s' failed after %d attempts", name, retries)
+                raise
 
 def getNativeRucioClient(config=None, logger=None):
     """
@@ -46,9 +73,12 @@ def getNativeRucioClient(config=None, logger=None):
         auth_type='x509',
         logger=rucioLogger
         )
-    ret = nativeClient.ping()
+    RETRIES = 3
+    DELAY = 180
+
+    ret = retry_call("ping", nativeClient.ping, retries=RETRIES, delay=DELAY, logger=logger)
     logger.info("Rucio server v.%s contacted", ret['version'])
-    ret = nativeClient.whoami()
+    ret = retry_call("whoami", nativeClient.whoami, retries=RETRIES, delay=DELAY, logger=logger)
     logger.info("Rucio client initialized for %s in status %s", ret['account'], ret['status'])
 
     return nativeClient
