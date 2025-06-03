@@ -288,8 +288,7 @@ def parseArgs():
     parser.add_option('--jobId', dest='jobId', type='string')
 
     (opts, _) = parser.parse_args(sys.argv[1:])
-
-    jobId = None if opts.jobId is 'None' else opts.jobId
+    jobId = opts.jobId
 
     input_params = {}
     # allow for arguments simply be the jobId (a string because automtic splitting has format like N-M

@@ -695,30 +695,6 @@ class DagmanCreator(TaskAction):
         for dagspec in dagSpecs:
             argDict = {}
             argDict['CRAB_Id'] = dagspec['count'] # '1' or '0-3' etc
-            # DEPRECATED: The following extra args were deprecated, we retrived them from input_args.json and jobID (CRAB_ID) instead
-            # argDict['jobNumber'] = dagspec['count'] # '1' or '0-3' etc
-            # argDict['inputFileList'] = f"job_input_file_list_{dagspec['count']}.txt"  #'job_input_file_list_1.txt'
-            # argDict['runAndLumis'] = f"job_lumis_{dagspec['count']}.json"
-            # argDict['lheInputFiles'] = dagspec['lheInputFiles']  # False
-            # argDict['firstEvent'] = dagspec['firstEvent']  # 'None'
-            # argDict['lastEvent'] = dagspec['lastEvent']  # 'None'
-            # argDict['firstLumi'] = dagspec['firstLumi']  # 'None'
-            # argDict['firstRun'] = dagspec['firstRun']  # 'None'
-            # argDict['userSandbox'] = task['tm_user_sandbox']  #SB we could simply hardocode 'sandbox.tar.gz'
-            # argDict['cmsswVersion'] = task['tm_job_sw']  # 'CMSSW_9_2_5'
-            # argDict['scramArch'] = task['tm_job_arch']  # 'slc6_amd64_gcc530'
-            # argDict['seeding'] = 'AutomaticSeeding'
-            # argDict['scriptExe'] = task['tm_scriptexe']  #
-            # argDict['eventsPerLumi'] = task['tm_events_per_lumi']  #
-            # argDict['maxRuntime'] = dagspec['maxRuntime']  # -1
-            # argDict['scriptArgs'] = task['tm_scriptargs']
-            # following one are for bkw compat. with CRABClient v3.241218 or earlier, to be removed
-            # argDict['CRAB_Archive'] = argDict['userSandbox']
-            # argDict['CRAB_ISB'] = 'dummy'
-            # argDict['CRAB_JobSW'] = argDict['cmsswVersion']
-            # argDict['CRAB_JobArch'] = argDict['scramArch']
-            # argDict['runAndLumiMask'] = argDict['runAndLumis']
-            # argDict['inputFiles'] = argDict['inputFileList']
 
             # The following two are for fixing up job.submit files
             # SB argDict['CRAB_localOutputFiles'] = dagspec['localOutputFiles']
