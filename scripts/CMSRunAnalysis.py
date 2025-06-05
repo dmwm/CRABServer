@@ -287,10 +287,9 @@ def parseArgs():
     parser = PassThroughOptionParser()
     parser.add_option('--jobId', dest='jobId', type='string')
 
-    (opts, _) = parser.parse_args(sys.argv[1:])
-    jobId = opts.jobId
+    (input_params, _) = parser.parse_args(sys.argv[1:])
+    jobId = input_params.jobId
 
-    input_params = {}
     # allow for arguments simply be the jobId (a string because automtic splitting has format like N-M
     if jobId:
         arguments = {}
@@ -303,16 +302,16 @@ def parseArgs():
         if not arguments:
             raise Exception("input jobId not found in input_args.json")
         for key, value in arguments.items():
-            input_params[key] = value
+            setattr(input_params, key, value)
 
     # JSON file has the string "None" to mean no value, we like python None better
     for name, value in vars(input_params).items():
         if value == 'None':
-            input_params[name] = None
+            setattr(input_params, name, None)
 
     # set default values for args which may be missing in the JSON file
-    if not 'oneEventMode' in input_params:
-        input_params['oneEventMode'] = 0
+    if not hasattr(input_params, 'oneEventMode'):
+        setattr(input_params, 'oneEventMode', 0)
 
     try:
         print(f"==== Parameters Dump at {UTCNow()} ===")
@@ -329,7 +328,6 @@ def parseArgs():
         print("lastEvent:     ", input_params.lastEvent)
         print("firstRun:      ", input_params.firstRun)
         print("seeding:       ", input_params.seeding)
-        print("userFiles:     ", input_params.userFiles)
         print("oneEventMode:  ", input_params.oneEventMode)
         print("scriptExe:     ", input_params.scriptExe)
         print("scriptArgs:    ", input_params.scriptArgs)
@@ -514,7 +512,7 @@ def AddPsetHashFjr(report=None, fjr_filename=None):
     try:
         tree = ElementTree.parse(fjr_filename)
         root = tree.getroot()
-        
+
         # Verify root is FrameworkJobReport
         if root.tag != 'FrameworkJobReport':
             raise ValueError("Root element is not FrameworkJobReport")
@@ -823,7 +821,7 @@ if __name__ == "__main__":
                 print('CONDITION FOR REPORTING READ BRANCHES WAS FALSE')
         except Exception:  # pylint: disable=broad-except
             pass
-            
+
         StripReport(rep)
         # Record the payload process's exit code separately; that way, we can distinguish
         # cmsRun failures from stageout failures.  The initial use case of this is to
