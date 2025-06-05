@@ -444,7 +444,7 @@ class RetryJob():
                 if falsePositive in line:
                     return False
         for line in fatalExceptionLines:
-            if "Fatal Root Error:" in fatalExceptionLines:
+            if "Fatal Root Error:" in line:
                 corruptedFile = True
                 self.logger.info("Corrupted input file found")
                 self.logger.debug(line)
@@ -475,6 +475,7 @@ class RetryJob():
                 corruptionMessage = {'DID': f'cms:{inputFileName}', 'RSE': RSE,
                                      'exitCode': exitCode, 'message': errorLines}
                 self.reportBadInputFile(corruptedFile, suspiciousFile, corruptionMessage)
+                break
         return corruptedFile
 
     # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -494,10 +495,10 @@ class RetryJob():
         with getLock(fname):  # use lock to avoid races with concurrent PostJobs
             if os.path.exists(fname):
                 with open(fname, 'r', encoding='utf-8') as fp:
-                    oldCount = int(json.load(fp))
+                    oldCount = json.load(fp)
             else:
                 oldCount = 0
-            count = str(oldCount + 1)
+            count = oldCount + 1
             with open(fname, 'w', encoding='utf-8') as fp:
                 json.dump(count, fp)
         if count > 30:
@@ -509,8 +510,8 @@ class RetryJob():
         webDirUrl = f"https://cmsweb.cern.ch/scheddmon/{schedId}/{username}/{taskName}"
         stdoutUrl = f"{webDirUrl}/job_out.{jobId}.txt"
         postJobUrl = f"{webDirUrl}/postjob.{jobId}.txt"
-        corruptionMessage['errorLines'].append(f"stdout: {stdoutUrl}")
-        corruptionMessage['errorLines'].append(f"postjob: {postJobUrl}")
+        corruptionMessage['message'].append(f"stdout: {stdoutUrl}")
+        corruptionMessage['message'].append(f"postjob: {postJobUrl}")
         # note things  down
         reportFileName = f'Badfile.job.{jobId}.json'
         with open(reportFileName, 'w', encoding='utf-8') as fp:
