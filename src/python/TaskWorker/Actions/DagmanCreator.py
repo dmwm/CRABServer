@@ -694,7 +694,24 @@ class DagmanCreator(TaskAction):
         argdicts = []
         for dagspec in dagSpecs:
             argDict = {}
+            argDict['inputFileList'] = f"job_input_file_list_{dagspec['count']}.txt"  #'job_input_file_list_1.txt'
+            argDict['runAndLumis'] = f"job_lumis_{dagspec['count']}.json"
+            # TODO: should find a way to use only CRAB_Id and get rid or jobNumber
+            argDict['jobNumber'] = dagspec['count'] # '1' or '0-3' etc
             argDict['CRAB_Id'] = dagspec['count'] # '1' or '0-3' etc
+            argDict['lheInputFiles'] = dagspec['lheInputFiles']  # False
+            argDict['firstEvent'] = dagspec['firstEvent']  # 'None'
+            argDict['lastEvent'] = dagspec['lastEvent']  # 'None'
+            argDict['firstLumi'] = dagspec['firstLumi']  # 'None'
+            argDict['firstRun'] = dagspec['firstRun']  # 'None'
+            argDict['userSandbox'] = task['tm_user_sandbox']  #SB we could simply hardocode 'sandbox.tar.gz'
+            argDict['cmsswVersion'] = task['tm_job_sw']  # 'CMSSW_9_2_5'
+            argDict['scramArch'] = task['tm_job_arch']  # 'slc6_amd64_gcc530'
+            argDict['seeding'] = 'AutomaticSeeding'
+            argDict['scriptExe'] = task['tm_scriptexe']  #
+            argDict['eventsPerLumi'] = task['tm_events_per_lumi']  #
+            argDict['maxRuntime'] = dagspec['maxRuntime']  # -1
+            argDict['scriptArgs'] = task['tm_scriptargs']
 
             # The following two are for fixing up job.submit files
             # SB argDict['CRAB_localOutputFiles'] = dagspec['localOutputFiles']
