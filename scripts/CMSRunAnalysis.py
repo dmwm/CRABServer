@@ -303,28 +303,16 @@ def parseArgs():
         if not arguments:
             raise Exception("input jobId not found in input_args.json")
         for key, value in arguments.items():
-            setattr(input_params, key, value)
-
-    # allow for most input arguments to be passed via a (job specific) JSON file
-    if getattr(input_params, 'jsonArgFile', None):
-        arguments = {}
-        with open(input_params.jsonArgFile, 'r', encoding='UTF-8') as fh:
-            arguments = json.load(fh)
-        for key, value in arguments.items():
-            setattr(input_params, key, value)
+            input_params[key] = value
 
     # JSON file has the string "None" to mean no value, we like python None better
     for name, value in vars(input_params).items():
         if value == 'None':
-            setattr(input_params, name, None)
+            input_params[name] = None
 
     # set default values for args which may be missing in the JSON file
-    if not hasattr(input_params, 'oneEventMode'):
-        setattr(input_params, 'oneEventMode', 0)
-
-    # next lines are for backward compatibility with Client v3.241218 or earlier, to be removed
-    input_params.userSandbox = input_params.userSandbox if input_params.userSandbox else input_params.archiveJob
-    input_params.inputFileList = input_params.inputFileList if input_params.inputFileList else input_params.inputFile
+    if not 'oneEventMode' in input_params:
+        input_params['oneEventMode'] = 0
 
     try:
         print(f"==== Parameters Dump at {UTCNow()} ===")
