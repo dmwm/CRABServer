@@ -400,6 +400,10 @@ def parseCondorLog(cacheDoc):
     newCacheDoc['fjrParseResCheckpoint'] = newFjrParseResCheckpoint
     newCacheDoc['nodes'] = nodes
     newCacheDoc['nodeMap'] = nodeMap
+    logging.info(f"Full dagStatus is {nodes['DagStatus']}")
+    collapsedDagStatus = collapseDAGStatus(nodes['DagStatus'])
+    logging.info(f"Collapsed DAG status for reportig is {collapsedDagStatus}")
+    newCacheDoc['overallDagStatus'] = collapsedDagStatus
     return newCacheDoc
 
 
@@ -504,22 +508,13 @@ def summarizeFjrParseResults(checkpoint):
     return None, 0
 
 
-def reportDagStatusToDB(dagStatus):
+def reportDagStatusToDB(statusName):
     """
     argument
-    dagStatus : a dictionary. Example for normal (no autom. splitt.) task:
-     { "SubDagStatus": {}, "SubDags": {}, "Timestamp": 1741859306,
-      "NodesTotal": 30, "DagStatus": 6 }
-       Example for an automatic splitting task with not tails:
-     {'SubDagStatus': {'Job0SubJobs': 99, 'Job1SubJobs': 5},
-      'SubDags': {0: {'Timestamp': 1744826643, 'NodesTotal': 26, 'DagStatus': 5}},
-       'Timestamp': 1744823021, 'NodesTotal': 6, 'DagStatus': 5}
-    this is the value of the `DagStatus' key in the 'nodes' dictionary
-    created inside parseNodeStateV2 function
+    statusName: string : the name to insert in Tasks table
     """
-    statusName = collapseDAGStatus((dagStatus))
+    #statusName = collapseDAGStatus((dagStatus))
     logging.info("UPDATE DAG STATUS IN TASK DB")
-    logging.info(f"Full dagStatus is {dagStatus}")
     logging.info(f"Will report {statusName}")
 
     with open(os.environ['_CONDOR_JOB_AD'], 'r', encoding='utf-8') as fd:
@@ -544,7 +539,19 @@ def reportDagStatusToDB(dagStatus):
 
 
 def collapseDAGStatus(dagInfo):
-    """Collapse the status of one or several DAGs to a single one.
+    """
+    Collapse the status of one or several DAGs to a single one.
+
+    argument
+    dagStatus : a dictionary. Example for normal (no autom. splitt.) task:
+     { "SubDagStatus": {}, "SubDags": {}, "Timestamp": 1741859306,
+      "NodesTotal": 30, "DagStatus": 6 }
+       Example for an automatic splitting task with not tails:
+     {'SubDagStatus': {'Job0SubJobs': 99, 'Job1SubJobs': 5},
+      'SubDags': {0: {'Timestamp': 1744826643, 'NodesTotal': 26, 'DagStatus': 5}},
+       'Timestamp': 1744823021, 'NodesTotal': 6, 'DagStatus': 5}
+    this is the value of the `DagStatus' key in the 'nodes' dictionary
+    created inside parseNodeStateV2 function
 
     Take into account that subdags can be submitted to the queue on the
     schedd, but not yet started.
@@ -600,7 +607,7 @@ def collapseDAGStatus(dagInfo):
 
 def translateDagStatus(status):
     """
-    from a number to a string which CRAB people can understand
+    Translate from a number to a string which CRAB people can understand
     From
     https://htcondor.readthedocs.io/en task_process/cache_status.py
 /latest/automated-workflows/dagman-information-files.html#current-node-status-file
@@ -651,7 +658,8 @@ def main():
         # make sure that we only do this when status has changed, not every 5 minutes
         # even if...all in all.. one call per task every 5min is a drop in the ocean
         # isTimeToReport
-        reportDagStatusToDB(updatedInfo['nodes']['DagStatus'])
+        #reportDagStatusToDB(updatedInfo['nodes']['DagStatus'])
+        reportDagStatusToDB(updatedInfo['overallDagStatus'])
 
     except Exception:  # pylint: disable=broad-except
         logging.exception("error during main loop")

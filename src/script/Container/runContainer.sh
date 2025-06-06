@@ -99,6 +99,7 @@ DOCKER_VOL="${DOCKER_VOL} -v /etc/vomses/:/etc/vomses/"
 DOCKER_VOL="${DOCKER_VOL} -v /data/certs/:/data/certs/"
 DOCKER_VOL="${DOCKER_VOL} -v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
 DOCKER_VOL="${DOCKER_VOL} -v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/pki/tls/certs/ca-bundle.crt"
+DOCKER_VOL="${DOCKER_VOL} -v /etc/resolv.conf:/etc/resolv.conf"
 if [[ "$OS_Version" = "7" ]]; then
     DOCKER_VOL="${DOCKER_VOL} -v /var/run/nscd/socket:/var/run/nscd/socket"
 fi

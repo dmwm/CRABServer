@@ -292,10 +292,6 @@ class DataWorkflow(object):
             msg = "You cannot resubmit %s if the task is in status %s." % (resubmitWhat, task_status)
             raise ExecutionError(msg)
 
-        if task_status == 'KILLED' and task_splitting == 'Automatic':
-            msg = "You cannot resubmit {0} if the task is in status {1} and uses automatic splitting.".format(resubmitWhat, task_status)
-            raise ExecutionError(msg)
-
         if task_status != 'SUBMITFAILED':
             if publication:
                 ## Retrieve publication information.

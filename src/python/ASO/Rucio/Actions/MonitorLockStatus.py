@@ -5,6 +5,7 @@ Monitoring replicas' transfer status and adding them to publish the container.
 import logging
 import copy
 import datetime
+import json
 
 import ASO.Rucio.config as config # pylint: disable=consider-using-from-import
 from ASO.Rucio.utils import updateToREST, parseFileNameFromLFN
@@ -186,14 +187,14 @@ class MonitorLockStatus:
                 datasetsMap[datasetName].append(i)
         for dataset, v in datasetsMap.items():
             metadata = self.rucioClient.get_metadata(self.transfer.rucioScope, dataset)
-            # TODO: Also close dataset when (in or)
-            # - the task has completed.
-            #   - We have no indication when task is completed unless it pass as
-            #     args manually from caller scripts (task_proc_wrapper.sh)
-            # - no new replica/is_open for more than 6 hours. DONE
+            # close if no new replica/is_open for too long
             shouldClose = (metadata['updated_at'] + \
                            datetime.timedelta(seconds=config.args.open_dataset_timeout)) \
                            < datetime.datetime.now()
+            # also close if task has completed (DAG is in final status)
+            with open('task_process/status_cache.json', 'r', encoding='utf-8') as fd:
+                statusCache = json.load(fd)
+            shouldClose |= (statusCache['overallDagStatus'] in ['COMPLETED', 'FAILED'])
             if not metadata['is_open']:
                 for f in v:
                     newF = copy.deepcopy(f)

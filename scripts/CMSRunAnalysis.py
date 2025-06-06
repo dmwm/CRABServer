@@ -286,92 +286,52 @@ def handleException(exitAcronym, exitCode, exitMsg):
 def parseArgs():
     parser = PassThroughOptionParser()
     parser.add_option('--jobId', dest='jobId', type='string')
-    parser.add_option('--json', dest='jsonArgFile', type='string')
-    parser.add_option('--userSandbox', dest='userSandbox', type='string')
-    parser.add_option('--inputFileList', dest='inputFileList', type='string')
-    parser.add_option('--jobNumber', dest='jobNumber', type='string')
-    parser.add_option('--cmsswVersion', dest='cmsswVersion', type='string')
-    parser.add_option('--scramArch', dest='scramArch', type='string')
-    parser.add_option('--runAndLumis', dest='runAndLumis', type='string', default=None)
-    parser.add_option('--lheInputFiles', dest='lheInputFiles', type='string', default='False')
-    parser.add_option('--firstEvent', dest='firstEvent', type='string', default=0)
-    parser.add_option('--firstLumi', dest='firstLumi', type='string', default=None)
-    parser.add_option('--lastEvent', dest='lastEvent', type='string', default=-1)
-    parser.add_option('--firstRun', dest='firstRun', type='string', default=None)
-    parser.add_option('--seeding', dest='seeding', type='string', default=None)
-    parser.add_option('--userFiles', dest='userFiles', type='string')
-    parser.add_option('--oneEventMode', dest='oneEventMode', default=0)
-    parser.add_option('--scriptExe', dest='scriptExe', type='string')
-    parser.add_option('--scriptArgs', dest='scriptArgs', type='string')
-    parser.add_option('--eventsPerLumi', dest='eventsPerLumi', type='string', default=None)
-    parser.add_option('--maxRuntime', dest='maxRuntime', type='string', default=None)
 
-    (opts, _) = parser.parse_args(sys.argv[1:])
-
-    # sanitize input options
-    # Note about options: default value is None for all, but if, like it usually happens,
-    # CRAB code calls this with inputs like --seeding=None
-    # the option variable is set to the string 'None', not to the python type None
-    # let's make life easier by replacing 'None' with None.
-    for name, value in vars(opts).items():
-        if value == 'None':
-            setattr(opts, name, None)
+    (input_params, _) = parser.parse_args(sys.argv[1:])
+    jobId = input_params.jobId
 
     # allow for arguments simply be the jobId (a string because automtic splitting has format like N-M
-    if getattr(opts, 'jobId', None):
+    if jobId:
         arguments = {}
         with open('input_args.json', 'r', encoding='UTF-8') as fh:
             allArgs = json.load(fh)  # read file prepared by DagmanCreator
         for args in allArgs:
-            if args['CRAB_Id'] == opts.jobId:
+            if args['CRAB_Id'] == jobId:
                 arguments = args  # pick the arguments for this job
                 break
         if not arguments:
             raise Exception("input jobId not found in input_args.json")
         for key, value in arguments.items():
-            setattr(opts, key, value)
-
-    # allow for most input arguments to be passed via a (job specific) JSON file
-    if getattr(opts, 'jsonArgFile', None):
-        arguments = {}
-        with open(opts.jsonArgFile, 'r', encoding='UTF-8') as fh:
-            arguments = json.load(fh)
-        for key, value in arguments.items():
-            setattr(opts, key, value)
+            setattr(input_params, key, value)
 
     # JSON file has the string "None" to mean no value, we like python None better
-    for name, value in vars(opts).items():
+    for name, value in vars(input_params).items():
         if value == 'None':
-            setattr(opts, name, None)
+            setattr(input_params, name, None)
 
     # set default values for args which may be missing in the JSON file
-    if not hasattr(opts, 'oneEventMode'):
-        setattr(opts, 'oneEventMode', 0)
-
-    # next lines are for backward compatibility with Client v3.241218 or earlier, to be removed
-    opts.userSandbox = opts.userSandbox if opts.userSandbox else opts.archiveJob
-    opts.inputFileList = opts.inputFileList if opts.inputFileList else opts.inputFile
+    if not hasattr(input_params, 'oneEventMode'):
+        setattr(input_params, 'oneEventMode', 0)
 
     try:
         print(f"==== Parameters Dump at {UTCNow()} ===")
-        print("userSandbox:   ", opts.userSandbox)
-        print("jobNumber:     ", opts.jobNumber)
-        print("cmsswVersion:  ", opts.cmsswVersion)
-        print("scramArch:     ", opts.scramArch)
-        print("inputFileList  ", opts.inputFileList)
-        print("runAndLumis:   ", opts.runAndLumis)
-        print("lheInputFiles: ", opts.lheInputFiles)
-        print("firstEvent:    ", opts.firstEvent)
-        print("firstLumi:     ", opts.firstLumi)
-        print("eventsPerLumi: ", opts.eventsPerLumi)
-        print("lastEvent:     ", opts.lastEvent)
-        print("firstRun:      ", opts.firstRun)
-        print("seeding:       ", opts.seeding)
-        print("userFiles:     ", opts.userFiles)
-        print("oneEventMode:  ", opts.oneEventMode)
-        print("scriptExe:     ", opts.scriptExe)
-        print("scriptArgs:    ", opts.scriptArgs)
-        print("maxRuntime:    ", opts.maxRuntime)
+        print("userSandbox:   ", input_params.userSandbox)
+        print("jobNumber:     ", input_params.jobNumber)
+        print("cmsswVersion:  ", input_params.cmsswVersion)
+        print("scramArch:     ", input_params.scramArch)
+        print("inputFileList  ", input_params.inputFileList)
+        print("runAndLumis:   ", input_params.runAndLumis)
+        print("lheInputFiles: ", input_params.lheInputFiles)
+        print("firstEvent:    ", input_params.firstEvent)
+        print("firstLumi:     ", input_params.firstLumi)
+        print("eventsPerLumi: ", input_params.eventsPerLumi)
+        print("lastEvent:     ", input_params.lastEvent)
+        print("firstRun:      ", input_params.firstRun)
+        print("seeding:       ", input_params.seeding)
+        print("oneEventMode:  ", input_params.oneEventMode)
+        print("scriptExe:     ", input_params.scriptExe)
+        print("scriptArgs:    ", input_params.scriptArgs)
+        print("maxRuntime:    ", input_params.maxRuntime)
         print("===================")
     except NameError:
         name, value, _ = sys.exc_info()
@@ -380,7 +340,7 @@ def parseArgs():
         mintime()
         sys.exit(EC_MissingArg)
 
-    return opts
+    return input_params
 
 
 def extractUserSandbox(sandbox):
@@ -552,7 +512,7 @@ def AddPsetHashFjr(report=None, fjr_filename=None):
     try:
         tree = ElementTree.parse(fjr_filename)
         root = tree.getroot()
-        
+
         # Verify root is FrameworkJobReport
         if root.tag != 'FrameworkJobReport':
             raise ValueError("Root element is not FrameworkJobReport")
@@ -861,7 +821,7 @@ if __name__ == "__main__":
                 print('CONDITION FOR REPORTING READ BRANCHES WAS FALSE')
         except Exception:  # pylint: disable=broad-except
             pass
-            
+
         StripReport(rep)
         # Record the payload process's exit code separately; that way, we can distinguish
         # cmsRun failures from stageout failures.  The initial use case of this is to
