@@ -610,8 +610,7 @@ class RESTUserWorkflow(RESTEntity):
                                            ignoreglobalblacklist=ignoreglobalblacklist, user_config=user_config)
 
     @restcall
-    def post(self, workflow, subresource, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory,
-             numcores, priority):
+    def post(self, workflow, subresource, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, priority):
         """Resubmit or continue an existing workflow. The caller needs to be a CMS user owner of the workflow.
 
            :arg str workflow: unique name identifier of the workflow;
@@ -628,7 +627,6 @@ class RESTUserWorkflow(RESTEntity):
                                                  sitewhitelist=sitewhitelist,
                                                  maxjobruntime=maxjobruntime,
                                                  maxmemory=maxmemory,
-                                                 numcores=numcores,
                                                  priority=priority,
                                                  userdn=cherrypy.request.headers['Cms-Authn-Dn'])
         elif subresource == 'resubmit2':
@@ -639,7 +637,6 @@ class RESTUserWorkflow(RESTEntity):
                                                   sitewhitelist=sitewhitelist,
                                                   maxjobruntime=maxjobruntime,
                                                   maxmemory=maxmemory,
-                                                  numcores=numcores,
                                                   priority=priority)
         elif subresource == 'proceed':
             return self.userworkflowmgr.proceed(workflow=workflow)
