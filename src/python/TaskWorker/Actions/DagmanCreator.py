@@ -345,8 +345,8 @@ class DagmanCreator(TaskAction):
         # note about Lists
         # in the JDL everything is a string, we can't use the simple classAd[name]=somelist
         # but need the ExprTree format (what classAd.lookup() would return)
-        jobSubmit['My.CRAB_SiteBlacklist'] = pythonListToClassAdExprTree(self._expandSites(set(task['tm_site_blacklist'])))
-        jobSubmit['My.CRAB_SiteWhitelist'] =  pythonListToClassAdExprTree(self._expandSites(set(task['tm_site_whitelist'])))
+        jobSubmit['My.CRAB_SiteBlacklist'] = pythonListToClassAdExprTree(list(self._expandSites(set(task['tm_site_blacklist']))))
+        jobSubmit['My.CRAB_SiteWhitelist'] =  pythonListToClassAdExprTree(list(self._expandSites(set(task['tm_site_whitelist']))))
         jobSubmit['My.CRAB_AdditionalOutputFiles'] = pythonListToClassAdExprTree(task['tm_outfiles'])
         jobSubmit['My.CRAB_EDMOutputFiles'] =  pythonListToClassAdExprTree(task['tm_edm_outfiles'])
         jobSubmit['My.CRAB_TFileOutputFiles'] = pythonListToClassAdExprTree(task['tm_outfiles'])
