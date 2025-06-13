@@ -276,3 +276,12 @@ class MonitorLockStatus:
             'list_of_fts_id': None,
         }
         updateToREST(self.crabRESTClient, 'filetransfers', 'updateRucioInfo', restFileDoc)
+        # update also publish flag in filetransfer table, use a separate API call now
+        # but we can move this into updateRucioInfo subresource in the REST and remove from here
+        restFileDoc = {
+            'asoworker': 'rucio',
+            'list_of_ids': [x['id'] for x in fileDocs],
+            'publish_flag': 1,
+            'list_of_publication_state': ['NEW'] * num,
+        }
+        updateToREST(self.crabRESTClient, 'filetransfers', 'updatePublication', restFileDoc)

@@ -2151,7 +2151,6 @@ class PostJob():
                     # need to do this after the first call to self.perform_transfers() so that
                     # ASO_JOB.docs_in_transfer and delayed_publicationflag are filled
                     self.upload_output_files_metadata()
-                    self.setPublicationFlag()
                 if ret_code == 4:
                     #if we need to defer the postjob execution stop here!
                     return ret_code, ""
