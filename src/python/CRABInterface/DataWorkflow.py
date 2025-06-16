@@ -333,7 +333,7 @@ class DataWorkflow(object):
                 if maxmemory is None:
                     maxmemory = origValues[3]
                 if priority is None:
-                    priority = origValues[5]
+                    priority = origValues[4]
             ## These are the parameters that we want to write down in the 'tm_arguments'
             ## column of the Tasks DB each time a resubmission is done.
             ## DagmanResubmitter will read these parameters and write them into the task ad.
