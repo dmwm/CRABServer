@@ -4,6 +4,7 @@
 # pylint: disable=too-many-lines, too-many-arguments
 # pylint: disable=too-many-nested-blocks, too-many-branches, too-many-locals
 # pylint: disable=too-many-statements, too-many-instance-attributes, too-many-public-methods
+# pylint: disable=line-too-long
 
 # this code intenionally uses some GLOBAL statements
 # pylint: disable=global-statement
@@ -3069,7 +3070,7 @@ class PostJob():
                     self.logger.error(msg)
                     rval = 3
         finally:
-            return rval  # pylint: disable=lost-exception, return-in-finally
+            return rval  # pylint: disable=lost-exception
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
