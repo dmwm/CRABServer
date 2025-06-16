@@ -2,8 +2,9 @@
 # This is a long term issue and to maintain ~3k lines of code in one file is hard.
 # The code it is hard to read: workflow, taskname, reqname. All are the same....
 # pylint: disable=too-many-lines, too-many-arguments
-# pylint: disable=too-many-nested-blocks, too-many-branches, too-many-locals, no-self-use
+# pylint: disable=too-many-nested-blocks, too-many-branches, too-many-locals
 # pylint: disable=too-many-statements, too-many-instance-attributes, too-many-public-methods
+# pylint: disable=line-too-long
 
 # this code intenionally uses some GLOBAL statements
 # pylint: disable=global-statement
@@ -101,18 +102,20 @@ from http.client import HTTPException
 import requests
 from requests.auth import HTTPBasicAuth
 
+import htcondor2 as htcondor
+import classad2 as classad
+
 from WMCore import Lexicon
 from WMCore.DataStructs.LumiList import LumiList
 
 from TaskWorker import __version__
 from TaskWorker.Actions.RetryJob import RetryJob
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
-from ServerUtilities import isFailurePermanent, mostCommon, TRANSFERDB_STATES, PUBLICATIONDB_STATES, encodeRequest, oracleOutputMapping
+from ServerUtilities import TRANSFERDB_STATES, PUBLICATIONDB_STATES
+from ServerUtilities import isFailurePermanent, mostCommon, encodeRequest, oracleOutputMapping
 from ServerUtilities import getLock, getHashLfn
 from RESTInteractions import CRABRest
 
-import htcondor2 as htcondor
-import classad2 as classad
 
 
 ASO_JOB = None
@@ -201,17 +204,17 @@ def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
             exit_code = -1
             rep = json.load(frep)
             if not 'exitCode' in rep:
-                raise Exception("'exitCode' key not found in the report")
+                raise Exception("'exitCode' key not found in the report")  # pylint: disable=broad-exception-raised
             exit_code = rep['exitCode']
             if not 'exitMsg'  in rep:
-                raise Exception("'exitMsg' key not found in the report")
+                raise Exception("'exitMsg' key not found in the report")  # pylint: disable=broad-exception-raised
             exit_msg = rep['exitMsg']
             if not 'steps'    in rep:
-                raise Exception("'steps' key not found in the report")
+                raise Exception("'steps' key not found in the report")  # pylint: disable=broad-exception-raised
             if not 'cmsRun'   in rep['steps']:
-                raise Exception("'cmsRun' key not found in report['steps']")
+                raise Exception("'cmsRun' key not found in report['steps']")  # pylint: disable=broad-exception-raised
             if not 'errors'   in rep['steps']['cmsRun']:
-                raise Exception("'errors' key not found in report['steps']['cmsRun']")
+                raise Exception("'errors' key not found in report['steps']['cmsRun']")  # pylint: disable=broad-exception-raised
             if rep['steps']['cmsRun']['errors']:
                 # If there are errors in the job report, they come from the job execution. This
                 # is the error we want to report to the user, so write it to the error summary.
@@ -400,10 +403,10 @@ class ASOServerJob():
             filename = 'transfer_info/docs_in_transfer.%s.%d.json' % (self.job_id, self.crab_retry)
             with open(filename) as fd:
                 self.docs_in_transfer = json.load(fd)
-        except Exception as ex:
+        except Exception as ex:  # pylint: disable=broad-except
             #Only printing a generic message, the full stacktrace is printed in execute()
             self.logger.error("Failed to load the docs in transfer. Aborting the postjob")
-            raise Exception from ex
+            raise Exception from ex  # pylint: disable=broad-exception-raised
 
     # = = = = = ASOServerJob = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -559,11 +562,12 @@ class ASOServerJob():
                 Clearly this could have been done better... e.g. raising an exception
         """
         self.found_doc_in_db = False  # This is only for oracle implementation and we want to check before adding new doc.
-        self.logger.info("====== Starting to check uploads to ASO database.")
+        self.logger.info("====== Upload out file records to filetransfersdb table in CRAB DataBase.")
         docs_in_transfer = []
         output_files = []
         now = str(datetime.datetime.now())
         last_update = int(time.time())
+        file_output_type = None
 
         if self.aso_start_timestamp is None or self.aso_start_time is None:
             self.aso_start_timestamp = last_update
@@ -866,7 +870,7 @@ class ASOServerJob():
                     self.recordASOStartTime()
 
 
-        self.logger.info("====== Finished to check uploads to ASO database.")
+        self.logger.info("====== Finished to upload output files info to database.")
 
         return docs_in_transfer
 
@@ -1367,6 +1371,7 @@ class PostJob():
         self.logger.addHandler(self.memory_handler)
         self.logger.propagate = False
         self.postjob_log_file_name = None
+        self.useAsoRucio = False
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1559,7 +1564,8 @@ class PostJob():
                           auth=HTTPBasicAuth(user, password),
                           data=json.dumps(docToSend),
                           headers={"Content-Type": "application/json; charset=UTF-8"},
-                          verify=False
+                          verify=False,
+                          timeout=300,
                           )
             msg = f"List of Branches sent to MONIT with status {r.status_code}. Output {r.text}"
             self.logger.info(msg)
@@ -1591,6 +1597,8 @@ class PostJob():
         self.output_files_names  = []
         for i in range(10, len(args)):
             self.output_files_names.append(args[i])
+        self.useAsoRucio = ('/store/user/rucio' in self.dest_dir) \
+                           or ('/store/group/rucio' in self.dest_dir)
 
         # Get the DAG cluster ID. Needed to know whether the job has run or not.
         try:
@@ -1690,7 +1698,7 @@ class PostJob():
                 self.logger.info(msg)
                 self.log_finish_msg(retval)
                 return retval
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             self.logger.exception(retmsg)
 
         # Add the post-job exit code and error message to the job report.
@@ -2127,13 +2135,23 @@ class PostJob():
                 msg = msg + ' and '.join(msgadd) + '.'
                 self.logger.info(msg)
 
+            if self.transfer_outputs:
+                self.upload_input_files_metadata()
+
         # Do the transfers (inject to ASO database if needed, and monitor the transfers
         # statuses until they reach a terminal state).
         if self.transfer_logs or self.transfer_outputs:
             if first_pj_execution():
+                self.logger.info("====== Injecting ASO transfers.")
+            else:
                 self.logger.info("====== Starting to check for ASO transfers.")
             try:
-                ret_code = self.perform_transfers()
+                ret_code = self.perform_transfers()  # inject to ASO or check ASO status
+                if  self.useAsoRucio and first_pj_execution():
+                    # defer publication handling to ASO-Rucio ref: https://github.com/dmwm/CRABServer/issues/9094
+                    # need to do this after the first call to self.perform_transfers() so that
+                    # ASO_JOB.docs_in_transfer and delayed_publicationflag are filled
+                    self.upload_output_files_metadata()
                 if ret_code == 4:
                     #if we need to defer the postjob execution stop here!
                     return ret_code, ""
@@ -2154,56 +2172,16 @@ class PostJob():
                 self.logger.info("====== Finished to check for ASO transfers.")
                 return self.check_retry_count(mostCommon(self.stageout_exit_codes, 60324)), retmsg
             except Exception as ex:
-                retmsg = "Stageout failure: %s" % (str(ex))
+                retmsg = "Fatal PostJob error during ASO checking: %s" % (str(ex))
                 self.logger.exception(retmsg)
-                self.logger.info("====== Finished to check for ASO transfers.")
-                return self.check_retry_count(mostCommon(self.stageout_exit_codes, 60324)), retmsg
+                raise
             self.logger.info("====== Finished to check for ASO transfers.")
 
-        # Upload the input files metadata.
-        self.logger.info("====== Starting upload of input files metadata.")
-        try:
-            self.upload_input_files_metadata()
-        except Exception as ex:
-            retmsg = "Fatal error uploading input files metadata: %s" % (str(ex))
-            self.logger.exception(retmsg)
-            self.logger.info("====== Finished upload of input files metadata.")
-            return self.check_retry_count(80001), retmsg
-        self.logger.info("====== Finished upload of input files metadata.")
-
-        # Upload the output files metadata.
-        if self.transfer_outputs:
-            self.logger.info("====== Starting upload of output files metadata.")
-            try:
-                self.upload_output_files_metadata()
-            except Exception as ex:
-                retmsg = "Fatal error uploading output files metadata: %s" % (str(ex))
-                self.logger.exception(retmsg)
-                self.logger.info("====== Finished upload of output files metadata.")
-                return self.check_retry_count(80001), retmsg
-            self.logger.info("====== Finished upload of output files metadata.")
-
-            if ASO_JOB:
-                self.logger.info("====== About to update publication flags of transfered files.")
-                for doc in getattr(ASO_JOB, 'docs_in_transfer', []):
-                    doc_id = doc.get('doc_id')
-                    self.logger.debug("Found doc %s", doc_id)
-                    if doc.get('delayed_publicationflag_update'):
-                        newDoc = {
-                            'subresource' : 'updatePublication',
-                            'publish_flag' : 1,
-                            'list_of_ids' : doc_id,
-                            'list_of_publication_state' : 'NEW',
-                            'asoworker' : '%'
-                        }
-                        try:
-                            self.crabserver.post(api="filetransfers", data=encodeRequest(newDoc))
-                        except Exception as ex:
-                            retmsg = "Fatal error uploading  publication flags of transfered files: %s" % (str(ex))
-                            self.logger.exception(retmsg)
-                            self.logger.info("====== Finished to update publication flags of transfered files.")
-                            return self.check_retry_count(80001), retmsg
-                self.logger.info("====== Finished to update publication flags of transfered files.")
+        # will reach here if ret_code fom self.perform_transfers() is not 4
+        # Upload the output files metadata and mark file as "publisheable"
+        if (not self.useAsoRucio) and self.transfer_outputs:
+            self.upload_output_files_metadata()
+            self.setPublicationFlag()
 
         self.set_dashboard_state('FINISHED')
         self.set_state_ClassAds('FINISHED')
@@ -2310,7 +2288,6 @@ class PostJob():
                     time.sleep(60)
                     aso_job_retval = ASO_JOB.check_transfers()
             else:
-                ASO_JOB = None
                 return 4
 
         # If no transfers failed, return success immediately.
@@ -2320,7 +2297,6 @@ class PostJob():
         # Return code 2 means post-job timed out waiting for transfer to complete and
         # not all the transfers could be cancelled.
         if aso_job_retval == 2:
-            ASO_JOB = None
             msg = "Stageout failed with code %d." % (aso_job_retval)
             msg += "\nPost-job timed out waiting for ASO transfers to complete."
             msg += "\nAttempts were made to cancel the ongoing transfers,"
@@ -2334,10 +2310,9 @@ class PostJob():
         # failure reason(s)). Determine which failures are permament stageout errors
         # and which ones are recoverable stageout errors.
         failures = ASO_JOB.get_failures()
-        ASO_JOB = None
         num_failures = len(failures)
         num_permanent_failures = 0
-        for doc_id in failures.keys():
+        for doc_id in failures:
             if isinstance(failures[doc_id]['reasons'], str):
                 failures[doc_id]['reasons'] = [failures[doc_id]['reasons']]
             if isinstance(failures[doc_id]['reasons'], list):
@@ -2356,7 +2331,7 @@ class PostJob():
         if num_permanent_failures:
             msg += " %d of those jobs had a permanent failure." % (num_permanent_failures)
         msg += "\nFailure reasons (per document) follow:"
-        for doc_id in failures.keys():
+        for doc_id in failures:
             msg += "\n- %s:" % (doc_id)
             if failures[doc_id]['app']:
                 msg += "\n  -----> %s log start -----" % (str(failures[doc_id]['app']).upper())
@@ -2430,6 +2405,7 @@ class PostJob():
         Upload the (primary) input files metadata. We care about the number of events
         and about the lumis for the report.
         """
+        self.logger.info("====== Starting upload of input files metadata.")
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
         temp_storage_site = self.executed_site
@@ -2495,9 +2471,10 @@ class PostJob():
             try:
                 self.crabserver.put(api=rest_api, data=encodeRequest(configreq))
             except HTTPException as hte:
-                msg = "Error uploading input file metadata: %s" % (str(hte.headers))
+                msg = "HTTP Error uploading input file metadata: %s" % (str(hte.headers))
                 self.logger.error(msg)
                 raise
+            self.logger.info("====== Finished upload of input files metadata.")
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -2505,6 +2482,7 @@ class PostJob():
         """
         Upload the output files metadata.
         """
+        self.logger.info("====== Starting upload of output files metadata.")
         if os.environ.get('TEST_POSTJOB_NO_STATUS_UPDATE', False):
             return
         output_datasets = set()
@@ -2561,9 +2539,37 @@ class PostJob():
             except HTTPException as hte:
                 # BrianB. Suppressing this exception is a tough decision.
                 # If the file made it back alright, I suppose we can proceed.
-                msg = "Error uploading output file metadata: %s" % (str(hte.headers))
+                msg = "HTTP Error uploading output file metadata: %s" % (str(hte.headers))
                 self.logger.error(msg)
                 raise
+            self.logger.info("====== Finished upload of output files metadata.")
+
+    # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def setPublicationFlag(self):
+        """
+        sets to 1 (True) the Publish flag of output files ready for Publisher
+        """
+
+        self.logger.info("====== About to update publication flags of transfered files.")
+        for doc in getattr(ASO_JOB, 'docs_in_transfer', []):
+            doc_id = doc.get('doc_id')
+            self.logger.debug("Found doc %s", doc_id)
+            if doc.get('delayed_publicationflag_update'):
+                newDoc = {
+                    'subresource': 'updatePublication',
+                    'publish_flag': 1,
+                    'list_of_ids': doc_id,
+                    'list_of_publication_state': 'NEW',
+                    'asoworker': '%'
+                }
+                try:
+                    self.crabserver.post(api="filetransfers", data=encodeRequest(newDoc))
+                except Exception as ex:  # pylint: disable=broad-except
+                    retmsg = "Fatal error updating publication flags of transfered files: %s" % (str(ex))
+                    self.logger.exception(retmsg)
+                    raise Exception(retmsg) from ex  # pylint: disable=broad-exception-raised
+        self.logger.info("====== Finished to update publication flags of transfered files.")
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
