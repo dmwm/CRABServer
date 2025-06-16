@@ -477,7 +477,6 @@ class RESTUserWorkflow(RESTEntity):
                 safe.kwargs['sitewhitelist'] = self._expandSites(safe.kwargs['sitewhitelist'])
             validate_num("maxjobruntime", param, safe, optional=True)
             validate_num("maxmemory", param, safe, optional=True)
-            validate_num("numcores", param, safe, optional=True)
             validate_num("priority", param, safe, optional=True)
             validate_num("force", param, safe, optional=True)
             validate_num("publication", param, safe, optional=True)
