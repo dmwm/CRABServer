@@ -120,9 +120,6 @@ class DagmanResubmitter(TaskAction):
         """
         The execute method of the DagmanResubmitter class.
         """
-        if 'task' in kwargs and 'tm_numcores' in kwargs['task']:
-            self.logger.info("Dropping tm_numcores from task dict")
-            del kwargs['task']['tm_numcores']
         self.executeInternal(*args, **kwargs)
         try:
             configreq = {'subresource': 'state',
