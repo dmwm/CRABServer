@@ -51,7 +51,7 @@ from http.client import HTTPException
 
 import fts3.rest.client.easy as fts3
 
-from rucio.client import Client as rucioclient
+from RucioUtils import Client as rucioclient
 from rucio.rse.rsemanager import find_matching_scheme
 
 from RESTInteractions import CRABRest

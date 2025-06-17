@@ -10,7 +10,7 @@ import datetime
 
 import requests
 from requests.auth import HTTPBasicAuth
-from RucioUtils import getRucioUsage
+from RucioUtils import getRucioUsage, Client
 
 FMT = "%Y-%m-%dT%H:%M:%S%z"
 WORKDIR = '/data/srv/monit/'
@@ -68,7 +68,6 @@ def send_and_check(document, should_fail=False):
         msg
 
 def main(log):
-    from rucio.client import Client
     rucioClient = Client(
         creds={"client_cert": "/data/certs/robotcert.pem", "client_key": "/data/certs/robotkey.pem"},
         auth_type='x509',
