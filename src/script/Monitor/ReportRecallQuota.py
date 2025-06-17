@@ -10,7 +10,7 @@ import datetime
 
 import requests
 from requests.auth import HTTPBasicAuth
-from RucioUtils import getRucioUsage, retry_call
+from RucioUtils import getRucioUsage, Client
 
 FMT = "%Y-%m-%dT%H:%M:%S%z"
 WORKDIR = '/data/srv/monit/'
@@ -68,19 +68,11 @@ def send_and_check(document, should_fail=False):
         msg
 
 def main(log):
-    from rucio.client import Client
     rucioClient = Client(
         creds={"client_cert": "/data/certs/robotcert.pem", "client_key": "/data/certs/robotkey.pem"},
         auth_type='x509',
     )
-    RETRIES = 3
-    DELAY = 180
-
-    # Wrap ping and whoami in retry logic
-    ping_result = retry_call("ping", rucioClient.ping, retries=RETRIES, delay=DELAY, logger=log)
-    whoami_result = retry_call("whoami", rucioClient.whoami, retries=RETRIES, delay=DELAY, logger=log)
-
-    log.info("Rucio client initialized: ping=%s whoami=%s", ping_result, whoami_result)
+    log.info("rucio client initialized: %s %s", rucioClient.ping(), rucioClient.whoami() )
 
     # prepare a JSON to be sent to MONIT
     jsonDoc = {'producer': MONITUSER, 'type': 'reportrecallquota', 'hostname': gethostname()}

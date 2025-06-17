@@ -3,35 +3,40 @@ import logging
 import time
 
 from TaskWorker.WorkerExceptions import TaskWorkerException
-from rucio.client import Client
+from rucio.client import Client as NativeClient
 from rucio.common.exception import RSENotFound, RuleNotFound
 
-def retry_call(name, func, retries=3, delay=180, logger=None):
-    """
-    Generic retry wrapper for any function.
-    :param name: Name of the operation (for logging).
-    :param func: A callable with no arguments.
-    :param retries: Number of retry attempts.
-    :param delay: Delay between attempts (in seconds).
-    :param logger: Logger instance (optional).
-    :return: The result of the function call.
-    """
-    attempt = 0
-    while attempt < retries:
-        try:
-            return func()
-        except Exception as e:
-            if logger:
-                logger.warning("Failed to execute '%s' (attempt %d/%d): %s", name, attempt+1, retries, str(e))
-            else:
-                print(f"Warning: Failed to execute '{name}' (attempt {attempt+1}/{retries}): {e}")
-            attempt += 1
-            if attempt < retries:
-                time.sleep(delay)
-            else:
-                if logger:
-                    logger.error("Operation '%s' failed after %d attempts", name, retries)
-                raise
+class Client:
+    def __init__(self, *args, retries=3, delay=180, logger=None, **kwargs):
+        self._client = NativeClient(*args, **kwargs)
+        self._retries = retries
+        self._delay = delay
+        self._logger = logger or logging.getLogger(__name__)
+
+    def __getattr__(self, name):
+        attr = getattr(self._client, name)
+        if callable(attr):
+            def wrapper(*args, **kwargs):
+                attempt = 0
+                while attempt < self._retries:
+                    try:
+                        return attr(*args, **kwargs)
+                    except Exception as e:
+                        self._logger.warning(
+                            "Failed to execute '%s' (attempt %d/%d): %s",
+                            name, attempt + 1, self._retries, str(e)
+                        )
+                        attempt += 1
+                        if attempt < self._retries:
+                            time.sleep(self._delay)
+                        else:
+                            self._logger.error(
+                                "Operation '%s' failed after %d attempts", name, self._retries
+                            )
+                            raise
+            return wrapper
+        else:
+            return attr
 
 def getNativeRucioClient(config=None, logger=None):
     """
@@ -64,24 +69,25 @@ def getNativeRucioClient(config=None, logger=None):
     rucioCert = getattr(rucioConfig, "Rucio_cert")
     rucioKey = getattr(rucioConfig, "Rucio_key")
     logger.debug("Using cert [%s]\n and key [%s] for rucio client.", rucioCert, rucioKey)
-    nativeClient = Client(
-        rucio_host=rucioConfig.Rucio_host,
-        auth_host=rucioConfig.Rucio_authUrl,
-        ca_cert=rucioConfig.Rucio_caPath,
-        account=rucioConfig.Rucio_account,
+    client = Client(
+        rucio_host = rucioConfig.Rucio_host,
+        auth_host  = rucioConfig.Rucio_authUrl,
+        ca_cert    = rucioConfig.Rucio_caPath,
+        account    = rucioConfig.Rucio_account,
         creds={"client_cert": rucioCert, "client_key": rucioKey},
-        auth_type='x509',
-        logger=rucioLogger
-        )
-    RETRIES = 3
-    DELAY = 180
+        auth_type = 'x509',
+        logger = rucioLogger,
+        retries = 3,
+        delay = 180
+    )
 
-    ret = retry_call("ping", nativeClient.ping, retries=RETRIES, delay=DELAY, logger=logger)
+    # Initial check: these calls now retry automatically
+    ret = client.ping()
     logger.info("Rucio server v.%s contacted", ret['version'])
-    ret = retry_call("whoami", nativeClient.whoami, retries=RETRIES, delay=DELAY, logger=logger)
+    ret = client.whoami()
     logger.info("Rucio client initialized for %s in status %s", ret['account'], ret['status'])
 
-    return nativeClient
+    return client
 
 
 def getWritePFN(rucioClient=None, siteName='', lfn='',  # pylint: disable=dangerous-default-value

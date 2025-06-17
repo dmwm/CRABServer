@@ -394,7 +394,7 @@ def ensureEnvironment(logger=None):
     make sure we can run Rucio client and talk with CRAB
     """
     try:
-        from rucio.client import Client  # pylint: disable=import-outside-toplevel
+        from RucioUtils import Client  # pylint: disable=import-outside-toplevel
     except ModuleNotFoundError:
         logger.info("Setup Rucio first via:\n" +
               "export PYTHONPATH=$PYTHONPATH:/cvmfs/cms.cern.ch/rucio/x86_64/slc7/py3/current/lib/python3.6/site-packages/\n" +
