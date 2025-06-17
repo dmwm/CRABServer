@@ -32,10 +32,7 @@ class UserDataDiscovery(DataDiscovery):
         if hasattr(self.config.Sites, 'available'):
             locations = self.config.Sites.available
         else:
-            with self.config.TaskWorker.envForCMSWEB :
-                configDict = {"cacheduration": 1, "pycurl": True} # cache duration is in hours
-                resourceCatalog = CRIC(logger=self.logger, configDict=configDict)
-                locations = resourceCatalog.getAllPSNs()
+            locations = self.resourceCatalog.getAllPSNs()
 
         userFileset = Fileset(name = kwargs['task']['tm_taskname'])
         self.logger.info("There are %d files specified by the user.", len(userfiles))
