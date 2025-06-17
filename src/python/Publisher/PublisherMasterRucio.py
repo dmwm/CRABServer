@@ -392,7 +392,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
         """
         handy wrapper for PublisherUtils/markFailed
         """
-        markFailed(files=lfns, crabServer=self.crabserver, failureReason=reason,
+        markFailed(files=lfns, crabServer=self.crabServer, failureReason=reason,
                              asoworker=self.config.asoworker, logger=self.logger)
 
     def pollInterval(self):

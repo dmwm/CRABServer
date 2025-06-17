@@ -1,4 +1,4 @@
-""" Interface used by the TaskWorker to ucquire tasks and change their state
+""" Interface used by the TaskWorker to acquire tasks and change their state
 """
 # WMCore dependecies here
 from builtins import str
@@ -148,7 +148,6 @@ def fixupTask(task):
         result['resubmit_site_blacklist'] = extraargs['siteBlackList']
     result['resubmit_maxjobruntime'] = extraargs['maxjobruntime'] if 'maxjobruntime' in extraargs else None
     result['resubmit_maxmemory'] = extraargs['maxmemory'] if 'maxmemory' in extraargs else None
-    result['resubmit_numcores'] = extraargs['numcores'] if 'numcores' in extraargs else None
     result['resubmit_priority'] = extraargs['priority'] if 'priority' in extraargs else None
 
     # load json data of tm_user_config column

@@ -477,7 +477,6 @@ class RESTUserWorkflow(RESTEntity):
                 safe.kwargs['sitewhitelist'] = self._expandSites(safe.kwargs['sitewhitelist'])
             validate_num("maxjobruntime", param, safe, optional=True)
             validate_num("maxmemory", param, safe, optional=True)
-            validate_num("numcores", param, safe, optional=True)
             validate_num("priority", param, safe, optional=True)
             validate_num("force", param, safe, optional=True)
             validate_num("publication", param, safe, optional=True)
@@ -610,8 +609,7 @@ class RESTUserWorkflow(RESTEntity):
                                            ignoreglobalblacklist=ignoreglobalblacklist, user_config=user_config)
 
     @restcall
-    def post(self, workflow, subresource, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory,
-             numcores, priority):
+    def post(self, workflow, subresource, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, priority):
         """Resubmit or continue an existing workflow. The caller needs to be a CMS user owner of the workflow.
 
            :arg str workflow: unique name identifier of the workflow;
@@ -628,7 +626,6 @@ class RESTUserWorkflow(RESTEntity):
                                                  sitewhitelist=sitewhitelist,
                                                  maxjobruntime=maxjobruntime,
                                                  maxmemory=maxmemory,
-                                                 numcores=numcores,
                                                  priority=priority,
                                                  userdn=cherrypy.request.headers['Cms-Authn-Dn'])
         elif subresource == 'resubmit2':
@@ -639,7 +636,6 @@ class RESTUserWorkflow(RESTEntity):
                                                   sitewhitelist=sitewhitelist,
                                                   maxjobruntime=maxjobruntime,
                                                   maxmemory=maxmemory,
-                                                  numcores=numcores,
                                                   priority=priority)
         elif subresource == 'proceed':
             return self.userworkflowmgr.proceed(workflow=workflow)

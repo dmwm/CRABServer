@@ -40,7 +40,7 @@ import classad2 as classad
 
 DAG_HEADER = """
 
-NODE_STATUS_FILE node_state{nodestate} 120
+NODE_STATUS_FILE node_state{nodestate} 120 ALWAYS-UPDATE
 
 # NOTE: a file must be present, but 'noop' makes it not be read.
 #FINAL FinalCleanup Job.1.submit NOOP
@@ -712,13 +712,6 @@ class DagmanCreator(TaskAction):
             argDict['eventsPerLumi'] = task['tm_events_per_lumi']  #
             argDict['maxRuntime'] = dagspec['maxRuntime']  # -1
             argDict['scriptArgs'] = task['tm_scriptargs']
-            # following one are for bkw compat. with CRABClient v3.241218 or earlier, to be removed
-            argDict['CRAB_Archive'] = argDict['userSandbox']
-            argDict['CRAB_ISB'] = 'dummy'
-            argDict['CRAB_JobSW'] = argDict['cmsswVersion']
-            argDict['CRAB_JobArch'] = argDict['scramArch']
-            argDict['runAndLumiMask'] = argDict['runAndLumis']
-            argDict['inputFiles'] = argDict['inputFileList']
 
             # The following two are for fixing up job.submit files
             # SB argDict['CRAB_localOutputFiles'] = dagspec['localOutputFiles']

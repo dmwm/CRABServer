@@ -99,6 +99,7 @@ DOCKER_VOL="${DOCKER_VOL} -v /etc/vomses/:/etc/vomses/"
 DOCKER_VOL="${DOCKER_VOL} -v /data/certs/:/data/certs/"
 DOCKER_VOL="${DOCKER_VOL} -v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
 DOCKER_VOL="${DOCKER_VOL} -v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/pki/tls/certs/ca-bundle.crt"
+DOCKER_VOL="${DOCKER_VOL} -v /etc/resolv.conf:/etc/resolv.conf"
 if [[ "$OS_Version" = "7" ]]; then
     DOCKER_VOL="${DOCKER_VOL} -v /var/run/nscd/socket:/var/run/nscd/socket"
 fi
@@ -110,7 +111,6 @@ if [[ "${SERVICE}" == TaskWorker_monit*  ]]; then
 else
   DOCKER_IMAGE=${TW_REPO:-registry.cern.ch/cmscrab}/crabtaskworker:${TW_VERSION}
 fi
-
 
 docker run --name ${SERVICE} -t --net host --privileged $DOCKER_OPT $DOCKER_VOL $DOCKER_IMAGE $COMMAND > $tmpfile
 if [[ "${SERVICE}" == TaskWorker_monit_*  ]]; then
