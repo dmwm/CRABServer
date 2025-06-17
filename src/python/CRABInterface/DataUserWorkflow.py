@@ -147,17 +147,17 @@ class DataUserWorkflow(object):
 
         return self.workflow.submit(*args, **kwargs)
 
-    def resubmit(self, workflow, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority, userdn):
+    def resubmit(self, workflow, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, priority, userdn):
         """Request to Resubmit a workflow.
 
            :arg str workflow: a workflow name"""
-        return self.workflow.resubmit(workflow, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority, userdn)
+        return self.workflow.resubmit(workflow, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, priority, userdn)
 
-    def resubmit2(self, workflow, publication, jobids, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority):
+    def resubmit2(self, workflow, publication, jobids, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, priority):
         """Request to Resubmit a workflow.
 
            :arg str workflow: a workflow name"""
-        return self.workflow.resubmit2(workflow, publication, jobids, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, numcores, priority)
+        return self.workflow.resubmit2(workflow, publication, jobids, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, priority)
 
     def status(self, workflow, userdn, verbose=False):
         """Retrieve the status of the workflow
