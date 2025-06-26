@@ -19,11 +19,18 @@ class SiteInfoResolver(TaskAction):
         self.resourceCatalog = resourceCatalog
 
     def execute(self, *args, **kwargs):
+        global_blacklist = set(self.loadJSONFromFileInScratchDir('blacklistedSites.txt'))
+        self.logger.debug("CRAB site blacklist: %s", list(global_blacklist))
+
         bannedOutDestinations = self.crabserver.get(api='info', data={'subresource': 'bannedoutdest'})[0]['result'][0]
         # self._checkASODestination(kwargs['task']['tm_asyncdest'], bannedOutDestinations)
 
-        siteWhitelist = kwargs['task']['tm_site_whitelist']
-        siteBlacklist = kwargs['task']['tm_site_blacklist']
+        # siteWhitelist = kwargs['task']['tm_site_whitelist']
+        # siteBlacklist = kwargs['task']['tm_site_blacklist']
+        siteWhitelist = self._expandSites(set(kwargs['task']['tm_site_whitelist']))
+        siteBlacklist = self._expandSites(set(kwargs['task']['tm_site_blacklist']))
+        self.logger.debug("Site whitelist: %s", list(siteWhitelist))
+        self.logger.debug("Site blacklist: %s", list(siteBlacklist))
         self.logger.debug("Site whitelist: %s", list(siteWhitelist))
         self.logger.debug("Site blacklist: %s", list(siteBlacklist))
 
@@ -44,7 +51,7 @@ class SiteInfoResolver(TaskAction):
 
         if ignoreLocality:
             try:
-            possiblesites = set(self.resourceCatalog.getAllPSNs()) - global
+                possiblesites = set(self.resourceCatalog.getAllPSNs()) - global_blacklist
             except Exception as ex:
                 msg = "The CRAB3 server backend could not contact the Resource Catalog to get the list of all CMS sites."
                 msg += " This could be a temporary Resource Catalog glitch."
@@ -53,6 +60,7 @@ class SiteInfoResolver(TaskAction):
                 msg += f"\nError reason: {ex}"
                 raise TaskWorkerException(msg) from ex
         else:
+            locations = set()
             possiblesites = locations
         ## At this point 'possiblesites' should never be empty.
         self.logger.debug("Possible sites: %s", list(possiblesites))
