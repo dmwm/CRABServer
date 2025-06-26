@@ -18,19 +18,32 @@ class SiteInfoResolver(TaskAction):
         TaskAction.__init__(self, config, crabserver, procnum)
         self.resourceCatalog = resourceCatalog
 
+    def isGlobalBlacklistIgnored(self, kwargs):
+        """ Determine wether the user wants to ignore the globalblacklist
+        """
+
+        return kwargs['task']['tm_ignore_global_blacklist'] == 'T'
+    
     def execute(self, *args, **kwargs):
         global_blacklist = set(self.loadJSONFromFileInScratchDir('blacklistedSites.txt'))
         self.logger.debug("CRAB site blacklist: %s", list(global_blacklist))
+# This is needed for Site Metrics
+        # It should not block any site for Site Metrics and if needed for other activities
+        # self.config.TaskWorker.ActivitiesToRunEverywhere = ['hctest', 'hcdev']
+        # The other case where the blacklist is ignored is if the user sset this explicitly in his configuration
+        if self.isGlobalBlacklistIgnored(kwargs) or (hasattr(self.config.TaskWorker, 'ActivitiesToRunEverywhere') and \
+                   kwargs['task']['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere):
+            global_blacklist = set()
+            self.logger.debug("Ignoring the CRAB site blacklist.")
 
         bannedOutDestinations = self.crabserver.get(api='info', data={'subresource': 'bannedoutdest'})[0]['result'][0]
         # self._checkASODestination(kwargs['task']['tm_asyncdest'], bannedOutDestinations)
+        breakpoint()
 
         # siteWhitelist = kwargs['task']['tm_site_whitelist']
         # siteBlacklist = kwargs['task']['tm_site_blacklist']
         siteWhitelist = self._expandSites(set(kwargs['task']['tm_site_whitelist']))
         siteBlacklist = self._expandSites(set(kwargs['task']['tm_site_blacklist']))
-        self.logger.debug("Site whitelist: %s", list(siteWhitelist))
-        self.logger.debug("Site blacklist: %s", list(siteBlacklist))
         self.logger.debug("Site whitelist: %s", list(siteWhitelist))
         self.logger.debug("Site blacklist: %s", list(siteBlacklist))
 
@@ -46,25 +59,12 @@ class SiteInfoResolver(TaskAction):
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
 
-        ignoreLocality = kwargs['task']['tm_ignore_locality'] == 'T'
-        self.logger.debug("Ignore locality: %s", ignoreLocality)
+        possiblesites = set(self.resourceCatalog.getAllPSNs()) - global_blacklist
 
-        if ignoreLocality:
-            try:
-                possiblesites = set(self.resourceCatalog.getAllPSNs()) - global_blacklist
-            except Exception as ex:
-                msg = "The CRAB3 server backend could not contact the Resource Catalog to get the list of all CMS sites."
-                msg += " This could be a temporary Resource Catalog glitch."
-                msg += " Please try to submit a new task (resubmit will not work)"
-                msg += " and contact the experts if the error persists."
-                msg += f"\nError reason: {ex}"
-                raise TaskWorkerException(msg) from ex
-        else:
-            locations = set()
-            possiblesites = locations
         ## At this point 'possiblesites' should never be empty.
         self.logger.debug("Possible sites: %s", list(possiblesites))
         self.logger.debug((kwargs['task'], possiblesites))
+        breakpoint()
 
         return Result(task=kwargs['task'], result=(possiblesites, args[0]))
 
