@@ -19,6 +19,7 @@ from TaskWorker.Actions.StageoutCheck import StageoutCheck
 from TaskWorker.Actions.MakeFakeFileSet import MakeFakeFileSet
 from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
 from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
+from TaskWorker.Actions.SiteInfoResolver import SiteInfoResolver
 from TaskWorker.Actions.Uploader import Uploader
 from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
 from TaskWorker.Actions.RucioDataDiscovery import RucioDataDiscovery
@@ -184,6 +185,7 @@ def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
 
     # start to work
     handler.addWork(MyProxyLogon(config=config, crabserver=crabserver, procnum=procnum, myproxylen=60 * 60 * 24))
+    handler.addWork(SiteInfoResolver(config=config, crabserver=crabserver, resourceCatalog=resourceCatalog, procnum=procnum)  
     handler.addWork(StageoutCheck(config=config, crabserver=crabserver, procnum=procnum, rucioClient=privilegedRucioClient))
     if task['tm_job_type'] == 'Analysis':
         if task.get('tm_input_dataset'):
