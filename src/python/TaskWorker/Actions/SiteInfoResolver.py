@@ -3,10 +3,11 @@ Resolve CRIC-related Sites info.
 """
 # pylint: disable=too-many-branches
 
+import re
 import json
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.TaskAction import TaskAction
-from TaskWorker.WorkerExceptions import SubmissionRefusedException
+from TaskWorker.WorkerExceptions import ConfigException, SubmissionRefusedException
 
 class SiteInfoResolver(TaskAction):
     """
@@ -38,7 +39,6 @@ class SiteInfoResolver(TaskAction):
 
         bannedOutDestinations = self.crabserver.get(api='info', data={'subresource': 'bannedoutdest'})[0]['result'][0]
         # self._checkASODestination(kwargs['task']['tm_asyncdest'], bannedOutDestinations)
-        breakpoint()
 
         # siteWhitelist = kwargs['task']['tm_site_whitelist']
         # siteBlacklist = kwargs['task']['tm_site_blacklist']
@@ -64,7 +64,9 @@ class SiteInfoResolver(TaskAction):
         ## At this point 'possiblesites' should never be empty.
         self.logger.debug("Possible sites: %s", list(possiblesites))
         self.logger.debug((kwargs['task'], possiblesites))
-        breakpoint()
+        
+        kwargs['task']['tm_site_whitelist'] = siteWhitelist
+        kwargs['task']['tm_site_blacklist'] = siteBlacklist
 
         return Result(task=kwargs['task'], result=(possiblesites, args[0]))
 
