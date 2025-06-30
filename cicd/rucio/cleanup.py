@@ -4,7 +4,7 @@ Cleanup rucio rules from cmsbot account created by task in testsuite.
 import datetime
 import os
 
-from rucio.client import Client
+from RucioUtils import Client
 
 DRY_RUN = os.getenv("DRY_RUN", 'True').lower() in ('true', '1', 't')
 

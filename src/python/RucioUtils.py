@@ -70,15 +70,15 @@ def getNativeRucioClient(config=None, logger=None):
     rucioKey = getattr(rucioConfig, "Rucio_key")
     logger.debug("Using cert [%s]\n and key [%s] for rucio client.", rucioCert, rucioKey)
     client = Client(
-        rucio_host = rucioConfig.Rucio_host,
-        auth_host  = rucioConfig.Rucio_authUrl,
-        ca_cert    = rucioConfig.Rucio_caPath,
-        account    = rucioConfig.Rucio_account,
+        rucio_host=rucioConfig.Rucio_host,
+        auth_host=rucioConfig.Rucio_authUrl,
+        ca_cert=rucioConfig.Rucio_caPath,
+        account=rucioConfig.Rucio_account,
         creds={"client_cert": rucioCert, "client_key": rucioKey},
-        auth_type = 'x509',
-        logger = rucioLogger,
-        retries = 3,
-        delay = 180
+        auth_type='x509',
+        logger=rucioLogger,
+        retries=3,
+        delay=180
     )
 
     # Initial check: these calls now retry automatically
