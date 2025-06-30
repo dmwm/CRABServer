@@ -7,6 +7,9 @@ import os
 import logging
 import sys
 
+from http.client import HTTPException
+from urllib.parse import urlencode
+
 from WMCore.Services.DBS.DBSReader import DBSReader
 from WMCore.Services.DBS.DBSErrors import DBSReaderError
 from WMCore.Configuration import ConfigurationEx
@@ -53,13 +56,33 @@ class DBSDataDiscovery(DataDiscovery):
                 msg += " To allow CRAB to consider a dataset that is not 'VALID', set Data.allowNonValidInputDataset = True in the CRAB configuration."
                 msg += " Notice that this will not force CRAB to run over all files in the dataset;"
                 msg += " CRAB will still check if there are any valid files in the dataset and run only over those files."
+                msg += "\nPublication will be disabled because DBS only supports VALID datasets as parents."
                 raise SubmissionRefusedException(msg)
             msg = f"The input dataset {dataset} is not 'VALID' but '{accessType}'."
             msg += " CRAB will check if there are any valid files in the dataset and run only over those files."
+            msg += "\nPublication will be disabled because DBS only supports VALID datasets as parents."
             if accessType == 'DEPRECATED':
                 msg += f" ({msgForDeprecDS})"
+            if kwargs['task']['tm_publication'] == 'T':
+                self.disablePublication(kwargs['task'])
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
 
+    def disablePublication(self, taskDict):
+        """ disable publication flag for this task """
+
+        # disable in the current task dictionary used throughout this Worker
+        taskDict['tm_publication'] = 'F'
+
+        # and in the task table in the DB
+        configreq = {'subresource': 'edit',
+                     'workflow': taskDict['tm_taskname'],
+                     'column': 'tm_publication',
+                     'value': 'F'
+                     }
+        try:
+            self.crabserver.post(api='task', data=urlencode(configreq))
+        except HTTPException as hte:
+            self.logger.error("Error disabling publication flag: %s", str(hte))
 
     @staticmethod
     def keepOnlyDiskRSEs(locationsMap):
