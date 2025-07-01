@@ -7,12 +7,14 @@ from rucio.client import Client as NativeClient
 from rucio.common.exception import RSENotFound, RuleNotFound
 
 class Client:
+    # Wraps NativeClient with configurable retry logic and logging
     def __init__(self, *args, retries=3, delay=180, logger=None, **kwargs):
         self._client = NativeClient(*args, **kwargs)
         self._retries = retries
         self._delay = delay
         self._logger = logger or logging.getLogger(__name__)
 
+    # Intercepts attribute access to enable retry logic on method calls
     def __getattr__(self, name):
         attr = getattr(self._client, name)
         if callable(attr):
@@ -36,7 +38,7 @@ class Client:
                             raise
             return wrapper
         else:
-            return attr
+            return attr # Returns non-callable attributes directly from the wrapped client
 
 def getNativeRucioClient(config=None, logger=None):
     """
