@@ -28,7 +28,7 @@ class SiteInfoResolver(TaskAction):
     def execute(self, *args, **kwargs):
         global_blacklist = set(self.loadJSONFromFileInScratchDir('blacklistedSites.txt'))
         self.logger.debug("CRAB site blacklist: %s", list(global_blacklist))
-# This is needed for Site Metrics
+        # This is needed for Site Metrics
         # It should not block any site for Site Metrics and if needed for other activities
         # self.config.TaskWorker.ActivitiesToRunEverywhere = ['hctest', 'hcdev']
         # The other case where the blacklist is ignored is if the user sset this explicitly in his configuration
@@ -37,11 +37,11 @@ class SiteInfoResolver(TaskAction):
             global_blacklist = set()
             self.logger.debug("Ignoring the CRAB site blacklist.")
 
-        bannedOutDestinations = self.crabserver.get(api='info', data={'subresource': 'bannedoutdest'})[0]['result'][0]
-        # self._checkASODestination(kwargs['task']['tm_asyncdest'], bannedOutDestinations)
+        ### Deprecated codes BELOW ###: 
+        ### might still usefull as a reminder, if we decided to support storage site checking/resolving again.
+        ### bannedOutDestinations = self.crabserver.get(api='info', data={'subresource': 'bannedoutdest'})[0]['result'][0]
+        ### self._checkASODestination(kwargs['task']['tm_asyncdest'], bannedOutDestinations)
 
-        # siteWhitelist = kwargs['task']['tm_site_whitelist']
-        # siteBlacklist = kwargs['task']['tm_site_blacklist']
         siteWhitelist = self._expandSites(set(kwargs['task']['tm_site_whitelist']))
         siteBlacklist = self._expandSites(set(kwargs['task']['tm_site_blacklist']))
         self.logger.debug("Site whitelist: %s", list(siteWhitelist))
@@ -59,16 +59,13 @@ class SiteInfoResolver(TaskAction):
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
 
-        possiblesites = set(self.resourceCatalog.getAllPSNs()) - global_blacklist
-
-        ## At this point 'possiblesites' should never be empty.
-        self.logger.debug("Possible sites: %s", list(possiblesites))
-        self.logger.debug((kwargs['task'], possiblesites))
+        all_possible_processing_sites = set(self.resourceCatalog.getAllPSNs()) - global_blacklist
         
         kwargs['task']['tm_site_whitelist'] = siteWhitelist
         kwargs['task']['tm_site_blacklist'] = siteBlacklist
+        kwargs['task']['all_possible_processing_sites'] = all_possible_processing_sites 
 
-        return Result(task=kwargs['task'], result=(possiblesites, args[0]))
+        return Result(task=kwargs['task'], result=(all_possible_processing_sites, args[0]))
 
     def _expandSites(self, sites, pnn=False):
         """Check if there are sites cotaining the '*' wildcard and convert them in the corresponding list
