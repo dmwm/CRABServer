@@ -6,7 +6,7 @@ import argparse
 
 from datetime import datetime, timedelta
 
-from rucio.client import Client
+from RucioUtils import Client
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--days', help='rules older than this will be deleted', required=True)

@@ -4,7 +4,7 @@ Initialize neccessary clients, put all actions together and execute it.
 
 import logging
 import os
-from rucio.client.client import Client as RucioClient
+from RucioUtils import Client as RucioClient
 
 from RESTInteractions import CRABRest
 from ASO.Rucio.Transfer import Transfer

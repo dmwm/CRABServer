@@ -111,7 +111,7 @@ def ensure_environment():
         print("Must use a shell w/o CMSSW environent")
         exit()
     try:
-        from rucio.client import Client
+        from RucioUtils import Client
     except ModuleNotFoundError:
         print("Setup Rucio first via:\n source /cvmfs/cms.cern.ch/rucio/setup-py3.sh; export RUCIO_ACCOUNT=`whoami`")
         exit()

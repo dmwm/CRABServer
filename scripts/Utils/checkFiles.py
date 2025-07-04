@@ -15,7 +15,7 @@ import sys
 import time
 import pandas as pd
 
-from rucio.client import Client
+from RucioUtils import Client
 
 def main():
     debug = len(sys.argv) == 3
