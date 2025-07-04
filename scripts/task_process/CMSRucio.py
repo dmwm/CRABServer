@@ -13,7 +13,7 @@ from subprocess import PIPE, Popen
 import requests
 from requests.exceptions import ReadTimeout
 
-from rucio.client.client import Client
+from RucioUtils import Client
 from rucio.common.exception import (DataIdentifierAlreadyExists, FileAlreadyExists, RucioException,
                                     AccessDenied)
 DEBUG_FLAG = False
