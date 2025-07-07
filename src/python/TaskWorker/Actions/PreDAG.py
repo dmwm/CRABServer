@@ -311,11 +311,7 @@ class PreDAG():
         try:
             parent = self.prefix if self.stage == 'tail' else None
             rucioClient = getNativeRucioClient(config=config, logger=self.logger)
-            creator = DagmanCreator(
-                config,
-                crabserver=None,
-                rucioClient=rucioClient,
-            )
+            creator = DagmanCreator(config, crabserver=None, rucioClient=rucioClient)
             creator.createSubdag(splitResult.result, task=task, parent=parent, stage=self.stage)
             self.submitSubdag('RunJobs{0}.subdag'.format(self.prefix),
                               getattr(config.TaskWorker, 'maxIdle', MAX_IDLE_JOBS),
