@@ -278,9 +278,10 @@ class MonitorLockStatus:
         updateToREST(self.crabRESTClient, 'filetransfers', 'updateRucioInfo', restFileDoc)
         # update also publish flag in filetransfer table, use a separate API call now
         # but we can move this into updateRucioInfo subresource in the REST and remove from here
+        filesToPublish = [x for x in fileDocs if not x['dataaset'].startswith('/FakeDataset/')]
         restFileDoc = {
             'asoworker': 'rucio',
-            'list_of_ids': [x['id'] for x in fileDocs],
+            'list_of_ids': [x['id'] for x in filesToPublish],
             'publish_flag': 1,
             'list_of_publication_state': ['NEW'] * num,
         }
