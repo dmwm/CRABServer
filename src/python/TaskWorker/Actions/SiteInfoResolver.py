@@ -116,7 +116,7 @@ if __name__ == '__main__':
     ###
     # Usage: (Inside TaskWorker container)
     # > export PYTHONPATH="$PYTHONPATH:/data/srv/current/lib/python/site-packages"
-    # > python3 DagmanCreator.py
+    # > python3 SiteInfoResolver.py
     ###
 
     import logging

@@ -1032,7 +1032,7 @@ class DagmanCreator(TaskAction):
                 subdags.append(subdag)
 
         ## Create a tarball with all the job lumi files.
-        # SB: I do not undderstand the "First iteration" comments here
+        # SB: I do not understand the "First iteration" comments here
         #     but am wary of changing, keep it as is for now
         with getLock('splitting_data'):
             self.logger.debug("Acquired lock on run and lumi tarball")
