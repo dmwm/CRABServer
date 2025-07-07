@@ -515,6 +515,8 @@ changeDict = {'param': 'inputDataset', 'section': 'Data', 'value': 'REMOVE'}
 confChangesList.append(changeDict)
 changeDict = {'param': 'splitting', 'section': 'Data', 'value': "'FileBased'"}
 confChangesList.append(changeDict)
+changeDict = {'param': name, 'section': 'Site', 'value': "['T2_CH_CERN']"}
+confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
