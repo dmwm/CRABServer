@@ -7,7 +7,7 @@ import re
 import json
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.TaskAction import TaskAction
-from TaskWorker.WorkerExceptions import ConfigException, SubmissionRefusedException
+from TaskWorker.WorkerExceptions import ConfigException, TaskWorkerException
 
 class SiteInfoResolver(TaskAction):
     """
@@ -24,7 +24,7 @@ class SiteInfoResolver(TaskAction):
         """
 
         return kwargs['task']['tm_ignore_global_blacklist'] == 'T'
-    
+
     def execute(self, *args, **kwargs):
         global_blacklist = set(self.loadJSONFromFileInScratchDir('blacklistedSites.txt'))
         self.logger.debug("CRAB site blacklist: %s", list(global_blacklist))
@@ -37,7 +37,7 @@ class SiteInfoResolver(TaskAction):
             global_blacklist = set()
             self.logger.debug("Ignoring the CRAB site blacklist.")
 
-        ### Deprecated codes BELOW ###: 
+        ### Deprecated codes BELOW ###:
         ### might still usefull as a reminder, if we decided to support storage site checking/resolving again.
         ### bannedOutDestinations = self.crabserver.get(api='info', data={'subresource': 'bannedoutdest'})[0]['result'][0]
         ### self._checkASODestination(kwargs['task']['tm_asyncdest'], bannedOutDestinations)
@@ -59,8 +59,18 @@ class SiteInfoResolver(TaskAction):
             self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
             self.logger.warning(msg)
 
-        all_possible_processing_sites = set(self.resourceCatalog.getAllPSNs()) - global_blacklist
-        
+        try:
+            all_possible_processing_sites = (
+                set(self.resourceCatalog.getAllPSNs()) - global_blacklist
+            )
+        except Exception as ex:
+            msg = "The CRAB3 server backend could not contact the Resource Catalog to get the list of all CMS sites."
+            msg += " This could be a temporary Resource Catalog glitch."
+            msg += " Please try to submit a new task (resubmit will not work)"
+            msg += " and contact the experts if the error persists."
+            msg += f"\nError reason: {ex}"
+            raise TaskWorkerException(msg) from ex
+
         kwargs['task']['tm_site_whitelist'] = siteWhitelist
         kwargs['task']['tm_site_blacklist'] = siteBlacklist
         kwargs['task']['all_possible_processing_sites'] = all_possible_processing_sites 

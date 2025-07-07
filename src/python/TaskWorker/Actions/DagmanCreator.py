@@ -899,22 +899,12 @@ class DagmanCreator(TaskAction):
                 continue
 
             if ignoreLocality:
-                try:
-                    possiblesites = set(self.resourceCatalog.getAllPSNs())
-                except Exception as ex:
-                    msg = "The CRAB3 server backend could not contact the Resource Catalog to get the list of all CMS sites."
-                    msg += " This could be a temporary Resource Catalog glitch."
-                    msg += " Please try to submit a new task (resubmit will not work)"
-                    msg += " and contact the experts if the error persists."
-                    msg += f"\nError reason: {ex}"
-                    raise TaskWorkerException(msg) from ex
+                availablesites = kwargs['task']['all_possible_processing_sites'] 
             else:
-                possiblesites = locations
-            ## At this point 'possiblesites' should never be empty.
-            self.logger.debug("Possible sites: %s", list(possiblesites))
+                availablesites = locations - global_blacklist
 
-            ## Apply the global site blacklist.
-            availablesites = possiblesites - global_blacklist
+            ## At this point 'available sites' should never be empty.
+            self.logger.debug("Available sites: %s", list(availablesites))
 
             # Special activities' white list overrides any other location
             if kwargs['task']['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere and siteWhitelist:
