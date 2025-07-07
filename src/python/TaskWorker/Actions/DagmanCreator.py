@@ -202,12 +202,11 @@ class DagmanCreator(TaskAction):
     into HTCondor
     """
 
-    def __init__(self, config, crabserver, resourceCatalog=None, procnum=-1, rucioClient=None):
+    def __init__(self, config, crabserver, procnum=-1, rucioClient=None):
         """ need a comment line here """
         TaskAction.__init__(self, config, crabserver, procnum)
         self.rucioClient = rucioClient
         self.runningInTW = crabserver is not None
-        self.resourceCatalog = resourceCatalog
 
     def populateGlideinMatching(self, task):
         """ actually simply set the required arch and microarch
