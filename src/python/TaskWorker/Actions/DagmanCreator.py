@@ -857,22 +857,8 @@ class DagmanCreator(TaskAction):
         bannedOutDestinations = self.crabserver.get(api='info', data={'subresource': 'bannedoutdest'})[0]['result'][0]
         self._checkASODestination(kwargs['task']['tm_asyncdest'], bannedOutDestinations)
 
-        siteWhitelist = self._expandSites(set(kwargs['task']['tm_site_whitelist']))
-        siteBlacklist = self._expandSites(set(kwargs['task']['tm_site_blacklist']))
-        self.logger.debug("Site whitelist: %s", list(siteWhitelist))
-        self.logger.debug("Site blacklist: %s", list(siteBlacklist))
-
-        if siteWhitelist & global_blacklist:
-            msg = f"The following sites from the user site whitelist are blacklisted by the CRAB server: {list(siteWhitelist & global_blacklist)}."
-            msg += " Since the CRAB server blacklist has precedence, these sites are not considered in the user whitelist."
-            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
-            self.logger.warning(msg)
-
-        if siteBlacklist & siteWhitelist:
-            msg = f"The following sites appear in both the user site blacklist and whitelist: {list(siteBlacklist & siteWhitelist)}."
-            msg += " Since the whitelist has precedence, these sites are not considered in the blacklist."
-            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
-            self.logger.warning(msg)
+        siteWhitelist = set(kwargs['task']['tm_site_whitelist'])
+        siteBlacklist = set(kwargs['task']['tm_site_blacklist'])
 
         ignoreLocality = kwargs['task']['tm_ignore_locality'] == 'T'
         self.logger.debug("Ignore locality: %s", ignoreLocality)
