@@ -317,7 +317,6 @@ class PreDAG():
                 creator = DagmanCreator(
                     config,
                     crabserver=None,
-                    resourceCatalog=resourceCatalog,
                     rucioClient=rucioClient,
                 )
                 creator.createSubdag(splitResult.result, task=task, parent=parent, stage=self.stage)

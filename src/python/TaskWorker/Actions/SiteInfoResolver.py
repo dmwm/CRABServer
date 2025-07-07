@@ -130,17 +130,17 @@ if __name__ == '__main__':
     MOCK_BANNED_OUT_DESTINATIONS = ['T2_UK_SGrid_Bristol', 'T2_US_MIT']
     with envForCMSWEB:
         resourceCatalog = CRICService(logger=logging.getLogger(), configDict={"cacheduration": 1, "pycurl": True, "usestalecache": True})
-        creator = DagmanCreator(config, crabserver=None, resourceCatalog=resourceCatalog)
+        resolver = SiteInfoResolver(config, crabserver=None, resourceCatalog=resourceCatalog)
 
-        assert creator._checkSite('T2_US_Florida', pnn=False) is None, 'Site T2_US_Florida is valid'
+        assert resolver._checkSite('T2_US_Florida', pnn=False) is None, 'Site T2_US_Florida is valid'
         try:
-            creator._checkSite('T2_TH_Bangkok', pnn=False)
+            resolver._checkSite('T2_TH_Bangkok', pnn=False)
         except ConfigException as ex:
             assert str(ex) == 'A site name T2_TH_Bangkok that user specified is not in the list of known CMS Processing Site Names', 'Site T2_TH_Bangkok are not existing and should be invalid'
-        assert creator._checkASODestination('T2_US_Florida', MOCK_BANNED_OUT_DESTINATIONS) is None, 'Site: T2_US_Florida, Should not be banned'
+        assert resolver._checkASODestination('T2_US_Florida', MOCK_BANNED_OUT_DESTINATIONS) is None, 'Site: T2_US_Florida, Should not be banned'
         try:
-            creator._checkASODestination('T2_UK_SGrid_Bristol', MOCK_BANNED_OUT_DESTINATIONS)
+            resolver._checkASODestination('T2_UK_SGrid_Bristol', MOCK_BANNED_OUT_DESTINATIONS)
         except ConfigException as ex:
             assert str(ex) == 'Remote output data site is banned, The output site you specified in the Site.storageSite parameter (T2_UK_SGrid_Bristol) is blacklisted (banned sites: [\'T2_UK_SGrid_Bristol\', \'T2_US_MIT\'])', 'ASO destination is banned'
-        assert sorted(creator._expandSites(['T2_US*', 'T2_UK*'])) == sorted(['T2_US_Caltech', 'T2_US_Florida', 'T2_US_MIT', 'T2_US_Nebraska', 'T2_US_Purdue', 'T2_US_UCSD', 'T2_US_Vanderbilt', 'T2_US_Wisconsin', 'T2_UK_London_Brunel', 'T2_UK_London_IC', 'T2_UK_SGrid_Bristol', 'T2_UK_SGrid_RALPP']), 'Site expansion is incorrect'
+        assert sorted(resolver._expandSites(['T2_US*', 'T2_UK*'])) == sorted(['T2_US_Caltech', 'T2_US_Florida', 'T2_US_MIT', 'T2_US_Nebraska', 'T2_US_Purdue', 'T2_US_UCSD', 'T2_US_Vanderbilt', 'T2_US_Wisconsin', 'T2_UK_London_Brunel', 'T2_UK_London_IC', 'T2_UK_SGrid_Bristol', 'T2_UK_SGrid_RALPP']), 'Site expansion is incorrect'
     print('===== Test::All tests passed =====')

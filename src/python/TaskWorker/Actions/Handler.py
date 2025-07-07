@@ -235,7 +235,6 @@ def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
         DagmanCreator(
             config=config,
             crabserver=crabserver,
-            resourceCatalog=resourceCatalog,
             procnum=procnum,
             rucioClient=rucioClient,
         )
