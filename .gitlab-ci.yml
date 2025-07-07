@@ -548,6 +548,7 @@ cleanup_rucio_rules:
     - source .env
     - export X509_USER_PROXY=$(cicd/gitlab/credFile.sh $X509_USER_PROXY x509)
     - export DRY_RUN=false
+    - export PYTHONPATH=$PYTHONPATH:$(pwd)/src
     - bash cicd/rucio/cleanup.sh
 
 # if test is pass, retag with `*-stable`
