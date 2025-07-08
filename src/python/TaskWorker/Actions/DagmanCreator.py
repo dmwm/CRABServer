@@ -27,7 +27,7 @@ from ServerUtilities import getLock, checkS3Object, getColumn, pythonListToClass
 import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.Actions.Splitter import SplittingSummary
-from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedException
+from TaskWorker.WorkerExceptions import ConfigException, TaskWorkerException, SubmissionRefusedException
 from RucioUtils import getWritePFN
 from CMSGroupMapper import get_egroup_users, map_user_to_groups
 
@@ -344,8 +344,8 @@ class DagmanCreator(TaskAction):
         # note about Lists
         # in the JDL everything is a string, we can't use the simple classAd[name]=somelist
         # but need the ExprTree format (what classAd.lookup() would return)
-        jobSubmit['My.CRAB_SiteBlacklist'] = pythonListToClassAdExprTree(task['tm_site_blacklist'])
-        jobSubmit['My.CRAB_SiteWhitelist'] =  pythonListToClassAdExprTree(task['tm_site_whitelist'])
+        jobSubmit['My.CRAB_SiteBlacklist'] = pythonListToClassAdExprTree(list(task['tm_site_blacklist']))
+        jobSubmit['My.CRAB_SiteWhitelist'] =  pythonListToClassAdExprTree(list(task['tm_site_whitelist']))
         jobSubmit['My.CRAB_AdditionalOutputFiles'] = pythonListToClassAdExprTree(task['tm_outfiles'])
         jobSubmit['My.CRAB_EDMOutputFiles'] =  pythonListToClassAdExprTree(task['tm_edm_outfiles'])
         jobSubmit['My.CRAB_TFileOutputFiles'] = pythonListToClassAdExprTree(task['tm_outfiles'])
@@ -848,20 +848,6 @@ class DagmanCreator(TaskAction):
 
         siteWhitelist = set(kwargs['task']['tm_site_whitelist'])
         siteBlacklist = set(kwargs['task']['tm_site_blacklist'])
-        self.logger.debug("Site whitelist: %s", list(siteWhitelist))
-        self.logger.debug("Site blacklist: %s", list(siteBlacklist))
-
-        if siteWhitelist & global_blacklist:
-            msg = f"The following sites from the user site whitelist are blacklisted by the CRAB server: {list(siteWhitelist & global_blacklist)}."
-            msg += " Since the CRAB server blacklist has precedence, these sites are not considered in the user whitelist."
-            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
-            self.logger.warning(msg)
-
-        if siteBlacklist & siteWhitelist:
-            msg = f"The following sites appear in both the user site blacklist and whitelist: {list(siteBlacklist & siteWhitelist)}."
-            msg += " Since the whitelist has precedence, these sites are not considered in the blacklist."
-            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
-            self.logger.warning(msg)
 
         ignoreLocality = kwargs['task']['tm_ignore_locality'] == 'T'
         self.logger.debug("Ignore locality: %s", ignoreLocality)
@@ -902,25 +888,12 @@ class DagmanCreator(TaskAction):
                 continue
 
             if ignoreLocality:
-                with self.config.TaskWorker.envForCMSWEB:
-                    configDict = {"cacheduration": 1, "pycurl": True} # cache duration is in hours
-                    resourceCatalog = CRIC(logger=self.logger, configDict=configDict)
-                    try:
-                        possiblesites = set(resourceCatalog.getAllPSNs())
-                    except Exception as ex:
-                        msg = "The CRAB3 server backend could not contact the Resource Catalog to get the list of all CMS sites."
-                        msg += " This could be a temporary Resource Catalog glitch."
-                        msg += " Please try to submit a new task (resubmit will not work)"
-                        msg += " and contact the experts if the error persists."
-                        msg += f"\nError reason: {ex}"
-                        raise TaskWorkerException(msg) from ex
+                availablesites = kwargs['task']['all_possible_processing_sites'] 
             else:
-                possiblesites = locations
-            ## At this point 'possiblesites' should never be empty.
-            self.logger.debug("Possible sites: %s", list(possiblesites))
+                availablesites = locations - global_blacklist
 
-            ## Apply the global site blacklist.
-            availablesites = possiblesites - global_blacklist
+            ## At this point 'available sites' should never be empty.
+            self.logger.debug("Available sites: %s", list(availablesites))
 
             # Special activities' white list overrides any other location
             if kwargs['task']['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere and siteWhitelist:
@@ -1052,7 +1025,7 @@ class DagmanCreator(TaskAction):
                 subdags.append(subdag)
 
         ## Create a tarball with all the job lumi files.
-        # SB: I do not undderstand the "First iteration" comments here
+        # SB: I do not understand the "First iteration" comments here
         #     but am wary of changing, keep it as is for now
         with getLock('splitting_data'):
             self.logger.debug("Acquired lock on run and lumi tarball")
