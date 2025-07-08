@@ -276,8 +276,8 @@ class MonitorLockStatus:
             'list_of_fts_id': None,
         }
         updateToREST(self.crabRESTClient, 'filetransfers', 'updateRucioInfo', restFileDoc)
-        # update also publish flag in filetransfer table, use a separate API call now
-        # but we can move this into updateRucioInfo subresource in the REST and remove from here
+        # update also publish flag in filetransfer table, use a separate API call
+        # because we have to restrict this to files which are fit for DBS
         filesToPublish = [x for x in fileDocs if not x['dataaset'].startswith('/FakeDataset/')]
         restFileDoc = {
             'asoworker': 'rucio',
