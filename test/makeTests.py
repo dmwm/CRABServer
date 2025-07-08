@@ -516,7 +516,7 @@ confChangesList.append(changeDict)
 changeDict = {'param': 'splitting', 'section': 'Data', 'value': "'FileBased'"}
 confChangesList.append(changeDict)
 changeDict = {'param': 'whitelist', 'section': 'Site', 'value': "['T2_CH_CERN']"}
-confChangesList = [changeDict]
+confChangesList.append(changeDict)
 testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
