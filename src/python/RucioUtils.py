@@ -23,9 +23,15 @@ class Client:
                     try:
                         return attr(*args, **kwargs)
                     except RucioException as e:
-                        # Only retry on RucioException
+                        self._logger.exception(
+                            "RucioException occurred in '%s': %s", name, str(e)
+                        )
+                        # Immediately raise
+                        raise
+                    except Exception as e:
+                        # Only retry on Exception other than RucioException
                         self._logger.warning(
-                            "RucioException occurred in '%s' (attempt %d/%d): %s",
+                            "Exception other than RucioException occurred in '%s' (attempt %d/%d): %s",
                             name, attempt + 1, self._retries, str(e)
                         )
                         attempt += 1
@@ -36,12 +42,6 @@ class Client:
                                 "Operation '%s' failed after %d attempts", name, self._retries
                             )
                             raise
-                    except Exception as e:
-                        self._logger.exception(
-                            "Exception other than RucioException occurred in '%s': %s", name, str(e)
-                        )
-                        # Immediately raise
-                        raise
             return wrapper
         else:
             return attr # Returns non-callable attributes directly from the wrapped client
