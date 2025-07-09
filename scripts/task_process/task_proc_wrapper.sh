@@ -4,27 +4,9 @@ function log {
     echo "[$(date +"%F %R")]" $*
 }
 
-function compare_status {
-  python3 task_process/Compare.py > task_process/status_cache_diff
-  Differ=$?
-  if  [ $Differ -eq '1' ]; then
-    log "=* STATUS_CACHE.JSON DIFFERS *="
-    #[ -f difference-already-reported ] || report_difference
-  fi
-}
-
-function report_difference {
-  echo -e "HOST = $HOSTNAME\nCWD =\n  $PWD\n`cat task_process/status_cache_diff`" | mail -s "Status difference in $REQUEST_NAME" stefano.belforte@cern.ch
-  touch difference-already-reported
-}
-
 function cache_status {
     log "Running cache_status.py"
     python3 task_process/cache_status.py
-    log "Running cache_status_old.py"
-    python3 task_process/cache_status_old.py
-    log "Comparing.."
-    compare_status
 }
 
 function manage_transfers {
