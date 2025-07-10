@@ -14,19 +14,16 @@ class MakeFakeFileSet(TaskAction):
        set all the other parmas to dummy values. We may want to set
        them in the future"""
 
-    def __init__(self, *args, resourceCatalog=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         TaskAction.__init__(self, *args, **kwargs)
-        self.resourceCatalog = resourceCatalog
 
-    def getListOfSites(self):
+    def getListOfFilteredSites(self, sites):
         """ Get the list of sites to use for PrivateMC workflows.
             For the moment we are filtering out T1_ since they are precious resources
             and don't want to overtake production (WMAgent) jobs there. In the
             future we would like to take this list from the SSB.
         """
-        sites = self.resourceCatalog.getAllPSNs()
         filteredSites = [site for site in sites if not site.startswith("T1_")]
-
         return filteredSites
 
 
@@ -50,7 +47,7 @@ class MakeFakeFileSet(TaskAction):
         #MC comes with only one MCFakeFile
         singleMCFileset = Fileset(name = "MCFakeFileSet")
         newFile = File("MCFakeFile", size = 1000, events = totalevents)
-        newFile.setLocation(self.getListOfSites())
+        newFile.setLocation(self.getListOfFilteredSites(kwargs['task']['all_possible_processing_sites']))
         newFile.addRun(Run(1, *range(firstLumi, lastLumi + 1)))
         newFile["block"] = 'MCFakeBlock'
         newFile["first_event"] = firstEvent

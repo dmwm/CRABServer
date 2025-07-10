@@ -32,7 +32,7 @@ class UserDataDiscovery(DataDiscovery):
         if hasattr(self.config.Sites, 'available'):
             locations = self.config.Sites.available
         else:
-            locations = self.resourceCatalog.getAllPSNs()
+            locations = kwargs['task']['all_possible_processing_sites']
 
         userFileset = Fileset(name = kwargs['task']['tm_taskname'])
         self.logger.info("There are %d files specified by the user.", len(userfiles))

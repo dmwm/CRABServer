@@ -610,7 +610,6 @@ if __name__ == '__main__':
     # Example: python3 DBSDataDiscovery.py prod/global /MuonEG/Run2016B-23Sep2016-v3/MINIAOD
     ###
     import json
-    from TaskWorker.WorkerUtilities import CRICService
     from ServerUtilities import newX509env
 
     dbsInstance = sys.argv[1]
@@ -652,13 +651,8 @@ if __name__ == '__main__':
     config.Services.Rucio_key = '/data/certs/robotkey.pem'
 
     rucioClient = getNativeRucioClient(config=config, logger=logging.getLogger())
-    resourceCatalog = None
-    with config.TaskWorker.envForCMSWEB:
-        resourceCatalog = CRICService(logger=logging.getLogger(),
-                                        configDict={"cacheduration": 1, "pycurl": True, "usestalecache": True})
 
-    discovery = DBSDataDiscovery(config=config, 
-                                 resourceCatalog=resourceCatalog, rucioClient=rucioClient)
+    discovery = DBSDataDiscovery(config=config, rucioClient=rucioClient)
     userConfig = {'partialdataset':False,
                   'inputblocks':blockList
                   }

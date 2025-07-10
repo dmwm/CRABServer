@@ -195,7 +195,6 @@ if __name__ == '__main__':
     rucioDid = f"{scope}:{container}"
 
     logging.basicConfig(level=logging.DEBUG)
-    from TaskWorker.WorkerUtilities import CRICService
     from WMCore.Configuration import ConfigurationEx
     from ServerUtilities import newX509env
 
@@ -223,11 +222,8 @@ if __name__ == '__main__':
     config.Services.Rucio_authUrl = 'https://cms-rucio-auth.cern.ch'
     config.Services.Rucio_caPath = '/etc/grid-security/certificates/'
     rucioClient = getNativeRucioClient(config=config, logger=logging.getLogger())
-    resourceCatalog = None
-    with config.TaskWorker.envForCMSWEB:
-        resourceCatalog = CRICService(logger=logging.getLogger(), configDict={"cacheduration": 1, "pycurl": True, "usestalecache": True})
 
-    fileset = RucioDataDiscovery(config=config, resourceCatalog=resourceCatalog, rucioClient=rucioClient)
+    fileset = RucioDataDiscovery(config=config, rucioClient=rucioClient)
     fileset.execute(task={'tm_nonvalid_input_dataset': 'T', 'tm_use_parent': 0, 'user_proxy': 'None',
                           'tm_input_dataset': rucioDid, 'tm_split_algo': 'FileBased',
                           'tm_taskname': 'pippo1', 'tm_username': config.Services.Rucio_account,

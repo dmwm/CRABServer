@@ -190,46 +190,18 @@ def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
     if task['tm_job_type'] == 'Analysis':
         if task.get('tm_input_dataset'):
             if ':' in task.get('tm_input_dataset'):  # Rucio DID is scope:name
-                handler.addWork(
-                    RucioDataDiscovery(
-                        config=config,
-                        crabserver=crabserver,
-                        resourceCatalog=resourceCatalog,
-                        procnum=procnum,
-                        rucioClient=rucioClient,
-                    )
-                )
+                handler.addWork(RucioDataDiscovery(config=config, crabserver=crabserver,
+                                    procnum=procnum, rucioClient=rucioClient))
             else:
-                handler.addWork(
-                    DBSDataDiscovery(
-                        config=config,
-                        crabserver=crabserver,
-                        resourceCatalog=resourceCatalog,
-                        procnum=procnum,
-                        rucioClient=rucioClient,
-                    )
-                )
+                handler.addWork(DBSDataDiscovery(config=config, crabserver=crabserver,
+                                                 procnum=procnum, rucioClient=rucioClient))
 
         elif task.get('tm_user_files'):
-            handler.addWork(
-                UserDataDiscovery(
-                    config=config,
-                    crabserver=crabserver,
-                    resourceCatalog=resourceCatalog,
-                    procnum=procnum,
-                )
-            )
+            handler.addWork(UserDataDiscovery(config=config, crabserver=crabserver, procnum=procnum))
         else:
             raise SubmissionRefusedException("Neither inputDataset nor userInputFiles specified", retry=0)
     elif task['tm_job_type'] == 'PrivateMC':
-        handler.addWork(
-            MakeFakeFileSet(
-                config=config,
-                crabserver=crabserver,
-                resourceCatalog=resourceCatalog,
-                procnum=procnum,
-            )
-        )
+        handler.addWork(MakeFakeFileSet(config=config, crabserver=crabserver, procnum=procnum))
     handler.addWork(Splitter(config=config, crabserver=crabserver, procnum=procnum))
     handler.addWork(
         DagmanCreator(

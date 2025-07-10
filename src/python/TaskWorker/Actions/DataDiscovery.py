@@ -7,7 +7,7 @@ from WMCore.DataStructs.Run import Run
 from WMCore.DataStructs.File import File
 from WMCore.DataStructs.Fileset import Fileset
 from WMCore.DataStructs.LumiList import LumiList
-from WMCore.Services.CRIC.CRIC import CRIC
+from TaskWorker.WorkerUtilities import CRICService
 
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.DataObjects.Result import Result
@@ -20,9 +20,10 @@ class DataDiscovery(TaskAction):  # pylint: disable=abstract-method
     return a properly formatted output.
     """
 
-    def __init__(self, *args, resourceCatalog=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         TaskAction.__init__(self, *args, **kwargs)
-        self.resourceCatalog = resourceCatalog
+        with self.config.TaskWorker.envForCMSWEB:
+            self.resourceCatalog = CRICService(logger=self.logger, configDict={"cacheduration": 1, "pycurl": True, "usestalecache": True})
 
     def formatOutput(self, task, requestname, datasetfiles, locations, tempDir):
         """
