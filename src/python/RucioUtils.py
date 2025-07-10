@@ -1,10 +1,9 @@
 """ a small set of utilities to work with Rucio used in various places """
 import logging
 import time
-
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from rucio.client import Client as NativeClient
-from rucio.common.exception import RSENotFound, RuleNotFound
+from rucio.common.exception import RSENotFound, RuleNotFound, RucioException
 
 class Client:
     # Wraps NativeClient with configurable retry logic and logging
@@ -23,9 +22,16 @@ class Client:
                 while attempt < self._retries:
                     try:
                         return attr(*args, **kwargs)
+                    except RucioException as e:
+                        self._logger.exception(
+                            "RucioException occurred in '%s': %s", name, str(e)
+                        )
+                        # Immediately raise
+                        raise
                     except Exception as e:
+                        # Only retry on Exception other than RucioException
                         self._logger.warning(
-                            "Failed to execute '%s' (attempt %d/%d): %s",
+                            "Exception other than RucioException occurred in '%s' (attempt %d/%d): %s",
                             name, attempt + 1, self._retries, str(e)
                         )
                         attempt += 1
