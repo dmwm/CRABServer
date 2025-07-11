@@ -14,10 +14,11 @@ class SiteInfoResolver(TaskAction):
     Given a task definition, resolve site white/black list with CRIC-related sites informations.
     """
 
-    def __init__(self, config, crabserver, resourceCatalog=None, procnum=-1):
+    def __init__(self, config, crabserver, procnum=-1):
         """ need a comment line here """
         TaskAction.__init__(self, config, crabserver, procnum)
-        self.resourceCatalog = resourceCatalog
+        with config.TaskWorker.envForCMSWEB:
+            self.resourceCatalog = CRICService(logger=handler.logger, configDict={"cacheduration": 1, "pycurl": True, "usestalecache": True})
 
     def isGlobalBlacklistIgnored(self, kwargs):
         """ Determine wether the user wants to ignore the globalblacklist

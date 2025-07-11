@@ -27,7 +27,7 @@ from ServerUtilities import getLock, checkS3Object, getColumn, pythonListToClass
 import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.Actions.Splitter import SplittingSummary
-from TaskWorker.WorkerExceptions import ConfigException, TaskWorkerException, SubmissionRefusedException
+from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedException
 from RucioUtils import getWritePFN
 from CMSGroupMapper import get_egroup_users, map_user_to_groups
 
