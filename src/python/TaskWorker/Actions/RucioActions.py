@@ -93,7 +93,7 @@ class RucioAction():
             self.logger.debug("List of existing rules for this DID")
             ruleId = None
             for rule in ruleIdGen:
-                self.logger.debug("did: %s account: %s activity: %s", did, account, activity)
+                self.logger.debug("rule['id']: %s account: %s activity: %s", rule['id'], account, activity)
                 if rule['account'] == account:
                     ruleId = rule['id']
                     break
