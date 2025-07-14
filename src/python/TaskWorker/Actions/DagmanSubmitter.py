@@ -156,7 +156,7 @@ def checkMemoryWalltime(task, cmd, logger, warningUploader):
     stdmaxjobruntime = 2750
     runtime = task[cmd+'_maxjobruntime']
     memory = task[cmd+'_maxmemory']
-    ncores = task[cmd+'_numcores']
+    ncores = task['tm_numcores']
     if ncores is None:
         ncores = 1
     absmaxmemory = max(MAX_MEMORY_SINGLE_CORE, ncores*MAX_MEMORY_PER_CORE)
