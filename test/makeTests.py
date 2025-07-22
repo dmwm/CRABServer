@@ -642,7 +642,9 @@ writeValidationScript(testName=name, validationScript=validationScript)
 # collector
 name = 'collector'
 confChangesList = []
-changeDict = {'param': name, 'value': '"cmsgwms-collector-itb.cern.ch,cmsgwms-collector-itb.fnal.gov"', 'section': 'Debug'}
+# temporarily remove FNAL ITB collector https://mattermost.web.cern.ch/cms-o-and-c/pl/5hgkkmg4jfge5b5umkq6jc968w
+# changeDict = {'param': name, 'value': '"cmsgwms-collector-itb.cern.ch,cmsgwms-collector-itb.fnal.gov"', 'section': 'Debug'}
+changeDict = {'param': name, 'value': '"cmsgwms-collector-itb.cern.ch"', 'section': 'Debug'}
 confChangesList.append(changeDict)
 changeDict = {'param': 'scheddName', 'value': '"crab3@vocms068.cern.ch"', 'section': 'Debug'}
 confChangesList.append(changeDict)
