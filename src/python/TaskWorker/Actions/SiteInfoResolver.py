@@ -4,7 +4,6 @@ Resolve CRIC-related Sites info.
 # pylint: disable=too-many-branches
 
 import re
-import json
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import ConfigException, TaskWorkerException
@@ -135,8 +134,7 @@ if __name__ == '__main__':
 
     MOCK_BANNED_OUT_DESTINATIONS = ['T2_UK_SGrid_Bristol', 'T2_US_MIT']
     with envForCMSWEB:
-        resolver = SiteInfoResolver(test_config, crabserver=None, resourceCatalog=resourceCatalog)
-
+        resolver = SiteInfoResolver(test_config, crabserver=None)
         assert resolver._checkSite('T2_US_Florida', pnn=False) is None, 'Site T2_US_Florida is valid' # pylint: disable=protected-access
         try:
             resolver._checkSite('T2_TH_Bangkok', pnn=False) # pylint: disable=protected-access
