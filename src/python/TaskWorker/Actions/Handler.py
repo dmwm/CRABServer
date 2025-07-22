@@ -26,7 +26,6 @@ from TaskWorker.Actions.RucioDataDiscovery import RucioDataDiscovery
 from TaskWorker.Actions.DagmanResubmitter import DagmanResubmitter
 from TaskWorker.WorkerExceptions import WorkerHandlerException, TapeDatasetException,\
     TaskWorkerException, SubmissionRefusedException
-from TaskWorker.WorkerUtilities import CRICService
 
 from CRABUtils.TaskUtils import updateTaskStatus, uploadWarning
 from ServerUtilities import uploadToS3
