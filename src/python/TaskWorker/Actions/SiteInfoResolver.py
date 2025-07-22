@@ -7,6 +7,7 @@ import re
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import ConfigException, TaskWorkerException
+from TaskWorker.WorkerUtilities import CRICService
 
 class SiteInfoResolver(TaskAction):
     """
