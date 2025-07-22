@@ -20,8 +20,8 @@ class RucioDataDiscovery(DataDiscovery):
 
     # disable pylint warning in next line since they refer to conflict with the main()
     # at the bottom of this file which is only used for testing
-    def __init__(self, *args, rucioClient=None, **kwargs): # pylint: disable=redefined-outer-name
-        DataDiscovery.__init__(self, *args, **kwargs)
+    def __init__(self, config, crabserver='', procnum=-1, rucioClient=None):  # pylint: disable=redefined-outer-name
+        DataDiscovery.__init__(self, config, crabserver, procnum)
         self.rucioClient = rucioClient
 
     def execute(self, *args, **kwargs):
