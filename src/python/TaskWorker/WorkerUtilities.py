@@ -1,4 +1,3 @@
-s
 """
 Common functions to be reused around TW and Publisher
 """
