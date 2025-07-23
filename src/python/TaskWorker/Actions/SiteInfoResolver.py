@@ -126,7 +126,7 @@ if __name__ == '__main__':
     ###
 
     import logging
-    from TaskWorker.WorkerUtilities import CRICService
+    from TaskWorker.WorkerUtilities import CRICService # pylint: disable=W0404
     from WMCore.Configuration import loadConfigurationFile
     from ServerUtilities import newX509env
     test_config = loadConfigurationFile('/data/srv/TaskManager/cfg/TaskWorkerConfig.py')
