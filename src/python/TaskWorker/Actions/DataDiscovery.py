@@ -1,17 +1,15 @@
 from __future__ import print_function
 import os
 import json
-import logging
 
 from WMCore.DataStructs.Run import Run
 from WMCore.DataStructs.File import File
 from WMCore.DataStructs.Fileset import Fileset
 from WMCore.DataStructs.LumiList import LumiList
-from WMCore.Services.CRIC.CRIC import CRIC
+from TaskWorker.WorkerUtilities import CRICService
 
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.DataObjects.Result import Result
-from ServerUtilities import tempSetLogLevel
 
 class DataDiscovery(TaskAction):  # pylint: disable=abstract-method
     """
@@ -20,6 +18,11 @@ class DataDiscovery(TaskAction):  # pylint: disable=abstract-method
     possibilities. Implementing only a common method to
     return a properly formatted output.
     """
+
+    def __init__(self, *args, **kwargs):
+        TaskAction.__init__(self, *args, **kwargs)
+        with self.config.TaskWorker.envForCMSWEB:
+            self.resourceCatalog = CRICService(logger=self.logger, configDict={"cacheduration": 1, "pycurl": True, "usestalecache": True})
 
     def formatOutput(self, task, requestname, datasetfiles, locations, tempDir):
         """
@@ -35,45 +38,40 @@ class DataDiscovery(TaskAction):  # pylint: disable=abstract-method
         datasetLumis = {}
         blocksWithNoLocations = set()
         ## Loop over the sorted list of files.
-        configDict = {"cacheduration": 1, "pycurl": True} # cache duration is in hours
-        with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
-            resourceCatalog = CRIC(logger=self.logger, configDict=configDict)
-        # can't affort one message from CRIC per file, unless critical !
-        with tempSetLogLevel(logger=self.logger, level=logging.ERROR):
-            for lfn, infos in datasetfiles.items():
-                ## Skip the file if it is not in VALID state.
-                if not infos.get('ValidFile', True):
-                    self.logger.warning("Skipping invalid file %s", lfn)
-                    continue
-                ## Skip the file if the block has not been found or has no locations.
-                if not infos['BlockName'] in locations or not locations[infos['BlockName']]:
-                    self.logger.warning("Skipping %s because its block (%s) has no locations", lfn, infos['BlockName'])
-                    blocksWithNoLocations.add(infos['BlockName'])
-                    continue
-                if task['tm_use_parent'] == 1 and len(infos['Parents']) == 0:
-                    self.logger.warning("Skipping %s because it has no parents")
-                    continue
-                ## Create a WMCore File object.
-                size = infos['FileSize']
-                checksums = {'Checksum': infos['Checksum'], 'Adler32': infos['Adler32'], 'Md5': infos['Md5']}
-                wmfile = File(lfn=lfn, events=infos['NumberOfEvents'], size=size, checksums=checksums, parents=infos['Parents'])
-                wmfile['block'] = infos['BlockName']
-                try:
-                    wmfile['locations'] = resourceCatalog.PNNstoPSNs(locations[wmfile['block']])
-                except Exception as ex:
-                    self.logger.error("Impossible translating %s to a CMS name through CMS Resource Catalog",
-                                      locations[wmfile['block']])
-                    self.logger.error("got this exception:\n %s", ex)
-                    raise
-                wmfile['workflow'] = requestname
-                event_counter += infos['NumberOfEvents']
-                for run, lumis in infos['Lumis'].items():
-                    datasetLumis.setdefault(run, []).extend(lumis)
-                    wmfile.addRun(Run(run, *lumis))
-                    for lumi in lumis:
-                        uniquelumis.add((run, lumi))
-                    lumi_counter += len(lumis)
-                wmfiles.append(wmfile)
+        for lfn, infos in datasetfiles.items():
+            ## Skip the file if it is not in VALID state.
+            if not infos.get('ValidFile', True):
+                self.logger.warning("Skipping invalid file %s", lfn)
+                continue
+            ## Skip the file if the block has not been found or has no locations.
+            if not infos['BlockName'] in locations or not locations[infos['BlockName']]:
+                self.logger.warning("Skipping %s because its block (%s) has no locations", lfn, infos['BlockName'])
+                blocksWithNoLocations.add(infos['BlockName'])
+                continue
+            if task['tm_use_parent'] == 1 and len(infos['Parents']) == 0:
+                self.logger.warning("Skipping %s because it has no parents")
+                continue
+            ## Create a WMCore File object.
+            size = infos['FileSize']
+            checksums = {'Checksum': infos['Checksum'], 'Adler32': infos['Adler32'], 'Md5': infos['Md5']}
+            wmfile = File(lfn=lfn, events=infos['NumberOfEvents'], size=size, checksums=checksums, parents=infos['Parents'])
+            wmfile['block'] = infos['BlockName']
+            try:
+                wmfile['locations'] = self.resourceCatalog.PNNstoPSNs(locations[wmfile['block']])
+            except Exception as ex:
+                self.logger.error("Impossible translating %s to a CMS name through CMS Resource Catalog",
+                                    locations[wmfile['block']])
+                self.logger.error("got this exception:\n %s", ex)
+                raise
+            wmfile['workflow'] = requestname
+            event_counter += infos['NumberOfEvents']
+            for run, lumis in infos['Lumis'].items():
+                datasetLumis.setdefault(run, []).extend(lumis)
+                wmfile.addRun(Run(run, *lumis))
+                for lumi in lumis:
+                    uniquelumis.add((run, lumi))
+                lumi_counter += len(lumis)
+            wmfiles.append(wmfile)
 
         if blocksWithNoLocations:
             trimmedList = sorted(list(blocksWithNoLocations))[:3] + ['...']

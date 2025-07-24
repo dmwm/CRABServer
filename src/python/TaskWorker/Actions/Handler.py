@@ -19,6 +19,7 @@ from TaskWorker.Actions.StageoutCheck import StageoutCheck
 from TaskWorker.Actions.MakeFakeFileSet import MakeFakeFileSet
 from TaskWorker.Actions.DagmanSubmitter import DagmanSubmitter
 from TaskWorker.Actions.DBSDataDiscovery import DBSDataDiscovery
+from TaskWorker.Actions.SiteInfoResolver import SiteInfoResolver
 from TaskWorker.Actions.Uploader import Uploader
 from TaskWorker.Actions.UserDataDiscovery import UserDataDiscovery
 from TaskWorker.Actions.RucioDataDiscovery import RucioDataDiscovery
@@ -180,12 +181,13 @@ def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
 
     # start to work
     handler.addWork(MyProxyLogon(config=config, crabserver=crabserver, procnum=procnum, myproxylen=60 * 60 * 24))
+    handler.addWork(SiteInfoResolver(config=config, crabserver=crabserver, procnum=procnum))
     handler.addWork(StageoutCheck(config=config, crabserver=crabserver, procnum=procnum, rucioClient=privilegedRucioClient))
     if task['tm_job_type'] == 'Analysis':
         if task.get('tm_input_dataset'):
             if ':' in task.get('tm_input_dataset'):  # Rucio DID is scope:name
                 handler.addWork(RucioDataDiscovery(config=config, crabserver=crabserver,
-                                                   procnum=procnum, rucioClient=rucioClient))
+                                                 procnum=procnum, rucioClient=rucioClient))
             else:
                 handler.addWork(DBSDataDiscovery(config=config, crabserver=crabserver,
                                                  procnum=procnum, rucioClient=rucioClient))
@@ -197,7 +199,14 @@ def handleNewTask(resthost, dbInstance, config, task, procnum, *args, **kwargs):
     elif task['tm_job_type'] == 'PrivateMC':
         handler.addWork(MakeFakeFileSet(config=config, crabserver=crabserver, procnum=procnum))
     handler.addWork(Splitter(config=config, crabserver=crabserver, procnum=procnum))
-    handler.addWork(DagmanCreator(config=config, crabserver=crabserver, procnum=procnum, rucioClient=rucioClient))
+    handler.addWork(
+        DagmanCreator(
+            config=config,
+            crabserver=crabserver,
+            procnum=procnum,
+            rucioClient=rucioClient,
+        )
+    )
     handler.addWork(Uploader(config=config, crabserver=crabserver, procnum=procnum))
     if task['tm_dry_run'] == 'T':
         # stop here and wait for user to be satisfied with what's been uploaded

@@ -5,7 +5,6 @@ from WMCore.DataStructs.File import File
 from WMCore.DataStructs.Fileset import Fileset
 from WMCore.DataStructs.Run import Run
 
-from WMCore.Services.CRIC.CRIC import CRIC
 
 class MakeFakeFileSet(TaskAction):
     """This is needed to make WMCore.JobSplitting lib working...
@@ -16,20 +15,14 @@ class MakeFakeFileSet(TaskAction):
 
     def __init__(self, *args, **kwargs):
         TaskAction.__init__(self, *args, **kwargs)
-        with self.config.TaskWorker.envForCMSWEB:
-            configDict = {"cacheduration": 1, "pycurl": True} # cache duration is in hours
-            self.resourceCatalog = CRIC(logger=self.logger, configDict=configDict)
 
-    def getListOfSites(self):
+    def getListOfFilteredSites(self, sites):
         """ Get the list of sites to use for PrivateMC workflows.
             For the moment we are filtering out T1_ since they are precious resources
             and don't want to overtake production (WMAgent) jobs there. In the
             future we would like to take this list from the SSB.
         """
-        with self.config.TaskWorker.envForCMSWEB:
-            sites = self.resourceCatalog.getAllPSNs()
         filteredSites = [site for site in sites if not site.startswith("T1_")]
-
         return filteredSites
 
 
@@ -53,7 +46,7 @@ class MakeFakeFileSet(TaskAction):
         #MC comes with only one MCFakeFile
         singleMCFileset = Fileset(name = "MCFakeFileSet")
         newFile = File("MCFakeFile", size = 1000, events = totalevents)
-        newFile.setLocation(self.getListOfSites())
+        newFile.setLocation(self.getListOfFilteredSites(kwargs['task']['all_possible_processing_sites']))
         newFile.addRun(Run(1, *range(firstLumi, lastLumi + 1)))
         newFile["block"] = 'MCFakeBlock'
         newFile["first_event"] = firstEvent
