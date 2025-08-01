@@ -353,6 +353,10 @@ class PreJob:
         # for next one, use same format as DESIRED_Sites. In case one day gWms uses it to match
         newJobSubmit['My.DESIRED_CMSDataLocations'] = classad.quote(','.join(dataLocations))
 
+        # if we have a token available, tell condor to use it
+        if os.path.isfile('TOKEN_OK'):
+            newJobSubmit['use_oauth_services'] = 'cms_crab'
+
         ## Finally read in the content of the generic Job.submit file as a string
         with open("Job.submit", 'r', encoding='utf-8') as fd:
             jobSubmitFileContent = fd.read()

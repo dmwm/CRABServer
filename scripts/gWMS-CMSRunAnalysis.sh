@@ -47,6 +47,20 @@ source ./submit_env.sh
 # from ./submit_env.sh
 save_env
 
+# if we have a token, use it
+set -x
+TOKEN_PATH="/srv/.condor_creds/cms_crab.use"
+if [[ -e $TOKEN_PATH ]]; then
+        echo "the file $TOKEN_PATH exists"
+        if [[ -s $TOKEN_PATH ]]; then
+            echo "the file $TOKEN_PATH is non-empty. Use it as BEARER_TOKEN_FILE"
+            export BEARER_TOKEN_FILE=$TOKEN_PATH
+            # uncomment following line when all sites are token ready. E.g. T2_CH_CERN !
+            # unset X509_USER_PROXY
+        fi
+fi
+set +x
+
 echo "======== Startup environment - FINISHING ========"
 
 echo "======== Auxiliary Functions - STARTING ========"
