@@ -60,11 +60,14 @@ class RucioAction():
         self.logger.info("Rucio container %s:%s created with %d blocks", scope, containerName, len(blockList))
 
     def createOrReuseRucioRule(self, did=None, grouping=None, activity=None,
-                               rseExpression='', comment='', lifetime=0):
+                               rseExpression='', comment='', lifetime=0, copies=None):
         """ if Rucio reports duplicate rule exception, reuse existing one """
         # Some RSE_EXPR for testing
         # rseExpression = 'dm_weight>0&(tier=1|tier=2)&rse_type=DISK'
         # rseExpression = 'T3_IT_Trieste' # for testing
+        # Set defaults if not passed
+        if copies is None:
+            copies = 1
         weight = 'dm_weight'  # only makes sense for rules which trigger replicas
         # weight = None # for testing
         if activity == "Analysis TapeRecall":
@@ -74,7 +77,6 @@ class RucioAction():
             askApproval = False
             account = self.rucioAccount
         # askApproval = True # for testing
-        copies = 1
         try:
             ruleIds = self.rucioClient.add_replication_rule(  # N.B. returns a list
                 dids=[did], copies=copies, rse_expression=rseExpression,
@@ -283,9 +285,22 @@ class RucioAction():
         comment = f"Lock {partOf} dataset: {dbsDatasetName} for user: {self.username}"
 
         # create rule
-        ruleId = self.createOrReuseRucioRule(did=containerDid, rseExpression='rse_type=DISK',
-                                             activity="Analysis Input",
-                                             comment=comment, lifetime=TASKLIFETIME)
+        rule_kwargs = {
+            'rseExpression': 'rse_type=DISK',
+            'activity': 'Analysis Input',
+            'comment': comment,
+            'lifetime': TASKLIFETIME,
+        }
+
+        if 'MINIAOD' in containerDid['name']:
+            rule_kwargs.update({
+                'rseExpression': 'keep_miniaod=True',
+                'lifetime': 3600 * 24 * 365,
+                'copies': 2,
+            })
+
+        ruleId = self.createOrReuseRucioRule(did=containerDid, **rule_kwargs)
+
         msg = f"Created Rucio rule ID: {ruleId}"
         self.logger.info(msg)
         return
