@@ -294,6 +294,7 @@ class RucioAction():
 
         if 'MINIAOD' in containerDid['name']:
             rule_kwargs.update({
+                'grouping': 'ALL'
                 'rseExpression': 'keep_miniaod=True',
                 'lifetime': 3600 * 24 * 365,
                 'copies': 2,
