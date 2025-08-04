@@ -60,14 +60,11 @@ class RucioAction():
         self.logger.info("Rucio container %s:%s created with %d blocks", scope, containerName, len(blockList))
 
     def createOrReuseRucioRule(self, did=None, grouping=None, activity=None,
-                               rseExpression='', comment='', lifetime=0, copies=None):
+                               rseExpression='', comment='', lifetime=0, copies=1):
         """ if Rucio reports duplicate rule exception, reuse existing one """
         # Some RSE_EXPR for testing
         # rseExpression = 'dm_weight>0&(tier=1|tier=2)&rse_type=DISK'
         # rseExpression = 'T3_IT_Trieste' # for testing
-        # Set defaults if not passed
-        if copies is None:
-            copies = 1
         weight = 'dm_weight'  # only makes sense for rules which trigger replicas
         # weight = None # for testing
         if activity == "Analysis TapeRecall":
