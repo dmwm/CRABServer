@@ -46,17 +46,8 @@ class SiteInfoResolver(TaskAction):
         ### bannedOutDestinations = self.crabserver.get(api='info', data={'subresource': 'bannedoutdest'})[0]['result'][0]
         ### self._checkASODestination(kwargs['task']['tm_asyncdest'], bannedOutDestinations)
 
-        is_valid_resubmit = ('resubmit_jobids' in task) and task['resubmit_jobids']
-
-        if is_valid_resubmit:
-            if 'resubmit_site_whitelist' in task and 'resubmit_site_blacklist' in task:
-                siteWhitelist = self._expandSites(set(task['resubmit_site_whitelist']))
-                siteBlacklist = self._expandSites(set(task['resubmit_site_blacklist']))
-            else:
-                raise ConfigException("The Site Whitelist/Blacklist was not provided correctly, when resubmitting a task...")
-        else:
-            siteWhitelist = self._expandSites(set(task['tm_site_whitelist']))
-            siteBlacklist = self._expandSites(set(task['tm_site_blacklist']))
+        siteWhitelist = self._expandSites(task['tm_site_whitelist']))
+        siteBlacklist = self._expandSites(task['tm_site_blacklist']))
 
         self.logger.debug("Site whitelist: %s", list(siteWhitelist))
         self.logger.debug("Site blacklist: %s", list(siteBlacklist))
@@ -85,13 +76,14 @@ class SiteInfoResolver(TaskAction):
             msg += f"\nError reason: {ex}"
             raise TaskWorkerException(msg) from ex
 
-        if is_valid_resubmit:
-            task['resubmit_site_whitelist'] = siteWhitelist
-            task['resubmit_site_blacklist'] = siteBlacklist
-        else: 
-            task['tm_site_whitelist'] = siteWhitelist
-            task['tm_site_blacklist'] = siteBlacklist
-            task['all_possible_processing_sites'] = all_possible_processing_sites 
+        task['tm_site_whitelist'] = siteWhitelist
+        task['tm_site_blacklist'] = siteBlacklist
+        task['all_possible_processing_sites'] = all_possible_processing_sites 
+
+        if 'resubmit_site_whitelist' in task and task['resubmit_site_whitelist']:
+                task['resubmit_site_whitelist']  = self._expandSites(set(task['resubmit_site_whitelist']))
+        if 'resubmit_site_blacklist' in task and task['resubmit_site_blacklist']:
+                task['resubmit_site_blacklist']  = self._expandSites(set(task['resubmit_site_blacklist']))
 
         return Result(task=task, result=(all_possible_processing_sites, args[0]))
 
