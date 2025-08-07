@@ -52,14 +52,14 @@ class SiteInfoResolver(TaskAction):
         self.logger.debug("Site whitelist: %s", list(siteWhitelist))
         self.logger.debug("Site blacklist: %s", list(siteBlacklist))
 
-        if siteWhitelist & global_blacklist:
-            msg = f"The following sites from the user site whitelist are blacklisted by the CRAB server: {list(siteWhitelist & global_blacklist)}."
+        if set(siteWhitelist) & set(global_blacklist):
+            msg = f"The following sites from the user site whitelist are blacklisted by the CRAB server: {list(set(siteWhitelist) & set(global_blacklist))}."
             msg += " Since the CRAB server blacklist has precedence, these sites are not considered in the user whitelist."
             self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
             self.logger.warning(msg)
 
-        if siteBlacklist & siteWhitelist:
-            msg = f"The following sites appear in both the user site blacklist and whitelist: {list(siteBlacklist & siteWhitelist)}."
+        if set(siteBlacklist) & set(siteWhitelist):
+            msg = f"The following sites appear in both the user site blacklist and whitelist: {list(set(siteBlacklist) & set(siteWhitelist))}."
             msg += " Since the whitelist has precedence, these sites are not considered in the blacklist."
             self.uploadWarning(msg, task['task']['user_proxy'], task['tm_taskname'])
             self.logger.warning(msg)
