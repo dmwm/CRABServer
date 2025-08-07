@@ -46,20 +46,27 @@ class SiteInfoResolver(TaskAction):
         ### bannedOutDestinations = self.crabserver.get(api='info', data={'subresource': 'bannedoutdest'})[0]['result'][0]
         ### self._checkASODestination(kwargs['task']['tm_asyncdest'], bannedOutDestinations)
 
-        siteWhitelist = self._expandSites(task['tm_site_whitelist']))
-        siteBlacklist = self._expandSites(task['tm_site_blacklist']))
+        task['tm_site_whitelist'] = self._expandSites(task['tm_site_whitelist'])
+        task['tm_site_blacklist'] = self._expandSites(task['tm_site_blacklist'])
+        if 'resubmit_site_whitelist' in task and task['resubmit_site_whitelist']:
+                task['resubmit_site_whitelist']  = self._expandSites(task['resubmit_site_whitelist'])
+        if 'resubmit_site_blacklist' in task and task['resubmit_site_blacklist']:
+                task['resubmit_site_blacklist']  = self._expandSites(task['resubmit_site_blacklist'])
+
+        siteWhitelist = set(task['tm_site_whitelist'])
+        siteBlacklist = set(task['tm_site_blacklist'])
 
         self.logger.debug("Site whitelist: %s", list(siteWhitelist))
         self.logger.debug("Site blacklist: %s", list(siteBlacklist))
 
-        if set(siteWhitelist) & set(global_blacklist):
-            msg = f"The following sites from the user site whitelist are blacklisted by the CRAB server: {list(set(siteWhitelist) & set(global_blacklist))}."
+        if siteWhitelist & global_blacklist:
+            msg = f"The following sites from the user site whitelist are blacklisted by the CRAB server: {list(siteWhitelist & global_blacklist)}."
             msg += " Since the CRAB server blacklist has precedence, these sites are not considered in the user whitelist."
             self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
             self.logger.warning(msg)
 
-        if set(siteBlacklist) & set(siteWhitelist):
-            msg = f"The following sites appear in both the user site blacklist and whitelist: {list(set(siteBlacklist) & set(siteWhitelist))}."
+        if siteBlacklist & siteWhitelist:
+            msg = f"The following sites appear in both the user site blacklist and whitelist: {list(siteBlacklist & siteWhitelist)}."
             msg += " Since the whitelist has precedence, these sites are not considered in the blacklist."
             self.uploadWarning(msg, task['task']['user_proxy'], task['tm_taskname'])
             self.logger.warning(msg)
@@ -68,6 +75,7 @@ class SiteInfoResolver(TaskAction):
             all_possible_processing_sites = (
                 set(self.resourceCatalog.getAllPSNs()) - global_blacklist
             )
+            task['all_possible_processing_sites'] = all_possible_processing_sites 
         except Exception as ex:
             msg = "The CRAB3 server backend could not contact the Resource Catalog to get the list of all CMS sites."
             msg += " This could be a temporary Resource Catalog glitch."
@@ -75,15 +83,6 @@ class SiteInfoResolver(TaskAction):
             msg += " and contact the experts if the error persists."
             msg += f"\nError reason: {ex}"
             raise TaskWorkerException(msg) from ex
-
-        task['tm_site_whitelist'] = siteWhitelist
-        task['tm_site_blacklist'] = siteBlacklist
-        task['all_possible_processing_sites'] = all_possible_processing_sites 
-
-        if 'resubmit_site_whitelist' in task and task['resubmit_site_whitelist']:
-                task['resubmit_site_whitelist']  = self._expandSites(task['resubmit_site_whitelist'])
-        if 'resubmit_site_blacklist' in task and task['resubmit_site_blacklist']:
-                task['resubmit_site_blacklist']  = self._expandSites(task['resubmit_site_blacklist'])
 
         return Result(task=task, result=(all_possible_processing_sites, args[0]))
 
