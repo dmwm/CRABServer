@@ -68,7 +68,7 @@ class SiteInfoResolver(TaskAction):
         if siteBlacklist & siteWhitelist:
             msg = f"The following sites appear in both the user site blacklist and whitelist: {list(siteBlacklist & siteWhitelist)}."
             msg += " Since the whitelist has precedence, these sites are not considered in the blacklist."
-            self.uploadWarning(msg, task['task']['user_proxy'], task['tm_taskname'])
+            self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
             self.logger.warning(msg)
 
         try:
@@ -103,7 +103,7 @@ class SiteInfoResolver(TaskAction):
             else:
                 self._checkSite(site, pnn) # pylint: disable=protected-access
                 res.add(site)
-        return res
+        return list(res)
 
     def _checkASODestination(self, site, bannedOutDestinations=None):
         """ Check that the ASO destination is correct and not among the banned ones
