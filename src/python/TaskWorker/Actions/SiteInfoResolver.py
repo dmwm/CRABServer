@@ -29,6 +29,7 @@ class SiteInfoResolver(TaskAction):
     def execute(self, *args, **kwargs):
         """ ... """
         
+        task = kwargs['task']
         global_blacklist = set(self.loadJSONFromFileInScratchDir('blacklistedSites.txt'))
         self.logger.debug("CRAB site blacklist: %s", list(global_blacklist))
         # This is needed for Site Metrics
@@ -36,7 +37,7 @@ class SiteInfoResolver(TaskAction):
         # self.config.TaskWorker.ActivitiesToRunEverywhere = ['hctest', 'hcdev']
         # The other case where the blacklist is ignored is if the user sset this explicitly in his configuration
         if self.isGlobalBlacklistIgnored(kwargs) or (hasattr(self.config.TaskWorker, 'ActivitiesToRunEverywhere') and \
-                   kwargs['task']['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere):
+                   task['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere):
             global_blacklist = set()
             self.logger.debug("Ignoring the CRAB site blacklist.")
 
@@ -45,27 +46,36 @@ class SiteInfoResolver(TaskAction):
         ### bannedOutDestinations = self.crabserver.get(api='info', data={'subresource': 'bannedoutdest'})[0]['result'][0]
         ### self._checkASODestination(kwargs['task']['tm_asyncdest'], bannedOutDestinations)
 
-        siteWhitelist = self._expandSites(set(kwargs['task']['tm_site_whitelist']))
-        siteBlacklist = self._expandSites(set(kwargs['task']['tm_site_blacklist']))
+        task['tm_site_whitelist'] = self._expandSites(task['tm_site_whitelist'])
+        task['tm_site_blacklist'] = self._expandSites(task['tm_site_blacklist'])
+        if 'resubmit_site_whitelist' in task and task['resubmit_site_whitelist']:
+                task['resubmit_site_whitelist']  = self._expandSites(task['resubmit_site_whitelist'])
+        if 'resubmit_site_blacklist' in task and task['resubmit_site_blacklist']:
+                task['resubmit_site_blacklist']  = self._expandSites(task['resubmit_site_blacklist'])
+
+        siteWhitelist = set(task['tm_site_whitelist'])
+        siteBlacklist = set(task['tm_site_blacklist'])
+
         self.logger.debug("Site whitelist: %s", list(siteWhitelist))
         self.logger.debug("Site blacklist: %s", list(siteBlacklist))
 
         if siteWhitelist & global_blacklist:
             msg = f"The following sites from the user site whitelist are blacklisted by the CRAB server: {list(siteWhitelist & global_blacklist)}."
             msg += " Since the CRAB server blacklist has precedence, these sites are not considered in the user whitelist."
-            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+            self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
             self.logger.warning(msg)
 
         if siteBlacklist & siteWhitelist:
             msg = f"The following sites appear in both the user site blacklist and whitelist: {list(siteBlacklist & siteWhitelist)}."
             msg += " Since the whitelist has precedence, these sites are not considered in the blacklist."
-            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+            self.uploadWarning(msg, task['user_proxy'], task['tm_taskname'])
             self.logger.warning(msg)
 
         try:
             all_possible_processing_sites = (
                 set(self.resourceCatalog.getAllPSNs()) - global_blacklist
             )
+            task['all_possible_processing_sites'] = all_possible_processing_sites 
         except Exception as ex:
             msg = "The CRAB3 server backend could not contact the Resource Catalog to get the list of all CMS sites."
             msg += " This could be a temporary Resource Catalog glitch."
@@ -74,11 +84,7 @@ class SiteInfoResolver(TaskAction):
             msg += f"\nError reason: {ex}"
             raise TaskWorkerException(msg) from ex
 
-        kwargs['task']['tm_site_whitelist'] = siteWhitelist
-        kwargs['task']['tm_site_blacklist'] = siteBlacklist
-        kwargs['task']['all_possible_processing_sites'] = all_possible_processing_sites 
-
-        return Result(task=kwargs['task'], result=(all_possible_processing_sites, args[0]))
+        return Result(task=task, result=(all_possible_processing_sites, args[0]))
 
     def _expandSites(self, sites, pnn=False):
         """Check if there are sites cotaining the '*' wildcard and convert them in the corresponding list
@@ -97,7 +103,7 @@ class SiteInfoResolver(TaskAction):
             else:
                 self._checkSite(site, pnn) # pylint: disable=protected-access
                 res.add(site)
-        return res
+        return list(res)
 
     def _checkASODestination(self, site, bannedOutDestinations=None):
         """ Check that the ASO destination is correct and not among the banned ones

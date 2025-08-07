@@ -343,8 +343,8 @@ class DagmanCreator(TaskAction):
         # note about Lists
         # in the JDL everything is a string, we can't use the simple classAd[name]=somelist
         # but need the ExprTree format (what classAd.lookup() would return)
-        jobSubmit['My.CRAB_SiteBlacklist'] = pythonListToClassAdExprTree(list(task['tm_site_blacklist']))
-        jobSubmit['My.CRAB_SiteWhitelist'] =  pythonListToClassAdExprTree(list(task['tm_site_whitelist']))
+        jobSubmit['My.CRAB_SiteBlacklist'] = pythonListToClassAdExprTree(task['tm_site_blacklist'])
+        jobSubmit['My.CRAB_SiteWhitelist'] =  pythonListToClassAdExprTree(task['tm_site_whitelist'])
         jobSubmit['My.CRAB_AdditionalOutputFiles'] = pythonListToClassAdExprTree(task['tm_outfiles'])
         jobSubmit['My.CRAB_EDMOutputFiles'] =  pythonListToClassAdExprTree(task['tm_edm_outfiles'])
         jobSubmit['My.CRAB_TFileOutputFiles'] = pythonListToClassAdExprTree(task['tm_outfiles'])
@@ -962,9 +962,9 @@ class DagmanCreator(TaskAction):
                 tmp += f"\nGlobal blacklist contain these T1/T2: {t12} and {len(t3)} T3's\n"
                 tmp += f" Full list at {globalBlacklistUrl}\n"
             if len(siteBlacklist) != 0:
-                tmp += f" User blacklist is {siteBlacklist}.\n"
+                tmp += f" User blacklist is {list(siteBlacklist)}.\n"
             if len(siteWhitelist) != 0:
-                tmp += f" User whitelist is {siteWhitelist}.\n"
+                tmp += f" User whitelist is {list(siteWhitelist)}.\n"
             return tmp
 
         if not dagSpecs:
