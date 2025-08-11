@@ -76,7 +76,7 @@ class SiteInfoResolver(TaskAction):
             all_possible_processing_sites = (
                 set(self.resourceCatalog.getAllPSNs()) - global_blacklist
             )
-            task['all_possible_processing_sites'] = all_possible_processing_sites 
+            task['all_possible_processing_sites'] = list(all_possible_processing_sites)
         except Exception as ex:
             msg = "The CRAB3 server backend could not contact the Resource Catalog to get the list of all CMS sites."
             msg += " This could be a temporary Resource Catalog glitch."

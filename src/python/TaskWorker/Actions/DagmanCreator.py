@@ -887,7 +887,7 @@ class DagmanCreator(TaskAction):
                 continue
 
             if ignoreLocality:
-                availablesites = kwargs['task']['all_possible_processing_sites']
+                availablesites = set(kwargs['task']['all_possible_processing_sites'])
             else:
                 availablesites = locations - global_blacklist
 
