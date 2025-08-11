@@ -53,11 +53,12 @@ class SiteInfoResolver(TaskAction):
         if 'resubmit_site_blacklist' in task and task['resubmit_site_blacklist']:
                 task['resubmit_site_blacklist']  = self._expandSites(task['resubmit_site_blacklist'])
 
+        self.logger.debug("Site whitelist: %s", list(task['tm_site_whitelist']))
+        self.logger.debug("Site blacklist: %s", list(task['tm_site_blacklist']))
+
+        # now turn lists into sets to do intersection
         siteWhitelist = set(task['tm_site_whitelist'])
         siteBlacklist = set(task['tm_site_blacklist'])
-
-        self.logger.debug("Site whitelist: %s", list(siteWhitelist))
-        self.logger.debug("Site blacklist: %s", list(siteBlacklist))
 
         if siteWhitelist & global_blacklist:
             msg = f"The following sites from the user site whitelist are blacklisted by the CRAB server: {list(siteWhitelist & global_blacklist)}."
@@ -90,6 +91,10 @@ class SiteInfoResolver(TaskAction):
         """Check if there are sites cotaining the '*' wildcard and convert them in the corresponding list
            Raise exception if any wildcard site does expand to an empty list
            note that all*names.sites come from an HTTP query to CRIC which returns JSON and thus are unicode
+            Args:
+                sites (list): A list of site names, possibly containing '*' wildcards e.g T2_US*, T2_UK*
+            Returns:
+                list: A list of expanded site names with no wildcards.
         """
         res = set()
         for site in sites:
