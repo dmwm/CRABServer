@@ -49,9 +49,9 @@ class SiteInfoResolver(TaskAction):
         task['tm_site_whitelist'] = self._expandSites(task['tm_site_whitelist'])
         task['tm_site_blacklist'] = self._expandSites(task['tm_site_blacklist'])
         if 'resubmit_site_whitelist' in task and task['resubmit_site_whitelist']:
-                task['resubmit_site_whitelist']  = self._expandSites(task['resubmit_site_whitelist'])
+            task['resubmit_site_whitelist']  = self._expandSites(task['resubmit_site_whitelist'])
         if 'resubmit_site_blacklist' in task and task['resubmit_site_blacklist']:
-                task['resubmit_site_blacklist']  = self._expandSites(task['resubmit_site_blacklist'])
+            task['resubmit_site_blacklist']  = self._expandSites(task['resubmit_site_blacklist'])
 
         self.logger.debug("Site whitelist: %s", list(task['tm_site_whitelist']))
         self.logger.debug("Site blacklist: %s", list(task['tm_site_blacklist']))
