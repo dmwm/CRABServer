@@ -232,6 +232,7 @@ def handleResubmit(resthost, dbInstance, config, task, procnum, *args, **kwargs)
     crabserver.setDbInstance(dbInstance)
     handler = TaskHandler(task, procnum, crabserver, config, 'handleResubmit')
     handler.addWork(MyProxyLogon(config=config, crabserver=crabserver, procnum=procnum, myproxylen=60 * 60 * 24))
+    handler.addWork(SiteInfoResolver(config=config, crabserver=crabserver, procnum=procnum))
     handler.addWork(DagmanResubmitter(config=config, crabserver=crabserver, procnum=procnum))
 
     return handler.actionWork(args, kwargs)

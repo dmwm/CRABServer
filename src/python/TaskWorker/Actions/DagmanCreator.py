@@ -887,7 +887,7 @@ class DagmanCreator(TaskAction):
                 continue
 
             if ignoreLocality:
-                availablesites = kwargs['task']['all_possible_processing_sites']
+                availablesites = set(kwargs['task']['all_possible_processing_sites'])
             else:
                 availablesites = locations - global_blacklist
 
@@ -962,9 +962,9 @@ class DagmanCreator(TaskAction):
                 tmp += f"\nGlobal blacklist contain these T1/T2: {t12} and {len(t3)} T3's\n"
                 tmp += f" Full list at {globalBlacklistUrl}\n"
             if len(siteBlacklist) != 0:
-                tmp += f" User blacklist is {siteBlacklist}.\n"
+                tmp += f" User blacklist is {list(siteBlacklist)}.\n"
             if len(siteWhitelist) != 0:
-                tmp += f" User whitelist is {siteWhitelist}.\n"
+                tmp += f" User whitelist is {list(siteWhitelist)}.\n"
             return tmp
 
         if not dagSpecs:
