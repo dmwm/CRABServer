@@ -1,9 +1,0 @@
-# Specify WMCore version to use with CRAB
-# Beware, the format is not the same as the normal python requirements.txt
-#
-# Format:
-# <repository url> <tag>
-#
-# Specifying repo other than "dmwm/WMCore" will use "clone-and-copy" method instead
-# of "pip install". See more detail in cicd/crabserver/installWMCore.sh
-https://github.com/dmwm/WMCore 2.3.7.1
