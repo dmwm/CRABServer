@@ -4,7 +4,7 @@ FROM registry.cern.ch/cmsweb/cmsweb:20230427-stable AS cmsweb
 # Use `wmagent-base` image as our baseimage:
 # https://github.com/dmwm/CMSKubernetes/blob/2b0454f9205cb8f97fecb91bf6661b59e4b31424/docker/pypi/wmagent-base/Dockerfile
 
-FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
+FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20250523-stable
 SHELL ["/bin/bash", "-c"]
 ENV WDIR=/data
 ENV USER=crab3
@@ -14,7 +14,7 @@ RUN useradd -m ${USER} \
 
 # install packages from debian official repo
 RUN apt-get update \
-    && apt-get install -y tini git bash-completion fd-find ripgrep python3-dev libgfal2-dev cmake libglib2.0-dev \
+    && apt-get install -y tini git bash-completion fd-find ripgrep \
     && apt-get clean all
 
 # local timezone (hardcode)
