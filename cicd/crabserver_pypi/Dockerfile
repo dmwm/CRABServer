@@ -14,7 +14,7 @@ RUN useradd -m ${USER} \
 
 # install packages from debian official repo
 RUN apt-get update \
-    && apt-get install -y tini git bash-completion fd-find ripgrep \
+    && apt-get install -y tini git bash-completion fd-find ripgrep libgfal2-dev \
     && apt-get clean all
 
 # local timezone (hardcode)
