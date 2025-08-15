@@ -6,7 +6,7 @@ CherryPy==18.10.0
 CMSMonitoring==0.6.13
 dbs3-client==4.0.19
 future==1.0.0
-httplib2==0.22.4
+httplib2==0.22.0
 psutil==7.0.0
 pycurl==7.45.6
 PyJWT==2.9.0
