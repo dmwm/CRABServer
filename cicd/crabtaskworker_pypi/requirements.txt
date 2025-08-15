@@ -1,15 +1,16 @@
 # https://github.com/dmwm/WMCore/blob/2.4.2/requirements.txt
 # update deps version when bump wmcore version
 
-dbs3-client~=4.0.12
-future~=0.18.2
+dbs3-client~=4.0.19
+future~=1.0.0
 htcondor~=24.3
-psutil~=5.9.1
-pycurl~=7.45.1
-pyOpenSSL~=18.0.0
+psutil~=7.0.0
+pycurl~=7.45.6
+pyOpenSSL~=25.1.0
 retry~=0.9.2
 rucio-clients~=1.29.10
-PyJWT~=2.4.0
+PyJWT~=2.9.0
+gfal2-python~=1.11.0.post3
 
 # crab deps
 python-ldap==3.4.3
