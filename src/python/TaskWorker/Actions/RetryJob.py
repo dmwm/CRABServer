@@ -415,6 +415,7 @@ class RetryJob():
         returns True/False accordingly to corrupted yes/no
         """
 
+        truncatedFile = False
         corruptedFile = False
         suspiciousFile = False
         fatalLine = False
@@ -454,12 +455,10 @@ class RetryJob():
             if corruptedFile:
                 errorLines.append(line)
                 if '/store/' in line and '.root' in line:
-                    # this may be better done in the script which processes the BadInputFiles reports
-                    # if '/store/user' in line or '/store/group' in line and not 'rucio' in line:
-                    #    # no point in reporting files unknown to Rucio
-                    #    corruptedFile = False
-                    #    break
-
+                    if ('/store/user' in line or '/store/group' in line) and not 'rucio' in line:
+                        # no point in reporting files unknown to Rucio
+                        corruptedFile = False
+                        break
                     # extract the '/store/...root' part of this line
                     fragment1 = line.split('/store/')[1]
                     fragment2 = fragment1.split('.root')[0]
@@ -471,16 +470,20 @@ class RetryJob():
                     errorLines.append('NOT CLEARLY CORRUPTED, OTHER ROOT ERROR ?')
                     errorLines.append('DID Identification may not be correct')
                     self.logger.info("RootFatalError does not contain file info")
+                if " is truncated " in line:
+                    # N.B. this is a sub-case of corrupted, there is a Fatal Root Error here !
+                    truncatedFile = True
+                    self.logger.info("Truncated file found")
+                    self.logger.debug(line)
             if corruptedFile or suspiciousFile:
                 corruptionMessage = {'DID': f'cms:{inputFileName}', 'RSE': RSE,
                                      'exitCode': exitCode, 'message': errorLines}
-                self.reportBadInputFile(corruptedFile, suspiciousFile, corruptionMessage)
-                break
+                self.reportBadInputFile(corruptedFile, truncatedFile, suspiciousFile, corruptionMessage)
         return corruptedFile
 
     # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def reportBadInputFile(self, corruptedFile, suspiciousFile, corruptionMessage):
+    def reportBadInputFile(self, corruptedFile, truncatedFile, suspiciousFile, corruptionMessage):
         """
         report bad file via a file on EOS
         """
@@ -495,13 +498,21 @@ class RetryJob():
         with getLock(fname):  # use lock to avoid races with concurrent PostJobs
             if os.path.exists(fname):
                 with open(fname, 'r', encoding='utf-8') as fp:
-                    oldCount = json.load(fp)
+                    count = json.load(fp)
             else:
-                oldCount = 0
-            count = oldCount + 1
+                count = {'corrupted': 0, 'truncated': 0, 'suspicious': 0}
+            if corruptedFile:
+                count['corrupted'] += 1
+            if truncatedFile:
+                count['truncated'] += 1
+            else:
+                count['suspicious'] += 1
             with open(fname, 'w', encoding='utf-8') as fp:
                 json.dump(count, fp)
-        if count > 30:
+        # always report truncated files. Other only up to 30 per task (beware false positives)
+        if not truncatedFile and \
+                ( (corruptedFile and count['corrupted'] < 30) \
+                  or (suspiciousFile and count['suspicious'] < 30) ) :
             return
 
         # add pointers to logs
