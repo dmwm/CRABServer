@@ -5,12 +5,14 @@ generic?general utilities
 import tarfile
 from ServerUtilities import executeCommand
 
-def addToGZippedTarfile(fileList=[], tarFile=None):
+def addToGZippedTarfile(fileList=None, tarFile=None):
     """
     add file names in fileListd to a gzipped tarFile
     it is assumed that tarFile name has the format: xxx.tar.gz
     this requires unzipping the tarfile, adding, zipping again
     """
+    if not fileList or not tarFile:
+        return
     cmd = f"gunzip {tarFile}"
     out, err, exitcode = executeCommand(cmd)
     if exitcode:
@@ -23,6 +25,3 @@ def addToGZippedTarfile(fileList=[], tarFile=None):
     out, err, exitcode = executeCommand(cmd)
     if exitcode:
         raise Exception(f"Failed to gzip {unzippedTarFile}: exitcode {exitcode}\n stdout: {out}\n stderr:{err}")
-
-    return
-
