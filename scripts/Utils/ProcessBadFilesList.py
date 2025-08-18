@@ -33,7 +33,7 @@ def main():
     topDir = f"{topDir}/BadInputFiles"
 
     totals = []
-    for problemType in ('corrupted', 'suspicious'):
+    for problemType in ('truncated', 'corrupted', 'suspicious'):
         doneTasks = []
         myDir = f"{topDir}/{problemType}"
         newReportsDir = myDir + '/new'
