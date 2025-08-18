@@ -770,8 +770,9 @@ class DagmanCreator(TaskAction):
             shutil.copy('run_and_lumis.tar.gz', workingDir)
             shutil.copy('input_files.tar.gz', workingDir)
         else:
-            # keep them here in order to build new tarball
-            pass
+            # still need to put run_and_lumis in SPOOL_DIR since automatic splitting code will
+            # need access e.g. in PostJob.saveAutomaticSplittingData
+            shutil.copy('run_and_lumis.tar.gz', workingDir)
         # now list of input arguments needed for each jobs, again prepare it in the temp dir
         argdicts = self.prepareJobArguments(dagSpecs)
         argFileName = "input_args.json"
@@ -1270,7 +1271,7 @@ class DagmanCreator(TaskAction):
             filesToAdd = filesToAdd + ['input_dataset_lumis.json', 'input_dataset_duplicate_lumis.json']
         addToGZippedTarfile(filesToAdd, 'TaskManagerRun.tar.gz')
 
-        # files to be transferred to remove WN's via Job.submmit. Add to the "code" tarball files created by TW
+        # files to be transferred to remote WN's via Job.submmit. Add to the "code" tarball files created by TW
         filesToAdd = ['run_and_lumis.tar.gz', 'input_files.tar.gz', 'input_args.json']
         addToGZippedTarfile(filesToAdd, 'CMSRunAnalysis.tar.gz')
 
