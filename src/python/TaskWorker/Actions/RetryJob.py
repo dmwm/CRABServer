@@ -532,9 +532,11 @@ class RetryJob():
         self.logger.info(f"X509_USER_PROXY = {proxy}")
         reportLocation = 'davs://eoscms.cern.ch:443/eos/cms/store/temp/user/BadInputFiles/'
         # there can be so many that we better split by task
-        if corruptedFile:
+        if truncatedFile:
+            reportLocation +=  f'truncated/new/{taskName}/'
+        elif corruptedFile:
             reportLocation += f'corrupted/new/{taskName}/'
-        if suspiciousFile:
+        elif suspiciousFile:
             reportLocation += f'suspicious/new/{taskName}/'
 
         destination = reportLocation + reportFileName
