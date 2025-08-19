@@ -97,8 +97,8 @@ class PassThroughOptionParser(OptionParser):
         while rargs:
             try:
                 OptionParser._process_args(self, largs, rargs, values)
-            except (BadOptionError, AmbiguousOptionError) as e:
-                largs.append(e.opt_str)
+            except (BadOptionError, AmbiguousOptionError) as err:
+                largs.append(err.opt_str)
 
 
 def parseAd():
@@ -531,10 +531,10 @@ def AddPsetHashFjr(report=None, fjr_filename=None):
         if not pset_id:
             raise ValueError("ParameterSetID value is empty")
 
-    except ElementTree.ParseError as e:
-        raise ValueError(f"Error parsing XML file: {str(e)}")
-    except Exception as e:
-        raise ValueError(f"Error processing XML file: {str(e)}")
+    except ElementTree.ParseError as pe:
+        raise ValueError(f"Error parsing XML file: {str(pe)}")
+    except Exception as err:
+        raise ValueError(f"Error processing XML file: {str(err)}")
 
     print(f"Extracted ParameterSetID (PSet Hash): {pset_id}")
 
@@ -858,7 +858,7 @@ if __name__ == "__main__":
             AddChecksums(rep)
             try:
                 AddPsetHashFjr(report=rep, fjr_filename='FrameworkJobReport.xml')
-            except Exception as e:
+            except Exception as e: # pylint: disable=broad-exception-caught
                 print(f"Error: {e}")
                 print("PsetHash could not be extracted from FrameworkJobReport. Trying to extract from EdmProvDump...")
                 try:    
