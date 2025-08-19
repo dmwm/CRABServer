@@ -861,13 +861,14 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"Error: {e}")
                 print("PsetHash could not be extracted from FrameworkJobReport. Trying to extract from EdmProvDump...")
-                AddPsetHashEdmProvDump(report=rep, scramTool=scram)
-            except Exception as ex:  # pylint: disable=broad-except
-                exmsg = "Unable to compute pset hash for job output. Got exception:"
-                exmsg += "\n" + str(ex) + "\n"
-                handleException("FAILED", EC_PsetHash, exmsg)
-                mintime()
-                sys.exit(EC_PsetHash)
+                try:    
+                    AddPsetHashEdmProvDump(report=rep, scramTool=scram)
+                except Exception as ex:  # pylint: disable=broad-except
+                    exmsg = "Unable to compute pset hash for job output. Got exception:"
+                    exmsg += "\n" + str(ex) + "\n"
+                    handleException("FAILED", EC_PsetHash, exmsg)
+                    mintime()
+                    sys.exit(EC_PsetHash)
         if jobExitCode:
             rep['exitAcronym'] = "FAILED"
             rep['exitCode'] = jobExitCode
