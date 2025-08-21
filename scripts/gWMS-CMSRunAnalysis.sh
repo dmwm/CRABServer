@@ -47,19 +47,6 @@ source ./submit_env.sh
 # from ./submit_env.sh
 save_env
 
-# if we have a token, use it
-set -x
-TOKEN_PATH="/srv/.condor_creds/cms_crab.use"
-if [[ -e $TOKEN_PATH ]]; then
-        echo "the file $TOKEN_PATH exists"
-        if [[ -s $TOKEN_PATH ]]; then
-            echo "the file $TOKEN_PATH is non-empty. Use it as BEARER_TOKEN_FILE"
-            export BEARER_TOKEN_FILE=$TOKEN_PATH
-            # uncomment following line when all sites are token ready. E.g. T2_CH_CERN !
-            # unset X509_USER_PROXY
-        fi
-fi
-set +x
 
 echo "======== Startup environment - FINISHING ========"
 
@@ -235,6 +222,39 @@ touch jobReport.json.$CRAB_Id
 echo "======== PROXY INFORMATION START at $(TZ=GMT date) ========"
 voms-proxy-info -all
 echo "======== PROXY INFORMATION FINISH at $(TZ=GMT date) ========"
+
+
+echo "======== TOKEN SETUP START at $(TZ=GMT date) ========"
+# if we have a token, use it, but only if SW and site are ready for it
+TOKEN_PATH="/srv/.condor_creds/cms_crab.use"
+if [[ -e $TOKEN_PATH ]]; then
+  echo "the file $TOKEN_PATH exists"
+  if [[ -s $TOKEN_PATH ]]; then
+      echo "the file $TOKEN_PATH is non-empty. Shall we use it as BEARER_TOKEN_FILE ?"
+      # only for selected CMSSW releases
+      JOB_CMSSW=`grep '^CRAB_JobSW =' $_CONDOR_JOB_AD|tr -d '"'|tr -d ' '|cut -d = -f 2`
+      JOB_CMSSW_Major=`echo $JOB_CMSSW | cut -d '_' -f 2`
+      if [[ $JOB_CMSSW_Major -ge 13 ]]; then
+        echo "$JOB_CMSSW is OK."
+        # only at selected sites
+        TOKEN_READY_SITES=(T1_US_FNAL T2_US_Florida T2_US_MIT T2_US_Purdue T2_US_Nebraska \
+        T2_US_UCSD T2_US_Vanderbilt T2_US_Wisconsin)
+        if [[ " ${TOKEN_READY_SITES[@]} " =~ " ${JOB_CMSSite} " ]]; then SITE_READY=Yes; fi
+        if [[ -n $SITE_READY ]]; then
+          echo " $JOB_CMSSite is token-ready."
+          echo "Define BEARER_TOKEN_FILE and unset X509_USER_PROXY"
+          export BEARER_TOKEN_FILE=$TOKEN_PATH
+          unset X509_USER_PROXY
+        else
+          echo "$JOB_CMSSite is NOT token-ready. Do nothing "
+        fi
+      else
+        echo "$JOB_CMSSW is NOT good for tokens. Do nothing."
+      fi
+  fi
+fi
+
+echo "======== TOKEN SETUP FINISH at $(TZ=GMT date) ========"
 
 echo "======== CMSRunAnalysis.sh at $(TZ=GMT date) STARTING ========"
 time sh ./CMSRunAnalysis.sh "$@" --oneEventMode=$CRAB_oneEventMode
