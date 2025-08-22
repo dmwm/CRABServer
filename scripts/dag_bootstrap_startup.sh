@@ -44,6 +44,9 @@ mkdir -p resubmit_info
 mkdir -p defer_info
 mkdir -p transfer_info
 
+#Test if bearer token is available and "notify it"
+condor_store_cred query-oauth > TOKEN 2>&1
+grep "is valid" TOKEN && mv TOKEN TOKEN_OK || mv TOKEN TOKEN_FAILED
 
 #This is the only file transfered from the TW to the schedd. Can be downloaded for the "preparelocal" client command
 TARBALL_NAME="InputFiles.tar.gz"

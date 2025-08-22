@@ -47,6 +47,7 @@ source ./submit_env.sh
 # from ./submit_env.sh
 save_env
 
+
 echo "======== Startup environment - FINISHING ========"
 
 echo "======== Auxiliary Functions - STARTING ========"
@@ -221,6 +222,45 @@ touch jobReport.json.$CRAB_Id
 echo "======== PROXY INFORMATION START at $(TZ=GMT date) ========"
 voms-proxy-info -all
 echo "======== PROXY INFORMATION FINISH at $(TZ=GMT date) ========"
+
+
+echo "======== TOKEN SETUP START at $(TZ=GMT date) ========"
+# if we have a token, use it, but only if SW and site are ready for it
+TOKEN_PATH="/srv/.condor_creds/cms_crab.use"
+if [[ -e $TOKEN_PATH ]]; then
+  echo "the file $TOKEN_PATH exists"
+  if [[ -s $TOKEN_PATH ]]; then
+      echo "the file $TOKEN_PATH is non-empty. Shall we use it as BEARER_TOKEN_FILE ?"
+      # only for selected CMSSW releases
+      JOB_CMSSW=`grep '^CRAB_JobSW =' $_CONDOR_JOB_AD|tr -d '"'|tr -d ' '|cut -d = -f 2`
+      JOB_CMSSW_Major=`echo $JOB_CMSSW | cut -d '_' -f 2`
+      if [[ $JOB_CMSSW_Major -ge 13 ]]; then
+        echo "$JOB_CMSSW is OK."
+        # only at selected sites
+        TOKEN_READY_SITES=( T2_BE_IIHE \
+        # T2_BE_UCL reads OK with token, but local stageout fails
+        T1_DE_KIT T2_DE_DESY T2_DE_RWTH \
+        # T!_ES_PIC and T2_ES_CIEMAT read OK with token, but local stageout fails
+        T1_IT_CNAF T2_IT_Pisa T2_IT_Legnaro T2_IT_Pisa T2_IT_Rome \
+        T1_UK_RAL T2_UK_London_IC T2_UK_SGrid_RALPP \
+        T1_US_FNAL T2_US_Florida T2_US_MIT T2_US_Purdue T2_US_Nebraska \
+        T2_US_UCSD T2_US_Vanderbilt T2_US_Wisconsin )
+        if [[ " ${TOKEN_READY_SITES[@]} " =~ " ${JOB_CMSSite} " ]]; then SITE_READY=Yes; fi
+        if [[ -n $SITE_READY ]]; then
+          echo " $JOB_CMSSite is token-ready."
+          echo "Define BEARER_TOKEN_FILE and unset X509_USER_PROXY"
+          export BEARER_TOKEN_FILE=$TOKEN_PATH
+          unset X509_USER_PROXY
+        else
+          echo "$JOB_CMSSite is NOT token-ready. Do nothing "
+        fi
+      else
+        echo "$JOB_CMSSW is NOT good for tokens. Do nothing."
+      fi
+  fi
+fi
+
+echo "======== TOKEN SETUP FINISH at $(TZ=GMT date) ========"
 
 echo "======== CMSRunAnalysis.sh at $(TZ=GMT date) STARTING ========"
 time sh ./CMSRunAnalysis.sh "$@" --oneEventMode=$CRAB_oneEventMode
