@@ -237,8 +237,14 @@ if [[ -e $TOKEN_PATH ]]; then
       if [[ $JOB_CMSSW_Major -ge 13 ]]; then
         echo "$JOB_CMSSW is OK."
         # only at selected sites
-        TOKEN_READY_SITES=(T1_US_FNAL T2_US_Florida T2_US_MIT T2_US_Purdue T2_US_Nebraska \
-        T2_US_UCSD T2_US_Vanderbilt T2_US_Wisconsin)
+        TOKEN_READY_SITES=( T2_BE_IIHE \
+        # T2_BE_UCL reads OK with token, but local stageout fails
+        T1_DE_KIT T2_DE_DESY T2_DE_RWTH \
+        # T!_ES_PIC and T2_ES_CIEMAT read OK with token, but local stageout fails
+        T1_IT_CNAF T2_IT_Pisa T2_IT_Legnaro T2_IT_Pisa T2_IT_Rome \
+        T1_UK_RAL T2_UK_London_IC T2_UK_SGrid_RALPP \
+        T1_US_FNAL T2_US_Florida T2_US_MIT T2_US_Purdue T2_US_Nebraska \
+        T2_US_UCSD T2_US_Vanderbilt T2_US_Wisconsin )
         if [[ " ${TOKEN_READY_SITES[@]} " =~ " ${JOB_CMSSite} " ]]; then SITE_READY=Yes; fi
         if [[ -n $SITE_READY ]]; then
           echo " $JOB_CMSSite is token-ready."
