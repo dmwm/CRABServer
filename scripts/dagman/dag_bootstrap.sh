@@ -101,7 +101,7 @@ then
         export TASKWORKER_ENV="1"
 fi
 
-export PYTHONPATH=$PWD:$PWD/CRAB3.zip:$PYTHONPATH
+export PYTHONPATH=$PWD:$PWD/CRAB3.zip:$PWD/WMCore.zip:$PYTHONPATH
 
 #if [[ "x$X509_USER_PROXY" = "x" ]]; then
 #    export X509_USER_PROXY=$(pwd)/user.proxy

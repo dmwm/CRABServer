@@ -223,7 +223,6 @@ echo "======== PROXY INFORMATION START at $(TZ=GMT date) ========"
 voms-proxy-info -all
 echo "======== PROXY INFORMATION FINISH at $(TZ=GMT date) ========"
 
-
 echo "======== TOKEN SETUP START at $(TZ=GMT date) ========"
 # if we have a token, use it, but only if SW and site are ready for it
 TOKEN_PATH="/srv/.condor_creds/cms_crab.use"
@@ -261,6 +260,10 @@ if [[ -e $TOKEN_PATH ]]; then
 fi
 
 echo "======== TOKEN SETUP FINISH at $(TZ=GMT date) ========"
+echo "======== Expand JobWrapper Tarball at $(TZ=GMT date) ========"
+tar xf CMSRunAnalysis.tar.gz
+ls
+echo "======== Expand JobWrapper Tarball completed ========"
 
 echo "======== CMSRunAnalysis.sh at $(TZ=GMT date) STARTING ========"
 time sh ./CMSRunAnalysis.sh "$@" --oneEventMode=$CRAB_oneEventMode
