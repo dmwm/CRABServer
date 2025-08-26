@@ -110,8 +110,7 @@ from WMCore.DataStructs.LumiList import LumiList
 
 from TaskWorker import __version__
 from TaskWorker.Actions.RetryJob import RetryJob
-from TaskWorker.Actions.
- import JOB_RETURN_CODES
+from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 from ServerUtilities import TRANSFERDB_STATES, PUBLICATIONDB_STATES
 from ServerUtilities import isFailurePermanent, mostCommon, encodeRequest, oracleOutputMapping
 from ServerUtilities import getLock, getHashLfn
