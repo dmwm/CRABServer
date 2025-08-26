@@ -22,7 +22,9 @@ from ast import literal_eval
 from urllib.parse import urlencode
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import getLock, checkS3Object, getColumn, pythonListToClassAdExprTree
+from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree
+
+from CRABUtils.Utils import addToGZippedTarfile
 
 import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
@@ -206,18 +208,17 @@ class DagmanCreator(TaskAction):
         TaskAction.__init__(self, config, crabserver, procnum)
         self.rucioClient = rucioClient
         self.runningInTW = crabserver is not None
+        self.task = None  # it will be filled later in execute() or createSubdag() depending who is using it
 
-    def populateGlideinMatching(self, task):
+    def populateGlideinMatching(self):
         """ actually simply set the required arch and microarch
-            arguments:
-                task : dictionary : the standard task info from taskdb
             returns:
                 matchinfo : dictionary : keys:
                             required_arch (string)
                             required_minimum_microarch (int)
         """
         matchInfo = {}
-        scram_arch = task['tm_job_arch']
+        scram_arch = self.task['tm_job_arch']
         # required_arch, set default
         matchInfo['required_arch'] = "X86_64"
         # The following regex matches a scram arch into four groups
@@ -234,7 +235,7 @@ class DagmanCreator(TaskAction):
         # required minimum micro_arch may need to be handled differently in the future (arm, risc, ...)
         # and may need different classAd(s) in the JDL, so try to be general here
         # ref:  https://github.com/dmwm/WMCore/issues/12168#issuecomment-2539233761 and comments below
-        min_micro_arch = task['tm_job_min_microarch']
+        min_micro_arch = self.task['tm_job_min_microarch']
         if not min_micro_arch:
             matchInfo['required_minimum_microarch'] = 2  # the current default for CMSSW
             return matchInfo
@@ -293,7 +294,7 @@ class DagmanCreator(TaskAction):
 
         return kwargs['task']['tm_ignore_global_blacklist'] == 'T'
 
-    def makeJobSubmit(self, task):
+    def makeJobSubmit(self):
         """
         Prepare an HTCondor Submit object which will serve as template for
          all job submissions. It will be persisted in Job.submiy JDL file and
@@ -301,7 +302,7 @@ class DagmanCreator(TaskAction):
         Differences between the jobs are taken care of in the makeDagSpecs and
          propagated to the scheduler via the DAG description files
         """
-
+        task = self.task
         jobSubmit = htcondor.Submit()
 
         if os.path.exists("Job.submit"):
@@ -391,7 +392,7 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_TransferOutputs'] = transferOutputs
 
         # These attributes help gWMS decide what platforms this job can run on; see https://twiki.cern.ch/twiki/bin/view/CMSPublic/CompOpsMatchArchitecture
-        matchInfo = self.populateGlideinMatching(task)
+        matchInfo = self.populateGlideinMatching()
         jobSubmit['My.REQUIRED_ARCH'] = classad.quote(matchInfo['required_arch'])
         jobSubmit['My.REQUIRED_MINIMUM_MICROARCH'] = str(matchInfo['required_minimum_microarch'])
         jobSubmit['My.DESIRED_CMSDataset'] = classad.quote(task['tm_input_dataset'])
@@ -444,24 +445,13 @@ class DagmanCreator(TaskAction):
         jobSubmit['Arguments'] = classad.quote("--jobId=$(count)")
         jobSubmit['transfer_output_files'] = "jobReport.json.$(count)"
 
-        additional_input_file = ""
         additional_environment_options = ""
         if os.path.exists("CMSRunAnalysis.tar.gz"):
             additional_environment_options += ' CRAB_RUNTIME_TARBALL=local'
-            additional_input_file += ", CMSRunAnalysis.tar.gz"
         else:
             raise TaskWorkerException(f"Cannot find CMSRunAnalysis.tar.gz inside the cwd: {os.getcwd()}")
-        if os.path.exists("TaskManagerRun.tar.gz"):
-            additional_environment_options += ' CRAB_TASKMANAGER_TARBALL=local'
-        else:
-            raise TaskWorkerException(f"Cannot find TaskManagerRun.tar.gz inside the cwd: {os.getcwd()}")
-        additional_input_file += ", sandbox.tar.gz"  # it will be present on SPOOL_DIR after dab_bootstrap
-        additional_input_file += ", input_args.json"
-        additional_input_file += ", run_and_lumis.tar.gz"
-        additional_input_file += ", input_files.tar.gz"
-        additional_input_file += ", submit_env.sh"
-        additional_input_file += ", cmscp.sh"
-        jobSubmit['transfer_input_files'] = f"CMSRunAnalysis.sh, cmscp.py{additional_input_file}"
+
+        jobSubmit['transfer_input_files'] = "CMSRunAnalysis.tar.gz, sandbox.tar.gz"
         # make sure coredump (if any) is not added to output files ref: https://lists.cs.wisc.edu/archive/htcondor-users/2022-September/msg00052.shtml
         jobSubmit['coresize'] = "0"
 
@@ -679,13 +669,12 @@ class DagmanCreator(TaskAction):
 
         return dagSpecs, i
 
-    def prepareJobArguments(self, dagSpecs, task):
+    def prepareJobArguments(self, dagSpecs):
         """ Prepare an object with all the input parameters of each jobs. It is a list
             with a dictionary for each job. The dictionary key/value pairs are the variables needed in CMSRunAnalysis.py
             This will be save in "input_args.json" by the caller, adding to existing list in ther if any
             Inputs:
                 dagSpecs : list of dictionaries with information for each DAG job
-                task: dictionary, the "standard" task dictionary with info from the DataBase TASK table
             Returns:
                 argdicts : list of dictionaries, one per job, with the args needeed by CMSRunAnalysis.py
         """
@@ -695,7 +684,7 @@ class DagmanCreator(TaskAction):
             argDict = {}
             argDict['inputFileList'] = f"job_input_file_list_{dagspec['count']}.txt"  #'job_input_file_list_1.txt'
             argDict['runAndLumis'] = f"job_lumis_{dagspec['count']}.json"
-            # TODO: should find a way to use only CRAB_Id and get rid or jobNumber
+            # SB : should find a way to use only CRAB_Id and get rid or jobNumber
             argDict['jobNumber'] = dagspec['count'] # '1' or '0-3' etc
             argDict['CRAB_Id'] = dagspec['count'] # '1' or '0-3' etc
             argDict['lheInputFiles'] = dagspec['lheInputFiles']  # False
@@ -703,14 +692,14 @@ class DagmanCreator(TaskAction):
             argDict['lastEvent'] = dagspec['lastEvent']  # 'None'
             argDict['firstLumi'] = dagspec['firstLumi']  # 'None'
             argDict['firstRun'] = dagspec['firstRun']  # 'None'
-            argDict['userSandbox'] = task['tm_user_sandbox']  #SB we could simply hardocode 'sandbox.tar.gz'
-            argDict['cmsswVersion'] = task['tm_job_sw']  # 'CMSSW_9_2_5'
-            argDict['scramArch'] = task['tm_job_arch']  # 'slc6_amd64_gcc530'
+            argDict['userSandbox'] = self.task['tm_user_sandbox']  #SB we could simply hardocode 'sandbox.tar.gz'
+            argDict['cmsswVersion'] = self.task['tm_job_sw']  # 'CMSSW_9_2_5'
+            argDict['scramArch'] = self.task['tm_job_arch']  # 'slc6_amd64_gcc530'
             argDict['seeding'] = 'AutomaticSeeding'
-            argDict['scriptExe'] = task['tm_scriptexe']  #
-            argDict['eventsPerLumi'] = task['tm_events_per_lumi']  #
+            argDict['scriptExe'] = self.task['tm_scriptexe']  #
+            argDict['eventsPerLumi'] = self.task['tm_events_per_lumi']  #
             argDict['maxRuntime'] = dagspec['maxRuntime']  # -1
-            argDict['scriptArgs'] = task['tm_scriptargs']
+            argDict['scriptArgs'] = self.task['tm_scriptargs']
 
             # The following two are for fixing up job.submit files
             # SB argDict['CRAB_localOutputFiles'] = dagspec['localOutputFiles']
@@ -727,6 +716,82 @@ class DagmanCreator(TaskAction):
         with tarfile.open('InputFiles.tar.gz', mode='w:gz') as tf:
             for ifname in filesForSched + subdags:
                 tf.add(ifname)
+
+    def createOrUpdateFilesForJobWrapper(self, dagSpecs):
+        """
+        deal with files to be possibly changed inside CMSRunAnalysis.tar.gz
+        in case createSubdag is called on the AP by PreDag (automatic splitting).
+        If that tarball exists already, expand it and update files in there
+        (which can be themselves other tarballs), tar it again and copy to
+        cwd. Otherwise simply create new files and copy them to cwd. When running
+        in TW the CMSRunAnalysis.tar.gz will be created later on.
+        """
+        workingDir = os.getcwd()  # remember current cwd: tmp dir in TW, SPOOL_DIR in the AP
+        tarballDir = tempfile.mkdtemp()
+        if not self.runningInTW:
+            with tarfile.open('CMSRunAnalysis.tar.gz') as tf:
+                tf.extractall(tarballDir)
+        os.chdir(tarballDir)
+        # use new tmp directory to create run_and_lumis.tar.gz and input_files.tar.gz
+        runAndLumisDir = tempfile.mkdtemp()
+        inputFilesDir = tempfile.mkdtemp()
+        if not self.runningInTW:
+            # pre-populate those directories with files from previous DagmanCreator steps
+            with tarfile.open('run_and_lumis.tar.gz') as tf:
+                tf.extractall(runAndLumisDir)
+            with tarfile.open('input_files.tar.gz') as tf:
+                tf.extractall(inputFilesDir)
+        # now add run_lumi and input_files from this DAG
+        # add current runs_and_lumis and input_files lists in the temp directories
+        for dagSpec in dagSpecs:
+            # run and lumis, one file for each job in standard lumi format
+            # beware that this file is called .json but it is a string, not a json format !!
+            # in order to change here we'd need to change at least where dagSpecs is created
+            # and TweakPSet.py which reads this file
+            job_lumis_file = os.path.join(runAndLumisDir, f"job_lumis_{dagSpec['count']}.json")
+            with open(job_lumis_file, "w", encoding='utf-8') as fd:
+                fd.write(str(dagSpec['runAndLumiMask']))
+            # for input files, a .txt file for each jobs with a list, again as strings
+            # could be turned into json with some effort
+            job_input_file_list = os.path.join(inputFilesDir, f"job_input_file_list_{dagSpec['count']}.txt")
+            with open(job_input_file_list, "w", encoding='utf-8') as fd:
+                fd.write(str(dagSpec['inputFiles']))
+        # make tarballs, if those file exists in tarballDir, they will be overwritten
+        os.chdir(tarballDir)
+        with tarfile.open('run_and_lumis.tar.gz', "w:gz") as tf:
+            # use arcname='' to have only filename in the archive. w/o dir
+            tf.add(runAndLumisDir, arcname='')
+        with tarfile.open('input_files.tar.gz', 'w:gz') as tf:
+            tf.add(inputFilesDir, arcname='')
+        shutil.rmtree(runAndLumisDir)
+        shutil.rmtree(inputFilesDir)
+        if self.runningInTW:
+            # simply put tarballs in correct directory, CMSRunAnalysis.tar.gz will be created later on
+            shutil.copy('run_and_lumis.tar.gz', workingDir)
+            shutil.copy('input_files.tar.gz', workingDir)
+        else:
+            # still need to put run_and_lumis in SPOOL_DIR since automatic splitting code will
+            # need access e.g. in PostJob.saveAutomaticSplittingData
+            shutil.copy('run_and_lumis.tar.gz', workingDir)
+        # now list of input arguments needed for each jobs, again prepare it in the temp dir
+        argdicts = self.prepareJobArguments(dagSpecs)
+        argFileName = "input_args.json"
+        if not self.runningInTW:  # add to argument list from previous stage
+            with open(argFileName, 'r', encoding='utf-8') as fd:
+                oldArgs = json.load(fd)
+            argdicts = oldArgs + argdicts
+        # create (updated) file
+        with open(argFileName, 'w', encoding='utf-8') as fd:
+            json.dump(argdicts, fd)
+        if self.runningInTW:
+            # simply move file to working dir
+            shutil.copy(argFileName, workingDir)
+        else:  # i.e. not running in TW but in the AP
+            # last effort, create new job wrapper tarball and replace old one
+            with tarfile.open(os.path.join(workingDir, 'CMSRunAnalysis.tar.gz'), 'w:gz') as tf:
+                tf.add(tarballDir, arcname='')
+        os.chdir(workingDir)
+        shutil.rmtree(tarballDir)
 
     def createSubdag(self, splitterResult, **kwargs):
         """ beware the "Sub" in the name ! This is used also for Main DAG
@@ -748,19 +813,36 @@ class DagmanCreator(TaskAction):
                                 SCRIPT DEFER 4 300 PRE Job0SubJobs dag_bootstrap.sh PREDAG processing 5 0
 
         Side effects - writes these files to cwd:
+         FILES TO BE USED BY SCRIPTS IN THE HTC AccessPoint (aka scheduler) TO BE PLACED IN TaskManagerRun.tar.gz
           RunJobs.dag : the initial DAGMAN which will be submitted by DagmanSubmitter
           RunJobs{0,1,2,3}.subdag : the DAGMAN description for processing and tail subdags
-          input_args.json : the arguments needed by CMSRunAnalysis.py for each job
           datadiscovery.pkl : the object returned in output from DataDiscovery action, PreDag will need it
                              in order to call Splitter and create the correct subdags
           taskinformation.pkl : the content of the task dictionary
           taskworkerconfig.pkl : the content of the TaskWorkerConfig object
           site.ad.json : sites assigned to jobs in each job group (info from Splitter)
+        FILES TO BE USED BY THE JOB WRAPPER IN THE WorkerNode  TO BE PLACED IN CMSRunAnalysis.tar.gz
+          input_args.json : the arguments needed by CMSRunAnalysis.py for each job
+          run_and_lumis.tar.gz : contains one json file for each jobs with run/lumis to process
+          input_files.tar.gz : contains one line for each jon with the list of input files to process
+
+        Those side effects require special care when this is called by PreDag during automatic splitting,
+        since following files already exists in the CMSRunAnalysis.tar.gz tarball which was sent byt TW
+          input_args.json, run_and_lumis.tar.gz, input_files.tar.gz
+         Therefore when running in the scheduler (HTC AccessPoing) we will move to a temp directory,
+         expand CMSRunAnalysis.tar.gz in there, do all the work, and create a new tarball to be places
+         in SPOOL_DIR to be used in next submissions by the created DAGs
+         Files in TaskManagerRun.tar.gz do not require special handling since that tarball is expanded
+         in the SPOOL_DIR when the task is initially bootstrapped in dag_bootstrap_startup.sh
         """
+        # must handle the fact that this is called with different arguments in
+        # DagmanCreatore.executeInternal vs. PreDag. In particular PreDag passes
+        # the task dictionay as a named argument, while in DagmanCreator it comes via self
+        if not self.task:
+            self.task = kwargs['task']
 
-        # SB should have a createDagSpects() methos to move away a lot of following code
+        # SB should have a createDagSpecs() method to move away a lot of following code
 
-        task = kwargs['task']
         startjobid = kwargs.get('startjobid', 0)
         # parentDag below is only used during automatic splitting
         # possible values in each stage are:  probe: 0, tail: 1/2/3, processing: None
@@ -772,19 +854,19 @@ class DagmanCreator(TaskAction):
         subdags = []  # in automatic splitting a DAG may contain a list of one or more subdags to start
 
         # disable direct stageout for rucio tasks
-        if kwargs['task']['tm_output_lfn'].startswith('/store/user/rucio') or \
-           kwargs['task']['tm_output_lfn'].startswith('/store/group/rucio'):
-            kwargs['task']['stageoutpolicy'] = "local"
+        if self.task['tm_output_lfn'].startswith('/store/user/rucio') or \
+           self.task['tm_output_lfn'].startswith('/store/group/rucio'):
+            self.task['stageoutpolicy'] = "local"
         elif hasattr(self.config.TaskWorker, 'stageoutPolicy'):
-            kwargs['task']['stageoutpolicy'] = ",".join(self.config.TaskWorker.stageoutPolicy)
+            self.task['stageoutpolicy'] = ",".join(self.config.TaskWorker.stageoutPolicy)
         else:
-            kwargs['task']['stageoutpolicy'] = "local,remote"
+            self.task['stageoutpolicy'] = "local,remote"
 
         ## In the future this parameter may be set by the user in the CRAB configuration
         ## file and we would take it from the Task DB.
-        kwargs['task']['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
+        self.task['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
 
-        runtime = kwargs['task']['tm_split_args'].get('minutes_per_job', -1)
+        runtime = self.task['tm_split_args'].get('minutes_per_job', -1)
 
         proberuntime = getattr(self.config.TaskWorker, 'automaticProbeRuntimeMins', 15)
         tailruntime = int(max(
@@ -794,26 +876,24 @@ class DagmanCreator(TaskAction):
 
         overhead = getattr(self.config.TaskWorker, 'automaticProcessingOverheadMins', 60)
 
-        kwargs['task']['max_runtime'] = runtime
+        self.task['max_runtime'] = runtime
         # include a factor of 4 as a buffer
-        kwargs['task']['maxproberuntime'] = proberuntime * 4
-        kwargs['task']['maxtailruntime'] = tailruntime * 5
-        if kwargs['task']['tm_split_algo'] == 'Automatic':
+        self.task['maxproberuntime'] = proberuntime * 4
+        self.task['maxtailruntime'] = tailruntime * 5
+        if self.task['tm_split_algo'] == 'Automatic':
             if stage == 'conventional':
-                kwargs['task']['max_runtime'] = proberuntime
+                self.task['max_runtime'] = proberuntime
                 outfiles = []
                 stage = 'probe'
                 parentDag = 0
             elif stage == 'processing':
                 # include a buffer of one hour for overhead beyond the time
                 # given to CMSSW
-                kwargs['task']['tm_maxjobruntime'] = min(runtime + overhead, kwargs['task']['tm_maxjobruntime'])
+                self.task['tm_maxjobruntime'] = min(runtime + overhead, self.task['tm_maxjobruntime'])
             elif stage == 'tail':
-                kwargs['task']['max_runtime'] = -1
+                self.task['max_runtime'] = -1
 
-        outfiles = kwargs['task']['tm_outfiles'] + kwargs['task']['tm_tfile_outfiles'] + kwargs['task']['tm_edm_outfiles']
-
-        os.chmod("CMSRunAnalysis.sh", 0o755)
+        outfiles = self.task['tm_outfiles'] + self.task['tm_tfile_outfiles'] + self.task['tm_edm_outfiles']
 
         # This config setting acts as a global black list
         global_blacklist = set(self.loadJSONFromFileInScratchDir('blacklistedSites.txt'))
@@ -829,7 +909,7 @@ class DagmanCreator(TaskAction):
         # self.config.TaskWorker.ActivitiesToRunEverywhere = ['hctest', 'hcdev']
         # The other case where the blacklist is ignored is if the user sset this explicitly in his configuration
         if self.isGlobalBlacklistIgnored(kwargs) or (hasattr(self.config.TaskWorker, 'ActivitiesToRunEverywhere') and \
-                   kwargs['task']['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere):
+                   self.task['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere):
             global_blacklist = set()
             self.logger.debug("Ignoring the CRAB site blacklist.")
 
@@ -845,10 +925,10 @@ class DagmanCreator(TaskAction):
         blocksWithBannedLocations = set()
         allblocks = set()
 
-        siteWhitelist = set(kwargs['task']['tm_site_whitelist'])
-        siteBlacklist = set(kwargs['task']['tm_site_blacklist'])
+        siteWhitelist = set(self.task['tm_site_whitelist'])
+        siteBlacklist = set(self.task['tm_site_blacklist'])
 
-        ignoreLocality = kwargs['task']['tm_ignore_locality'] == 'T'
+        ignoreLocality = self.task['tm_ignore_locality'] == 'T'
         self.logger.debug("Ignore locality: %s", ignoreLocality)
 
         for jobgroup in splitterResult[0]:
@@ -895,7 +975,7 @@ class DagmanCreator(TaskAction):
             self.logger.debug("Available sites: %s", list(availablesites))
 
             # Special activities' white list overrides any other location
-            if kwargs['task']['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere and siteWhitelist:
+            if self.task['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere and siteWhitelist:
                 availablesites = siteWhitelist
 
             ## See https://github.com/dmwm/CRABServer/issues/5241
@@ -905,13 +985,13 @@ class DagmanCreator(TaskAction):
                 continue
 
             # Intersect with sites that only have accelerator (currently we only have nvidia GPU)
-            if kwargs['task']['tm_user_config']['requireaccelerator']:
+            if self.task['tm_user_config']['requireaccelerator']:
                 availablesites &= acceleratorsites
                 if availablesites:
                     msg = "Site.requireAccelerator is True. CRAB will restrict sites to run the jobs to %s."
                     msg = msg % (list(availablesites), )
                     self.logger.warning(msg)
-                    self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+                    self.uploadWarning(msg, self.task['user_proxy'], self.task['tm_taskname'])
                 else:
                     blocksWithBannedLocations = blocksWithBannedLocations.union(jgblocks)
                     continue
@@ -926,7 +1006,7 @@ class DagmanCreator(TaskAction):
                     trimmedList = sorted(list(jgblocks))[:3] + ['...']
                     msg = msg % (len(list(jgblocks)), trimmedList, list(availablesites))
                     self.logger.warning(msg)
-                    self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+                    self.uploadWarning(msg, self.task['user_proxy'], self.task['tm_taskname'])
                     blocksWithBannedLocations = blocksWithBannedLocations.union(jgblocks)
                     continue
             available -= (siteBlacklist - siteWhitelist)
@@ -935,7 +1015,7 @@ class DagmanCreator(TaskAction):
                 trimmedList = sorted(list(jgblocks))[:3] + ['...']
                 msg = msg % (len(list(jgblocks)), trimmedList, list(availablesites))
                 self.logger.warning(msg)
-                self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+                self.uploadWarning(msg, self.task['user_proxy'], self.task['tm_taskname'])
                 blocksWithBannedLocations = blocksWithBannedLocations.union(jgblocks)
                 continue
 
@@ -949,7 +1029,7 @@ class DagmanCreator(TaskAction):
                 self.logger.debug(msg)
 
             jobgroupDagSpecs, startjobid = self.makeDagSpecs(
-                kwargs['task'], siteinfo, jobgroup, list(jgblocks)[0],
+                self.task, siteinfo, jobgroup, list(jgblocks)[0],
                 availablesites, datasites, outfiles, startjobid,
                 parentDag=parentDag, stage=stage)
             dagSpecs += jobgroupDagSpecs
@@ -968,10 +1048,10 @@ class DagmanCreator(TaskAction):
             return tmp
 
         if not dagSpecs:
-            msg = f"No jobs created for task {kwargs['task']['tm_taskname']}."
+            msg = f"No jobs created for task {self.task['tm_taskname']}."
             if blocksWithNoLocations or blocksWithBannedLocations:
                 msg = "The CRAB server backend refuses to send jobs to the Grid scheduler. "
-                msg += f"No locations found for dataset {kwargs['task']['tm_input_dataset']}. "
+                msg += f"No locations found for dataset {self.task['tm_input_dataset']}. "
                 msg += "(or at least for what passed the lumi-mask and/or run-range selection).\n"
                 msg += "Use `crab checkdataset` command to find block locations\n"
                 msg += "and compare with your black/white list\n"
@@ -980,7 +1060,7 @@ class DagmanCreator(TaskAction):
                 msg += " only at blacklisted not-whitelisted, and/or non-accelerator sites."
                 msg += getBlacklistMsg()
             raise SubmissionRefusedException(msg)
-        msg = f"Some blocks from dataset {kwargs['task']['tm_input_dataset']} were skipped"
+        msg = f"Some blocks from dataset {self.task['tm_input_dataset']} were skipped"
         if blocksWithNoLocations:
             msgBlocklist = sorted(list(blocksWithNoLocations)[:5]) + ['...']
             msg += f" because they have no locations.\n List is (first 5 elements only): {msgBlocklist}\n"
@@ -992,11 +1072,11 @@ class DagmanCreator(TaskAction):
         if blocksWithNoLocations or blocksWithBannedLocations:
             msg += f" Dataset processing will be incomplete because {len(blocksWithNoLocations) + len(blocksWithBannedLocations)} (out of {len(allblocks)}) blocks"
             msg += " are only present at blacklisted and/or not whitelisted site(s)"
-            self.uploadWarning(msg, kwargs['task']['user_proxy'], kwargs['task']['tm_taskname'])
+            self.uploadWarning(msg, self.task['user_proxy'], self.task['tm_taskname'])
             self.logger.warning(msg)
 
         ## Write down the DAG as needed by DAGMan.
-        restHostForSchedd = kwargs['task']['resthost']  # SB better to use self.crabserver.server['host']
+        restHostForSchedd = self.task['resthost']  # SB better to use self.crabserver.server['host']
         dag = DAG_HEADER.format(nodestate=f".{parentDag}" if parentDag else ('.0' if stage == 'processing' else ''),
                                 resthost=restHostForSchedd)
         if stage == 'probe':
@@ -1023,46 +1103,7 @@ class DagmanCreator(TaskAction):
                     fd.write("")
                 subdags.append(subdag)
 
-        ## Create a tarball with all the job lumi files.
-        # SB: I do not understand the "First iteration" comments here
-        #     but am wary of changing, keep it as is for now
-        with getLock('splitting_data'):
-            self.logger.debug("Acquired lock on run and lumi tarball")
-
-            try:
-                tempDir = tempfile.mkdtemp()
-                tempDir2 = tempfile.mkdtemp()
-
-                try:
-                    tfd = tarfile.open('run_and_lumis.tar.gz', 'r:gz')
-                    tfd.extractall(tempDir)
-                    tfd.close()
-                except (tarfile.ReadError, IOError):
-                    self.logger.debug("First iteration: creating run and lumi from scratch")
-                try:
-                    tfd2 = tarfile.open('input_files.tar.gz', 'r:gz')
-                    tfd2.extractall(tempDir2)
-                    tfd2.close()
-                except (tarfile.ReadError, IOError):
-                    self.logger.debug("First iteration: creating inputfiles from scratch")
-                tfd = tarfile.open('run_and_lumis.tar.gz', 'w:gz')
-                tfd2 = tarfile.open('input_files.tar.gz', 'w:gz')
-                for dagSpec in dagSpecs:
-                    job_lumis_file = os.path.join(tempDir, 'job_lumis_'+ str(dagSpec['count']) +'.json')
-                    with open(job_lumis_file, "w", encoding='utf-8') as fd:
-                        fd.write(str(dagSpec['runAndLumiMask']))
-                    ## Also creating a tarball with the dataset input files.
-                    ## Each .txt file in the tarball contains a list of dataset files to be used for the job.
-                    job_input_file_list = os.path.join(tempDir2, 'job_input_file_list_'+ str(dagSpec['count']) +'.txt')
-                    with open(job_input_file_list, "w", encoding='utf-8') as fd2:
-                        fd2.write(str(dagSpec['inputFiles']))
-            finally:
-                tfd.add(tempDir, arcname='')
-                tfd.close()
-                shutil.rmtree(tempDir)
-                tfd2.add(tempDir2, arcname='')
-                tfd2.close()
-                shutil.rmtree(tempDir2)
+        self.createOrUpdateFilesForJobWrapper(dagSpecs)
 
         # pick the name for the DAG file that we will create
         if stage in ('probe', 'conventional'):
@@ -1072,14 +1113,13 @@ class DagmanCreator(TaskAction):
             with open("datadiscovery.pkl", "wb") as fd:
                 pickle.dump(splitterResult[1], fd)  # Cache data discovery
             with open("taskinformation.pkl", "wb") as fd:
-                pickle.dump(kwargs['task'], fd)  # Cache task information
+                pickle.dump(self.task, fd)  # Cache task information
             with open("taskworkerconfig.pkl", "wb") as fd:
                 pickle.dump(self.config, fd)  # Cache TaskWorker configuration
         elif stage == 'processing':
             dagFileName = "RunJobs0.subdag"
         else:
             dagFileName = f"RunJobs{parentDag}.subdag"
-        argFileName = "input_args.json"
 
         ## Cache site information
         with open("site.ad.json", "w", encoding='utf-8') as fd:
@@ -1089,36 +1129,24 @@ class DagmanCreator(TaskAction):
         with open(dagFileName, "w", encoding='utf-8') as fd:
             fd.write(dag)
 
-        kwargs['task']['jobcount'] = len(dagSpecs)
+        self.task['jobcount'] = len(dagSpecs)
 
-        jobSubmit = self.makeJobSubmit(kwargs['task'])
-
-        # list of input arguments needed for each jobs
-        argdicts = self.prepareJobArguments(dagSpecs, kwargs['task'])
-        # save the input arguments to each job's CMSRunAnalysis.py in input_args.json file
-        if stage in ['processing', 'tail']:  # add to argument list from previous stage
-            with open(argFileName, 'r', encoding='utf-8') as fd:
-                oldArgs = json.load(fd)
-            argdicts = oldArgs + argdicts
-        # no worry of overwriting, even in automatic splitting multiple DagmanCreator
-        # is executed inside PreDag which is wrapped with a lock
-        with open(argFileName, 'w', encoding='utf-8') as fd:
-            json.dump(argdicts, fd)
+        jobSubmit = self.makeJobSubmit()
 
         # add maxidle, maxpost and faillimit to the object passed to DagmanSubmitter
         # first two be used in the DAG submission and the latter the PostJob
         maxidle = getattr(self.config.TaskWorker, 'maxIdle', MAX_IDLE_JOBS)
         if maxidle == -1:
-            maxidle = kwargs['task']['jobcount']
+            maxidle = self.task['jobcount']
         elif maxidle == 0:
-            maxidle = int(max(MAX_IDLE_JOBS, kwargs['task']['jobcount']*.1))
+            maxidle = int(max(MAX_IDLE_JOBS, self.task['jobcount']*.1))
         jobSubmit['My.CRAB_MaxIdle'] = str(maxidle)
 
         maxpost = getattr(self.config.TaskWorker, 'maxPost', MAX_POST_JOBS)
         if maxpost == -1:
-            maxpost = kwargs['task']['jobcount']
+            maxpost = self.task['jobcount']
         elif maxpost == 0:
-            maxpost = int(max(MAX_POST_JOBS, kwargs['task']['jobcount']*.1))
+            maxpost = int(max(MAX_POST_JOBS, self.task['jobcount']*.1))
         jobSubmit['My.CRAB_MaxPost'] = str(maxpost)
 
         if not 'My.CRAB_FailedNodeLimit' in jobSubmit:
@@ -1128,7 +1156,7 @@ class DagmanCreator(TaskAction):
 
         # last thing, update number of jobs in this task in Task table
         # using the numer of jobs in this (sub)DAGta
-        self.reportNumJobToDB(task, len(dagSpecs))
+        self.reportNumJobToDB(len(dagSpecs))
 
         return jobSubmit, splitterResult, subdags
 
@@ -1147,10 +1175,10 @@ class DagmanCreator(TaskAction):
             return []
         return highPrioUsers
 
-    def reportNumJobToDB(self, task, nJobs):
-        # update numner of jobs in this task in task table.
+    def reportNumJobToDB(self, nJobs):
+        """ update numner of jobs in this task in task table. """
         numJobsHere = nJobs
-        taskname = task['tm_taskname']
+        taskname = self.task['tm_taskname']
         if self.runningInTW:
             # things are easy
             self.logger.info('Reporting numJobs from TW: %s', numJobsHere)
@@ -1188,40 +1216,21 @@ class DagmanCreator(TaskAction):
     def executeInternal(self, *args, **kw):
         """ all real work is done here """
 
-        # put in current directory all files that we need to move around
-        transform_location = getLocation('CMSRunAnalysis.sh')
-        cmscp_location = getLocation('cmscp.py')
-        cmscpsh_location = getLocation('cmscp.sh')
-        gwms_location = getLocation('gWMS-CMSRunAnalysis.sh')
-        env_location = getLocation('submit_env.sh')
-        dag_bootstrap_location = getLocation('dag_bootstrap_startup.sh')
-        bootstrap_location = getLocation("dag_bootstrap.sh")
-        adjust_location = getLocation("AdjustSites.py")
-
-        shutil.copy(transform_location, '.')
-        shutil.copy(cmscp_location, '.')
-        shutil.copy(cmscpsh_location, '.')
-        shutil.copy(gwms_location, '.')
-        shutil.copy(env_location, '.')
-        shutil.copy(dag_bootstrap_location, '.')
-        shutil.copy(bootstrap_location, '.')
-        shutil.copy(adjust_location, '.')
-
         # make sure we have InputSandBox
         sandboxTarBall = 'sandbox.tar.gz'  # SB only used once 10 lines below ! no need for a variable !
 
         # Bootstrap the ISB if we are running in the TW
-        # SB: I do not like this overwriting of kw['task']['tm_user_sandbox'] nor
+        # SB: I do not like this overwriting of self.task['tm_user_sandbox'] nor
         # understand yet why it is being done.
         if self.runningInTW:
-            username = kw['task']['tm_username']
-            taskname = kw['task']['tm_taskname']
-            sandboxName = kw['task']['tm_user_sandbox']
+            username = self.task['tm_username']
+            taskname = self.task['tm_taskname']
+            sandboxName = self.task['tm_user_sandbox']
             self.logger.debug(f"Checking if sandbox file is available: {sandboxName}")
             try:
                 checkS3Object(crabserver=self.crabserver, objecttype='sandbox', taskname=taskname,
                               username=username, tarballname=sandboxName, logger=self.logger)
-                kw['task']['tm_user_sandbox'] = sandboxTarBall  # SB no need for this either ! it is only there to reuse same name in prepareArguments. A variable in self would be much cleaner, of even one constant to ensure same name in AdjustSites and CRABClient
+                self.task['tm_user_sandbox'] = sandboxTarBall  # SB no need for this either ! it is only there to reuse same name in prepareArguments. A variable in self would be much cleaner, of even one constant to ensure same name in AdjustSites and CRABClient
             except Exception as ex:
                 raise TaskWorkerException("The CRAB server backend could not find the input sandbox with your code " + \
                                   "from S3.\nThis could be a temporary glitch; please try to submit a new task later " + \
@@ -1235,22 +1244,9 @@ class DagmanCreator(TaskAction):
         task_runtime = getLocation('TaskManagerRun.tar.gz')
         shutil.copy(task_runtime, '.')
 
-        kw['task']['resthost'] = self.crabserver.server['host']  # SB most likely not needed, see Line 1027
-        kw['task']['dbinstance'] = self.crabserver.getDbInstance()  # SB never used in here nor in DagmanSubmitter ??
+        self.task['resthost'] = self.crabserver.server['host']  # SB most likely not needed, see Line 1027
+        self.task['dbinstance'] = self.crabserver.getDbInstance()  # SB never used in here nor in DagmanSubmitter ??
         params = {}
-
-        # files to be transferred to remove WN's via Job.submit, could pack most in a tarball
-        filesForWN = ['submit_env.sh', 'CMSRunAnalysis.sh', 'cmscp.py', 'cmscp.sh', 'CMSRunAnalysis.tar.gz',
-                      'run_and_lumis.tar.gz', 'input_files.tar.gz', 'input_args.json']
-        # files to be transferred to the scheduler by fDagmanSubmitter (these will all be placed in InputFiles.tar.gz)
-        filesForSched = filesForWN + \
-            ['gWMS-CMSRunAnalysis.sh', 'RunJobs.dag', 'Job.submit', 'dag_bootstrap.sh',
-             'AdjustSites.py', 'site.ad.json', 'TaskManagerRun.tar.gz',
-             'datadiscovery.pkl', 'taskinformation.pkl', 'taskworkerconfig.pkl',]
-
-        if kw['task']['tm_input_dataset']:
-            filesForSched.append("input_dataset_lumis.json")
-            filesForSched.append("input_dataset_duplicate_lumis.json")
 
         # now create the DAG. According to wheter this runs in the TW or in one PreDag, it will
         # create the MAIN DAG or one of the subdags for automatic splitting, hence it was called "createsubdag"
@@ -1258,13 +1254,31 @@ class DagmanCreator(TaskAction):
 
         # as splitter summary is useful for dryrun, let's add it to the InputFiles tarball
         jobGroups = splitterResult[0]  # the first returned value of Splitter action is the splitterFactory output
-        splittingSummary = SplittingSummary(kw['task']['tm_split_algo'])
+        splittingSummary = SplittingSummary(self.task['tm_split_algo'])
         for jobgroup in jobGroups:
             jobs = jobgroup.getJobs()
             splittingSummary.addJobs(jobs)
         splittingSummary.dump('splitting-summary.json')
-        filesForSched.append('splitting-summary.json')
 
+        # extract from tarball the executable to be passed to condor submit
+        with tarfile.open('TaskManagerRun.tar.gz',  mode='r:gz') as tf:
+            tf.extract('dag_bootstrap_startup.sh', path=os.getcwd())
+        # and add to the "code" tarball the files created by TW
+        filesToAdd = ['site.ad.json', 'RunJobs.dag', 'Job.submit',
+                      'datadiscovery.pkl', 'taskinformation.pkl',
+                      'taskworkerconfig.pkl', 'splitting-summary.json']
+        if self.task['tm_input_dataset']:
+            filesToAdd = filesToAdd + ['input_dataset_lumis.json', 'input_dataset_duplicate_lumis.json']
+        addToGZippedTarfile(filesToAdd, 'TaskManagerRun.tar.gz')
+
+        # files to be transferred to remote WN's via Job.submmit. Add to the "code" tarball files created by TW
+        filesToAdd = ['run_and_lumis.tar.gz', 'input_files.tar.gz', 'input_args.json']
+        addToGZippedTarfile(filesToAdd, 'CMSRunAnalysis.tar.gz')
+
+        # files to be transferred to the scheduler by DagmanSubmitter (these will all be placed in InputFiles.tar.gz)
+        filesForSched = ['CMSRunAnalysis.tar.gz', 'TaskManagerRun.tar.gz']
+
+        # this creates InputFiles.tar.gz
         self.prepareTarballForSched(filesForSched, subdags)
 
         return jobSubmit, params, ["InputFiles.tar.gz"], splitterResult
@@ -1274,6 +1288,7 @@ class DagmanCreator(TaskAction):
         cwd = os.getcwd()
         try:
             os.chdir(kw['tempDir'])
+            self.task = kw['task']
             jobSubmit, params, inputFiles, splitterResult = self.executeInternal(*args, **kw)
             return TaskWorker.DataObjects.Result.Result(task=kw['task'], result=(jobSubmit, params, inputFiles, splitterResult))
         finally:

@@ -37,13 +37,8 @@ systems = \
     },
     'TaskWorker':
     {
-        'py_modules': ['RESTInteractions',
-                       'CRABQuality', 'HTCondorLocator',
-                       'ServerUtilities', 'MultiProcessingLog', 'CMSGroupMapper',
-                       'RucioUtils', 'cache_status'],
-        'python': ['TaskWorker', 'TaskWorker/Actions', 'TaskWorker/DataObjects',
-                   'TaskWorker/Actions/Recurring', 'Publisher', 'TransferInterface',
-                   'ASO', 'ASO/Rucio', 'ASO/Rucio/Actions' ]
+        'py_modules': [''],
+        'python': ['' ]
     },
     'Publisher':
     {
@@ -278,9 +273,5 @@ setup(name='crabserver',
       #include_package_data=True,
       #base directory for all the packages
       package_dir={'': 'src/python'},
-      data_files=['scripts/%s' % x for x in \
-                        ['CMSRunAnalysis.sh', 'cmscp.py', 'cmscp.sh',
-                         'gWMS-CMSRunAnalysis.sh', 'submit_env.sh',
-                         'dag_bootstrap_startup.sh',
-                         'dag_bootstrap.sh', 'AdjustSites.py']] + getWebDir(),
+      data_files=getWebDir(),
      )

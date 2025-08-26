@@ -66,21 +66,35 @@ rm -f "${STARTDIR}/dummyFile"
 
 # Take the libraries from the build environment.
 pushd "${WMCORE_BUILD_PREFIX}"
-zip -r "${STARTDIR}/WMCore.zip" ./*
-zip -rq "${STARTDIR}/CRAB3.zip" WMCore PSetTweaks Utils -x \*.pyc || exit 3
+zip -rq "${STARTDIR}/WMCore.zip" ./*
 popd
 
-pushd "${CRABSERVER_BUILD_PREFIX}"
-zip -rq "${STARTDIR}/CRAB3.zip" RESTInteractions.py HTCondorLocator.py TaskWorker CRABInterface  TransferInterface ASO -x \*.pyc || exit 3
+# for CRAB just take all python files and put in a zip to be added to PYTHONPATH
+pushd "${CRABSERVERDIR}"/src/python
+zip -rq "${STARTDIR}/CRAB3.zip" . -x  \*.pyc || exit 3
 popd
 
-cp -r "${CRABSERVERDIR}/scripts"/{TweakPSet.py,CMSRunAnalysis.py,task_process} .
-cp "${CRABSERVERDIR}/src/python"/{ServerUtilities.py,RucioUtils.py,CMSGroupMapper.py,RESTInteractions.py} .
+cp -r "${CRABSERVERDIR}/scripts/job_wrapper" .
+cp -r "${CRABSERVERDIR}/scripts/dagman" .
+
+#cp "${CRABSERVERDIR}/src/python"/{ServerUtilities.py,RucioUtils.py,CMSGroupMapper.py,RESTInteractions.py} .
 
 echo "Making TaskManagerRun tarball"
-tar zcf "${RUNTIME_WORKDIR}/TaskManagerRun.tar.gz" CRAB3.zip task_process ServerUtilities.py RucioUtils.py CMSGroupMapper.py RESTInteractions.py || exit 4
+tar cf "${RUNTIME_WORKDIR}/TaskManagerRun.tar" CRAB3.zip WMCore.zip || exit 4
+# add scripts from dagman directory at top level of tarball. Will be in correct place when tar is expanded
+pushd dagman
+tar rf "${RUNTIME_WORKDIR}/TaskManagerRun.tar" * || exit 4
+popd
+gzip "${RUNTIME_WORKDIR}/TaskManagerRun.tar"
+
 echo "Making CMSRunAnalysis tarball"
-tar zcf "${RUNTIME_WORKDIR}/CMSRunAnalysis.tar.gz" WMCore.zip TweakPSet.py CMSRunAnalysis.py || exit 4
+tar cf "${RUNTIME_WORKDIR}/CMSRunAnalysis.tar" WMCore.zip || exit 4
+# add scripts from job_wrapper directory at top level of tarball. Will be in correct place when tar is expanded
+pushd job_wrapper
+tar rf "${RUNTIME_WORKDIR}/CMSRunAnalysis.tar" * || exit 4
+popd
+gzip "${RUNTIME_WORKDIR}/CMSRunAnalysis.tar"
+
 
 # cleanup.
 # current directory ($RUNTIME_WORKDIR) should only have TaskManagerRun.tar.gz and CMSRunAnalysis.tar.gz
