@@ -401,7 +401,7 @@ def parseCondorLog(cacheDoc):
     newCacheDoc['nodes'] = nodes
     newCacheDoc['nodeMap'] = nodeMap
     logging.info(f"Full dagStatus is {nodes['DagStatus']}")
-    collapsedDagStatus = collapseDAGStatus(nodes['DagStatus'])
+    collapsedDagStatus = collapseDAGStatus(nodes['DagStatus'], nodes)
     logging.info(f"Collapsed DAG status for reportig is {collapsedDagStatus}")
     newCacheDoc['overallDagStatus'] = collapsedDagStatus
     return newCacheDoc
@@ -538,7 +538,7 @@ def reportDagStatusToDB(statusName):
     logging.info(f"HTTP POST returned {ret}")
 
 
-def collapseDAGStatus(dagInfo):
+def collapseDAGStatus(dagInfo, nodes=None):
     """
     Collapse the status of one or several DAGs to a single one.
 
@@ -602,7 +602,14 @@ def collapseDAGStatus(dagInfo):
     # If no tails are active, return the status of the processing DAG.
     if len(subDagInfos) > 0:
         return checkQueued(translateDagStatus(subDagInfos[0]['DagStatus']))
-    return checkQueued(translateDagStatus(dagInfo['DagStatus']))
+    status = checkQueued(translateDagStatus(dagInfo['DagStatus']))
+    # Extra logic: if all nodes are terminal, force "END"
+    if nodes:
+        nodeStates = [info.get("State") for nid, info in nodes.items() if nid != "DagStatus"]
+        if all(st in ("finished", "held") for st in nodeStates):
+            status = "END"
+
+    return status
 
 
 def translateDagStatus(status):
