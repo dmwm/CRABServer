@@ -28,7 +28,7 @@ class PreJob:
         """
         PreJob constructor.
         """
-        self.dag_retry     = None
+        self.dag_retry     = 100
         self.job_id        = None
         self.taskname      = None
         self.backend       = None
@@ -546,7 +546,7 @@ class PreJob:
         ## Note the cooloff time is based on the DAGMan retry number (i.e. the number of
         ## times the full cycle pre-job + job + post-job finished). This way, we don't
         ## punish users for condor re-starts.
-        sleep_time = int(self.dag_retry)*60
+        sleep_time = 60 #int(self.dag_retry)*60
         if old_time:
             sleep_time = int(max(1, sleep_time - old_time))
         self.update_dashboard(crab_retry)

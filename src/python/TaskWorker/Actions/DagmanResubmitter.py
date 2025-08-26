@@ -65,7 +65,10 @@ class DagmanResubmitter(TaskAction):
         #
         # Processing and tail DAGs will be restarted by these scrips on the
         # schedd after the modifications are made.
-        rootConst = f"(CRAB_DAGType =?= \"BASE\" && CRAB_ReqName =?= {classad.quote(workflow)})"
+        
+        # Only operate on held jobs of this workflow
+        jobConst = f"(CRAB_ReqName =?= {classad.quote(workflow)}) && JobStatus == 5"  # 5 = Held
+        #rootConst = f"(CRAB_DAGType =?= \"BASE\" && CRAB_ReqName =?= {classad.quote(workflow)})"
 
         ## Calculate new parameters for resubmitted jobs. These parameters will
         ## be (re)written in the _CONDOR_JOB_AD when we do schedd.edit() below.
@@ -80,7 +83,7 @@ class DagmanResubmitter(TaskAction):
         if ('resubmit_jobids' in task) and task['resubmit_jobids']:
             self.logger.debug("Resubmitting when JOBIDs were specified")
             try:
-                schedd.edit(rootConst, "HoldKillSig", 'SIGKILL')
+                
                 # Overwrite parameters in the os.environ[_CONDOR_JOB_AD] file. This will affect
                 # all the jobs, not only the ones we want to resubmit. That's why the pre-job
                 # is saving the values of the parameters for each job retry in text files (the
@@ -95,11 +98,15 @@ class DagmanResubmitter(TaskAction):
                             newAdValue = pythonListToClassAdExprTree(task['resubmit_'+taskparam])
                         else:
                             newAdValue = str(task['resubmit_'+taskparam])
-                        schedd.edit(rootConst, adparam, newAdValue)
-                # finally restart the dagman with the 3 lines below
-                schedd.act(htcondor.JobAction.Hold, rootConst)
-                schedd.edit(rootConst, "HoldKillSig", 'SIGUSR1')
-                schedd.act(htcondor.JobAction.Release, rootConst)
+                        schedd.edit(jobConst, adparam, newAdValue)
+                # Release held jobs
+                schedd.act(htcondor.JobAction.Release, jobConst)
+                # Warn about divergence between submit file and live ads
+                self.logger.warning(
+                    "Jobs were released with modified classAds. "
+                    "Submit files in the task sandbox may not match. "
+                    "Check with 'condor_q -long' to see the actual running parameters."
+                )
             except Exception as hte:
                 msg = "The CRAB server backend was not able to resubmit the task,"
                 msg += " because the Grid scheduler answered with an error."

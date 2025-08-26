@@ -103,12 +103,12 @@ class RetryJob():
         Need a doc string here
         """
         self.ads.append(self.ad)
-        if self.dag_retry == 0:
+        if self.crab_retry == 0:
             msg = "This is job retry number 0. Will not try to search and load previous job ads."
             self.logger.info(msg)
             return
-        for dag_retry in range(self.dag_retry):
-            job_ad_file = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, dag_retry))
+        for crab_retry in range(self.crab_retry):
+            job_ad_file = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, crab_retry))
             if os.path.isfile(job_ad_file):
                 try:
                     with open(job_ad_file, encoding='utf-8') as fd:

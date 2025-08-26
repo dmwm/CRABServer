@@ -56,111 +56,6 @@ def setupStreamLogger():
     logger.setLevel(logging.DEBUG)
     return logger
 
-
-def adjustPostScriptExitStatus(resubmitJobIds, filename):
-    """
-    Edit the DAG .nodes.log file changing the POST script exit code from 0|2 to 1
-    (i.e., in RetryJob terminology, from OK|FATAL_ERROR to RECOVERABLE_ERROR) for
-    the job ids passed in the resubmitJobIds argument. This way DAGMan will retry
-    these nodes when the DAG is resubmitted. In practice, search for this kind of
-    sequence in the DAG .nodes.log file:
-    ...
-    016 (146493.000.000) 11/11 17:45:46 POST Script terminated.
-        (1) Normal termination (return value [0|2])
-        DAG Node: Job105
-    ...
-    for the job ids in resubmitJobIds and replace the return value to 1.
-    If resubmitJobIds = True, only replace return values 2 (not 0) to 1.
-
-    Note:
-          When DAGMan runs in recovery mode, the DAG .nodes.log file is used to
-    identify the nodes that have completed and should not be resubmitted.
-          When DAGMan runs in rescue mode (assuming a rescue DAG file is present,
-    which is not the case when a DAG is aborted, for example), all failed nodes
-    are resubmitted. Nodes can be labeled as DONE in the rescue DAG file and
-    DAGMan will not be rerun them, but then the node state would be set to DONE.
-    """
-    if not resubmitJobIds:
-        return []
-    printLog(f"Looking for resubmitJobIds {resubmitJobIds} in {filename}")
-    resubmitAllFailed = (resubmitJobIds is True)
-    terminator_re = re.compile(r"^\.\.\.$")
-    # date field has two different format, this is for condor up to version 8.8.8
-    event1_re = re.compile(r"016 \(-?\d+\.\d+\.\d+\) \d+/\d+ \d+:\d+:\d+ POST Script terminated.")
-    # and this for 8.9.7
-    event2_re = re.compile(r"016 \(-?\d+\.\d+\.\d+\) \d+-\d+-\d+ \d+:\d+:\d+ POST Script terminated.")
-    if resubmitAllFailed:
-        retvalue_re = re.compile(r"Normal termination \(return value 2\)")
-    else:
-        retvalue_re = re.compile(r"Normal termination \(return value [0|2]\)")
-    node_re = re.compile(r"DAG Node: Job(\d+(-\d+)?)")
-    ra_buffer = []
-    alt = None
-    output = ''
-    adjustedJobIds = []
-    for line in open(filename, 'r', encoding='utf-8').readlines():
-        if len(ra_buffer) == 0:
-            m = terminator_re.search(line)
-            if m:
-                ra_buffer.append(line)
-            else:
-                output += line
-        elif len(ra_buffer) == 1:
-            m1 = event1_re.search(line)
-            m2 = event2_re.search(line)
-            if m1 or m2:
-                ra_buffer.append(line)
-            else:
-                for l in ra_buffer:
-                    output += l
-                output += line
-                ra_buffer = []
-        elif len(ra_buffer) == 2:
-            m = retvalue_re.search(line)
-            if m:
-                ra_buffer.append("        (1) Normal termination (return value 1)\n")
-                alt = line
-            else:
-                for l in ra_buffer:
-                    output += l
-                output += line
-                ra_buffer = []
-        elif len(ra_buffer) == 3:
-            m = node_re.search(line)
-            printLog(f"Matching the line '{line.strip()}' to groups: {m.groups()}")
-            if m and (resubmitAllFailed or (m.groups()[0] in resubmitJobIds)):
-                printLog(f"Successful match: {m.groups()[0]}, adjusting status and appending to adjustedJobIds")
-                adjustedJobIds.append(m.groups()[0])
-                for l in ra_buffer:
-                    output += l
-            else:
-                for l in ra_buffer[:-1]:
-                    output += l
-                output += alt
-            output += line
-            ra_buffer = []
-        else:
-            output += line
-    if ra_buffer:
-        for l in ra_buffer:
-            output += l
-    # This is a curious dance!  If the user is out of quota, we don't want
-    # to fail halfway into writing the file.  OTOH, we can't write into a temp
-    # file and an atomic rename because the running shadows keep their event log
-    # file descriptors open.  Accordingly, we write the file once (to see if we)
-    # have enough quota space, then rewrite "the real file" after deleting the
-    # temporary one.  There's a huge race condition here, but it seems to be the
-    # best we can do given the constraints.  Note that we don't race with the
-    # shadow as we have a write lock on the file itself.
-    tmpfilename = filename + ".tmp"
-    with  open(tmpfilename, "w", encoding='utf-8') as output_fd:
-        output_fd.write(output)
-    os.unlink(tmpfilename)
-    with open(filename, "w", encoding='utf-8') as output_fd:
-        output_fd.write(output)
-    return adjustedJobIds
-
-
 def getGlob(ad, normal, automatic):
     """ Function used to return the correct list of files to modify when we
         adjust the max retries and the PJ exit codes (automatic splitting has subdags)
@@ -168,64 +63,6 @@ def getGlob(ad, normal, automatic):
     if ad.get('CRAB_SplitAlgo') == 'Automatic':
         return glob.glob(automatic)
     return [normal]
-
-
-def adjustMaxRetries(adjustJobIds, ad):
-    """
-    Edit the DAG file adjusting the maximum allowed number of retries to the current
-    retry + CRAB_NumAutomJobRetries for the jobs specified in the jobIds argument
-    (or for all jobs if jobIds = True). Incrementing the maximum allowed number of
-    retries is a necessary condition for a job to be resubmitted.
-    """
-    printLog(f"Adjusting retries for job ids: {adjustJobIds}")
-    if not adjustJobIds:
-        return
-    if not os.path.exists("RunJobs.dag"):
-        return
-    ## Get the latest retry count of each DAG node from the node status file.
-    retriesDict = {}
-    filenames = getGlob(ad, "node_state", "node_state.[1-9]*")
-    for fn in filenames:
-        with open(fn, 'r', encoding='utf-8') as fd:
-            for nodeStatusAd in classad.parseAds(fd):
-                if nodeStatusAd['Type'] != "NodeStatus":
-                    continue
-                node = nodeStatusAd.get('Node', '')
-                if (not node.startswith("Job")) or node.endswith("SubJobs"):
-                    continue
-                jobId = node[3:]
-                retriesDict[jobId] = int(nodeStatusAd.get('RetryCount', -1))
-    ## Search for the RETRY directives in the DAG file for the job ids passed in the
-    ## resubmitJobIds argument and change the maximum retries to the current retry
-    ## count + CRAB_NumAutomJobRetries.
-    retry_re = re.compile(r'RETRY Job(\d+(?:-\d+)?) (\d+) ')
-    adjustAll = (adjustJobIds is True)
-    numAutomJobRetries = int(ad.get('CRAB_NumAutomJobRetries', 2))
-    filenames = getGlob(ad, "RunJobs.dag", "RunJobs[1-9]*.subdag")
-    for fn in filenames:
-        output = ""
-        with open(fn, 'r', encoding='utf-8') as fd:
-            for line in fd.readlines():
-                match_retry_re = retry_re.search(line)
-                if match_retry_re:
-                    jobId = match_retry_re.groups()[0]
-                    if adjustAll or (jobId in adjustJobIds):
-                        if jobId in retriesDict and retriesDict[jobId] != -1:
-                            lastRetry = retriesDict[jobId]
-                            ## The 1 is to account for the resubmission itself; then, if the job fails, we
-                            ## allow up to numAutomJobRetries automatic retries from DAGMan.
-                            maxRetries = lastRetry + (1 + numAutomJobRetries)
-                        else:
-                            try:
-                                maxRetries = int(match_retry_re.groups()[1]) + (1 + numAutomJobRetries)
-                            except ValueError:
-                                maxRetries = numAutomJobRetries
-                        printLog(f"Adjusted maxRetries for {jobId} to {maxRetries}")
-                        line = retry_re.sub(r'RETRY Job%s %d ' % (jobId, maxRetries), line)  # pylint: disable=consider-using-f-string
-                output += line
-        with open(fn, 'w', encoding='utf-8') as fd:
-            fd.write(output)
-
 
 def makeWebDir(ad):
     """
@@ -568,26 +405,7 @@ def main():
         schedd.edit(tailconst, "HoldKillSig", 'SIGKILL')
         schedd.act(htcondor.JobAction.Hold, tailconst)
 
-    if resubmitJobIds:
-        adjustedJobIds = []
-        filenames = getGlob(ad, "RunJobs.dag.nodes.log", "RunJobs[1-9]*.subdag.nodes.log")
-        for fn in filenames:
-            if hasattr(htcondor, 'lock'):
-                # While dagman is not running at this point, the schedd may be writing events to this
-                # file; hence, we only edit the file while holding an appropriate lock.
-                # Note this lock method didn't exist until 8.1.6; prior to this, we simply
-                # run dangerously.
-                with htcondor.lock(open(fn, 'a', encoding='utf-8'), htcondor.LockType.WriteLock):
-                    adjustedJobIds.extend(adjustPostScriptExitStatus(resubmitJobIds, fn))
-            else:
-                adjustedJobIds.extend(adjustPostScriptExitStatus(resubmitJobIds, fn))
-        ## Adjust the maximum allowed number of retries only for the job ids for which
-        ## the POST script exit status was adjusted. Why only for these job ids and not
-        ## for all job ids in resubmitJobIds? Because if resubmitJobIds = True, which as
-        ## a general rule means "all failed job ids", we don't have a way to know if a
-        ## job is in failed status or not just from the RunJobs.dag file, while job ids
-        ## in adjustedJobIds correspond only to failed jobs.
-        adjustMaxRetries(adjustedJobIds, ad)
+    # What to do in between holding and releasing for automatic splitting?
 
     if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
         printLog("Releasing processing and tail DAGs")

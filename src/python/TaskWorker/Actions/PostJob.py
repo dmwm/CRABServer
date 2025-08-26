@@ -110,7 +110,8 @@ from WMCore.DataStructs.LumiList import LumiList
 
 from TaskWorker import __version__
 from TaskWorker.Actions.RetryJob import RetryJob
-from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
+from TaskWorker.Actions.
+ import JOB_RETURN_CODES
 from ServerUtilities import TRANSFERDB_STATES, PUBLICATIONDB_STATES
 from ServerUtilities import isFailurePermanent, mostCommon, encodeRequest, oracleOutputMapping
 from ServerUtilities import getLock, getHashLfn
@@ -1305,7 +1306,7 @@ class PostJob():
         # http://research.cs.wisc.edu/htcondor/manual/v8.2/2_10DAGMan_Applications.html
         self.dag_jobid           = None # $JOBID
         self.job_return_code     = None # $RETURN
-        self.dag_retry           = None # $RETRY
+        self.dag_retry           = 100 # $RETRY
         self.max_retries         = None # $MAX_RETRIES
         self.reqname             = None
         self.job_id              = None
@@ -1372,12 +1373,13 @@ class PostJob():
         self.logger.propagate = False
         self.postjob_log_file_name = None
         self.useAsoRucio = False
+        self.hold_requested = False
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def get_defer_num(self):
 
-        DEFER_INFO_FILE = 'defer_info/defer_num.%s.%d.txt' % (self.job_id, self.dag_retry)
+        DEFER_INFO_FILE = 'defer_info/defer_num.%s.%d.txt' % (self.job_id, self.crab_retry)
         defer_num = 0
 
         #read retry number
@@ -1660,7 +1662,7 @@ class PostJob():
             # DAGMan will resubmit the job unless the maximum allowed number of retries has
             # been reached already (DAGMan compares the DAGMan retry count against the
             # maximum allowed number of retries).
-            msg = "This is job retry number %d." % (self.dag_retry)
+            msg = "This is job retry number %d." % (self.crab_retry)
             msg += " The maximum allowed number of retries is %d." % (self.max_retries)
             self.logger.info(msg)
             # Print a message about the DAG cluster ID of the job, which can be -1 when the
@@ -1796,13 +1798,14 @@ class PostJob():
                 self.logger.info("====== Finished to analyze job exit status.")
                 res = JOB_RETURN_CODES.FATAL_ERROR, ""
             elif self.retryjob_retval == JOB_RETURN_CODES.RECOVERABLE_ERROR:
-                if self.dag_retry >= self.max_retries:
+                if self.crab_retry >= self.max_retries:
                     msg = "The retry handler indicated this was a recoverable error,"
                     msg += " but the maximum number of retries was already hit."
-                    msg += " DAGMan will not retry."
+                    msg += " DAGMan will not retry. Setting Job on Hold. User can resubmit."
                     self.logger.info(msg)
                     self.set_dashboard_state('FAILED')
                     self.set_state_ClassAds('FAILED')
+                    self.hold_requested = True
                     self.logger.info("====== Finished to analyze job exit status.")
                     res = JOB_RETURN_CODES.FATAL_ERROR, ""
                 else:
@@ -1823,7 +1826,7 @@ class PostJob():
                 res = JOB_RETURN_CODES.FATAL_ERROR, "" #MarcoM: this should never happen
         # This is for the case in which we don't run the retry-job.
         elif self.job_return_code != JOB_RETURN_CODES.OK:
-            if self.dag_retry >= self.max_retries:
+            if self.crab_retry >= self.max_retries:
                 msg = "The maximum allowed number of retries was hit and the job failed."
                 msg += " Setting this node (job) to permanent failure."
                 self.logger.info(msg)
@@ -1918,7 +1921,7 @@ class PostJob():
         used_job_ad = False
         if self.dag_clusterid == -1:
             # the grid job did not run, see the comments in execute() method
-            job_ad_file_name = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.dag_retry))
+            job_ad_file_name = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.crab_retry))
         else:
             condor_history_dir = os.environ.get("_CONDOR_PER_JOB_HISTORY_DIR", "")
             job_ad_file_name = os.path.join(condor_history_dir, str("history." + str(self.dag_jobid)))
@@ -1929,7 +1932,7 @@ class PostJob():
             if not os.path.exists(job_ad_file_name):
                 self.logger.info('PER_JOB_HISTORY file %s not found , look in ./finished_jobs', job_ad_file_name)
                 jobad_in_condor_history = False
-                job_ad_file_name = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.dag_retry))
+                job_ad_file_name = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.crab_retry))
             if not os.path.exists(job_ad_file_name):
                 self.logger.info('History file not found in ./finished_jobs. Create it by querying schedd')
                 counter = 0
@@ -1973,7 +1976,7 @@ class PostJob():
                     try:
                         shutil.copy2(job_ad_file_name, './finished_jobs/')
                         job_ad_source = "history.%s" % (self.dag_jobid)
-                        job_ad_symlink = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.dag_retry))
+                        job_ad_symlink = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.crab_retry))
                         os.symlink(job_ad_source, job_ad_symlink)
                         self.logger.info("       -----> Succeeded to copy job ad file.")
                     except Exception:
@@ -3013,7 +3016,7 @@ class PostJob():
         number of job retries was hit. If it was, the post-job should return with the
         fatal error exit code. Otherwise with the recoverable error exit code.
         """
-        if self.dag_retry >= self.max_retries:
+        if self.crab_retry >= self.max_retries:
             msg = "Job could be retried, but the maximum allowed number of retries was hit."
             msg += " Setting this node (job) to permanent failure. DAGMan will NOT retry."
             self.logger.info(msg)
