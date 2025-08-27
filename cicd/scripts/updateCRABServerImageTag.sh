@@ -20,9 +20,11 @@ git clone --branch ${GITLAB_SIDECAR_REPO_BRANCH} \
   "https://oauth2:${GITLAB_SIDECAR_REPO_PAT}@${GITLAB_SIDECAR_REPO_URL}" \
   $WORKDIR/crab-iac
 
-DESIRED_IMAGE=$DESIRED_IMAGE yq -i -y '
-  (.spec.template.spec.containers[] | select(.name=="crabserver").image)
-  = strenv(DESIRED_IMAGE)
+yq -i -y --arg DESIRED_IMAGE "$DESIRED_IMAGE" '
+  .spec.template.spec.containers |=
+    map(if .name=="crabserver"
+        then .image = $DESIRED_IMAGE
+        else . end)
 ' $WORKDIR/crab-iac/argocd/apps/crab/crabserver/overlays/$DEPLOY_ENV/patches/image.yaml
 
 pushd $WORKDIR/crab-iac
