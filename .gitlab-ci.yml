@@ -225,8 +225,17 @@ deploy_server:
     - echo $KUBECONFIG_FILE
     - yq -i -y ".\"current-context\" = \"$KUBECONTEXT\"" $KUBECONFIG_FILE
     - export KUBECONFIG=$KUBECONFIG_FILE
-    - kubectl set image deployment/crabserver "crabserver=registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}"
-    - kubectl rollout status deployment crabserver --watch --timeout=5m
+    - export DESIRED_IMAGE="registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}"
+    - |
+      if [[ "$KUBECONTEXT" =~ ^cmsweb-test14$ ]]; then
+        export DEPLOY_ENV="${KUBECONTEXT#cmsweb-}"         # "test14"
+        export NEW_IMAGE_TAG="${IMAGE_TAG}"
+        ./cicd/scripts/updateCRABServerImageTag.sh
+      else
+        kubectl -n crab set image deployment/crabserver "$DESIRED_IMAGE"
+      fi
+    - kubectl -n crab wait deployment/crabserver --for="jsonpath={.spec.template.spec.containers[?(@.name==\"crabserver\")].image}=$DESIRED_IMAGE" --timeout=10m
+    - kubectl -n crab rollout status deployment/crabserver --watch --timeout=5m
 
 .deploy_tw_template:
   rules:
