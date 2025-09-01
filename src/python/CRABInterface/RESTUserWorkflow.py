@@ -246,7 +246,7 @@ class RESTUserWorkflow(RESTEntity):
                 validate_real("totalunits", param, safe, optional=True)
             validate_str("cachefilename", param, safe, RX_CACHENAME, optional=False)
             validate_str("debugfilename", param, safe, RX_CACHENAME, optional=True)
-            validate_str("cacheurl", param, safe, RX_CACHEURL, optional=False)
+            validate_str("cacheurl", param, safe, RX_CACHEURL, optional=True)
             validate_str("lfn", param, safe, RX_LFN, optional=True)
             self._checkOutLFN(safe.kwargs, username)
             validate_strlist("addoutputfiles", param, safe, RX_ADDFILE, custom_err="Incorrect 'JobType.outputFiles' parameter. " \
@@ -534,6 +534,7 @@ class RESTUserWorkflow(RESTEntity):
             'inputblocks': inputblocks if inputblocks else None,
         }
 
+        cacheurl = f"S3/{self.config.s3_bucket}"   # record S3 bucket in task table
         return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch,
                                            jobminuarch=jobminuarch, inputdata=inputdata, primarydataset=primarydataset,
                                            nonvaliddata=nonvaliddata, use_parent=useparent,
