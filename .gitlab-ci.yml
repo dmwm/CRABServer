@@ -237,7 +237,7 @@ deploy_server:
 
       else
         echo "=== k8s deployment ==="
-        kubectl -n crab set image deployment/crabserver "$DESIRED_IMAGE"
+        kubectl -n crab set image deployment/crabserver crabserver="$DESIRED_IMAGE"
       fi
     - kubectl -n crab rollout status deployment/crabserver --watch --timeout=5m
 
