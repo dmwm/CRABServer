@@ -49,6 +49,7 @@ class PreJob:
     In the new model, DAGMan's retry counter is ignored. The authoritative
     source of truth is the `retry_info/job.<id>.txt` file, which is updated
     by PostJob after each attempt. It contains:
+      - 'pre': number of times PreJob has run for this job
       - 'post': number of times PostJob has run for this job
       - 'hold': whether the next attempt should be submitted in Hold state
 
@@ -546,7 +547,7 @@ class PreJob:
         ## Note the cooloff time is based on the DAGMan retry number (i.e. the number of
         ## times the full cycle pre-job + job + post-job finished). This way, we don't
         ## punish users for condor re-starts.
-        sleep_time = 60 #int(self.dag_retry)*60
+        sleep_time = 180 #int(self.dag_retry)*60
         if old_time:
             sleep_time = int(max(1, sleep_time - old_time))
         self.update_dashboard(crab_retry)

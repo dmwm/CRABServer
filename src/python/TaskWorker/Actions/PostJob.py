@@ -1802,9 +1802,9 @@ class PostJob():
                     msg += " but the maximum number of retries was already hit."
                     msg += " DAGMan will not retry. Setting Job on Hold. User can resubmit."
                     self.logger.info(msg)
+                    self.hold_requested = True
                     self.set_dashboard_state('FAILED')
                     self.set_state_ClassAds('FAILED')
-                    self.hold_requested = True
                     self.logger.info("====== Finished to analyze job exit status.")
                     res = JOB_RETURN_CODES.FATAL_ERROR, ""
                 else:
@@ -2971,7 +2971,11 @@ class PostJob():
 
     def calculate_crab_retry(self):
         """
-        Calculate the retry number we're on. See the notes in PreJob.
+        Calculate the retry number we're on and persist hold-requested state.
+
+        In the new model, PreJob reads 'retry_info/job.<id>.txt'
+
+        PostJob updates 'post' and 'hold' so that PreJob can use them.
         """
         fname = "retry_info/job.%s.txt" % (self.job_id)
         if os.path.exists(fname):
@@ -2985,26 +2989,30 @@ class PostJob():
                 self.logger.exception(msg)
                 return 1, None
         else:
-            retry_info = {'pre': 0, 'post': 0}
+            retry_info = {'pre': 0, 'post': 0, 'hold': False}
         if 'pre' not in retry_info or 'post' not in retry_info:
             msg = "Unable to calculate post-job retry count."
             msg += " File %s doesn't contain the expected information." % (fname)
             self.logger.warning(msg)
             return 1, None
+        # persist hold_requested if set
+        if getattr(self, "hold_requested", False):
+            retry_info['hold'] = True
         if first_pj_execution():
             crab_retry = retry_info['post']
             retry_info['post'] += 1
-            try:
-                with open(fname + '.tmp', 'w') as fd:
-                    json.dump(retry_info, fd)
-                os.rename(fname + '.tmp', fname)
-            except Exception:
-                msg = "Failed to update file %s with increased post-job count by +1." % (fname)
-                msg += "\nDetails follow:"
-                self.logger.exception(msg)
-                return 1, crab_retry
         else:
             crab_retry = retry_info['post'] - 1
+
+        try:
+            with open(fname + '.tmp', 'w') as fd:
+                json.dump(retry_info, fd)
+            os.rename(fname + '.tmp', fname)
+        except Exception:
+            msg = "Failed to update file %s with increased post-job count by +1." % (fname)
+            msg += "\nDetails follow:"
+            self.logger.exception(msg)
+            return 1, crab_retry
         return 0, crab_retry
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
