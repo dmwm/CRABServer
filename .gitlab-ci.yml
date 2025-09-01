@@ -226,13 +226,17 @@ deploy_server:
     - yq -i -y ".\"current-context\" = \"$KUBECONTEXT\"" $KUBECONFIG_FILE
     - export KUBECONFIG=$KUBECONFIG_FILE
     - export DESIRED_IMAGE="registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}"
+    - printenv
     - |
       if [[ "$KUBECONTEXT" =~ ^cmsweb-test14$ ]]; then
+        echo "=== argoCD test14 deployment ==="
         export DEPLOY_ENV="${KUBECONTEXT#cmsweb-}"         # "test14"
         export NEW_IMAGE_TAG="${IMAGE_TAG}"
         ./cicd/scripts/updateCRABServerImageTag.sh
         ./cicd/scripts/waitForArgoCDToDeployed.sh
+
       else
+        echo "=== k8s deployment ==="
         kubectl -n crab set image deployment/crabserver "$DESIRED_IMAGE"
       fi
     - kubectl -n crab rollout status deployment/crabserver --watch --timeout=5m
