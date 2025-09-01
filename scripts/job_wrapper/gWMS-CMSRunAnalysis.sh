@@ -239,7 +239,8 @@ if [[ -e $TOKEN_PATH ]]; then
         TOKEN_READY_SITES=( T2_BE_IIHE \
         # T2_BE_UCL reads OK with token, but local stageout fails
         T1_DE_KIT T2_DE_DESY T2_DE_RWTH \
-        # T!_ES_PIC and T2_ES_CIEMAT read OK with token, but local stageout fails
+        # T!_ES_PIC reads OK with token, but local stageout fails
+        T2_ES_CIEMAT \
         T1_IT_CNAF T2_IT_Pisa T2_IT_Legnaro T2_IT_Pisa T2_IT_Rome \
         T1_UK_RAL T2_UK_London_IC T2_UK_SGrid_RALPP \
         T1_US_FNAL T2_US_Florida T2_US_MIT T2_US_Purdue T2_US_Nebraska \
