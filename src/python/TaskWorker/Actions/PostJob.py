@@ -1301,8 +1301,8 @@ class PostJob():
         """
         # These attributes are set from arguments passed to the post-job (see
         # RunJobs.dag file). The first four arguments correspond to special script
-        # argument macros set by DAGMan. Documentation about these four arguments in
-        # http://research.cs.wisc.edu/htcondor/manual/v8.2/2_10DAGMan_Applications.html
+        # argument macros set by DAGMan. Documentation about these four arguments is in
+        # https://htcondor.readthedocs.io/en/latest/automated-workflows/dagman-introduction.html#special-script-argument-macros
         self.dag_jobid           = None # $JOBID
         self.job_return_code     = None # $RETURN
         self.dag_retry           = None # $RETRY
