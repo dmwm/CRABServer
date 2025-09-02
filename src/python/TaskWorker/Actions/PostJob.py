@@ -1306,7 +1306,7 @@ class PostJob():
         self.dag_jobid           = None # $JOBID
         self.job_return_code     = None # $RETURN
         self.dag_retry           = 100 # $RETRY
-        self.max_retries         = None # $MAX_RETRIES
+        self.max_retries         = 3 # $MAX_RETRIES
         self.reqname             = None
         self.job_id              = None
         self.source_dir          = None
@@ -1583,7 +1583,7 @@ class PostJob():
         self.dag_jobid           = args[0] # = ClusterId.ProcId
         self.job_return_code     = int(args[1])
         self.dag_retry           = int(args[2])
-        self.max_retries         = int(args[3])
+        self.max_retries         = 3 #int(args[3]) commenting out for testing
         # TODO: Why not get the request name from the job ad?
         # We will need to parse the job ad earlier, that's all.
         self.reqname             = args[4]
@@ -3027,6 +3027,7 @@ class PostJob():
             msg = "Job could be retried, but the maximum allowed number of retries was hit."
             msg += " Setting this node (job) to permanent failure. DAGMan will NOT retry."
             self.logger.info(msg)
+            self.hold_requested = True
             self.set_dashboard_state('FAILED', exitCode=exitCode)
             self.set_state_ClassAds('FAILED', exitCode=exitCode)
             return JOB_RETURN_CODES.FATAL_ERROR
