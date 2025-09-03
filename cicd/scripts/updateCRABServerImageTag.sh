@@ -4,7 +4,7 @@ NEW_IMAGE_TAG="${NEW_IMAGE_TAG:?NEW_IMAGE_TAG is required}"
 DESIRED_IMAGE="${DESIRED_IMAGE:=registry.cern.ch/cmscrab/crabserver:$NEW_IMAGE_TAG}"
 
 UPSTREAM_IAC_REPO_URL="${UPSTREAM_IAC_REPO_URL:=https://github.com/sinonkt/CMSKubernetes}"
-UPSTREAM_IAC_BRANCH="${UPSTREAM_IAC_BRANCH:=migrate-to-argocd}"
+UPSTREAM_IAC_BRANCH="${UPSTREAM_IAC_BRANCH:=crab-migrate-to-argocd}"
 GITLAB_SIDECAR_REPO_URL="${GITLAB_SIDECAR_REPO_URL:=gitlab.cern.ch/kphornsi/crab-iac}"
 GITLAB_SIDECAR_REPO_BRANCH="${GITLAB_SIDECAR_REPO_BRANCH:=master}"
 GITLAB_SIDECAR_REPO_PAT="${GITLAB_SIDECAR_REPO_PAT:?GITLAB_SIDECAR_REPO_PAT is required}"
@@ -20,6 +20,16 @@ git clone --branch ${GITLAB_SIDECAR_REPO_BRANCH} \
   "https://oauth2:${GITLAB_SIDECAR_REPO_PAT}@${GITLAB_SIDECAR_REPO_URL}" \
   $WORKDIR/crab-iac
 
+# Automatically bumped to latest base.
+yq -y -i --arg LATEST_COMMIT_SHA "$LATEST_COMMIT_SHA" '
+  .resources[0] |=
+    ( if test("^https://raw\\.githubusercontent\\.com/")
+      then (split("/") | .[5] = $LATEST_COMMIT_SHA | join("/"))
+      else .
+      end )
+' $WORKDIR/crab-iac/argocd/apps/crab/crabserver/overlays/$DEPLOY_ENV/kustomization.yaml
+
+# Automatically bump image regarding DevOperator desired image.
 yq -i -y --arg DESIRED_IMAGE "$DESIRED_IMAGE" '
   .spec.template.spec.containers |=
     map(if .name=="crabserver"
