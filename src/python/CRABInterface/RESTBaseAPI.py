@@ -62,7 +62,7 @@ class RESTBaseAPI(DatabaseRESTApi):
                     'task': RESTTask(app, self, config, mount),
                     'filetransfers': RESTFileTransfers(app, self, config, mount),
                     'fileusertransfers': RESTFileUserTransfers(app, self, config, mount),
-                    'cache': RESTCache(app, self, config, mount, extconfig),
+                    'cache': RESTCache(app, self, config, mount),
                    })
 
         self._initLogger( getattr(config, 'loggingFile', None), getattr(config, 'loggingLevel', None),

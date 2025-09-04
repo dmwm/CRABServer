@@ -534,6 +534,7 @@ class RESTUserWorkflow(RESTEntity):
             'inputblocks': inputblocks if inputblocks else None,
         }
 
+        cacheurl = f"S3/{self.config.s3_bucket}"   # record S3 bucket in task table
         return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch,
                                            jobminuarch=jobminuarch, inputdata=inputdata, primarydataset=primarydataset,
                                            nonvaliddata=nonvaliddata, use_parent=useparent,
