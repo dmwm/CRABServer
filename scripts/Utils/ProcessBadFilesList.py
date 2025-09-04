@@ -35,18 +35,18 @@ def main():
     totals = []
     for problemType in ('truncated', 'corrupted', 'suspicious'):
         doneTasks = []
-        myDir = f"{topDir}/{problemType}"
-        newReportsDir = myDir + '/new'
-        doneReportsDir = myDir + '/done'
-        fakeReportsDir = myDir + '/falsePositives'
+        reportDir = f"{topDir}/{problemType}"
+        newReportsDir = reportDir + '/new'
+        doneReportsDir = reportDir + '/done'
+        fakeReportsDir = reportDir + '/falsePositives'
+        for dir in [reportDir, newReportsDir, doneReportsDir, fakeReportsDir]:
+            if not os.path.exists(dir):
+                os.makedirs(dir)
         troubledTasks = os.listdir(newReportsDir)
         for task in troubledTasks:
             if 'sciaba' in task:
                 continue
             taskDir = os.path.join(newReportsDir, task)
-            if os.path.isfile(taskDir):  # old format
-                shutil.move(taskDir, doneReportsDir)
-                continue
             doneTaskDir = os.path.join(doneReportsDir, task)
             # in doneReportsDir we move one file at a time in a subdir named as the task
             if not os.path.exists(doneTaskDir):
