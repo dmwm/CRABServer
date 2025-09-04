@@ -60,8 +60,9 @@ def main():
             # count files in the taskDir, EOS on Fuse has a limit so use eos command
             result = subprocess.run(f"eos ls {taskDir} |wc -l",shell=True, stdout=subprocess.PIPE, check=False)
             nBadFileReports = int(result.stdout.decode('utf-8'))
-            if nBadFileReports > 30:
+            if nBadFileReports > 30 and not problemType == 'truncated':
                 # likely code, not files, can't fix whole datasets
+                # but we always trust truncated files to be really bad
                 shutil.move(taskDir, fakeTaskDir)
                 continue
             newFiles = os.listdir(taskDir)
