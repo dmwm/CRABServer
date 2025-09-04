@@ -532,8 +532,8 @@ class MasterWorker(object):
         rejectedCommands = getattr(self.config.TaskWorker, 'rejectedCommands', [])
         if command in rejectedCommands:
             self.logger.debug("Rejecting command %s", command)
-            if command == 'SUBMIT':  # refuse i.e. mark as submission failed
-                self.updateWork(taskname, command, 'SUBMITFAILED')
+            if command == 'SUBMIT':  # refuse
+                self.updateWork(taskname, command, 'SUBMITREFUSED')
             if command == 'RESUBMIT':  # ignore, i.e. leave in status 'SUBMITTED'
                 self.updateWork(taskname, command, 'SUBMITTED')
             if command == 'KILL':  # ignore, i.e. leave in status 'SUBMITTED'
