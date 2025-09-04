@@ -5,7 +5,7 @@ DESIRED_IMAGE="${DESIRED_IMAGE:=registry.cern.ch/cmscrab/crabserver:$NEW_IMAGE_T
 
 UPSTREAM_IAC_REPO_URL="${UPSTREAM_IAC_REPO_URL:=https://github.com/sinonkt/CMSKubernetes}"
 UPSTREAM_IAC_BRANCH="${UPSTREAM_IAC_BRANCH:=crab-migrate-to-argocd}"
-GITLAB_SIDECAR_REPO_URL="${GITLAB_SIDECAR_REPO_URL:=gitlab.cern.ch/kphornsi/crab-iac}"
+GITLAB_SIDECAR_REPO_URL="${GITLAB_SIDECAR_REPO_URL:=gitlab.cern.ch/crab3/crab-iac-overlays-sidecar}"
 GITLAB_SIDECAR_REPO_BRANCH="${GITLAB_SIDECAR_REPO_BRANCH:=master}"
 GITLAB_SIDECAR_REPO_PAT="${GITLAB_SIDECAR_REPO_PAT:?GITLAB_SIDECAR_REPO_PAT is required}"
 CI_BOT_USER_NAME="${CI_BOT_USER_NAME:=crabserver-ci-bot}"
