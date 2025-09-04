@@ -38,11 +38,6 @@ def getDBinstance(config, namespace, name):
     return factory.loadObject(name)
 
 
-def globalinit(credpath):
-    global credServerPath  # pylint: disable=global-statement
-    credServerPath = credpath
-
-
 def execute_command(command, logger, timeout):
     """
     _execute_command_
