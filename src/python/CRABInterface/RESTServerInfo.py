@@ -45,7 +45,13 @@ class RESTServerInfo(RESTEntity):
 
     @conn_handler(services=['centralconfig'])
     def backendurls(self , **kwargs):
-        yield self.centralcfg.centralconfig['backend-urls']
+        # need to keep this API until calls to it are removed from Client and TW
+        backendUrlsDict = {
+            "cacheSSL": "https://s3.cern.ch/crabcache",
+            "htcondorSchedds": []
+        }
+
+        yield backendUrlsDict
 
     @conn_handler(services=['centralconfig'])
     def version(self , **kwargs):
