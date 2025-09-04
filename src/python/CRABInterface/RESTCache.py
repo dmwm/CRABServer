@@ -72,7 +72,7 @@ class RESTCache(RESTEntity):
     Information about usage will be available to any authenticated user.
     """
 
-    def __init__(self, app, api, config, mount, extconfig):
+    def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
         self.logger = logging.getLogger("CRABLogger.RESTCache")
         # get S3 connection secrets from the CRABServerAuth file in the same way
@@ -88,14 +88,8 @@ class RESTCache(RESTEntity):
         access_key = s3Dict['access_key']
         secret_key = s3Dict['secret_key']
 
-        # in order to use S3 based CRABCache the cacheSSL config. param in rest external config
-        # must be set to "endpoint/bucket" e.g. https://s3.cern.ch/<bucketname>
-        cacheSSL = extconfig.centralconfig['backend-urls']['cacheSSL']
-        # make sure any trailing '/' in the cacheSSL url does not end in the bucket name
-        cacheSSL = cacheSSL.rstrip('/')
-        bucket = cacheSSL.split('/')[-1]
+        self.s3_bucket = config.s3_bucket
         endpoint = 'https://s3.cern.ch'  # hardcode this. In case it can be moved to the s3Dict in config
-        self.s3_bucket = bucket
         self.s3_client = boto3.client('s3', endpoint_url=endpoint, aws_access_key_id=access_key,
                                       aws_secret_access_key=secret_key)
 

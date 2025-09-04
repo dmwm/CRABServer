@@ -45,15 +45,17 @@ class RESTServerInfo(RESTEntity):
 
     @conn_handler(services=['centralconfig'])
     def backendurls(self , **kwargs):
-        yield self.centralcfg.centralconfig['backend-urls']
+        # need to keep this API until calls to it are removed from Client and TW
+        backendUrlsDict = {
+            "cacheSSL": "https://s3.cern.ch/crabcache",
+            "htcondorSchedds": []
+        }
+
+        yield backendUrlsDict
 
     @conn_handler(services=['centralconfig'])
     def version(self , **kwargs):
         yield self.centralcfg.centralconfig['compatible-version']+[__version__]
-
-    @conn_handler(services=['centralconfig'])
-    def bannedoutdest(self, **kwargs):
-        yield self.centralcfg.centralconfig['banned-out-destinations']
 
     @conn_handler(services=['centralconfig'])
     def ignlocalityblacklist(self, **kwargs):
