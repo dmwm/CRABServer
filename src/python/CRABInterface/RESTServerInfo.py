@@ -52,9 +52,5 @@ class RESTServerInfo(RESTEntity):
         yield self.centralcfg.centralconfig['compatible-version']+[__version__]
 
     @conn_handler(services=['centralconfig'])
-    def bannedoutdest(self, **kwargs):
-        yield self.centralcfg.centralconfig['banned-out-destinations']
-
-    @conn_handler(services=['centralconfig'])
     def ignlocalityblacklist(self, **kwargs):
         yield self.centralcfg.centralconfig['ign-locality-blacklist']
