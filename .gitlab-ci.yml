@@ -227,7 +227,7 @@ deploy_server:
     - export KUBECONFIG=$KUBECONFIG_FILE
     - export DESIRED_IMAGE="registry.cern.ch/cmscrab/crabserver:${IMAGE_TAG}"
     - |
-      if [[ "$KUBECONTEXT" =~ ^cmsweb-test14$ ]]; then
+      if [[ "$KUBECONTEXT" =~ ^cmsweb-test(2|12|14)$ ]]; then
         export DEPLOY_ENV="${KUBECONTEXT#cmsweb-}"         # "test14"
         export NEW_IMAGE_TAG="${IMAGE_TAG}"
         ./cicd/scripts/updateCRABServerImageTag.sh
