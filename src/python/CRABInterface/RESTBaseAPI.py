@@ -15,7 +15,7 @@ from WMCore.REST.Format import JSONFormat
 from WMCore.REST.Error import ExecutionError
 
 # CRABServer dependecies here
-from CRABInterface.Utilities import ConfigCache, globalinit, getCentralConfig
+from CRABInterface.Utilities import ConfigCache, getCentralConfig
 from CRABInterface.RESTUserWorkflow import RESTUserWorkflow
 from CRABInterface.RESTTask import RESTTask
 from CRABInterface.RESTServerInfo import RESTServerInfo
@@ -48,10 +48,9 @@ class RESTBaseAPI(DatabaseRESTApi):
 
         #Global initialization of Data objects. Parameters coming from the config should go here
         DataUserWorkflow.globalinit(config)
-        DataWorkflow.globalinit(dbapi=self, credpath=config.credpath, centralcfg=extconfig, config=config)
+        DataWorkflow.globalinit(dbapi=self, centralcfg=extconfig, config=config)
         DataFileMetadata.globalinit(dbapi=self, config=config)
         RESTTask.globalinit(centralcfg=extconfig)
-        globalinit(config.credpath)
 
         ## TODO need a check to verify the format depending on the resource
         ##      the RESTFileMetadata has the specifc requirement of getting xml reports
