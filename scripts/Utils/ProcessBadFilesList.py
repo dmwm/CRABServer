@@ -35,18 +35,18 @@ def main():
     totals = []
     for problemType in ('truncated', 'corrupted', 'suspicious'):
         doneTasks = []
-        myDir = f"{topDir}/{problemType}"
-        newReportsDir = myDir + '/new'
-        doneReportsDir = myDir + '/done'
-        fakeReportsDir = myDir + '/falsePositives'
+        reportDir = f"{topDir}/{problemType}"
+        newReportsDir = reportDir + '/new'
+        doneReportsDir = reportDir + '/done'
+        fakeReportsDir = reportDir + '/falsePositives'
+        for dir in [reportDir, newReportsDir, doneReportsDir, fakeReportsDir]:
+            if not os.path.exists(dir):
+                os.makedirs(dir)
         troubledTasks = os.listdir(newReportsDir)
         for task in troubledTasks:
             if 'sciaba' in task:
                 continue
             taskDir = os.path.join(newReportsDir, task)
-            if os.path.isfile(taskDir):  # old format
-                shutil.move(taskDir, doneReportsDir)
-                continue
             doneTaskDir = os.path.join(doneReportsDir, task)
             # in doneReportsDir we move one file at a time in a subdir named as the task
             if not os.path.exists(doneTaskDir):
@@ -60,8 +60,9 @@ def main():
             # count files in the taskDir, EOS on Fuse has a limit so use eos command
             result = subprocess.run(f"eos ls {taskDir} |wc -l",shell=True, stdout=subprocess.PIPE, check=False)
             nBadFileReports = int(result.stdout.decode('utf-8'))
-            if nBadFileReports > 30:
+            if nBadFileReports > 30 and not problemType == 'truncated':
                 # likely code, not files, can't fix whole datasets
+                # but we always trust truncated files to be really bad
                 shutil.move(taskDir, fakeTaskDir)
                 continue
             newFiles = os.listdir(taskDir)

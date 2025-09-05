@@ -5,7 +5,7 @@ DESIRED_IMAGE="${DESIRED_IMAGE:=registry.cern.ch/cmscrab/crabserver:$NEW_IMAGE_T
 
 UPSTREAM_IAC_REPO_URL="${UPSTREAM_IAC_REPO_URL:=https://github.com/sinonkt/CMSKubernetes}"
 UPSTREAM_IAC_BRANCH="${UPSTREAM_IAC_BRANCH:=migrate-to-argocd}"
-GITLAB_SIDECAR_REPO_URL="${GITLAB_SIDECAR_REPO_URL:=gitlab.cern.ch/kphornsi/crab-iac}"
+GITLAB_SIDECAR_REPO_URL="${GITLAB_SIDECAR_REPO_URL:=gitlab.cern.ch/crab3/crab-iac-overlays-sidecar}"
 GITLAB_SIDECAR_REPO_BRANCH="${GITLAB_SIDECAR_REPO_BRANCH:=master}"
 GITLAB_SIDECAR_REPO_PAT="${GITLAB_SIDECAR_REPO_PAT:?GITLAB_SIDECAR_REPO_PAT is required}"
 CI_BOT_USER_NAME="${CI_BOT_USER_NAME:=crabserver-ci-bot}"
@@ -20,6 +20,18 @@ git clone --branch ${GITLAB_SIDECAR_REPO_BRANCH} \
   "https://oauth2:${GITLAB_SIDECAR_REPO_PAT}@${GITLAB_SIDECAR_REPO_URL}" \
   $WORKDIR/crab-iac
 
+# Automatically bumped to latest base.
+yq -y -i --arg LATEST_COMMIT_SHA "$LATEST_COMMIT_SHA" '
+  .resources[0] |=
+    ( if test("^https://raw\\.githubusercontent\\.com/")
+      then (split("/") | .[5] = $LATEST_COMMIT_SHA | join("/"))
+      elif test("^https://github\\.com/.+\\.git//")
+      then sub("([?&]ref=)[^&]*"; "?ref=" + $LATEST_COMMIT_SHA)
+      else .
+      end )
+' $WORKDIR/crab-iac/argocd/apps/crab/crabserver/overlays/$DEPLOY_ENV/kustomization.yaml
+
+# Automatically bump image regarding DevOperator desired image.
 yq -i -y --arg DESIRED_IMAGE "$DESIRED_IMAGE" '
   .spec.template.spec.containers |=
     map(if .name=="crabserver"
@@ -30,6 +42,6 @@ yq -i -y --arg DESIRED_IMAGE "$DESIRED_IMAGE" '
 pushd $WORKDIR/crab-iac
 git config user.name  "$CI_BOT_USER_NAME"
 git config user.email "$CI_BOT_USER_EMAIL"
-git commit -am "bump ${DEPLOY_ENV} crabserver image -> ${NEW_IMAGE_TAG}, bump upstream base -> ${LATEST_COMMIT_SHA}"
+git commit -am "bumped ${DEPLOY_ENV}'s {crabserver:${NEW_IMAGE_TAG}|base:${LATEST_COMMIT_SHA}}"
 git push -u origin $GITLAB_SIDECAR_REPO_BRANCH
 popd
