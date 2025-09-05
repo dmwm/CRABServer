@@ -3001,18 +3001,18 @@ class PostJob():
         if first_pj_execution():
             crab_retry = retry_info['post']
             retry_info['post'] += 1
+            try:
+                with open(fname + '.tmp', 'w') as fd:
+                    json.dump(retry_info, fd)
+                os.rename(fname + '.tmp', fname)
+            except Exception:
+                msg = "Failed to update file %s with increased post-job count by +1." % (fname)
+                msg += "\nDetails follow:"
+                self.logger.exception(msg)
+                return 1, crab_retry
         else:
             crab_retry = retry_info['post'] - 1
 
-        try:
-            with open(fname + '.tmp', 'w') as fd:
-                json.dump(retry_info, fd)
-            os.rename(fname + '.tmp', fname)
-        except Exception:
-            msg = "Failed to update file %s with increased post-job count by +1." % (fname)
-            msg += "\nDetails follow:"
-            self.logger.exception(msg)
-            return 1, crab_retry
         return 0, crab_retry
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

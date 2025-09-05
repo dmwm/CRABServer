@@ -39,19 +39,15 @@ class PreJob:
         self.prejob_exit_code = None
         self.logger = logging.getLogger()
         self.hold_requested = False
-        self.max_retries = 3  # default, can be overridden by classad 
 
 
     def calculate_crab_retry(self):
         """
     Determine the CRAB retry count and whether the next job should be held.
 
-    In the new model, DAGMan's retry counter is ignored. The authoritative
+    In the new model, DAGMan's retry counter is used only in case of exception. The authoritative
     source of truth is the `retry_info/job.<id>.txt` file, which is updated
-    by PostJob after each attempt. It contains:
-      - 'pre': number of times PreJob has run for this job
-      - 'post': number of times PostJob has run for this job
-      - 'hold': whether the next attempt should be submitted in Hold state
+    by PostJob after each attempt. 
 
     PreJob reads these values, returns the retry number, and sets an internal
     flag (`self.hold_requested`) that will be applied when creating the next
@@ -60,45 +56,54 @@ class PreJob:
         retmsg = ""
         ## Load the retry_info.
         retry_info_file_name = "retry_info/job.%s.txt" % (self.job_id)
-        retry_info = {'pre': 0,'post': 0, 'hold': False}
         if os.path.exists(retry_info_file_name):
             try:
                 with open(retry_info_file_name, 'r', encoding='utf-8') as fd:
                     retry_info = json.load(fd)
             except Exception:
                 retmsg += "\n\tFailed to load file %s" % (retry_info_file_name)
-                pass
+                retmsg += "\n\tWill use DAGMan retry number (%s)" % (self.dag_retry)
+                return self.dag_retry, retmsg
+        else:
+            retry_info = {'pre': 0, 'post': 0, 'hold': False}
 
         retmsg += "\n\tLoaded retry_info = %s" % (retry_info)
 
+        ## Simple validation of the retry_info.
+        for key in ['pre',  'post', 'hold']:
+            if key not in retry_info:
+                retmsg += "\n\tKey '%s' not found in retry_info (%s)" % (key, retry_info)
+                retmsg += "\n\tWill use DAGMan retry number (%s)" % (self.dag_retry)
+                return self.dag_retry, retmsg
+
         ## Define the retry number for the pre-job as the number of times the post-job has
         ## been ran.
-        crab_retry = retry_info.get('post', 0)
+        crab_retry = retry_info['post']
         ## hold_requested set by PostJob
         self.hold_requested = retry_info.get('hold', False)
 
-        ## The next (first) if statement is trying to catch the case in which the job or
-        ## the pre-job was re-started before the post-job started to run ...
-        job_out_file_name = "job_out.%s" % (self.job_id)
-        if retry_info['pre'] > retry_info['post']:
-            ## If job_out exists, then the job was likely submitted and we should run the
-            ## post-job.
-            if os.path.exists(job_out_file_name):
-                retmsg += "\n\tFile %s already exists." % (job_out_file_name)
-                retmsg += "\n\tIt seems the job has already been submitted."
-                retmsg += "\n\tSetting the pre-job exit code to 1."
-                self.prejob_exit_code = 1
-        ## ... or not.
-        else:
-            ## If the job_out doesn't exist, then this is certainly (ok, 99.99% certainly)
-            ## the first time the pre-job runs for this job retry. So we set the 'pre' count
-            ## in retry_info equal to the 'post' count, and add +1 to account for the current
-            ## pre-job run. Note that we don't use the 'pre' count anywhere else than here,
-            ## so its only purpose is to detect job (pre-job) re-starts that occur before
-            ## the post-job runs.
-            if not os.path.exists(job_out_file_name):
-                retry_info['pre'] = retry_info['post'] + 1
-                retmsg += "\n\tUpdated retry_info = %s" % (retry_info)
+        # ## The next (first) if statement is trying to catch the case in which the job or
+        # ## the pre-job was re-started before the post-job started to run ...
+        # job_out_file_name = "job_out.%s" % (self.job_id)
+        # if retry_info['pre'] > retry_info['post']:
+        #     ## If job_out exists, then the job was likely submitted and we should run the
+        #     ## post-job.
+        #     if os.path.exists(job_out_file_name):
+        #         retmsg += "\n\tFile %s already exists." % (job_out_file_name)
+        #         retmsg += "\n\tIt seems the job has already been submitted."
+        #         retmsg += "\n\tSetting the pre-job exit code to 1."
+        #         self.prejob_exit_code = 1
+        # ## ... or not.
+        # else:
+        #     ## If the job_out doesn't exist, then this is certainly (ok, 99.99% certainly)
+        #     ## the first time the pre-job runs for this job retry. So we set the 'pre' count
+        #     ## in retry_info equal to the 'post' count, and add +1 to account for the current
+        #     ## pre-job run. Note that we don't use the 'pre' count anywhere else than here,
+        #     ## so its only purpose is to detect job (pre-job) re-starts that occur before
+        #     ## the post-job runs.
+        #     if not os.path.exists(job_out_file_name):
+        #         retry_info['pre'] = retry_info['post'] + 1
+        #         retmsg += "\n\tUpdated retry_info = %s" % (retry_info)
 
         ## Save the retry_info dictionary to file.
         retmsg += "\n\tSaving retry_info = %s to %s" % (retry_info, retry_info_file_name)
@@ -109,7 +114,6 @@ class PreJob:
             retmsg += "\n\tSuccessfully saved %s" % (retry_info_file_name)
         except Exception:
             retmsg += "\n\tFailed to save %s" % (retry_info_file_name)
-            pass
 
         return crab_retry, retmsg
 
