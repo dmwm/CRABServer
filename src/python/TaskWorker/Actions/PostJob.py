@@ -1583,7 +1583,7 @@ class PostJob():
         self.dag_jobid           = args[0] # = ClusterId.ProcId
         self.job_return_code     = int(args[1])
         self.dag_retry           = int(args[2])
-        self.max_retries         = 3 #int(args[3]) commenting out for testing
+        self.max_retries         = int(args[3])
         # TODO: Why not get the request name from the job ad?
         # We will need to parse the job ad earlier, that's all.
         self.reqname             = args[4]

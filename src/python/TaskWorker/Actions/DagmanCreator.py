@@ -484,7 +484,7 @@ class DagmanCreator(TaskAction):
         # (P.S. why 1 day ago? because there is recurring action which is updating user proxy and lifetime.)
         # ** If New periodic remove expression is added, also it should have Periodic Remove Reason. **
         # ** Otherwise message will not be clear and it is hard to debug **
-        periodicRemove = "( (JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*24*60*60) )"  # a) job is held for more than 7 days(not mins) testing
+        periodicRemove = "( (JobStatus =?= 5) && (time() - EnteredCurrentStatus > (TASKLIFETIME + 10*24*60*60)) )"  # a) job is held for more than 10 days above tasklifetime testing
         periodicRemove += "|| ( (JobStatus =?= 1) && (time() - EnteredCurrentStatus > 7*24*60*60) )"  # b)
         periodicRemove += "|| ( (JobStatus =?= 2) && ( "  # c)
         periodicRemove += "(MemoryUsage =!= UNDEFINED && MemoryUsage > RequestMemory)"  # c) 1)
@@ -505,7 +505,7 @@ class DagmanCreator(TaskAction):
         periodicRemoveReason += "ifThenElse(MaxWallTimeMinsRun * 60 < (time() - EnteredCurrentStatus), \"Removed due to wall clock limit\","
         periodicRemoveReason += f"ifThenElse(DiskUsage > {MAX_DISK_SPACE}, \"Removed due to disk usage\","
         periodicRemoveReason += "ifThenElse(time() > CRAB_TaskEndTime, \"Removed due to reached CRAB_TaskEndTime\","
-        periodicRemoveReason += "\"Removed due to job being held\"))))))"  # one closed ")" for each "ifThenElse("
+        periodicRemoveReason += "\"Removed due to job being held for more than 10 days above tasklifetime\"))))))"  # one closed ")" for each "ifThenElse("
         jobSubmit['My.PeriodicRemoveReason'] = periodicRemoveReason
 
         # tm_extrajdl contains a list of k=v assignements to be turned each into a classAds
@@ -864,7 +864,7 @@ class DagmanCreator(TaskAction):
 
         ## In the future this parameter may be set by the user in the CRAB configuration
         ## file and we would take it from the Task DB.
-        self.task['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
+        self.task['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 100)
 
         runtime = self.task['tm_split_args'].get('minutes_per_job', -1)
 
