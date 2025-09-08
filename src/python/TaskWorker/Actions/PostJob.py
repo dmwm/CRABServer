@@ -1317,7 +1317,7 @@ class PostJob():
         self.output_dataset      = None
         # The crab_retry is the number of times the post-job was ran (not necessarilly
         # completing) for this job id.
-        self.crab_retry          = None
+        self.crab_retry          = 0
         # These attributes are read from the job ad (see parse_job_ad()).
         self.job_ad              = {}
         self.dest_site           = None
