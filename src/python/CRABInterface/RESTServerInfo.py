@@ -51,5 +51,5 @@ class RESTServerInfo(RESTEntity):
         yield backendUrlsDict
 
     def version(self , **kwargs):
-        yield self.config.compatibleVersions
+        yield self.config.compatibleClientVersions
 
