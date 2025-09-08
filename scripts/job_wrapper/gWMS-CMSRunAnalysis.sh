@@ -219,6 +219,11 @@ touch jobReport.json
 #MM: Are these two lines needed?
 touch jobReport.json.$CRAB_Id
 
+echo "======== Expand JobWrapper Tarball at $(TZ=GMT date) ========"
+tar xf CMSRunAnalysis.tar.gz
+ls
+echo "======== Expand JobWrapper Tarball completed ========"
+
 echo "======== PROXY INFORMATION START at $(TZ=GMT date) ========"
 voms-proxy-info -all
 echo "======== PROXY INFORMATION FINISH at $(TZ=GMT date) ========"
@@ -229,7 +234,9 @@ TOKEN_PATH="/srv/.condor_creds/cms_crab.use"
 if [[ -e $TOKEN_PATH ]]; then
   echo "the file $TOKEN_PATH exists"
   if [[ -s $TOKEN_PATH ]]; then
-      echo "the file $TOKEN_PATH is non-empty. Shall we use it as BEARER_TOKEN_FILE ?"
+      echo "the file $TOKEN_PATH is non-empty. TOKEN INFORMATION:"
+      ./httokendecode  -a -H $TOKEN_PATH
+      echo " Shall we use it as BEARER_TOKEN_FILE ?"
       # only for selected CMSSW releases
       JOB_CMSSW=`grep '^CRAB_JobSW =' $_CONDOR_JOB_AD|tr -d '"'|tr -d ' '|cut -d = -f 2`
       JOB_CMSSW_Major=`echo $JOB_CMSSW | cut -d '_' -f 2`
@@ -261,10 +268,6 @@ if [[ -e $TOKEN_PATH ]]; then
 fi
 
 echo "======== TOKEN SETUP FINISH at $(TZ=GMT date) ========"
-echo "======== Expand JobWrapper Tarball at $(TZ=GMT date) ========"
-tar xf CMSRunAnalysis.tar.gz
-ls
-echo "======== Expand JobWrapper Tarball completed ========"
 
 echo "======== CMSRunAnalysis.sh at $(TZ=GMT date) STARTING ========"
 time sh ./CMSRunAnalysis.sh "$@" --oneEventMode=$CRAB_oneEventMode

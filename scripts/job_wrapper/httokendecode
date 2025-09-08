@@ -1,0 +1,142 @@
+#!/usr/bin/bash
+# Based on
+#   https://gist.github.com/thomasdarimont/46358bc8167fce059d83a1ebdb92b0e7
+# Modified to understand WLCG Bearer Token Discovery and to have an option
+#  to print the algorithm in the first part of the token
+
+usage()
+{
+    echo 'Usage: htdecodetoken [-a] [-H] [file]'
+    echo
+    echo 'Decodes a JSON Web Token'
+    echo '  -a: show algorithm portion of JWT'
+    echo '  -H: show dates in human readable format instead of epoch'
+    echo 'File name may be "-" to read from stdin.'
+    echo 'If file name not given, follows WLCG Bearer Token Discovery'
+    echo '  which is to first try $BEARER_TOKEN, next $BEARER_TOKEN_FILE,'
+    echo '  and next ${XDG_RUNTIME_DIR:-/tmp}/bt_u`id -u`.'
+    echo 'If scitokens-verify is available, will also validate the token.'
+    exit 1
+} >&2
+
+decode_base64_url() {
+  local len=$((${#1} % 4))
+  local result="$1"
+  if [ $len -eq 2 ]; then result="$1"'=='
+  elif [ $len -eq 3 ]; then result="$1"'=' 
+  fi
+  echo "$result" | tr '_-' '/+' | base64 --decode
+}
+
+
+decode_jwt() {
+  local showalg=$1
+  local token=$2
+  if "$showalg" ; then
+      decode_base64_url "$(echo "$token"|cut -d. -f1)" | jq .
+  fi
+  decode_base64_url "$(echo "$token"|cut -d. -f2)" | jq .
+}
+
+
+
+human_dates() {
+
+    local wrd
+    local w1
+    local date
+
+    for wrd in "$@"; do
+        w1=${wrd/,/}
+        if [[ "$w1" =~ ^[0-9]+$ ]]; then
+            # field is entirely numeric
+            echo -n "\"$(date --date=@$w1)\""
+            if [ "$wrd" != "$w1" ]; then
+                # add the comma back
+                echo ','
+            else
+                echo
+            fi
+        else
+            echo "$wrd"
+        fi
+    done
+}
+
+
+# script starts here -- "main"
+
+set -e
+
+SHOWALG=false
+HUMANDATE=false
+NUMSHIFT=0
+while getopts ":aH" opt; do
+    case "$opt" in
+       a)
+          SHOWALG=true
+          (( NUMSHIFT+=1 ))
+          ;;
+       H)
+          HUMANDATE=true
+          (( NUMSHIFT+=1 ))
+          ;;
+       *)
+          usage
+    esac
+done
+shift "$NUMSHIFT"
+
+TOKEN=""
+TOKENFILE=""
+if [ $# = 0 ]; then
+    if [ -n "$BEARER_TOKEN" ]; then
+        TOKEN="$BEARER_TOKEN"
+    else
+        TOKENFILE="${BEARER_TOKEN_FILE:-${XDG_RUNTIME_DIR:-/tmp}/bt_u`id -u`}"
+    fi
+elif [ $# = 1 ]; then
+    if [ "$1" = - ]; then
+        read TOKEN # from stdin
+    else
+        TOKENFILE="$1"
+    fi
+else
+    usage
+fi
+if [ -n "$TOKENFILE" ]; then
+    if [ ! -e "$TOKENFILE" ]; then
+        echo "$TOKENFILE not found" >&2
+        exit 1
+    fi
+    read TOKEN <$TOKENFILE
+fi
+if [ -z "$TOKEN" ]; then
+    echo "Token is empty" >&2
+    usage
+fi
+
+
+JWT="$(decode_jwt "$SHOWALG" "$TOKEN")"
+
+if "$HUMANDATE"  ; then
+   READABLE="$(human_dates $JWT)"
+   echo $READABLE | jq .
+else
+   echo "$JWT" | jq .
+fi
+
+set +e
+VERIFY="$(command -v scitokens-verify)"
+if [ $? != 0 ]; then
+    # silently exit if scitokens-verify not found
+    exit
+fi
+VERIFYOUT="$($VERIFY $TOKEN)"
+RET=$?
+if [ $RET != 0 ]; then
+    if [ -n "$VERIFYOUT" ]; then
+        echo "$VERIFYOUT" >&2
+    fi
+    exit $RET
+fi
