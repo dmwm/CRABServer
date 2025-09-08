@@ -88,7 +88,8 @@ global cfgFallback  # pylint: disable=global-statement, global-at-module-level
 cfgFallback = {}
 
 
-def getCentralConfig(extconfigurl, mode):
+def getCentralConfig(extconfigurl):
+    # this can be removed once htcondor pool and schedd list is managed as TW config
     """Utility to retrieve the central configuration to be used for dynamic variables
     arg str extconfigurl: the url pointing to the external configuration parameter
     arg str mode: also known as the variant of the rest (prod, preprod, dev, private)
@@ -124,31 +125,10 @@ def getCentralConfig(extconfigurl, mode):
             return cfgFallback[externalLink]
 
     extConfCommon = json.loads(retrieveConfig(extconfigurl))
-    extConfSchedds = json.loads(retrieveConfig(extConfCommon['htcondorScheddsLink']))
-
-    # The code below constructs dict from below provided JSON structure
-    # {   u'htcondorPool': '', u'compatible-version': [''], u'htcondorScheddsLink': '',
-    #     u'modes': [{
-    #         u'mode': '', u'backend-urls': {
-    #             u'htcondorSchedds': [''], u'cacheSSL': '', u'baseURL': ''}}],
-    #     u'banned-out-destinations': [], u'delegate-dn': ['']}
-    # to match expected dict structure which is:
-    # {   u'compatible-version': [''], u'htcondorScheddsLink': '',
-    #     'backend-urls': {
-    #         u'htcondorSchedds': {u'crab3@vocmsXXXX.cern.ch': {u'proxiedurl': '', u'weightfactor': 1}},
-    #         u'cacheSSL': '', u'baseURL': '', 'htcondorPool': ''},
-    #     u'banned-out-destinations': [], u'delegate-dn': ['']}
-    extConfCommon['backend-urls'] = next((item['backend-urls'] for item in extConfCommon['modes'] if item['mode'] == mode), None)
+    extConfCommon["backend-urls"] = {}
     extConfCommon['backend-urls']['htcondorPool'] = extConfCommon.pop('htcondorPool')
-    del extConfCommon['modes']
-
-    # if htcondorSchedds": [] is not empty, it gets populated with the specified list of schedds,
-    # otherwise it takes default list of schedds
-    if extConfCommon['backend-urls']['htcondorSchedds']:
-        extConfCommon['backend-urls']['htcondorSchedds'] = {k: v for k, v in extConfSchedds.items() if
-                                                            k in extConfCommon['backend-urls']['htcondorSchedds']}
-    else:
-        extConfCommon["backend-urls"]["htcondorSchedds"] = extConfSchedds
+    extConfSchedds = json.loads(retrieveConfig(extConfCommon['htcondorScheddsLink']))
+    extConfCommon["backend-urls"]["htcondorSchedds"] = extConfSchedds
 
     return extConfCommon
 
