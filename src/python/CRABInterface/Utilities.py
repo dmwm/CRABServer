@@ -146,7 +146,7 @@ def conn_handler(services):
             if ('centralconfig' in services and \
                     (not args[0].centralcfg.centralconfig or (args[0].centralcfg.cachetime + 1800 < mktime(gmtime())))):
                 args[0].centralcfg = ConfigCache(
-                    centralconfig=getCentralConfig(extconfigurl=args[0].config.extconfigurl, mode=args[0].config.mode),
+                    centralconfig=getCentralConfig(extconfigurl=args[0].config.extconfigurl),
                     cachetime=mktime(gmtime()))
             return func(*args, **kwargs)
         return wrapped_func

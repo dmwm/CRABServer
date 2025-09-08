@@ -7,7 +7,6 @@ from WMCore.REST.Validation import validate_str
 # CRABServer dependecies here
 from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import RX_SUBRES_SI, RX_TASKNAME
-from CRABInterface.Utilities import conn_handler
 from CRABInterface.__init__ import __version__
 
 
