@@ -2,7 +2,6 @@
 """
 
 # external dependecies here
-import re
 import logging
 import cherrypy
 # WMCore dependecies here

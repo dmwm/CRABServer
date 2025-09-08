@@ -6,13 +6,11 @@ import socket
 import os
 
 import cherrypy
-from subprocess import getstatusoutput
 from time import mktime, gmtime
 
 # WMCore dependecies here
 from WMCore.REST.Server import DatabaseRESTApi, rows
 from WMCore.REST.Format import JSONFormat
-from WMCore.REST.Error import ExecutionError
 
 # CRABServer dependecies here
 from CRABInterface.Utilities import ConfigCache, getCentralConfig
@@ -100,7 +98,7 @@ class RESTBaseAPI(DatabaseRESTApi):
         if cherrypy.request.db['type'].__name__ == 'MySQLdb':
             return c, c.execute(sql, kwbinds)
 
-        with MeasureTime(self.logger, modulename=__name__, label="RESTBaseAPI.execute") as mt:
+        with MeasureTime(self.logger, modulename=__name__, label="RESTBaseAPI.execute"):
             ret = c.execute(None, *binds, **kwbinds)
         return c, ret
 
@@ -115,7 +113,7 @@ class RESTBaseAPI(DatabaseRESTApi):
         trace and cherrypy.log("%s executemany: %s %s" % (trace, binds, kwbinds))
         if cherrypy.request.db['type'].__name__ == 'MySQLdb':
             return c, c.executemany(sql, binds[0])
-        with MeasureTime(self.logger, modulename=__name__, label="RESTBaseAPI.executemany") as mt:
+        with MeasureTime(self.logger, modulename=__name__, label="RESTBaseAPI.executemany"):
             ret = c.executemany(None, *binds, **kwbinds)
         return c, ret
 
@@ -172,9 +170,9 @@ class RESTBaseAPI(DatabaseRESTApi):
                 formatter = logging.Formatter(f'%(asctime)s:%(trace_id)s:%(levelname)s:%(module)s:%(message)s - Podname={podname} Type=crablog')
                 # change log format of cherry to append "Type=cherrypylog"
                 logfmt = logging.Formatter(f'%(message)s - Podname={podname} Type=cherrypylog')
-                h = cherrypy.log._get_builtin_handler(cherrypy.log.access_log, 'screen')
+                h = cherrypy.log._get_builtin_handler(cherrypy.log.access_log, 'screen')  # pylint: disable=protected-access
                 h.setFormatter(logfmt)
-                h = cherrypy.log._get_builtin_handler(cherrypy.log.error_log, 'screen')
+                h = cherrypy.log._get_builtin_handler(cherrypy.log.error_log, 'screen')  # pylint: disable=protected-access
                 h.setFormatter(logfmt)
                 hdlr.setFormatter(formatter)
             else:
