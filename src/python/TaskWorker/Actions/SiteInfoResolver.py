@@ -25,7 +25,7 @@ class SiteInfoResolver(TaskAction):
         """ Determine wether the user wants to ignore the globalblacklist
         """
 
-        return kwargs['task']['tm_ignore_globalBlacklist'] == 'T'
+        return kwargs['task']['tm_ignore_global_blacklist'] == 'T'
 
     def execute(self, *args, **kwargs):
         """ ... """
