@@ -1792,6 +1792,7 @@ class PostJob():
             if self.retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR:
                 msg = "The retry handler indicated this was a fatal error."
                 self.logger.info(msg)
+                self.hold_requested = True
                 self.set_dashboard_state('FAILED')
                 self.set_state_ClassAds('FAILED')
                 self.logger.info("====== Finished to analyze job exit status.")
@@ -1811,6 +1812,7 @@ class PostJob():
                     msg = "The retry handler indicated this was a recoverable error."
                     msg += " DAGMan will retry."
                     self.logger.info(msg)
+                    self.hold_requested = False
                     self.set_dashboard_state('COOLOFF')
                     self.set_state_ClassAds('COOLOFF')
                     self.logger.info("====== Finished to analyze job exit status.")
@@ -1819,6 +1821,7 @@ class PostJob():
                 msg = "The retry handler returned an unexpected value (%d)." % (self.retryjob_retval)
                 msg += " Will consider this as a fatal error. DAGMan will not retry."
                 self.logger.info(msg)
+                self.hold_requested = True
                 self.set_dashboard_state('FAILED')
                 self.set_state_ClassAds('FAILED')
                 self.logger.info("====== Finished to analyze job exit status.")
@@ -1829,6 +1832,7 @@ class PostJob():
                 msg = "The maximum allowed number of retries was hit and the job failed."
                 msg += " Setting this node (job) to permanent failure."
                 self.logger.info(msg)
+                self.hold_requested = True
                 self.set_dashboard_state('FAILED')
                 self.set_state_ClassAds('FAILED')
                 self.logger.info("====== Finished to analyze job exit status.")
