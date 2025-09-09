@@ -9,6 +9,7 @@ from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.WorkerExceptions import ConfigException, TaskWorkerException
 from TaskWorker.WorkerUtilities import CRICService
 
+
 class SiteInfoResolver(TaskAction):
     """
     Given a task definition, resolve site white/black list with CRIC-related sites informations.
@@ -36,17 +37,18 @@ class SiteInfoResolver(TaskAction):
         # It should not block any site for Site Metrics and if needed for other activities
         # self.config.TaskWorker.ActivitiesToRunEverywhere = ['hctest', 'hcdev']
         # The other case where the blacklist is ignored is if the user sset this explicitly in his configuration
-        if self.isGlobalBlacklistIgnored(kwargs) or (hasattr(self.config.TaskWorker, 'ActivitiesToRunEverywhere') and \
-                   task['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere):
+        if (self.isGlobalBlacklistIgnored(kwargs)
+                or (hasattr(self.config.TaskWorker, 'ActivitiesToRunEverywhere')
+                    and task['tm_activity'] in self.config.TaskWorker.ActivitiesToRunEverywhere)):
             globalBlacklist = set()
             self.logger.debug("Ignoring the CRAB site blacklist.")
 
         task['tm_site_whitelist'] = self.expandSites(task['tm_site_whitelist'])
         task['tm_site_blacklist'] = self.expandSites(task['tm_site_blacklist'])
         if 'resubmit_site_whitelist' in task and task['resubmit_site_whitelist']:
-            task['resubmit_site_whitelist']  = self.expandSites(task['resubmit_site_whitelist'])
+            task['resubmit_site_whitelist'] = self.expandSites(task['resubmit_site_whitelist'])
         if 'resubmit_site_blacklist' in task and task['resubmit_site_blacklist']:
-            task['resubmit_site_blacklist']  = self.expandSites(task['resubmit_site_blacklist'])
+            task['resubmit_site_blacklist'] = self.expandSites(task['resubmit_site_blacklist'])
 
         self.logger.debug("Site whitelist: %s", list(task['tm_site_whitelist']))
         self.logger.debug("Site blacklist: %s", list(task['tm_site_blacklist']))
@@ -68,9 +70,7 @@ class SiteInfoResolver(TaskAction):
             self.logger.warning(msg)
 
         try:
-            allPossibleProcessingSites = (
-                set(self.resourceCatalog.getAllPSNs()) - globalBlacklist
-            )
+            allPossibleProcessingSites = set(self.resourceCatalog.getAllPSNs()) - globalBlacklist
             task['all_possible_processing_sites'] = list(allPossibleProcessingSites)
         except Exception as ex:
             msg = "The CRAB3 server backend could not contact the Resource Catalog to get the list of all CMS sites."
@@ -101,7 +101,7 @@ class SiteInfoResolver(TaskAction):
                     raise ConfigException(f"Remote output data site not valid, Cannot expand site {site} to anything")
                 res = res.union(expanded)
             else:
-                self.checkSite(site, pnn) # pylint: disable=protected-access
+                self.checkSite(site, pnn)  # pylint: disable=protected-access
                 res.add(site)
         return list(res)
 
@@ -131,12 +131,12 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
     resolver = SiteInfoResolver(test_config, crabserver=None)
-    assert resolver.checkSite('T2_US_Florida', pnn=False) is None, 'Site T2_US_Florida is valid' # pylint: disable=protected-access
+    assert resolver.checkSite('T2_US_Florida', pnn=False) is None, 'Site T2_US_Florida is valid'  # pylint: disable=protected-access
     try:
         resolver.checkSite('T2_TH_Bangkok', pnn=False)  # pylint: disable=protected-access
     except ConfigException as exc:
         assert str(exc) == 'A site name T2_TH_Bangkok that user specified is not in the list ' \
-               + 'of known CMS Processing Site Names' , \
+               + 'of known CMS Processing Site Names', \
                'Site T2_TH_Bangkok are not existing and should be invalid'
     assert sorted(resolver.expandSites(['T2_US*', 'T2_UK*'])) == sorted([  # pylint: disable=protected-access
         'T2_US_Caltech', 'T2_US_Florida', 'T2_US_MIT', 'T2_US_Nebraska', 'T2_US_Purdue', 'T2_US_UCSD',
