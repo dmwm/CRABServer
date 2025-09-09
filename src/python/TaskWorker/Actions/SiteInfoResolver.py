@@ -125,20 +125,19 @@ if __name__ == '__main__':
     from WMCore.Configuration import loadConfigurationFile
     from ServerUtilities import newX509env
     test_config = loadConfigurationFile('/data/srv/TaskManager/cfg/TaskWorkerConfig.py')
-    envForCMSWEB = newX509env(X509_USER_CERT=test_config.TaskWorker.cmscert, X509_USER_KEY=test_config.TaskWorker.cmskey)
+    test_config.TaskWorker.envForCMSWEB = newX509env(X509_USER_CERT=test_config.TaskWorker.cmscert, X509_USER_KEY=test_config.TaskWorker.cmskey)
     logging.basicConfig(level=logging.DEBUG)
 
-    with ((envForCMSWEB)):
-        resolver = SiteInfoResolver(test_config, crabserver=None)
-        assert resolver._checkSite('T2_US_Florida', pnn=False) is None, 'Site T2_US_Florida is valid' # pylint: disable=protected-access
-        try:
-            resolver._checkSite('T2_TH_Bangkok', pnn=False)  # pylint: disable=protected-access
-        except ConfigException as exc:
-            assert str(exc) == 'A site name T2_TH_Bangkok that user specified is not in the list ' \
-                   + 'of known CMS Processing Site Names' , \
-                   'Site T2_TH_Bangkok are not existing and should be invalid'
-        assert sorted(resolver._expandSites(['T2_US*', 'T2_UK*'])) == sorted([  # pylint: disable=protected-access
-            'T2_US_Caltech', 'T2_US_Florida', 'T2_US_MIT', 'T2_US_Nebraska', 'T2_US_Purdue', 'T2_US_UCSD',
-            'T2_US_Vanderbilt', 'T2_US_Wisconsin', 'T2_UK_London_Brunel', 'T2_UK_London_IC', 'T2_UK_SGrid_Bristol',
-            'T2_UK_SGrid_RALPP']), 'Site expansion is incorrect'
+    resolver = SiteInfoResolver(test_config, crabserver=None)
+    assert resolver._checkSite('T2_US_Florida', pnn=False) is None, 'Site T2_US_Florida is valid' # pylint: disable=protected-access
+    try:
+        resolver._checkSite('T2_TH_Bangkok', pnn=False)  # pylint: disable=protected-access
+    except ConfigException as exc:
+        assert str(exc) == 'A site name T2_TH_Bangkok that user specified is not in the list ' \
+               + 'of known CMS Processing Site Names' , \
+               'Site T2_TH_Bangkok are not existing and should be invalid'
+    assert sorted(resolver._expandSites(['T2_US*', 'T2_UK*'])) == sorted([  # pylint: disable=protected-access
+        'T2_US_Caltech', 'T2_US_Florida', 'T2_US_MIT', 'T2_US_Nebraska', 'T2_US_Purdue', 'T2_US_UCSD',
+        'T2_US_Vanderbilt', 'T2_US_Wisconsin', 'T2_UK_London_Brunel', 'T2_UK_London_IC', 'T2_UK_SGrid_Bristol',
+        'T2_UK_SGrid_RALPP']), 'Site expansion is incorrect'
     print('===== Test::All tests passed =====')
