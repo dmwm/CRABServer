@@ -49,7 +49,7 @@ class RetryJob():
         self.reqname = None
         self.job_return_code = None
         self.dag_retry = None
-        self.crab_retry = None
+        self.crab_retry = 0
         self.job_id = None
         self.dag_jobid = None
         self.dag_clusterid = None
