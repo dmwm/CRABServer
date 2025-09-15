@@ -864,7 +864,7 @@ class DagmanCreator(TaskAction):
 
         ## In the future this parameter may be set by the user in the CRAB configuration
         ## file and we would take it from the Task DB.
-        self.task['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 100)
+        self.task['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
 
         runtime = self.task['tm_split_args'].get('minutes_per_job', -1)
 
