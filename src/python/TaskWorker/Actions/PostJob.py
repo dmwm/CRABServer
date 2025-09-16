@@ -1306,7 +1306,7 @@ class PostJob():
         self.dag_jobid           = None # $JOBID
         self.job_return_code     = None # $RETURN
         self.dag_retry           = 100 # $RETRY
-        self.max_retries         = 3 # $MAX_RETRIES
+        self.max_retries         = 2 # $MAX_RETRIES
         self.reqname             = None
         self.job_id              = None
         self.source_dir          = None
