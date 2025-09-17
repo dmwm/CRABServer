@@ -16,4 +16,7 @@ RUN curl -Lo sops "https://github.com/mozilla/sops/releases/download/v${SOPS_VER
     && chmod +x sops \
     && mv sops /usr/local/bin/
 
+RUN wget -O- https://carvel.dev/install.sh > install.sh \
+    && bash install.sh
+
 COPY --from=crane /ko-app/crane /usr/bin/crane
