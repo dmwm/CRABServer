@@ -1,7 +1,6 @@
 set -euo pipefail
 DEPLOY_ENV="${DEPLOY_ENV:?DEPLOY_ENV is required}"
 NEW_IMAGE_TAG="${NEW_IMAGE_TAG:?NEW_IMAGE_TAG is required}"
-DESIRED_IMAGE="${DESIRED_IMAGE:=registry.cern.ch/cmscrab/crabserver:$NEW_IMAGE_TAG}"
 
 UPSTREAM_IAC_REPO_URL="${UPSTREAM_IAC_REPO_URL:=https://github.com/sinonkt/CMSKubernetes}"
 UPSTREAM_IAC_BRANCH="${UPSTREAM_IAC_BRANCH:=migrate-to-argocd}"
@@ -24,7 +23,7 @@ git clone --branch ${GITLAB_SIDECAR_REPO_BRANCH} \
 yq -i -y --arg LATEST_COMMIT_SHA "$LATEST_COMMIT_SHA" '.directories[0].contents[0].git.ref = $LATEST_COMMIT_SHA' $WORKDIR/crab-k8s-overlays/vendir.yml
 
 # Automatically bump image regarding DevOperator desired image.
-yq -i -y --arg DESIRED_IMAGE "$DESIRED_IMAGE" '.image.tag = $DESIRED_IMAGE' $WORKDIR/crab-k8s-overlays/helm/crabserver/values-$DEPLOY_ENV.yaml
+yq -i -y --arg NEW_IMAGE_TAG "$NEW_IMAGE_TAG" '.image.tag = $NEW_IMAGE_TAG' $WORKDIR/crab-k8s-overlays/helm/crabserver/values-$DEPLOY_ENV.yaml
 
 pushd $WORKDIR/crab-k8s-overlays
 vendir sync
