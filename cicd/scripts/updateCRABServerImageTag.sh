@@ -21,7 +21,7 @@ git clone --branch ${GITLAB_SIDECAR_REPO_BRANCH} \
   $WORKDIR/crab-k8s-overlays
 
 # Workaround, automatically bump chart via vendoring until we have clear helm chart registry. then we bumped chart version instead.
-yq -y -i --arg LATEST_COMMIT_SHA "$LATEST_COMMIT_SHA" '.directories[0].contents[0].git.ref = $LATEST_COMMIT_SHA' $WORKDIR/crab-k8s-overlays/vendir.yml
+yq -i -y --arg LATEST_COMMIT_SHA "$LATEST_COMMIT_SHA" '.directories[0].contents[0].git.ref = $LATEST_COMMIT_SHA' $WORKDIR/crab-k8s-overlays/vendir.yml
 
 # Automatically bump image regarding DevOperator desired image.
 yq -i -y --arg DESIRED_IMAGE "$DESIRED_IMAGE" '.image.tag = $DESIRED_IMAGE' $WORKDIR/crab-k8s-overlays/helm/crabserver/values-$DEPLOY_ENV.yaml
