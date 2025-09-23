@@ -326,8 +326,11 @@ class PreDAG():
             failTask(task['tm_taskname'], self.crabserver, failTaskMsg, self.logger, 'FAILED')
             return 1
         self.saveProcessedJobs(unprocessed)
-        uploadToS3(crabserver=self.crabserver, filepath='InputFiles.tar.gz',
-                   objecttype='runtimefiles', taskname=task['tm_taskname'],
+        uploadToS3(crabserver=self.crabserver, filepath='run_and_lumis.tar.gz',
+                   objecttype='clientlog', taskname=task['tm_taskname'],
+                   logger=self.logger)
+        uploadToS3(crabserver=self.crabserver, filepath='input_files.tar.gz',
+                   objecttype='clientlog', taskname=task['tm_taskname'],
                    logger=self.logger)
         return 0
 
