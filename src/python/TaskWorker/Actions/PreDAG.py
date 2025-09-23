@@ -327,10 +327,10 @@ class PreDAG():
             return 1
         self.saveProcessedJobs(unprocessed)
         uploadToS3(crabserver=self.crabserver, filepath='run_and_lumis.tar.gz',
-                   objecttype='clientlog', taskname=task['tm_taskname'],
+                   objecttype='runtimefiles', taskname=task['tm_taskname'],
                    logger=self.logger)
         uploadToS3(crabserver=self.crabserver, filepath='input_files.tar.gz',
-                   objecttype='clientlog', taskname=task['tm_taskname'],
+                   objecttype='runtimefiles', taskname=task['tm_taskname'],
                    logger=self.logger)
         return 0
 
