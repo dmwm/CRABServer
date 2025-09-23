@@ -36,7 +36,7 @@ from ast import literal_eval
 
 from WMCore.DataStructs.LumiList import LumiList
 
-from ServerUtilities import getLock, newX509env, MAX_IDLE_JOBS, MAX_POST_JOBS
+from ServerUtilities import getLock, newX509env, MAX_IDLE_JOBS, MAX_POST_JOBS, uploadToS3
 from RESTInteractions import CRABRest
 from RucioUtils import getNativeRucioClient
 from TaskWorker.Actions.Splitter import Splitter
@@ -326,6 +326,9 @@ class PreDAG():
             failTask(task['tm_taskname'], self.crabserver, failTaskMsg, self.logger, 'FAILED')
             return 1
         self.saveProcessedJobs(unprocessed)
+        uploadToS3(crabserver=self.crabserver, filepath='InputFiles.tar.gz',
+                   objecttype='runtimefiles', taskname=task['tm_taskname'],
+                   logger=self.logger)
         return 0
 
     @staticmethod
