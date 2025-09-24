@@ -328,8 +328,6 @@ class PreDAG():
             return 1
         self.saveProcessedJobs(unprocessed)
 
-        filesToUpdate = ['run_and_lumis.tar.gz', 'input_files.tar.gz']
-        addToGZippedTarfile(filesToUpdate, 'CMSRunAnalysis.tar.gz')
         addToGZippedTarfile(['CMSRunAnalysis.tar.gz'], 'InputFiles.tar.gz')
         uploadToS3(crabserver=self.crabserver, filepath='InputFiles.tar.gz',
                    objecttype='runtimefiles', taskname=task['tm_taskname'],
