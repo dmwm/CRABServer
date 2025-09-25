@@ -62,9 +62,6 @@ stages:
     - CMSSW_12_5_0
     - CMSSW_11_3_4
     - CMSSW_10_6_26
-    - CMSSW_10_1_0
-    - CMSSW_9_4_21
-    - CMSSW_8_0_36
 
 get_env:
   # NB rules are evaluated like python `any()`. If there is no rule the job runs all of the times.
