@@ -2,7 +2,6 @@
 """
 
 # external dependecies here
-import re
 import logging
 import cherrypy
 # WMCore dependecies here
@@ -246,7 +245,7 @@ class RESTUserWorkflow(RESTEntity):
                 validate_real("totalunits", param, safe, optional=True)
             validate_str("cachefilename", param, safe, RX_CACHENAME, optional=False)
             validate_str("debugfilename", param, safe, RX_CACHENAME, optional=True)
-            validate_str("cacheurl", param, safe, RX_CACHEURL, optional=False)
+            validate_str("cacheurl", param, safe, RX_CACHEURL, optional=True)
             validate_str("lfn", param, safe, RX_LFN, optional=True)
             self._checkOutLFN(safe.kwargs, username)
             validate_strlist("addoutputfiles", param, safe, RX_ADDFILE, custom_err="Incorrect 'JobType.outputFiles' parameter. " \
@@ -257,8 +256,6 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("saveoutput", param, safe, optional=True)
             validate_num("faillimit", param, safe, optional=True)
             validate_num("ignorelocality", param, safe, optional=True)
-            if safe.kwargs['ignorelocality'] and self.centralcfg.centralconfig.get('ign-locality-blacklist', []):
-                safe.kwargs['siteblacklist'] += self.centralcfg.centralconfig['ign-locality-blacklist']
             validate_str("vorole", param, safe, RX_VOPARAMS, optional=True)
             validate_str("vogroup", param, safe, RX_VOPARAMS, optional=True)
             validate_num("publication", param, safe, optional=False)
@@ -534,6 +531,7 @@ class RESTUserWorkflow(RESTEntity):
             'inputblocks': inputblocks if inputblocks else None,
         }
 
+        cacheurl = f"S3/{self.config.s3_bucket}"   # record S3 bucket in task table
         return self.userworkflowmgr.submit(workflow=workflow, activity=activity, jobtype=jobtype, jobsw=jobsw, jobarch=jobarch,
                                            jobminuarch=jobminuarch, inputdata=inputdata, primarydataset=primarydataset,
                                            nonvaliddata=nonvaliddata, use_parent=useparent,

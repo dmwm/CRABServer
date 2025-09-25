@@ -24,9 +24,8 @@ class DataWorkflow(object):
     failedList = ['failed']
 
     @staticmethod
-    def globalinit(dbapi, credpath='/tmp', centralcfg=None, config=None):
+    def globalinit(dbapi, centralcfg=None, config=None):
         DataWorkflow.api = dbapi
-        DataWorkflow.credpath = credpath
         DataWorkflow.centralcfg = centralcfg
         DataWorkflow.config = config
 
@@ -269,7 +268,6 @@ class DataWorkflow(object):
             return [{'result': retmsg}]
 
         task_status = row.task_status
-        task_splitting = row.split_algo
 
         resubmitWhat = "publications" if publication else "jobs"
         self.logger.info("About to resubmit %s for workflow: %s.", resubmitWhat, workflow)
