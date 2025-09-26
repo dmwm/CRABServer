@@ -363,10 +363,17 @@ class DagmanSubmitter(TaskAction.TaskAction):
             retry = results[0]['JobStatus'] == 5 #5==Held
             msg = f"Task {workflow} already found on schedd {task['tm_schedd']} "
             if retry:
-                msg += "Going to retry submission later since the dag status is Held and the task should be removed on the schedd"
+                hold_code = results[0].get('HoldReasonCode', None)
+                hold_reason = results[0].get('HoldReason', "")          
+                # Only block if the hold is not resubmission-related
+                if hold_code == 1001 and hold_reason == "Held by CRAB PostJob request":
+                    self.logger.warning("The task was held by PostJob. User can resubmit.")
+                else:
+                    msg += "Going to retry submission later since the dag status is Held for a reason other than resubmission"
+                    raise TaskWorkerException(msg, retry)
             else:
                 msg += f"Aborting submission since the task is in state {results[0]['JobStatus']}"
-            raise TaskWorkerException(msg, retry)
+                raise TaskWorkerException(msg, retry)
         self.logger.debug("Task seems to be submitted correctly. Classads got from scheduler: %s", results)
 
         configreq = {'workflow': workflow,
