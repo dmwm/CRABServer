@@ -1378,7 +1378,7 @@ class PostJob():
 
     def get_defer_num(self):
 
-        DEFER_INFO_FILE = 'defer_info/defer_num.%s.%d.txt' % (self.job_id, self.crab_retry)
+        DEFER_INFO_FILE = 'defer_info/defer_num.%s.%d.txt' % (self.job_id, self.dag_retry)
         defer_num = 0
 
         #read retry number
