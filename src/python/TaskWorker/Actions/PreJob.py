@@ -320,17 +320,6 @@ class PreJob:
         if priority is not None:
             newJobSubmit['priority'] = str(priority)
 
-        ## Within the schedd, order the first few jobs in the task before all other tasks of the same priority.
-        pre_job_prio = '1'
-        if int(self.job_id.split('-')[0]) <= 5:
-            pre_job_prio = '0'
-        newJobSubmit['My.PreJobPrio1'] = pre_job_prio
-
-        ## The schedd will use PostJobPrio1 as a secondary job-priority sorting key: it
-        ## will first run jobs by JobPrio; then, for jobs with the same JobPrio, it will
-        ## run the job with the higher PostJobPrio1.
-        newJobSubmit['My.PostJobPrio1'] = str(self.task_ad['QDate'])
-
         ## Order retries before all other jobs in this task
         newJobSubmit['My.PostJobPrio2'] = str(crab_retry)
 

@@ -7,7 +7,6 @@ from WMCore.REST.Validation import validate_str
 # CRABServer dependecies here
 from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import RX_SUBRES_SI, RX_TASKNAME
-from CRABInterface.Utilities import conn_handler
 from CRABInterface.__init__ import __version__
 
 
@@ -39,22 +38,17 @@ class RESTServerInfo(RESTEntity):
             next(self.api.query(None, None, "select NULL from DUAL")) #Checking database connection
             return [{"crabserver":"Welcome","version":__version__}]
 
-    @conn_handler(services=['centralconfig'])
     def delegatedn(self, **kwargs):
         yield {'services': [self.config.delegateDN]}
 
-    @conn_handler(services=['centralconfig'])
     def backendurls(self , **kwargs):
-        yield self.centralcfg.centralconfig['backend-urls']
+        # need to keep this API until calls to it are removed from Client and TW
+        backendUrlsDict = {
+            "cacheSSL": "https://s3.cern.ch/crabcache",
+            "htcondorSchedds": []
+        }
+        yield backendUrlsDict
 
-    @conn_handler(services=['centralconfig'])
     def version(self , **kwargs):
-        yield self.centralcfg.centralconfig['compatible-version']+[__version__]
+        yield self.config.compatibleClientVersions
 
-    @conn_handler(services=['centralconfig'])
-    def bannedoutdest(self, **kwargs):
-        yield self.centralcfg.centralconfig['banned-out-destinations']
-
-    @conn_handler(services=['centralconfig'])
-    def ignlocalityblacklist(self, **kwargs):
-        yield self.centralcfg.centralconfig['ign-locality-blacklist']
