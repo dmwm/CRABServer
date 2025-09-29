@@ -67,7 +67,7 @@ class DagmanResubmitter(TaskAction):
         # schedd after the modifications are made.
         
         # Only operate on held jobs of this workflow
-        jobConst = f'(CRAB_DAGType =?= "BASE" && CRAB_ReqName =?= {classad.quote(workflow)} && JobStatus == 5 && HoldReason == "Held by CRAB PostJob request" && HoldReasonCode == 1001)'
+        jobConst = f'(CRAB_DAGType =?= "BASE" && CRAB_ReqName =?= {classad.quote(workflow)} && JobStatus == 5 && HoldReasonCode == "1001")'
         # 5 = Held
         #rootConst = f"(CRAB_DAGType =?= \"BASE\" && CRAB_ReqName =?= {classad.quote(workflow)})"
 

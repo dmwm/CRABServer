@@ -366,7 +366,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
                 hold_code = results[0].get('HoldReasonCode', None)
                 hold_reason = results[0].get('HoldReason', "")          
                 # Only block if the hold is not resubmission-related
-                if hold_code == 1001 and hold_reason == "Held by CRAB PostJob request":
+                if hold_code == "1001":
                     self.logger.warning("The task was held by PostJob. User can resubmit.")
                 else:
                     msg += "Going to retry submission later since the dag status is Held for a reason other than resubmission"

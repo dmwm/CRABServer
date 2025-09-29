@@ -344,7 +344,7 @@ class PreJob:
             self.logger.info("PreJob: marking job %s (retry %s) to be submitted on Hold", self.job_id, crab_retry)
             newJobSubmit['Hold'] = "True"
             newJobSubmit['HoldReason'] = '"Held by CRAB PostJob request"'
-            newJobSubmit['HoldReasonCode'] = 1001  # pick a custom number outside Condor’s reserved codes
+            newJobSubmit['HoldReasonCode'] = "1001"  # pick a custom number outside Condor’s reserved codes
 
 
         ## Finally read in the content of the generic Job.submit file as a string
