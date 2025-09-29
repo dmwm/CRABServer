@@ -3022,7 +3022,7 @@ class PostJob():
                 return 1, crab_retry
         else:
             crab_retry = retry_info['post'] - 1
-        if crab_retry >= self.max_retries:
+        if crab_retry >= self.max_retries - 1 :
             retry_info['hold'] = True
             try:
                 with open(fname + '.tmp', 'w') as fd:
