@@ -1305,8 +1305,8 @@ class PostJob():
         # https://htcondor.readthedocs.io/en/latest/automated-workflows/dagman-introduction.html#special-script-argument-macros
         self.dag_jobid           = None # $JOBID
         self.job_return_code     = None # $RETURN
-        self.dag_retry           = None # $RETRY
-        self.max_retries         = None # $MAX_RETRIES
+        self.dag_retry           = 100 # $RETRY
+        self.max_retries         = 2 # $MAX_RETRIES
         self.reqname             = None
         self.job_id              = None
         self.source_dir          = None
@@ -1317,7 +1317,7 @@ class PostJob():
         self.output_dataset      = None
         # The crab_retry is the number of times the post-job was ran (not necessarilly
         # completing) for this job id.
-        self.crab_retry          = None
+        self.crab_retry          = 0
         # These attributes are read from the job ad (see parse_job_ad()).
         self.job_ad              = {}
         self.dest_site           = None
@@ -1372,6 +1372,7 @@ class PostJob():
         self.logger.propagate = False
         self.postjob_log_file_name = None
         self.useAsoRucio = False
+        self.hold_requested = False
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1582,7 +1583,7 @@ class PostJob():
         self.dag_jobid           = args[0] # = ClusterId.ProcId
         self.job_return_code     = int(args[1])
         self.dag_retry           = int(args[2])
-        self.max_retries         = int(args[3])
+        self.max_retries         = 2 #int(args[3])
         # TODO: Why not get the request name from the job ad?
         # We will need to parse the job ad earlier, that's all.
         self.reqname             = args[4]
@@ -1660,7 +1661,7 @@ class PostJob():
             # DAGMan will resubmit the job unless the maximum allowed number of retries has
             # been reached already (DAGMan compares the DAGMan retry count against the
             # maximum allowed number of retries).
-            msg = "This is job retry number %d." % (self.dag_retry)
+            msg = "This is job retry number %d." % (self.crab_retry)
             msg += " The maximum allowed number of retries is %d." % (self.max_retries)
             self.logger.info(msg)
             # Print a message about the DAG cluster ID of the job, which can be -1 when the
@@ -1692,12 +1693,14 @@ class PostJob():
         retval = JOB_RETURN_CODES.RECOVERABLE_ERROR
         retmsg = "Failure during post-job execution."
         try:
-            retval, retmsg = self.execute_internal()
+            retval, retmsg, *hold = self.execute_internal()
             if retval == 4:
                 msg = "Deferring the execution of the post-job."
                 self.logger.info(msg)
                 self.log_finish_msg(retval)
                 return retval
+            if hold == [True]:
+                self.hold_requested=True
         except Exception:  # pylint: disable=broad-except
             self.logger.exception(retmsg)
 
@@ -1776,6 +1779,7 @@ class PostJob():
         """
 
         res = 0, ""
+        hold = getattr(self, "hold_requested", False)
 
         self.logger.info("====== Starting to analyze job exit status.")
         retry = RetryJob()
@@ -1791,16 +1795,18 @@ class PostJob():
             if self.retryjob_retval == JOB_RETURN_CODES.FATAL_ERROR:
                 msg = "The retry handler indicated this was a fatal error."
                 self.logger.info(msg)
+                hold = True
                 self.set_dashboard_state('FAILED')
                 self.set_state_ClassAds('FAILED')
                 self.logger.info("====== Finished to analyze job exit status.")
                 res = JOB_RETURN_CODES.FATAL_ERROR, ""
             elif self.retryjob_retval == JOB_RETURN_CODES.RECOVERABLE_ERROR:
-                if self.dag_retry >= self.max_retries:
+                if self.crab_retry >= self.max_retries:
                     msg = "The retry handler indicated this was a recoverable error,"
                     msg += " but the maximum number of retries was already hit."
-                    msg += " DAGMan will not retry."
+                    msg += " DAGMan will not retry. Setting Job on Hold. User can resubmit."
                     self.logger.info(msg)
+                    hold = True
                     self.set_dashboard_state('FAILED')
                     self.set_state_ClassAds('FAILED')
                     self.logger.info("====== Finished to analyze job exit status.")
@@ -1809,6 +1815,7 @@ class PostJob():
                     msg = "The retry handler indicated this was a recoverable error."
                     msg += " DAGMan will retry."
                     self.logger.info(msg)
+                    hold = False
                     self.set_dashboard_state('COOLOFF')
                     self.set_state_ClassAds('COOLOFF')
                     self.logger.info("====== Finished to analyze job exit status.")
@@ -1817,23 +1824,26 @@ class PostJob():
                 msg = "The retry handler returned an unexpected value (%d)." % (self.retryjob_retval)
                 msg += " Will consider this as a fatal error. DAGMan will not retry."
                 self.logger.info(msg)
+                hold = True
                 self.set_dashboard_state('FAILED')
                 self.set_state_ClassAds('FAILED')
                 self.logger.info("====== Finished to analyze job exit status.")
                 res = JOB_RETURN_CODES.FATAL_ERROR, "" #MarcoM: this should never happen
         # This is for the case in which we don't run the retry-job.
         elif self.job_return_code != JOB_RETURN_CODES.OK:
-            if self.dag_retry >= self.max_retries:
+            if self.crab_retry >= self.max_retries:
                 msg = "The maximum allowed number of retries was hit and the job failed."
                 msg += " Setting this node (job) to permanent failure."
                 self.logger.info(msg)
+                hold = True
                 self.set_dashboard_state('FAILED')
                 self.set_state_ClassAds('FAILED')
                 self.logger.info("====== Finished to analyze job exit status.")
                 res = JOB_RETURN_CODES.FATAL_ERROR, ""
         else:
             self.logger.info("====== Finished to analyze job exit status.")
-        return res
+        self.hold_requested = hold
+        return res[0], res[1], hold
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -1902,7 +1912,7 @@ class PostJob():
         (injections to ASO database, monitoring transfers, file metadata upload)
         are done from here.
         """
-
+        hold = getattr(self, "hold_requested", False)
         # Make sure the location of the user's proxy file is set in the environment.
         if 'X509_USER_PROXY' not in os.environ:
             retmsg = "X509_USER_PROXY is not present in environment."
@@ -1918,7 +1928,7 @@ class PostJob():
         used_job_ad = False
         if self.dag_clusterid == -1:
             # the grid job did not run, see the comments in execute() method
-            job_ad_file_name = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.dag_retry))
+            job_ad_file_name = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.crab_retry))
         else:
             condor_history_dir = os.environ.get("_CONDOR_PER_JOB_HISTORY_DIR", "")
             job_ad_file_name = os.path.join(condor_history_dir, str("history." + str(self.dag_jobid)))
@@ -1929,7 +1939,7 @@ class PostJob():
             if not os.path.exists(job_ad_file_name):
                 self.logger.info('PER_JOB_HISTORY file %s not found , look in ./finished_jobs', job_ad_file_name)
                 jobad_in_condor_history = False
-                job_ad_file_name = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.dag_retry))
+                job_ad_file_name = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.crab_retry))
             if not os.path.exists(job_ad_file_name):
                 self.logger.info('History file not found in ./finished_jobs. Create it by querying schedd')
                 counter = 0
@@ -1973,7 +1983,7 @@ class PostJob():
                     try:
                         shutil.copy2(job_ad_file_name, './finished_jobs/')
                         job_ad_source = "history.%s" % (self.dag_jobid)
-                        job_ad_symlink = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.dag_retry))
+                        job_ad_symlink = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.crab_retry))
                         os.symlink(job_ad_source, job_ad_symlink)
                         self.logger.info("       -----> Succeeded to copy job ad file.")
                     except Exception:
@@ -2012,9 +2022,11 @@ class PostJob():
             self.logger.debug(msg)
 
         if first_pj_execution():
-            pj_error, msg = self.check_exit_code(used_job_ad)
+            pj_error, msg, hold = self.check_exit_code(used_job_ad)
             if pj_error:
-                return pj_error, msg
+                return pj_error, msg, hold
+            if hold==True:
+                self.hold_requested=True
 
         # If this is a deferred post-job execution, reduce the log level to ERROR.
         if not first_pj_execution():
@@ -2026,7 +2038,7 @@ class PostJob():
             self.set_state_ClassAds('FAILED', exitCode=89999)
             self.logger.info("====== Finished to parse job report.")
             retmsg = "Failure parsing the job report."
-            return JOB_RETURN_CODES.FATAL_ERROR, retmsg
+            return JOB_RETURN_CODES.FATAL_ERROR, retmsg, hold
         self.logger.info("====== Finished to parse job report.")
 
         self.logger.info("====== Starting saving data for automatic splitting.")
@@ -2049,7 +2061,7 @@ class PostJob():
             self.logger.info(msg)
             self.set_dashboard_state('FINISHED')
             self.set_state_ClassAds('FINISHED')
-            return 0, ""
+            return 0, "", hold
 
         # Give a message about the transfer flags.
         if first_pj_execution():
@@ -2116,7 +2128,7 @@ class PostJob():
                     retmsg = "Fatal error uploading logs archive file metadata: %s" % (str(ex))
                     self.logger.error(retmsg)
                     self.logger.info("====== Finished upload of logs archive file metadata.")
-                    return self.check_retry_count(80001), retmsg
+                    return self.check_retry_count(80001), retmsg, hold
                 self.logger.info("====== Finished upload of logs archive file metadata.")
             else:
                 msg = "Skipping logs archive file metadata upload, because it is marked as"
@@ -2154,7 +2166,7 @@ class PostJob():
                     self.upload_output_files_metadata()
                 if ret_code == 4:
                     #if we need to defer the postjob execution stop here!
-                    return ret_code, ""
+                    return ret_code, "", hold
             except PermanentStageoutError as pse:
                 retmsg = "Got fatal stageout exception:\n%s" % (str(pse))
                 self.logger.error(retmsg)
@@ -2163,14 +2175,14 @@ class PostJob():
                 self.set_dashboard_state('FAILED', exitCode=mostCommon(self.stageout_exit_codes, 60324))
                 self.set_state_ClassAds('FAILED', exitCode=mostCommon(self.stageout_exit_codes, 60324))
                 self.logger.info("====== Finished to check for ASO transfers.")
-                return JOB_RETURN_CODES.FATAL_ERROR, retmsg
+                return JOB_RETURN_CODES.FATAL_ERROR, retmsg, hold
             except RecoverableStageoutError as rse:
                 retmsg = "Got recoverable stageout exception:\n%s" % (str(rse))
                 self.logger.error(retmsg)
                 msg = "These are all recoverable stageout errors; automatic resubmit is possible."
                 self.logger.error(msg)
                 self.logger.info("====== Finished to check for ASO transfers.")
-                return self.check_retry_count(mostCommon(self.stageout_exit_codes, 60324)), retmsg
+                return self.check_retry_count(mostCommon(self.stageout_exit_codes, 60324)), retmsg, hold
             except Exception as ex:
                 retmsg = "Fatal PostJob error during ASO checking: %s" % (str(ex))
                 self.logger.exception(retmsg)
@@ -2186,7 +2198,7 @@ class PostJob():
         self.set_dashboard_state('FINISHED')
         self.set_state_ClassAds('FINISHED')
 
-        return 0, ""
+        return 0, "", hold
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -2969,7 +2981,11 @@ class PostJob():
 
     def calculate_crab_retry(self):
         """
-        Calculate the retry number we're on. See the notes in PreJob.
+        Calculate the retry number we're on and persist hold-requested state.
+
+        In the new model, PreJob reads 'retry_info/job.<id>.txt'
+
+        PostJob updates 'post' and 'hold' so that PreJob can use them.
         """
         fname = "retry_info/job.%s.txt" % (self.job_id)
         if os.path.exists(fname):
@@ -2983,12 +2999,15 @@ class PostJob():
                 self.logger.exception(msg)
                 return 1, None
         else:
-            retry_info = {'pre': 0, 'post': 0}
+            retry_info = {'pre': 0, 'post': 0, 'hold': False}
         if 'pre' not in retry_info or 'post' not in retry_info:
             msg = "Unable to calculate post-job retry count."
             msg += " File %s doesn't contain the expected information." % (fname)
             self.logger.warning(msg)
             return 1, None
+        # persist hold_requested if set
+        if getattr(self, "hold_requested", False):
+            retry_info['hold'] = True
         if first_pj_execution():
             crab_retry = retry_info['post']
             retry_info['post'] += 1
@@ -3003,6 +3022,18 @@ class PostJob():
                 return 1, crab_retry
         else:
             crab_retry = retry_info['post'] - 1
+        if crab_retry >= self.max_retries - 1 :
+            retry_info['hold'] = True
+            try:
+                with open(fname + '.tmp', 'w') as fd:
+                    json.dump(retry_info, fd)
+                os.rename(fname + '.tmp', fname)
+            except Exception:
+                msg = "Failed to update file %s with changed hold status to True." % (fname)
+                msg += "\nDetails follow:"
+                self.logger.exception(msg)
+                return 1, crab_retry
+            
         return 0, crab_retry
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -3013,10 +3044,11 @@ class PostJob():
         number of job retries was hit. If it was, the post-job should return with the
         fatal error exit code. Otherwise with the recoverable error exit code.
         """
-        if self.dag_retry >= self.max_retries:
+        if self.crab_retry >= self.max_retries:
             msg = "Job could be retried, but the maximum allowed number of retries was hit."
             msg += " Setting this node (job) to permanent failure. DAGMan will NOT retry."
             self.logger.info(msg)
+            self.hold_requested = True
             self.set_dashboard_state('FAILED', exitCode=exitCode)
             self.set_state_ClassAds('FAILED', exitCode=exitCode)
             return JOB_RETURN_CODES.FATAL_ERROR
