@@ -255,9 +255,9 @@ if [[ -e $TOKEN_PATH ]]; then
         if [[ " ${TOKEN_READY_SITES[@]} " =~ " ${JOB_CMSSite} " ]]; then SITE_READY=Yes; fi
         if [[ -n $SITE_READY ]]; then
           echo " $JOB_CMSSite is token-ready."
-          echo "Define BEARER_TOKEN_FILE and unset X509_USER_PROXY"
+          echo "Define BEARER_TOKEN_FILE while keeping X509_USER_PROXY as fallback"
           export BEARER_TOKEN_FILE=$TOKEN_PATH
-          unset X509_USER_PROXY
+          #unset X509_USER_PROXY  # will uncomment once we are ready to deprecate X509
         else
           echo "$JOB_CMSSite is NOT token-ready. Do nothing "
         fi
@@ -297,9 +297,10 @@ then
   exit $EXIT_STATUS
 fi
 
+echo "======  Application running completed. Run httokendecode on BEARER_TOKEN_FILE = $BEARER_TOKEN_FILE  ==="
+./httokendecode  -a -H $BEARER_TOKEN_FILE
 
-
-echo "======== User application running completed. Prepare env. for stageout ==="
+echo "======== Run stageout  ========"
 rm -f wmcore_initialized
 time sh ./cmscp.sh
 STAGEOUT_EXIT_STATUS=$?
