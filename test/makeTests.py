@@ -624,6 +624,20 @@ writeValidationScript(testName=name, validationScript=validationScript)
 # SECTION DEBUG
 #=============================
 
+# anySchedd
+name = 'anySchedd'
+changeDict = {'param': 'scheddName', 'value': 'REMOVE', 'section': 'Debug'}
+confChangesList = [changeDict]
+testSubmitScript = dummyTestScript
+validationScript = """
+checkStatus ${taskName} COMPLETED
+statusCode=$?
+([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+"""
+writeConfigFile(testName=name, listOfDicts=confChangesList)
+writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
+writeValidationScript(testName=name, validationScript=validationScript)
+
 # scheddName
 name = 'scheddName'
 changeDict = {'param': name, 'value': '"crab3@vocms059.cern.ch"', 'section': 'Debug'}
