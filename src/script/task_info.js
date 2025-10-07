@@ -295,7 +295,7 @@ $(document).ready(function() {
             S3=false;
 
         if(S3==true)
-            url= window.location.origin + "crabserver/" + dbVersion + "/cache?subresource=download&objecttype=twlog&taskname="+inputTaskName;
+            url= window.location.origin + "/crabserver/" + dbVersion + "/cache?subresource=download&objecttype=twlog&taskname="+inputTaskName;
         else
             url = cacheUrl + "/logfile?name=" + inputTaskName + "_TaskWorker.log&username=" + username;
 
@@ -336,7 +336,7 @@ $(document).ready(function() {
         else
             S3=false;
         if(S3==true)
-            url= window.location.origin  + "crabserver/" + dbVersion + "/cache?subresource=download&objecttype=clientlog&taskname="+inputTaskName;
+            url= window.location.origin  + "/crabserver/" + dbVersion + "/cache?subresource=download&objecttype=clientlog&taskname="+inputTaskName;
         else
             url = cacheUrl + "/logfile?name=" + inputTaskName + ".log&username=" + username;
 
