@@ -72,12 +72,7 @@ class CRAB3ProxyRenewer():
     def get_backendurls(self):
         """ need a doc string here """
         # need to deal with the fact that TaskWorkerConfig may only specify a name instance
-        self.restHost, self.dbInstance = getRESTParams(self.config, self.logger)
-        self.logger.info("Querying server %s for HTCondor schedds and pool names.", self.restHost)
-        crabserver = CRABRest(self.restHost, self.config.TaskWorker.cmscert, self.config.TaskWorker.cmskey,
-                              retry=2, userAgent='CRABTaskWorker')
-        crabserver.setDbInstance(self.dbInstance)
-        result = crabserver.get(api='info', data={'subresource':'backendurls'})[0]['result'][0]
+        result = self.backendurls
         self.pool = str(result['htcondorPool'])
         self.schedds = [str(i) for i in result['htcondorSchedds']]
         self.logger.info("Resulting pool %s; schedds %s", self.pool, ",".join(self.schedds))
