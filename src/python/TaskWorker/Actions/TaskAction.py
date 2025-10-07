@@ -29,7 +29,6 @@ class TaskAction(object):
 
         if crabserver:  # When testing, the server can be None.
             self.backendurls = {
-                "cacheSSL": "https://s3.cern.ch/crabcache",
                 "htcondorPool": self.config.TaskWorker.htcondorPool,
                 "htcondorSchedds": self.config.TaskWorker.htcondorSchedds
             }
