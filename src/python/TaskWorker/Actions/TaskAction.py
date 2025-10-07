@@ -28,7 +28,10 @@ class TaskAction(object):
         self.tapeLocations = set()
 
         if crabserver:  # When testing, the server can be None.
-            self.backendurls = self.crabserver.get(api='info', data={'subresource': 'backendurls'})[0]['result'][0]
+            self.backendurls = {
+                "htcondorPool": self.config.TaskWorker.htcondorPool,
+                "htcondorSchedds": self.config.TaskWorker.htcondorSchedds
+            }
 
     def execute(self, *args, **kwargs):
         raise NotImplementedError
