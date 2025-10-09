@@ -175,7 +175,7 @@ def checkMemoryWalltime(task, cmd, logger, warningUploader):
         warningUploader(msg, task['user_proxy'], task['tm_taskname'])
     if memory is not None and memory > absmaxmemory:
         msg = f"Task requests {memory} MB of memory, above the allowed maximum of {absmaxmemory}"
-        msg += f" for a {ncores} core(s) job.\n"
+        msg += f" for a {ncores} core(s) job.\nPlease see https://cmssi.docs.cern.ch/policies/memory/ \n"
         logger.error(msg)
         raise SubmissionRefusedException(msg)
     if memory is not None and memory > MAX_MEMORY_PER_CORE:
