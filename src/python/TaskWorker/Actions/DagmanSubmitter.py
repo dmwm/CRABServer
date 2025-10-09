@@ -177,7 +177,10 @@ def checkMemoryWalltime(task, cmd, logger, warningUploader):
         msg = f"Task requests {memory} MB of memory, above the allowed maximum of {absmaxmemory}"
         msg += f" for a {ncores} core(s) job.\nPlease see https://cmssi.docs.cern.ch/policies/memory/ \n"
         logger.error(msg)
-        raise SubmissionRefusedException(msg)
+        if cmd == 'resubmit':
+            raise TaskWorkerException(msg)
+        else:
+            raise SubmissionRefusedException(msg)
     if memory is not None and memory > MAX_MEMORY_PER_CORE:
         if ncores is not None and ncores < 2:
             msg = f"Task requests {memory} MB of memory, but only {MAX_MEMORY_PER_CORE} are guaranteed to be available."
