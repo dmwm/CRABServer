@@ -14,7 +14,7 @@ import HTCondorLocator
 
 from ServerUtilities import FEEDBACKMAIL
 from ServerUtilities import TASKLIFETIME
-from ServerUtilities import MAX_MEMORY_PER_CORE, MAX_MEMORY_SINGLE_CORE
+from ServerUtilities import MAX_MEMORY_PER_CORE, MAX_MEMORY_SINGLE_CORE, MAX_MEMORY_SINGLE_CORE_ON_RESUBMIT
 
 from TaskWorker.DataObjects import Result
 from TaskWorker.Actions import TaskAction
@@ -159,7 +159,11 @@ def checkMemoryWalltime(task, cmd, logger, warningUploader):
     ncores = task['tm_numcores']
     if ncores is None:
         ncores = 1
-    absmaxmemory = max(MAX_MEMORY_SINGLE_CORE, ncores*MAX_MEMORY_PER_CORE)
+
+    if cmd == 'tm':  # means this was called by DagmanSubmitter, not DagmanResubmitter
+        absmaxmemory = max(MAX_MEMORY_SINGLE_CORE, ncores*MAX_MEMORY_PER_CORE)
+    else:  # it is a resubmission
+        absmaxmemory = max(MAX_MEMORY_SINGLE_CORE_ON_RESUBMIT, ncores*MAX_MEMORY_PER_CORE)
     if runtime is not None and runtime > stdmaxjobruntime:
         msg = f"Task requests {runtime} minutes of runtime, but only {stdmaxjobruntime} are guaranteed to be available."
         msg += " Jobs may not find a site where to run."
@@ -171,9 +175,12 @@ def checkMemoryWalltime(task, cmd, logger, warningUploader):
         warningUploader(msg, task['user_proxy'], task['tm_taskname'])
     if memory is not None and memory > absmaxmemory:
         msg = f"Task requests {memory} MB of memory, above the allowed maximum of {absmaxmemory}"
-        msg += f" for a {ncores} core(s) job.\n"
+        msg += f" for a {ncores} core(s) job.\nPlease see https://cmssi.docs.cern.ch/policies/memory/ \n"
         logger.error(msg)
-        raise SubmissionRefusedException(msg)
+        if cmd == 'resubmit':
+            raise TaskWorkerException(msg)
+        else:
+            raise SubmissionRefusedException(msg)
     if memory is not None and memory > MAX_MEMORY_PER_CORE:
         if ncores is not None and ncores < 2:
             msg = f"Task requests {memory} MB of memory, but only {MAX_MEMORY_PER_CORE} are guaranteed to be available."
@@ -307,7 +314,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         msg += f" The submission was retried {nTries} times on {nScheds} schedulers."
         msg += f" These are the failures per Grid scheduler:\n {scheddStats.taskErrors}"
 
-        raise TaskWorkerException(msg, retry=(schedName is not None))
+        raise TaskWorkerException(msg, retry=schedName is not None)
 
 
     def duplicateCheck(self, task):
