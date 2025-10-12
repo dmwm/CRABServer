@@ -56,15 +56,22 @@ stages:
   - tagging_release
 
 .cmssw_matrix_release: &cmssw_matrix_release
-  - CMSSW_release:
-    - CMSSW_13_0_2
-    - CMSSW_12_6_4
-    - CMSSW_12_5_0
-    - CMSSW_11_3_4
-    - CMSSW_10_6_26
-    - CMSSW_10_1_0
-    - CMSSW_9_4_21
-    - CMSSW_8_0_36
+  - CMSSW_release: CMSSW_13_0_2
+    SCRAM_ARCH: el8_amd64_gcc11
+  - CMSSW_release: CMSSW_12_6_4
+    SCRAM_ARCH: el8_amd64_gcc10
+  - CMSSW_release: CMSSW_12_5_0
+    SCRAM_ARCH: el8_amd64_gcc10
+  - CMSSW_release: CMSSW_11_3_4
+    SCRAM_ARCH: slc7_amd64_gcc900
+  - CMSSW_release: CMSSW_10_6_26
+    SCRAM_ARCH: slc7_amd64_gcc700
+  - CMSSW_release: CMSSW_10_1_0
+    SCRAM_ARCH: slc7_amd64_gcc630
+  - CMSSW_release: CMSSW_9_4_21
+    SCRAM_ARCH: slc7_amd64_gcc630
+  - CMSSW_release: CMSSW_8_0_36
+    SCRAM_ARCH: slc7_amd64_gcc530
 
 get_env:
   # NB rules are evaluated like python `any()`. If there is no rule the job runs all of the times.
@@ -535,7 +542,7 @@ check_status_tracking_release:
     - export CRABClient_version  # from .env
     - export ROOT_DIR
     - export CMSSW_release=$CMSSW_release
-    - export SCRAM_ARCH=el8_amd64_gcc11
+    - export SCRAM_ARCH=$SCRAM_ARCH
     - export Check_Publication_Status=Yes
     - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
   cache:
