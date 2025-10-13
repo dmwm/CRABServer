@@ -57,6 +57,10 @@ class CRAB3ProxyRenewer():
             self.logger.addHandler(handler)
 
         self.config = config
+        self.backendurls = {
+            "htcondorPool": self.config.TaskWorker.htcondorPool,
+            "htcondorSchedds": self.config.TaskWorker.htcondorSchedds
+        }
         self.pool = ''
         self.schedds = []
         self.restHost = None
