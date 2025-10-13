@@ -11,9 +11,7 @@ import htcondor
 from WMCore.Credential.Proxy import Proxy
 from WMCore.Configuration import loadConfigurationFile
 
-from RESTInteractions import CRABRest
 from ServerUtilities import  tempSetLogLevel
-from TaskWorker.MasterWorker import getRESTParams
 
 from TaskWorker.Actions.Recurring.BaseRecurringAction import BaseRecurringAction
 
