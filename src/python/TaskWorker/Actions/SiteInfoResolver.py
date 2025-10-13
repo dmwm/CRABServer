@@ -6,7 +6,7 @@ Resolve CRIC-related Sites info.
 import re
 from TaskWorker.DataObjects.Result import Result
 from TaskWorker.Actions.TaskAction import TaskAction
-from TaskWorker.WorkerExceptions import ConfigException, TaskWorkerException
+from TaskWorker.WorkerExceptions import SubmissionRefusedException, TaskWorkerException
 from TaskWorker.WorkerUtilities import CRICService
 
 
@@ -98,7 +98,7 @@ class SiteInfoResolver(TaskAction):
                 expanded = [str(s) for s in (self.resourceCatalog.getAllPhEDExNodeNames() if pnn else self.resourceCatalog.getAllPSNs()) if sitere.match(s)]
                 self.logger.debug("Site %s expanded to %s during validate", site, expanded)
                 if not expanded:
-                    raise ConfigException(f"Remote output data site not valid, Cannot expand site {site} to anything")
+                    raise SubmissionRefusedException(f"Remote output data site not valid, Cannot expand site {site} to anything")
                 res = res.union(expanded)
             else:
                 self.checkSite(site, pnn)  # pylint: disable=protected-access
@@ -112,7 +112,7 @@ class SiteInfoResolver(TaskAction):
         if site not in sites:
             msg = f"A site name {site} that user specified is not in the list of known CMS "
             msg += f"{'Storage nodes' if pnn else 'Processing Site Names'}"
-            raise ConfigException(msg)
+            raise SubmissionRefusedException(msg)
 
 
 if __name__ == '__main__':
@@ -134,7 +134,7 @@ if __name__ == '__main__':
     assert resolver.checkSite('T2_US_Florida', pnn=False) is None, 'Site T2_US_Florida is valid'  # pylint: disable=protected-access
     try:
         resolver.checkSite('T2_TH_Bangkok', pnn=False)  # pylint: disable=protected-access
-    except ConfigException as exc:
+    except SubmissionRefusedException as exc:
         assert str(exc) == 'A site name T2_TH_Bangkok that user specified is not in the list ' \
                + 'of known CMS Processing Site Names', \
                'Site T2_TH_Bangkok are not existing and should be invalid'
