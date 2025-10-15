@@ -30,7 +30,7 @@ def getCrabserver(restConfig=None, agentName='crabtest', logger=None):
         restHost = SERVICE_INSTANCES[instance]['restHost']
         dbInstance = SERVICE_INSTANCES[instance]['dbInstance']
     else:
-        msg = "Invalid instance value '%s'" % instance
+        msg = f"Invalid instance value '{instance}'"
         raise ConfigException(msg)
     if instance == 'other':
         logger.info('Will use restHost and dbInstance from config file')
@@ -90,7 +90,7 @@ def deleteWarnings(taskname=None, crabserver=None, logger=None):
         logger.warning("Can not delete warnings from REST interface.")
 
 
-def safe_get(obj, key, default=None):
+def safeGet(obj, key, default=None):
     """
     Try dictionary-style access first, otherwise try attribute access.
     """
@@ -99,14 +99,14 @@ def safe_get(obj, key, default=None):
     return getattr(obj, key, default)
 
 
-def suppress_external_service_logging(func):
+def suppressExternalServiceLogging(func):
     """
     Suppresses logging for a function of external service.
     
     Note: Assumes `self.logger` is defined.
 
     Example:
-        @suppress_external_service_logging
+        @suppressExternalServiceLogging
         def some_external_call(self, ...):
             # External call with suppressed logging
             ...
@@ -115,7 +115,7 @@ def suppress_external_service_logging(func):
     @functools.wraps(func)
     def _wrapper(self, *args, **kwargs):
         with tempSetLogLevel(
-            logger=safe_get(self, "logger", default=logging.getLogger()),
+            logger=safeGet(self, "logger", default=logging.getLogger()),
             level=logging.ERROR,
         ):
             return func(self, *args, **kwargs)
@@ -132,11 +132,12 @@ class CRICService(CRIC):
         with tempSetLogLevel(logger=kwargs["logger"], level=logging.ERROR):
             super().__init__(*args, **kwargs)
 
-    @suppress_external_service_logging
+    @suppressExternalServiceLogging
     def _getResult(self, *args, **kwargs):
+        """ override super class method to suppress logging """
         return super()._getResult(*args, **kwargs)
 
-    @suppress_external_service_logging
+    @suppressExternalServiceLogging
     def PNNstoPSNs(self, *args, **kwargs):
+        """ maps PhexedNodeNames (i.e. RSE's) to ProcessingSiteNames (i.e. sites) """
         return super().PNNstoPSNs(*args, **kwargs)
-
