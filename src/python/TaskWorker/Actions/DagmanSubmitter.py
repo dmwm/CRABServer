@@ -18,6 +18,7 @@ from ServerUtilities import MAX_MEMORY_PER_CORE, MAX_MEMORY_SINGLE_CORE, MAX_MEM
 
 from TaskWorker.DataObjects import Result
 from TaskWorker.Actions import TaskAction
+from TaskWorker.WorkerUtilities import safeGet
 from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedException
 
 import htcondor2 as htcondor
@@ -140,12 +141,13 @@ class ScheddStats(dict):
 scheddStats = ScheddStats()
 
 
-def checkMemoryWalltime(task, cmd, logger, warningUploader):
+def checkMemoryWalltime(twconfig, task, cmd, logger, warningUploader):
     """ Check memory and walltime and if user requires too much:
         - upload warning back to crabserver
         - change walltime to max 47h Issue: #4742
         NOTE: this is used also in DagmanResubmitter.
         Arguments:
+            twconfig : a TaskWorker config object
             task : dictionary : the Task info from taskdb
             cmd: string : "tm" if called by D.Submitter, "resubmit" if callead by D.Resubmitter
             logger: logging object : the current logger
@@ -161,9 +163,10 @@ def checkMemoryWalltime(task, cmd, logger, warningUploader):
         ncores = 1
 
     if cmd == 'tm':  # means this was called by DagmanSubmitter, not DagmanResubmitter
-        absmaxmemory = max(MAX_MEMORY_SINGLE_CORE, ncores*MAX_MEMORY_PER_CORE)
+        absmaxmemory = max(safeGet(twconfig, 'maxMemorySingleCore', MAX_MEMORY_SINGLE_CORE),
+                           ncores * MAX_MEMORY_PER_CORE)
     else:  # it is a resubmission
-        absmaxmemory = max(MAX_MEMORY_SINGLE_CORE_ON_RESUBMIT, ncores*MAX_MEMORY_PER_CORE)
+        absmaxmemory = max(MAX_MEMORY_SINGLE_CORE_ON_RESUBMIT, ncores * MAX_MEMORY_PER_CORE)
     if runtime is not None and runtime > stdmaxjobruntime:
         msg = f"Task requests {runtime} minutes of runtime, but only {stdmaxjobruntime} are guaranteed to be available."
         msg += " Jobs may not find a site where to run."
@@ -265,7 +268,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
 
         cwd = os.getcwd()
 
-        checkMemoryWalltime(task, 'tm', self.logger, self.uploadWarning)
+        checkMemoryWalltime(self.config.TaskWorker, task, 'tm', self.logger, self.uploadWarning)
 
         if not schedName:
             self.pickAndSetSchedd(task)
