@@ -531,6 +531,7 @@ class DagmanSubmitter(TaskAction.TaskAction):
         with open('subdag.jdl', 'w', encoding='utf-8') as fd:
             print(subdag, file=fd)
 
+        # see https://github.com/dmwm/CRABServer/issues/8488 for CRAB_DAGType definition and usage
         dagJobJDL["My.CRAB_DAGType"] = classad.quote("BASE")  # we want the ad value to be "BASE", not BASE
         dagJobJDL["output"] = os.path.join(task['scratch'], "request.out")
         dagJobJDL["error"] = os.path.join(task['scratch'], "request.err")
