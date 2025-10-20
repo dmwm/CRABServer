@@ -378,6 +378,7 @@ class DagmanCreator(TaskAction):
         oneEventMode = "1" if task['tm_one_event_mode'] == 'T' else "0"
         jobSubmit['My.CRAB_oneEventMode'] = oneEventMode
         jobSubmit['My.CRAB_PrimaryDataset'] = classad.quote(task['tm_primary_dataset'])
+        # see https://github.com/dmwm/CRABServer/issues/8488 for CRAB_DAGType definition and usage
         jobSubmit['My.CRAB_DAGType'] = classad.quote("Job")
         jobSubmit['My.CRAB_SubmitterIpAddr'] = classad.quote(task['tm_submitter_ip_addr'])
         jobSubmit['My.CRAB_TaskLifetimeDays'] = str(TASKLIFETIME // 24 // 60 // 60)

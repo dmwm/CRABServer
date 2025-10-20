@@ -337,6 +337,7 @@ class PreDAG():
     @staticmethod
     def submitSubdag(subdag, maxidle, maxpost, stage):
         """ Submit a subdag
+            see https://github.com/dmwm/CRABServer/issues/8488 for CRAB_DAGType definition and usage
         """
         subprocess.check_call(['condor_submit_dag', '-DoRecov', '-AutoRescue', '0', '-MaxPre', '20',
                                '-MaxIdle', str(maxidle), '-MaxPost', str(maxpost), '-insert_sub_file', 'subdag.jdl',
