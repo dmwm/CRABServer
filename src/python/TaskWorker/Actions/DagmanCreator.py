@@ -878,7 +878,7 @@ class DagmanCreator(TaskAction):
         overhead = getattr(self.config.TaskWorker, 'automaticProcessingOverheadMins', 60)
 
         # max_runtime here eventually goes into process.maxSecondsUntilRampdown via TweakPSet.py
-        self.task['max_runtime'] = runtime  # this will eventually go into 
+        self.task['max_runtime'] = runtime
         # include a factor of 4 as a buffer
         self.task['maxproberuntime'] = proberuntime * 4
         self.task['maxtailruntime'] = tailruntime * 5
