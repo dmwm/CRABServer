@@ -56,13 +56,12 @@ def setupStreamLogger():
     logger.setLevel(logging.DEBUG)
     return logger
 
-def getGlob(ad, normal, automatic):
-    """ Function used to return the correct list of files to modify when we
-        adjust the max retries and the PJ exit codes (automatic splitting has subdags)
-    """
+def getRescueFiles(ad):
+    main = glob.glob("RunJobs.dag.rescue0*")
     if ad.get('CRAB_SplitAlgo') == 'Automatic':
-        return glob.glob(automatic)
-    return [normal]
+        subs = glob.glob("RunJobs[1-9]*.subdag.rescue0*")
+        return sorted(set(main + subs))
+    return sorted(main)
 
 def adjustMaxRetries(adjustJobIds, ad):
     """
@@ -82,17 +81,14 @@ def adjustMaxRetries(adjustJobIds, ad):
 
     # Fixed increment logic — same meaning as original code
     increment = 1 + int(ad.get('CRAB_NumAutomJobRetries', 2))
-
-    # Use your normal/automatic glob logic
-    rescue_files = getGlob(
-        ad,
-        "RunJobs.dag.rescue0*",
-        "RunJobs[1-9]*.subdag.rescue0*"
-    )
+    printLog(f"increment is {increment}")
+    # Use your automatic glob logic
+    rescue_files = getRescueFiles(ad)
+    printLog(f"rescue files received are {rescue_files}")
 
     retry_re = re.compile(r'^(RETRY\s+Job(\d+(?:-\d+)?)\s+)(\d+)(.*)$')
     adjustAll = (adjustJobIds is True)
-
+    printLog(f"adjustJobIds is {adjustJobIds}")
     # Normalize set of job IDs
     if not adjustAll:
         adjustJobIds = set(adjustJobIds)
@@ -456,7 +452,7 @@ def main():
         saveProxiedWebdir(crabserver, ad)
         printLog("Proxied webdir saved")
 
-    printLog("Clearing the automatic blacklist and handling RunJobs.dag.nodes.log for resubmissions")
+    printLog("Clearing the automatic blacklist and handling rescue files for resubmissions")
 
     clearAutomaticBlacklist()
 
