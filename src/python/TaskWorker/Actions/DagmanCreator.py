@@ -55,7 +55,7 @@ JOB Job{count} Job.{count}.submit
 SCRIPT {prescriptDefer} PRE  Job{count} dag_bootstrap.sh PREJOB $RETRY {count} {taskname} {backend} {stage}
 SCRIPT DEFER 4 1800 POST Job{count} dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES {taskname} {count} {tempDest} {outputDest} cmsRun_{count}.log.tar.gz {stage} {remoteOutputFiles}
 #PRE_SKIP Job{count} 3
-RETRY Job{count} {maxretries} UNLESS-EXIT 2
+RETRY Job{count} 5 UNLESS-EXIT 2
 VARS Job{count} count="{count}"
 # following 3 classAds could possibly be moved to Job.submit but as they are job-dependent
 # would need to be done in the PreJob... doing it here is a bit ugly, but simpler
@@ -485,7 +485,7 @@ class DagmanCreator(TaskAction):
         # (P.S. why 1 day ago? because there is recurring action which is updating user proxy and lifetime.)
         # ** If New periodic remove expression is added, also it should have Periodic Remove Reason. **
         # ** Otherwise message will not be clear and it is hard to debug **
-        periodicRemove = "( (JobStatus =?= 5) && (time() - EnteredCurrentStatus > 7*60) )"  # a)
+        periodicRemove = "( (JobStatus =?= 5) && (time() - EnteredCurrentStatus > (TASKLIFETIME + 10*24*60*60)) )"  # a) job is held for more than 10 days above tasklifetime testing
         periodicRemove += "|| ( (JobStatus =?= 1) && (time() - EnteredCurrentStatus > 7*24*60*60) )"  # b)
         periodicRemove += "|| ( (JobStatus =?= 2) && ( "  # c)
         periodicRemove += "(MemoryUsage =!= UNDEFINED && MemoryUsage > RequestMemory)"  # c) 1)
@@ -506,7 +506,7 @@ class DagmanCreator(TaskAction):
         periodicRemoveReason += "ifThenElse(MaxWallTimeMinsRun * 60 < (time() - EnteredCurrentStatus), \"Removed due to wall clock limit\","
         periodicRemoveReason += f"ifThenElse(DiskUsage > {MAX_DISK_SPACE}, \"Removed due to disk usage\","
         periodicRemoveReason += "ifThenElse(time() > CRAB_TaskEndTime, \"Removed due to reached CRAB_TaskEndTime\","
-        periodicRemoveReason += "\"Removed due to job being held\"))))))"  # one closed ")" for each "ifThenElse("
+        periodicRemoveReason += "\"Removed due to job being held for more than 10 days above tasklifetime\"))))))"  # one closed ")" for each "ifThenElse("
         jobSubmit['My.PeriodicRemoveReason'] = periodicRemoveReason
 
         # tm_extrajdl contains a list of k=v assignements to be turned each into a classAds
