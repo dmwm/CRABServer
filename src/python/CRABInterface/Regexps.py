@@ -46,7 +46,6 @@ RX_DATASET   = re.compile(DATASET_RE) #See https://github.com/dmwm/WMCore/issues
 RX_LFNPRIMDS = re.compile(r"^%(primDS)s$" % lfnParts)
 RX_BLOCK     = re.compile(r"^(/[a-zA-Z0-9\.\-_]{1,100}){3}#[a-zA-Z0-9\.\-_]{1,100}$")
 RX_SPLIT     = re.compile(r"^(Automatic|FileBased|EventBased|LumiBased|EventAwareLumiBased)$")
-RX_CACHEURL  = re.compile(r"^https?://([-\w\.]*)\.cern\.ch+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?$")
 RX_ADDFILE   = re.compile(r"^(?=.{0,255}$)([a-zA-Z0-9\-\._]+)$")
 # Can be a LFN or PFN (anything CMSSW accepts is fine here)
 RX_USERFILE  = re.compile(r"^(?=.{0,255}$)([a-zA-Z0-9\-._:?/=]+)$")

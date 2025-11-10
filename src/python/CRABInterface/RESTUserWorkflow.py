@@ -16,7 +16,7 @@ from CRABInterface.DataUserWorkflow import DataUserWorkflow
 from CRABInterface.RESTExtensions import authz_owner_match
 from CRABInterface.Regexps import (RX_TASKNAME, RX_ACTIVITY, RX_JOBTYPE, RX_GENERATOR, RX_LUMIEVENTS, RX_CMSSW,
                                    RX_ARCH, RX_MICROARCH, RX_DATASET, RX_CMSSITE, RX_SPLIT, RX_CACHENAME,
-                                   RX_CACHEURL, RX_LFN, RX_USERFILE, RX_VOPARAMS, RX_DBSURL, RX_LFNPRIMDS, RX_OUTFILES,
+                                   RX_LFN, RX_USERFILE, RX_VOPARAMS, RX_DBSURL, RX_LFNPRIMDS, RX_OUTFILES,
                                    RX_RUNS, RX_LUMIRANGE, RX_SCRIPTARGS, RX_SCHEDD_NAME, RX_COLLECTOR, RX_SUBRESTAT,
                                    RX_JOBID, RX_ADDFILE, RX_ANYTHING, RX_USERNAME, RX_DATE, RX_MANYLINES_SHORT,
                                    RX_CUDA_VERSION, RX_BLOCK, RX_RUCIODID, RX_RUCIOSCOPE)
@@ -245,7 +245,6 @@ class RESTUserWorkflow(RESTEntity):
                 validate_real("totalunits", param, safe, optional=True)
             validate_str("cachefilename", param, safe, RX_CACHENAME, optional=False)
             validate_str("debugfilename", param, safe, RX_CACHENAME, optional=True)
-            validate_str("cacheurl", param, safe, RX_CACHEURL, optional=True)
             validate_str("lfn", param, safe, RX_LFN, optional=True)
             self._checkOutLFN(safe.kwargs, username)
             validate_strlist("addoutputfiles", param, safe, RX_ADDFILE, custom_err="Incorrect 'JobType.outputFiles' parameter. " \
@@ -458,7 +457,7 @@ class RESTUserWorkflow(RESTEntity):
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, activity, jobtype, jobsw, jobarch, jobminuarch, inputdata, primarydataset, nonvaliddata,
             useparent, secondarydata, generator, eventsperlumi,
-            siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, debugfilename, cacheurl, addoutputfiles,
+            siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, debugfilename, addoutputfiles,
             savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup,
             tfileoutfiles, edmoutfiles, runs, lumis,
             totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
@@ -485,7 +484,6 @@ class RESTUserWorkflow(RESTEntity):
            :arg str algoargs: argument to be used by the splitting algorithm;
            :arg str cachefilename: name of the file inside the cache
            :arg str debugfilename: name of the debugFiles tarball inside the cache
-           :arg str cacheurl: URL of the cache
            :arg str list addoutputfiles: list of additional output files;
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
            :arg int publication: flag enabling or disabling data publication;
