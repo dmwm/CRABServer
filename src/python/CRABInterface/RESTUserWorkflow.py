@@ -452,7 +452,7 @@ class RESTUserWorkflow(RESTEntity):
             siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, debugfilename, addoutputfiles,
             savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup,
             tfileoutfiles, edmoutfiles, runs, lumis,
-            totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, lfn, saveoutput,
+            totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, nonprodsw, lfn, saveoutput,
             faillimit, ignorelocality, userfiles, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun, ignoreglobalblacklist,
             partialdataset, requireaccelerator, acceleratorparams, inputblocks):
         """Perform the workflow injection
