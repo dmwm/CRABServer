@@ -27,6 +27,7 @@ from urllib.parse import urlencode
 import traceback
 from datetime import datetime
 from http.client import HTTPException
+from itertools import chain
 
 from RESTInteractions import CRABRest
 from ServerUtilities import getProxiedWebDir, getColumn, downloadFromS3
@@ -55,6 +56,52 @@ def setupStreamLogger():
     logger.addHandler(logHandler)
     logger.setLevel(logging.DEBUG)
     return logger
+
+def deleteOldCacheForResubmission(adjustJobIds):
+    """
+    On resubmission, DAGMan resets $RETRY to 0 in the rescue DAG(s).
+    PostJob reads and updates per-(job,retry) state in:
+      - retry_info/job.<jobid>.txt
+      - defer_info/defer_num.<jobid>.<dag_retry>.txt
+      - finished_jobs/job.<jobid>.<dag_retry> (may exist if created earlier)
+    If we only increase RETRY lines in rescue DAGs without resetting these caches,
+    PostJob gets confused and reuses stale deferral/retry state, effectively capping retries.
+    This function wipes those per-job caches so that the new rescue generation starts clean.
+    """
+    def _safe_unlink(path):
+        try:
+            if os.path.exists(path):
+                os.unlink(path)
+        except Exception as ex:  # pylint: disable=broad-except
+            printLog(f"[rescue] WARNING: failed to remove {path}: {ex}")
+
+    def _glob_delete(patterns):
+        for pat in patterns:
+            for fn in glob.glob(pat):
+                _safe_unlink(fn)
+
+    if not adjustJobIds:
+        return
+    jobIds = []
+    if adjustJobIds is True:
+        # All jobs: infer from existing state on disk
+        # Collect any job ids we can spot from defer_info and retry_info
+        dpat = re.compile(r"defer_info/defer_num\.(\d+)\.\d+\.txt$")
+        for fn in chain(glob.glob("defer_info/defer_num.*.*.txt")):
+            m = dpat.match(fn)
+            if m:
+                jobIds.append(m.group(1))
+        jobIds = sorted(set(jobIds))
+    else:
+        jobIds = [str(j) for j in set(adjustJobIds)]
+
+    if not jobIds:
+        printLog("[rescue] No job ids found to reset PostJob state")
+        return
+
+    printLog(f"[rescue] Deleting defer_info for jobs: {jobIds[:10]}{' ...' if len(jobIds)>10 else ''}")
+    for jid in jobIds:
+        _glob_delete([f"defer_info/defer_num.{jid}.*.txt", f"finished_jobs/job.{jid}.*"])
 
 def getRescueFiles(ad):
     main = glob.glob("RunJobs.dag.rescue0*")
@@ -477,6 +524,7 @@ def main():
 
     if resubmitJobIds:
         adjustMaxRetries(resubmitJobIds, ad)
+        deleteOldCacheForResubmission(resubmitJobIds)
 
     if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
         printLog("Releasing processing and tail DAGs")
