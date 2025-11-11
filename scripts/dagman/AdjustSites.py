@@ -103,83 +103,6 @@ def deleteOldCacheForResubmission(adjustJobIds):
     for jid in jobIds:
         _glob_delete([f"defer_info/defer_num.{jid}.*.txt", f"finished_jobs/job.{jid}.*"])
 
-def getRescueFiles(ad):
-    main = glob.glob("RunJobs.dag.rescue0*")
-    if ad.get('CRAB_SplitAlgo') == 'Automatic':
-        subs = glob.glob("RunJobs[1-9]*.subdag.rescue0*")
-        return sorted(set(main + subs))
-    return sorted(main)
-
-def adjustMaxRetries(adjustJobIds, ad):
-    """
-    Rescue-mode version:
-    Simply increments RETRY counts in RunJobs.dag.rescue0* files by:
-        increment = 1 + CRAB_NumAutomJobRetries
-
-    adjustJobIds:
-        - True: adjust all RETRY lines
-        - iterable: adjust only those job IDs
-        - empty/None: do nothing
-    """
-    printLog(f"[rescue] Adjusting retries for job ids: {adjustJobIds}")
-
-    if not adjustJobIds:
-        return
-
-    # Fixed increment logic — same meaning as original code
-    increment = 1 + int(ad.get('CRAB_NumAutomJobRetries', 2))
-    printLog(f"increment is {increment}")
-    # Use your automatic glob logic
-    rescue_files = getRescueFiles(ad)
-    printLog(f"rescue files received are {rescue_files}")
-
-    retry_re = re.compile(r'^(RETRY\s+Job(\d+(?:-\d+)?)\s+)(\d+)(.*)$')
-    adjustAll = (adjustJobIds is True)
-    printLog(f"adjustJobIds is {adjustJobIds}")
-    # Normalize set of job IDs
-    if not adjustAll:
-        adjustJobIds = set(adjustJobIds)
-
-    for fn in sorted(set(rescue_files)):
-        if not os.path.exists(fn):
-            continue
-
-        printLog(f"[rescue] Processing {fn}")
-        new_lines = []
-        changed = False
-
-        with open(fn, 'r', encoding='utf-8') as fd:
-            for line in fd:
-                m = retry_re.match(line)
-                if not m:
-                    new_lines.append(line)
-                    continue
-
-                prefix, jobId, old_str, suffix = m.groups()
-
-                if adjustAll or (jobId in adjustJobIds):
-                    try:
-                        old = int(old_str)
-                        new = old + increment
-                    except ValueError:
-                        new_lines.append(line)
-                        continue
-
-                    printLog(f"[rescue] {fn}: Job{jobId} RETRY {old} -> {new}")
-                    line = f"{prefix}{new}{suffix}\n"
-                    changed = True
-
-                new_lines.append(line)
-
-        if changed:
-            # Backup + write
-            backup = fn + ".bak"
-            os.replace(fn, backup)
-            with open(fn, 'w', encoding='utf-8') as fd:
-                fd.writelines(new_lines)
-            printLog(f"[rescue] Updated {fn} (backup at {backup})")
-        else:
-            printLog(f"[rescue] No changes in {fn}")
 
 def makeWebDir(ad):
     """
@@ -499,7 +422,7 @@ def main():
         saveProxiedWebdir(crabserver, ad)
         printLog("Proxied webdir saved")
 
-    printLog("Clearing the automatic blacklist and handling rescue files for resubmissions")
+    printLog("Clearing the automatic blacklist and only deleting cache files for resubmissions, no rescue file editing")
 
     clearAutomaticBlacklist()
 
@@ -523,7 +446,6 @@ def main():
         schedd.act(htcondor.JobAction.Hold, tailconst)
 
     if resubmitJobIds:
-        adjustMaxRetries(resubmitJobIds, ad)
         deleteOldCacheForResubmission(resubmitJobIds)
 
     if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':

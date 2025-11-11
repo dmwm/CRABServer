@@ -152,8 +152,6 @@ fi
 # if needed to facilitate debugging
 cp $_CONDOR_JOB_AD  ./_CONDOR_JOB_AD
 
-export _CONDOR_DAGMAN_RESET_RETRIES_UPON_RESCUE=False
-
 # Recalculate the black / whitelist
 if [ -e AdjustSites.py ]; then
     export schedd_name=`condor_config_val schedd_name`

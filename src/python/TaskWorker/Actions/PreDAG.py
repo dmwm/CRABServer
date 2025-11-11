@@ -342,8 +342,7 @@ class PreDAG():
         subprocess.check_call(['condor_submit_dag', '-DoRecov', '-AutoRescue', '0', '-MaxPre', '20',
                                '-MaxIdle', str(maxidle), '-MaxPost', str(maxpost), '-insert_sub_file', 'subdag.jdl',
                                '-append', f'Environment = "_CONDOR_DAGMAN_LOG={os.getcwd()}/{subdag}.dagman.out"',
-                               '-append', f'My.CRAB_DAGType = "{stage.upper()}"',
-                               '-append', '_CONDOR_DAGMAN_RESET_RETRIES_UPON_RESCUE = False', subdag])
+                               '-append', f'My.CRAB_DAGType = "{stage.upper()}"', subdag])
 
     def adjustLumisForCompletion(self, task, unprocessed):
         """Sets the run, lumi information in the task information for the
