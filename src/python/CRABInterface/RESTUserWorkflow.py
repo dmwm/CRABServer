@@ -1,5 +1,8 @@
 """ This module is used to validate requests to the /workflow resource and calls either HTCondorDataWorkflow or DataWorkflow methods
 """
+# avoid pylint complainging about non-elegfant code . It is old and works. Do not touch.
+# pylint: disable=too-many-locals, too-many-branches, too-many-nested-blocks, too-many-statements, too-many-arguments
+
 
 # external dependecies here
 import logging
@@ -16,7 +19,7 @@ from CRABInterface.DataUserWorkflow import DataUserWorkflow
 from CRABInterface.RESTExtensions import authz_owner_match
 from CRABInterface.Regexps import (RX_TASKNAME, RX_ACTIVITY, RX_JOBTYPE, RX_GENERATOR, RX_LUMIEVENTS, RX_CMSSW,
                                    RX_ARCH, RX_MICROARCH, RX_DATASET, RX_CMSSITE, RX_SPLIT, RX_CACHENAME,
-                                   RX_CACHEURL, RX_LFN, RX_USERFILE, RX_VOPARAMS, RX_DBSURL, RX_LFNPRIMDS, RX_OUTFILES,
+                                   RX_LFN, RX_USERFILE, RX_VOPARAMS, RX_DBSURL, RX_LFNPRIMDS, RX_OUTFILES,
                                    RX_RUNS, RX_LUMIRANGE, RX_SCRIPTARGS, RX_SCHEDD_NAME, RX_COLLECTOR, RX_SUBRESTAT,
                                    RX_JOBID, RX_ADDFILE, RX_ANYTHING, RX_USERNAME, RX_DATE, RX_MANYLINES_SHORT,
                                    RX_CUDA_VERSION, RX_BLOCK, RX_RUCIODID, RX_RUCIOSCOPE)
@@ -33,18 +36,18 @@ class RESTUserWorkflow(RESTEntity):
         self.logger = logging.getLogger("CRABLogger.RESTUserWorkflow")
         self.userworkflowmgr = DataUserWorkflow()
         self.centralcfg = centralcfg
-        self.Task = getDBinstance(config, 'TaskDB', 'Task')
+        self.task = getDBinstance(config, 'TaskDB', 'Task')
         self.tagCollector = TagCollector(logger = self.logger, anytype = 1, anyarch = 1)
 
     @staticmethod
-    def _checkOutLFN(kwargs, username):
+    def checkOutLFN(kwargs, username):
         """Check the lfn parameter: it must start with '/store/user/<username>/', '/store/group/groupname/' or '/store/local/something/',
            where username is the one registered in CMS global list (i.e. the one used in the CERN primary account).
            If lfn is not there, default to '/store/user/<username>/'.
         """
         if not kwargs['lfn']:
             ## Default to '/store/user/<username>/' if the user did not specify the lfn parameter.
-            kwargs['lfn'] = '/store/user/%s/' % (username)
+            kwargs['lfn'] = f"/store/user/{username}/"
         else:
             if not checkOutLFN(kwargs['lfn'], username):
                 msg = "The parameter Data.outLFNDirBase in the CRAB configuration file must start with either"
@@ -54,7 +57,7 @@ class RESTUserWorkflow(RESTEntity):
                 msg += " (i.e. the username of your CERN primary account)."
                 raise InvalidParameter(msg)
 
-    def _checkPublishDataName(self, kwargs, outlfn, requestname, username):
+    def checkPublishDataName(self, kwargs, outlfn, requestname, username):
         """
         Validate the (user specified part of the) output dataset name for publication
         using the WMCore.Lexicon method userprocdataset(), which does the same
@@ -75,19 +78,19 @@ class RESTUserWorkflow(RESTEntity):
         ## (The PostJob replaces then the isbchecksum by the psethash.)
         ## Here we add the requestname if the user did not specify the publishname
         if kwargs['publishname'].find('-') == -1:
-            outputDatasetTagToCheck = "%s-%s" % (requestname.replace(':', '_'), kwargs['publishname'])
+            outputDatasetTagToCheck = f"{requestname.replace(':', '_')}-{kwargs['publishname']}"
         else:
-            outputDatasetTagToCheck = "%s" % (kwargs['publishname'])
+            outputDatasetTagToCheck = f"{kwargs['publishname']}"
         kwargs['publishname'] = outputDatasetTagToCheck #that's what the version earlier than 1509 were putting in the DB
         if 'publishgroupname' in kwargs and int(kwargs['publishgroupname']): #the first half of the if is for backward compatibility
             if not (outlfn.startswith('/store/group/') and outlfn.split('/')[3]):
                 msg = "Parameter 'publishgroupname' is True,"
                 msg += " but parameter 'lfn' does not start with '/store/group/<groupname>'."
                 raise InvalidParameter(msg)
-            group_user_prefix = outlfn.split('/')[3]
+            groupUserPrefix = outlfn.split('/')[3]
         else:
-            group_user_prefix = username
-        outputDatasetTagToCheck = "%s-%s" % (group_user_prefix, outputDatasetTagToCheck)
+            groupUserPrefix = username
+        outputDatasetTagToCheck = f"{groupUserPrefix}-{outputDatasetTagToCheck}"
         try:
             userprocdataset(outputDatasetTagToCheck)
         except AssertionError:
@@ -99,15 +102,15 @@ class RESTUserWorkflow(RESTEntity):
             else:
                 param = 'Data.outputDatasetTag'
                 extrastr = ''
-            msg = "Invalid CRAB configuration parameter %s." % (param)
-            msg += " The combined string '%s-%s<%s>' should not have more than 166 characters" % (group_user_prefix, extrastr, param)
-            msg += " and should match the regular expression %s" % (userProcDSParts['publishdataname'])
+            msg = f"Invalid CRAB configuration parameter {param}."
+            msg += f" The combined string '{groupUserPrefix}-{extrastr}<{param}>'"
+            msg += " should not have more than 166 characters"
+            msg += f" and should match the regular expression {userProcDSParts['publishdataname']}"
             raise InvalidParameter(msg) from AssertionError
 
-
-    ## Basically copy and pasted from _checkPublishDataName which will be eventually removed
+    ## Basically copy and pasted from checkPublishDataName which will be eventually removed
     @staticmethod
-    def _checkPublishDataName2(kwargs, outlfn, requestname, username):
+    def checkPublishDataName2(kwargs, requestname, username):
         """
         Validate the (user specified part of the) output dataset name for publication
         using the WMCore.Lexicon method userprocdataset(), which does the same
@@ -127,18 +130,9 @@ class RESTUserWorkflow(RESTEntity):
         #saves that in kwargs since it's what we want
         kwargs['publishname2'] = outputDatasetTagToCheck
 
-        # ##Determine if it's a dataset that will go into a group space and therefore the (group)username prefix it will be used
-        # if 'publishgroupname' in kwargs and int(kwargs['publishgroupname']): #the first half of the if is for backward compatibility
-        #     if not (outlfn.startswith('/store/group/') and outlfn.split('/')[3]):
-        #         msg = "Parameter 'publishgroupname' is True,"
-        #         msg += " but parameter 'lfn' does not start with '/store/group/<groupname>'."
-        #         raise InvalidParameter(msg)
-        #     group_user_prefix = outlfn.split('/')[3]
-        # else:
-        #     group_user_prefix = username
-
-        outputDatasetTagToCheck = "%s-%s" % (username, outputDatasetTagToCheck)
+        outputDatasetTagToCheck = f"{username}-{outputDatasetTagToCheck}"
         try:
+            # check validity using WMCore's Lexicon
             userprocdataset(outputDatasetTagToCheck)
         except AssertionError:
             ## The messages below are more descriptive than if we would use
@@ -149,14 +143,14 @@ class RESTUserWorkflow(RESTEntity):
             else:
                 param = 'Data.outputDatasetTag'
                 extrastr = ''
-            msg = "Invalid CRAB configuration parameter %s." % (param)
-            msg += " The combined string '%s-%s<%s>' should not have more than 166 characters" % (username, extrastr, param)
-            msg += " and should match the regular expression %s" % (userProcDSParts['publishdataname'])
+            msg = f"Invalid CRAB configuration parameter {param}."
+            msg += f" The combined string '{username}-{extrastr}<{param}>'"
+            msg += " should not have more than 166 characters"
+            msg += f" and should match the regular expression {userProcDSParts['publishdataname']}"
             raise InvalidParameter(msg) from AssertionError
 
-
     @staticmethod
-    def _checkPrimaryDataset(kwargs, optional=False):
+    def checkPrimaryDataset(kwargs, optional=False):
         """
         Validate the primary dataset name using the WMCore.Lexicon method primdataset(),
         which does the same validation as DBS (see discussion with Yuyi Guo in following
@@ -165,9 +159,8 @@ class RESTUserWorkflow(RESTEntity):
         if 'primarydataset' not in kwargs:
             if optional:
                 return
-            else:
-                msg = "Missing 'primarydataset' parameter."
-                raise InvalidParameter(msg)
+            msg = "Missing 'primarydataset' parameter."
+            raise InvalidParameter(msg)
         try:
             primdataset(kwargs['primarydataset'])
         except AssertionError:
@@ -178,10 +171,11 @@ class RESTUserWorkflow(RESTEntity):
             ## "'<kwargs['primarydataset']>' does not match regular expression [a-zA-Z0-9\.\-_]+".
             msg = "Invalid 'primarydataset' parameter."
             msg += " The parameter should not have more than 99 characters"
-            msg += " and should match the regular expression [a-zA-Z][a-zA-Z0-9\-_]*"
+            msg += " and should match the regular expression "
+            msg += r"[a-zA-Z][a-zA-Z0-9\-_]*"
             raise InvalidParameter(msg) from AssertionError
 
-    def _checkReleases(self, jobarch, jobsw):
+    def checkReleases(self, jobarch, jobsw):
         """ Check if the software needed by the user is available in the tag collector
             Uses allScramArchsAndVersions from WMCore. If an IOError is raised report an error message.
             If the list of releases is empty (reason may be an ExpatError) then report an error message
@@ -192,16 +186,17 @@ class RESTUserWorkflow(RESTEntity):
         try:
             goodReleases = self.tagCollector.releases_by_architecture()
         except: #pylint: disable=bare-except
-            msg = "Error connecting to %s (params: %s) and determining the list of available releases. " % \
-                  (self.tagCollector['endpoint'], self.tagCollector.tcArgs) + "Skipping the check of the releases"
+            msg = f"Error connecting to {self.tagCollector['endpoint']} (params: {self.tagCollector.tcArgs})"
+            msg += " and determining the list of available releases. "
+            msg += "Skipping the check of the releases"
         else:
             if goodReleases == {}:
-                msg = "The list of releases at %s (params: %s) is empty. " % \
-                      (self.tagCollector['endpoint'], self.tagCollector.tcArgs) + "Skipping the check of the releases"
+                msg = f"The list of releases at {self.tagCollector['endpoint']} (params: {self.tagCollector.tcArgs})"
+                msg += "is empty. Skipping the check of the releases"
             elif jobarch not in goodReleases or jobsw not in goodReleases[jobarch]:
-                msg = "ERROR: %s on %s is not among supported releases" % (jobsw, jobarch)
+                msg = f"ERROR: {jobsw} on {jobarch} is not among supported releases"
                 msg += "\nUse config.JobType.allowUndistributedCMSSW = True if you are sure of what you are doing"
-                excasync = "ERROR: %s on %s is not among supported releases or an error occurred" % (jobsw, jobarch)
+                excasync = f"ERROR: {jobsw} on {jobarch} is not among supported releases or an error occurred"
                 invalidp = InvalidParameter(msg, errobj=excasync)
                 setattr(invalidp, 'trace', '')
                 raise invalidp
@@ -221,7 +216,6 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("workflow", param, safe, RX_TASKNAME, optional=False)
             validate_str("activity", param, safe, RX_ACTIVITY, optional=True)
             validate_str("jobtype", param, safe, RX_JOBTYPE, optional=False)
-            # TODO this should be changed to be non-optional
             validate_str("generator", param, safe, RX_GENERATOR, optional=True)
             validate_str("eventsperlumi", param, safe, RX_LUMIEVENTS, optional=True)
             validate_str("jobsw", param, safe, RX_CMSSW, optional=False)
@@ -229,7 +223,7 @@ class RESTUserWorkflow(RESTEntity):
             validate_str("jobarch", param, safe, RX_ARCH, optional=False)
             validate_str("jobminuarch", param, safe, RX_MICROARCH, optional=True)
             if not safe.kwargs["nonprodsw"]: #if the user wants to allow non-production releases
-                self._checkReleases(safe.kwargs['jobarch'], safe.kwargs['jobsw'])
+                self.checkReleases(safe.kwargs['jobarch'], safe.kwargs['jobsw'])
             validate_num("useparent", param, safe, optional=True)
             validate_str("secondarydata", param, safe, RX_DATASET, optional=True)
             # site black/white list needs to be cast to unicode for later use in self._expandSites
@@ -245,13 +239,12 @@ class RESTUserWorkflow(RESTEntity):
                 validate_real("totalunits", param, safe, optional=True)
             validate_str("cachefilename", param, safe, RX_CACHENAME, optional=False)
             validate_str("debugfilename", param, safe, RX_CACHENAME, optional=True)
-            validate_str("cacheurl", param, safe, RX_CACHEURL, optional=True)
             validate_str("lfn", param, safe, RX_LFN, optional=True)
-            self._checkOutLFN(safe.kwargs, username)
+            self.checkOutLFN(safe.kwargs, username)
             validate_strlist("addoutputfiles", param, safe, RX_ADDFILE, custom_err="Incorrect 'JobType.outputFiles' parameter. " \
-                    "Allowed regexp for each filename: '%s'." % RX_ADDFILE.pattern)
+                    f"Allowed regexp for each filename: '{RX_ADDFILE.pattern}'.")
             validate_strlist("userfiles", param, safe, RX_USERFILE, custom_err="Incorrect 'Data.userInputFiles' parameter. " \
-                    "Allowed regexp for each filename: '%s'." % RX_USERFILE.pattern)
+                    f"Allowed regexp for each filename: '{ RX_USERFILE.pattern}'.")
             validate_num("savelogsflag", param, safe, optional=False)
             validate_num("saveoutput", param, safe, optional=True)
             validate_num("faillimit", param, safe, optional=True)
@@ -267,20 +260,20 @@ class RESTUserWorkflow(RESTEntity):
             ## therefore we will need to make sure we do not break it!
             ## The following two lines will be removed in the future once we will
             ## not need backward compatibility anymore
-            self._checkPublishDataName(param.kwargs, safe.kwargs['lfn'], requestname, username)
+            self.checkPublishDataName(param.kwargs, safe.kwargs['lfn'], requestname, username)
             validate_str('publishname', param, safe, RX_ANYTHING, optional=True)
 
-            ##And this if as well, just do self._checkPublishDataName2(param.kwargs, safe.kwargs['lfn'], requestname, username)
+            ##And this if as well, just do self.checkPublishDataName2(param.kwargs, safe.kwargs['lfn'], requestname, username)
             if not safe.kwargs["publishname"]: #new clients won't define this anymore
                 ## The (user specified part of the) publication dataset name must be
                 ## specified and must pass DBS validation. Since this is the correct
                 ## validation function, it must be done before the
                 ## validate_str("publishname", ...) we have below.
-                self._checkPublishDataName2(param.kwargs, safe.kwargs['lfn'], requestname, username)
+                self.checkPublishDataName2(param.kwargs, requestname, username)
             else:
                 param.kwargs["publishname2"] = safe.kwargs["publishname"]
 
-            ## 'publishname' was already validated above in _checkPublishDataName().
+            ## 'publishname' was already validated above in checkPublishDataName().
             ## Calling validate_str with a fake regexp to move the param to the
             ## list of validated inputs
             validate_str("publishname2", param, safe, RX_ANYTHING, optional=True)
@@ -339,16 +332,14 @@ class RESTUserWorkflow(RESTEntity):
             ## We validate the primary dataset agains DBS rules even if publication is off,
             ## because in the future we may want to give the possibility to users to publish
             ## a posteriori.
-            self._checkPrimaryDataset(param.kwargs, optional=False)
+            self.checkPrimaryDataset(param.kwargs, optional=False)
             validate_str("primarydataset", param, safe, RX_LFNPRIMDS, optional=False)
 
             validate_num("nonvaliddata", param, safe, optional=True)
             #if one and only one between outputDatasetTag and publishDbsUrl is set raise an error (we need both or none of them)
-            # asyncdest needs to be cast to unicode for later use in self._checkASODestination
+            # asyncdest needs to be cast to unicode for later use in self.checkASODestination
             validate_str("asyncdest", param, safe, RX_CMSSITE, optional=False)
 
-            # We no longer use this attribute, but keep it around for older client compatibility
-            validate_num("blacklistT1", param, safe, optional=True)
             validate_num("oneEventMode", param, safe, optional=True)
             validate_num("priority", param, safe, optional=True)
             validate_num("maxjobruntime", param, safe, optional=True)
@@ -356,9 +347,9 @@ class RESTUserWorkflow(RESTEntity):
             validate_num("maxmemory", param, safe, optional=True)
             validate_str("dbsurl", param, safe, RX_DBSURL, optional=False)
             validate_strlist("tfileoutfiles", param, safe, RX_OUTFILES, custom_err="Incorrect tfileoutfiles parameter (TFileService). " \
-                    "Allowed regexp: '%s'." % RX_OUTFILES.pattern)
+                    f"Allowed regexp: '{RX_OUTFILES.pattern}'.")
             validate_strlist("edmoutfiles", param, safe, RX_OUTFILES, custom_err="Incorrect edmoutfiles parameter (PoolOutputModule). " \
-                    "Allowed regexp: '%s'." % RX_OUTFILES.pattern)
+                    f"Allowed regexp: '{RX_OUTFILES.pattern}'.")
             validate_strlist("runs", param, safe, RX_RUNS)
             validate_strlist("lumis", param, safe, RX_LUMIRANGE)
             if len(safe.kwargs["runs"]) != len(safe.kwargs["lumis"]):
@@ -458,10 +449,10 @@ class RESTUserWorkflow(RESTEntity):
     #@getUserCert(headers=cherrypy.request.headers)
     def put(self, workflow, activity, jobtype, jobsw, jobarch, jobminuarch, inputdata, primarydataset, nonvaliddata,
             useparent, secondarydata, generator, eventsperlumi,
-            siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, debugfilename, cacheurl, addoutputfiles,
+            siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, debugfilename, addoutputfiles,
             savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup,
             tfileoutfiles, edmoutfiles, runs, lumis,
-            totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, blacklistT1, nonprodsw, lfn, saveoutput,
+            totalunits, adduserfiles, oneEventMode, maxjobruntime, numcores, maxmemory, priority, nonprodsw, lfn, saveoutput,
             faillimit, ignorelocality, userfiles, scriptexe, scriptargs, scheddname, extrajdl, collector, dryrun, ignoreglobalblacklist,
             partialdataset, requireaccelerator, acceleratorparams, inputblocks):
         """Perform the workflow injection
@@ -485,7 +476,6 @@ class RESTUserWorkflow(RESTEntity):
            :arg str algoargs: argument to be used by the splitting algorithm;
            :arg str cachefilename: name of the file inside the cache
            :arg str debugfilename: name of the debugFiles tarball inside the cache
-           :arg str cacheurl: URL of the cache
            :arg str list addoutputfiles: list of additional output files;
            :arg int savelogsflag: archive the log files? 0 no, everything else yes;
            :arg int publication: flag enabling or disabling data publication;
@@ -524,7 +514,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str list inputblocks: the blocks to process instead of the full dataset
            :returns: a dict which contaians details of the request"""
 
-        user_config = {
+        userConfig = {
             'partialdataset': True if partialdataset else False,
             'requireaccelerator': True if requireaccelerator else False,
             'acceleratorparams': acceleratorparams if acceleratorparams else None,
@@ -551,7 +541,7 @@ class RESTUserWorkflow(RESTEntity):
                                            userfiles=userfiles, scriptexe=scriptexe, scriptargs=scriptargs,
                                            scheddname=scheddname, extrajdl=extrajdl, collector=collector, dryrun=dryrun,
                                            submitipaddr=cherrypy.request.headers['X-Forwarded-For'],
-                                           ignoreglobalblacklist=ignoreglobalblacklist, user_config=user_config)
+                                           ignoreglobalblacklist=ignoreglobalblacklist, user_config=userConfig)
 
     @restcall
     def post(self, workflow, subresource, publication, jobids, force, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, priority):
@@ -561,7 +551,7 @@ class RESTUserWorkflow(RESTEntity):
            :arg str list siteblacklist: black list of sites, with CMS name;
            :arg str list sitewhitelist: white list of sites, with CMS name."""
         # strict check on authz: only the workflow owner can modify it
-        authz_owner_match(self.api, [workflow], self.Task)
+        authz_owner_match(self.api, [workflow], self.task)
         if not subresource or subresource == 'resubmit':
             return self.userworkflowmgr.resubmit(workflow=workflow,
                                                  publication=publication,
@@ -573,7 +563,7 @@ class RESTUserWorkflow(RESTEntity):
                                                  maxmemory=maxmemory,
                                                  priority=priority,
                                                  userdn=cherrypy.request.headers['Cms-Authn-Dn'])
-        elif subresource == 'resubmit2':
+        if subresource == 'resubmit2':
             return self.userworkflowmgr.resubmit2(workflow=workflow,
                                                   publication=publication,
                                                   jobids=jobids,
@@ -582,8 +572,10 @@ class RESTUserWorkflow(RESTEntity):
                                                   maxjobruntime=maxjobruntime,
                                                   maxmemory=maxmemory,
                                                   priority=priority)
-        elif subresource == 'proceed':
+        if subresource == 'proceed':
             return self.userworkflowmgr.proceed(workflow=workflow)
+
+        raise Exception(f"Invalid subresource '{subresource}' for RESTUserWorkflo/POST")  # pylint: disable=broad-exception-raised
 
     @restcall
     def get(self, workflow, subresource, username, limit, shortformat, exitcode, jobids, verbose, timestamp):
@@ -629,7 +621,7 @@ class RESTUserWorkflow(RESTEntity):
         else:
             # retrieve the information about latest worfklows for that user
             # age can have a default: 1 week ?
-            cherrypy.log("Found user '%s'" % cherrypy.request.user['login'])
+            cherrypy.log(f"Found user '{cherrypy.request.user['login']}'")
             result = self.userworkflowmgr.getLatests(username or cherrypy.request.user['login'], timestamp)     #eric added timestamp to match username
 
         return result
@@ -643,5 +635,5 @@ class RESTUserWorkflow(RESTEntity):
            :return: nothing"""
 
         # strict check on authz: only the workflow owner can modify it
-        authz_owner_match(self.api, [workflow], self.Task)
+        authz_owner_match(self.api, [workflow], self.task)
         return self.userworkflowmgr.kill(workflow, killwarning)
