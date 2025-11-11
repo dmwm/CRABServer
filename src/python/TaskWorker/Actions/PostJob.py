@@ -1621,6 +1621,7 @@ class PostJob():
         # Get/update the crab retry.
         calculate_crab_retry_retval, self.crab_retry = self.calculate_crab_retry()
 
+        self.logger.info("PostJob context: job_id=%s dag_jobid=%s dag_retry=%d max_retries=%d DEFER_NUM=%d crab_retry=%s",self.job_id,self.dag_jobid,self.dag_retry,self.max_retries,DEFER_NUM,str(self.crab_retry))
         # Define the name of the post-job log file.
         if self.crab_retry is None:
             self.postjob_log_file_name = "postjob.%s.error.txt" % (self.job_id)

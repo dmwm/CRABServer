@@ -166,7 +166,7 @@ def adjustMaxRetries(adjustJobIds, ad):
                         continue
 
                     printLog(f"[rescue] {fn}: Job{jobId} RETRY {old} -> {new}")
-                    line = f"{prefix}{new}{suffix}"
+                    line = f"{prefix}{new}{suffix}\n"
                     changed = True
 
                 new_lines.append(line)
