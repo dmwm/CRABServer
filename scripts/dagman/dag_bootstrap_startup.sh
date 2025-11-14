@@ -7,7 +7,7 @@ echo "As user: $(whoami)"
 set -x
 
 # Touch a bunch of files to make sure job doesn't go on hold for missing files
-for FILE in $1.dagman.out RunJobs.dag.dagman.out dbs_discovery.err dbs_discovery.out job_splitting.err job_splitting.out; do
+for FILE in $1.dagman.out RunJobs.dag.dagman.out dbs_discovery.err dbs_discovery.out job_splitting.err job_splitting.out prescript.debug postscript.debug; do
     touch $FILE
 done
 
@@ -277,7 +277,7 @@ EOF
     # This is also done in the PostJob to submit subdags for tail-catching
     # and automated splitting.  Values below will also have to be changed
     # there in (createSubdagSubmission)!
-    exec nice -n 19 condor_dagman -f -l . -Lockfile $PWD/$1.lock -DoRecov -AutoRescue 0 -MaxPre 20 -MaxIdle $MAX_IDLE -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 4 -verbose
+    exec nice -n 19 condor_dagman -f -l . -Lockfile $PWD/$1.lock -AutoRescue 1 -MaxPre 20 -MaxIdle $MAX_IDLE -MaxPost $MAX_POST -Dag $PWD/$1 -Dagman `which condor_dagman` -CsdVersion "$CONDOR_VERSION" -debug 4 -verbose
     EXIT_STATUS=$?
     echo "condor_dagman terminated with EXIT_STATUS=${EXIT_STATUS} at `date`"
 fi
