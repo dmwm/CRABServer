@@ -168,6 +168,9 @@ class HTCondorLocator():
             if not choices:
                 raise Exception(f"List of possible schedds from {chooserFunction} is empty")
             self.adjustWeights(choices)
+            self.logger.debug("Final list of possible schedds")
+            for choice in choices:
+                self.logger.debug("%s - weight: %.3f", choice[0], choice[1])  # print weigth as 0.xxx
             schedd = weightedChoice(choices)
         except Exception as ex:
             msg = f"Could not find any schedd to submit to. Exception was raised: {ex}\n"
