@@ -1,4 +1,5 @@
 """ used by TaskWorker to decide which scheduler to submit to """
+# pylint: disable=broad-exception-raised
 import time
 import bisect
 import random
