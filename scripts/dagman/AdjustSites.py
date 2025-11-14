@@ -61,11 +61,8 @@ def deleteOldCacheForResubmission(adjustJobIds):
     """
     On resubmission, DAGMan resets $RETRY to 0 in the rescue DAG(s).
     PostJob reads and updates per-(job,retry) state in:
-      - retry_info/job.<jobid>.txt
       - defer_info/defer_num.<jobid>.<dag_retry>.txt
-      - finished_jobs/job.<jobid>.<dag_retry> (may exist if created earlier)
-    If we only increase RETRY lines in rescue DAGs without resetting these caches,
-    PostJob gets confused and reuses stale deferral/retry state, effectively capping retries.
+    PostJob gets confused and reuses stale deferral state, effectively capping retries.
     This function wipes those per-job caches so that the new rescue generation starts clean.
     """
     def _safe_unlink(path):
@@ -101,7 +98,7 @@ def deleteOldCacheForResubmission(adjustJobIds):
 
     printLog(f"[rescue] Deleting defer_info for jobs: {jobIds[:10]}{' ...' if len(jobIds)>10 else ''}")
     for jid in jobIds:
-        _glob_delete([f"defer_info/defer_num.{jid}.*.txt", f"finished_jobs/job.{jid}.*"])
+        _glob_delete([f"defer_info/defer_num.{jid}.*.txt"])
 
 
 def makeWebDir(ad):
