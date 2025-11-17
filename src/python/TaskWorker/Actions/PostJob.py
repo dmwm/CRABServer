@@ -1869,8 +1869,9 @@ class PostJob():
         try:
             tmpdir = tempfile.mkdtemp()
             fn = "job_lumis_{0}.json".format(self.job_id)
-            with tarfile.open("run_and_lumis.tar.gz") as f:
-                f.extract(fn, path=tmpdir)
+            with getLock("run_and_lumis"):
+                with tarfile.open("run_and_lumis.tar.gz") as f:
+                    f.extract(fn, path=tmpdir)
             with open(os.path.join(tmpdir, fn)) as fd:
                 injson = json.load(fd)
                 inlumis = LumiList(compactList=injson)
