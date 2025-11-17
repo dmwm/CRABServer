@@ -741,8 +741,8 @@ class DagmanCreator(TaskAction):
             with getLock("run_and_lumis"):
                 with tarfile.open('run_and_lumis.tar.gz') as tf:
                     tf.extractall(runAndLumisDir)
-            with tarfile.open('input_files.tar.gz') as tf:
-                tf.extractall(inputFilesDir)
+                with tarfile.open('input_files.tar.gz') as tf:
+                    tf.extractall(inputFilesDir)
         # now add run_lumi and input_files from this DAG
         # add current runs_and_lumis and input_files lists in the temp directories
         for dagSpec in dagSpecs:
@@ -764,18 +764,18 @@ class DagmanCreator(TaskAction):
             with tarfile.open('run_and_lumis.tar.gz', "w:gz") as tf:
                 # use arcname='' to have only filename in the archive. w/o dir
                 tf.add(runAndLumisDir, arcname='')
-        with tarfile.open('input_files.tar.gz', 'w:gz') as tf:
-            tf.add(inputFilesDir, arcname='')
+            with tarfile.open('input_files.tar.gz', 'w:gz') as tf:
+                tf.add(inputFilesDir, arcname='')
         shutil.rmtree(runAndLumisDir)
         shutil.rmtree(inputFilesDir)
-        with getLock("run_and_lumis"):
-            if self.runningInTW:
-                # simply put tarballs in correct directory, CMSRunAnalysis.tar.gz will be created later on
-                shutil.copy('run_and_lumis.tar.gz', workingDir)
-                shutil.copy('input_files.tar.gz', workingDir)
-            else:
-                # still need to put run_and_lumis in SPOOL_DIR since automatic splitting code will
-                # need access e.g. in PostJob.saveAutomaticSplittingData
+        if self.runningInTW:
+            # simply put tarballs in correct directory, CMSRunAnalysis.tar.gz will be created later on
+            shutil.copy('run_and_lumis.tar.gz', workingDir)
+            shutil.copy('input_files.tar.gz', workingDir)
+        else:
+            # still need to put run_and_lumis in SPOOL_DIR since automatic splitting code will
+            # need access e.g. in PostJob.saveAutomaticSplittingData
+            with getLock("run_and_lumis"):
                 shutil.copy('run_and_lumis.tar.gz', workingDir)
         # now list of input arguments needed for each jobs, again prepare it in the temp dir
         argdicts = self.prepareJobArguments(dagSpecs)
