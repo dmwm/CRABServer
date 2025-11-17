@@ -65,24 +65,23 @@ def deleteOldCacheForResubmission(adjustJobIds):
     PostJob gets confused and reuses stale deferral state, effectively capping retries.
     This function wipes those per-job caches so that the new rescue generation starts clean.
     """
-    def _safe_unlink(path):
+    def safeUnlink(path):
         try:
             if os.path.exists(path):
                 os.unlink(path)
         except Exception as ex:  # pylint: disable=broad-except
             printLog(f"[rescue] WARNING: failed to remove {path}: {ex}")
 
-    def _glob_delete(patterns):
+    def globDelete(patterns):
         for pat in patterns:
             for fn in glob.glob(pat):
-                _safe_unlink(fn)
+                safeUnlink(fn)
 
     if not adjustJobIds:
         return
     jobIds = []
     if adjustJobIds is True:
-        # All jobs: infer from existing state on disk
-        # Collect any job ids we can spot from defer_info and retry_info
+        # Case when TypeError occurs
         dpat = re.compile(r"defer_info/defer_num\.(\d+)\.\d+\.txt$")
         for fn in chain(glob.glob("defer_info/defer_num.*.*.txt")):
             m = dpat.match(fn)
@@ -90,6 +89,7 @@ def deleteOldCacheForResubmission(adjustJobIds):
                 jobIds.append(m.group(1))
         jobIds = sorted(set(jobIds))
     else:
+        # Case when valid job ids are passed
         jobIds = [str(j) for j in set(adjustJobIds)]
 
     if not jobIds:
@@ -98,7 +98,7 @@ def deleteOldCacheForResubmission(adjustJobIds):
 
     printLog(f"[rescue] Deleting defer_info for jobs: {jobIds[:10]}{' ...' if len(jobIds)>10 else ''}")
     for jid in jobIds:
-        _glob_delete([f"defer_info/defer_num.{jid}.*.txt"])
+        globDelete([f"defer_info/defer_num.{jid}.*.txt"])
 
 
 def makeWebDir(ad):
@@ -419,7 +419,7 @@ def main():
         saveProxiedWebdir(crabserver, ad)
         printLog("Proxied webdir saved")
 
-    printLog("Clearing the automatic blacklist and only deleting cache files for resubmissions, no rescue file editing")
+    printLog("Clearing the automatic blacklist")
 
     clearAutomaticBlacklist()
 
