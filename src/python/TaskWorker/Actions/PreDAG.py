@@ -368,14 +368,13 @@ class PreDAG():
                 missing = missing + LumiList(compactList=literal_eval(fd.read()))
         for failedId in failed:
             tmpdir = tempfile.mkdtemp()
-            with getLock("run_and_lumis"):
-                with tarfile.open("run_and_lumis.tar.gz") as f:
-                    fn = f"job_lumis_{failedId}.json"
-                    f.extract(fn, path=tmpdir)
-                    with open(os.path.join(tmpdir, fn), 'r', encoding='utf-8') as fd:
-                        injson = json.load(fd)
-                        missing = missing + LumiList(compactList=injson)
-                        self.logger.info("Adding lumis from failed job %s", failedId)
+            with tarfile.open("run_and_lumis.tar.gz") as f:
+                fn = f"job_lumis_{failedId}.json"
+                f.extract(fn, path=tmpdir)
+                with open(os.path.join(tmpdir, fn), 'r', encoding='utf-8') as fd:
+                    injson = json.load(fd)
+                    missing = missing + LumiList(compactList=injson)
+                    self.logger.info("Adding lumis from failed job %s", failedId)
             shutil.rmtree(tmpdir)
         missignCompact = missing.getCompactList()
         runs = missing.getRuns()
