@@ -22,7 +22,7 @@ from ast import literal_eval
 from urllib.parse import urlencode
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree
+from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree, getLock
 
 from CRABUtils.Utils import addToGZippedTarfile
 
@@ -737,10 +737,11 @@ class DagmanCreator(TaskAction):
         inputFilesDir = tempfile.mkdtemp()
         if not self.runningInTW:
             # pre-populate those directories with files from previous DagmanCreator steps
-            with tarfile.open('run_and_lumis.tar.gz') as tf:
-                tf.extractall(runAndLumisDir)
-            with tarfile.open('input_files.tar.gz') as tf:
-                tf.extractall(inputFilesDir)
+            with getLock("run_and_lumis"):
+                with tarfile.open('run_and_lumis.tar.gz') as tf:
+                    tf.extractall(runAndLumisDir)
+                with tarfile.open('input_files.tar.gz') as tf:
+                    tf.extractall(inputFilesDir)
         # now add run_lumi and input_files from this DAG
         # add current runs_and_lumis and input_files lists in the temp directories
         for dagSpec in dagSpecs:
@@ -758,11 +759,12 @@ class DagmanCreator(TaskAction):
                 fd.write(str(dagSpec['inputFiles']))
         # make tarballs, if those file exists in tarballDir, they will be overwritten
         os.chdir(tarballDir)
-        with tarfile.open('run_and_lumis.tar.gz', "w:gz") as tf:
-            # use arcname='' to have only filename in the archive. w/o dir
-            tf.add(runAndLumisDir, arcname='')
-        with tarfile.open('input_files.tar.gz', 'w:gz') as tf:
-            tf.add(inputFilesDir, arcname='')
+        with getLock("run_and_lumis"):
+            with tarfile.open('run_and_lumis.tar.gz', "w:gz") as tf:
+                # use arcname='' to have only filename in the archive. w/o dir
+                tf.add(runAndLumisDir, arcname='')
+            with tarfile.open('input_files.tar.gz', 'w:gz') as tf:
+                tf.add(inputFilesDir, arcname='')
         shutil.rmtree(runAndLumisDir)
         shutil.rmtree(inputFilesDir)
         if self.runningInTW:
@@ -772,7 +774,8 @@ class DagmanCreator(TaskAction):
         else:
             # still need to put run_and_lumis in SPOOL_DIR since automatic splitting code will
             # need access e.g. in PostJob.saveAutomaticSplittingData
-            shutil.copy('run_and_lumis.tar.gz', workingDir)
+            with getLock("run_and_lumis"):
+                shutil.copy('run_and_lumis.tar.gz', workingDir)
         # now list of input arguments needed for each jobs, again prepare it in the temp dir
         argdicts = self.prepareJobArguments(dagSpecs)
         argFileName = "input_args.json"
