@@ -25,6 +25,7 @@ import traceback
 import subprocess
 import contextlib
 import shutil
+import tempfile
 from pathlib import Path
 
 if sys.version_info >= (3, 0):
