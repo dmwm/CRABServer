@@ -466,7 +466,7 @@ def rebuildSpoolTarFromDir(spool_dir, tar_filename, src_dir):
     with tarfile.open(tmpLocalTar, "w:gz") as local_tf:
         local_tf.add(src_dir, arcname='')
 
-    atomic_move_to_spool(tmpLocalTar, spool_dir)
+    atomicMoveToSpool(tmpLocalTar, spool_dir)
     try:
         shutil.rmtree(tmpLocalDir)
     except OSError:
