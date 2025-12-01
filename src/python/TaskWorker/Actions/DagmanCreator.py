@@ -23,7 +23,7 @@ from urllib.parse import urlencode
 from pathlib import Path
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree, getLock, atomicMoveToSpool, rebuildSpoolTarFromDir
+from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree, atomicMoveToSpool, rebuildSpoolTarFromDir
 
 from CRABUtils.Utils import addToGZippedTarfile
 
@@ -739,11 +739,10 @@ class DagmanCreator(TaskAction):
         inputFilesDir = tempfile.mkdtemp()
         if not self.runningInTW:
             # pre-populate those directories with files from previous DagmanCreator steps
-            with getLock("run_and_lumis"):
-                with tarfile.open('run_and_lumis.tar.gz') as tf:
-                    tf.extractall(runAndLumisDir)
-                with tarfile.open('input_files.tar.gz') as tf:
-                    tf.extractall(inputFilesDir)
+            with tarfile.open('run_and_lumis.tar.gz') as tf:
+                tf.extractall(runAndLumisDir)
+            with tarfile.open('input_files.tar.gz') as tf:
+                tf.extractall(inputFilesDir)
         # now add run_lumi and input_files from this DAG
         # add current runs_and_lumis and input_files lists in the temp directories
         for dagSpec in dagSpecs:
