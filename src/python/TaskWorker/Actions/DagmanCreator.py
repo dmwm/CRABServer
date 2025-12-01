@@ -764,11 +764,15 @@ class DagmanCreator(TaskAction):
 
         ### Start: update tarball on local first then atomic move back to SPOOL ###
         tmpdir = Path(tempfile.mkdtemp()) # local AP disk
+        runAndLumisSpoolPath = Path(tarballDir) / "run_and_lumis.tar.gz"
+        inputFilesSpoolPath = Path(tarballDir) / "input_files.tar.gz"
         tmpRunAndLumisPath = tmpdir / "run_and_lumis.tar.gz"
         tmpInputFilesPath = tmpdir / "input_files.tar.gz"
         # Copy tarball back from SPOOL to Local
-        shutil.copy2('run_and_lumis.tar.gz', tmpRunAndLumisPath)
-        shutil.copy2('input_files.tar.gz', tmpInputFilesPath)
+        if runAndLumisSpoolPath.exists():
+            shutil.copy2(runAndLumisSpoolPath, tmpRunAndLumisPath)
+        if inputFilesSpoolPath.exists():
+            shutil.copy2(inputFilesSpoolPath, tmpInputFilesPath)
         # Update Tarballs
         with tarfile.open(tmpRunAndLumisPath, "w:gz") as tf:
             tf.add(runAndLumisDir, arcname='')
