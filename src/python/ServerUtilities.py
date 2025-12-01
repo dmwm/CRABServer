@@ -438,36 +438,36 @@ def getLock(name):
         yield fd
 
 
-def atomicMoveToSpool(src, dst_spool_dir, suffix=".tmp"):
+def atomicMoveToSpool(src, dstSpoolDir, suffix=".tmp"):
     """
     Guarantee atomicity, at last mile SPOOL destination filesystem via
     copy `src` -> `temp` intermediates at spool -- then atomic mv/replace --> `final` at spool
     """
     src = Path(src)
-    dst_spool_dir = Path(dst_spool_dir)
-    temp_spool_path = dst_spool_dir / f"{src.name}{suffix}"
-    final_spool_path = dst_spool_dir / src.name
+    dstSpoolDir = Path(dstSpoolDir)
+    tempSpoolPath = dstSpoolDir / f"{src.name}{suffix}"
+    finalSpoolPath = dstSpoolDir / src.name
 
     # from local to temp SPOOL
-    shutil.copy2(src, temp_spool_path)      # AFAIK, copy2 will preserve metatdata of file.
+    shutil.copy2(src, tempSpoolPath)      # AFAIK, copy2 will preserve metatdata of file.
     # from temp SPOOL to final SPOOL
-    temp_spool_path.replace(final_spool_path)     # More robust than os.system('mv x y')? Since, we don't have to handle errors ourself.
+    tempSpoolPath.replace(finalSpoolPath)     # More robust than os.system('mv x y')? Since, we don't have to handle errors ourself.
 
-def rebuildSpoolTarFromDir(spool_dir, tar_filename, src_dir):
+def rebuildSpoolTarFromDir(spoolDir, tarFileName, srcDir):
     """
-    Create `tar_filename` from `src_dir` on a local tmp dir,
-    then atomically publish it into `spool_dir`.
+    Create `tarFileName` from `srcDir` on a local tmp dir,
+    then atomically publish it into `spoolDir`.
     """
-    spool_dir = Path(spool_dir)
-    src_dir = Path(src_dir)
+    spoolDir = Path(spoolDir)
+    srcDir = Path(srcDir)
 
     tmpLocalDir = Path(tempfile.mkdtemp())
-    tmpLocalTar = tmpLocaDir / tar_filename
+    tmpLocalTar = tmpLocaDir / tarFileName
 
-    with tarfile.open(tmpLocalTar, "w:gz") as local_tf:
-        local_tf.add(src_dir, arcname='')
+    with tarfile.open(tmpLocalTar, "w:gz") as tf:
+        tf.add(srcDir, arcname='')
 
-    atomicMoveToSpool(tmpLocalTar, spool_dir)
+    atomicMoveToSpool(tmpLocalTar, spoolDir)
     try:
         shutil.rmtree(tmpLocalDir)
     except OSError:
