@@ -26,6 +26,7 @@ import subprocess
 import contextlib
 import shutil
 import tempfile
+import tarfile
 from pathlib import Path
 
 if sys.version_info >= (3, 0):
