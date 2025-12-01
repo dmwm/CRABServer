@@ -764,14 +764,19 @@ class DagmanCreator(TaskAction):
 
         ### Start: update tarball on local first then atomic move back to SPOOL ###
         tmpdir = Path(tempfile.mkdtemp()) # local AP disk
-        shutil.copy2('run_and_lumis.tar.gz', tmpdir / "run_and_lumis.tar.gz.tmp")
-        shutil.copy2('input_files.tar.gz', tmpdir / "input_files.tar.gz.tmp")
-        with tarfile.open(tmpdir / 'run_and_lumis.tar.gz', "w:gz") as tf:
+        tmpRunAndLumisPath = tmpdir / "run_and_lumis.tar.gz"
+        tmpInputFilesPath = tmpdir / "input_files.tar.gz"
+        # Copy tarball back from SPOOL to Local
+        shutil.copy2('run_and_lumis.tar.gz', tmpRunAndLumisPath)
+        shutil.copy2('input_files.tar.gz', tmpInputFilesPath)
+        # Update Tarballs
+        with tarfile.open(tmpRunAndLumisPath, "w:gz") as tf:
             tf.add(runAndLumisDir, arcname='')
-        with tarfile.open(tmpdir / 'input_files.tar.gz', 'w:gz') as tf:
+        with tarfile.open(tmpInputFilesPath, 'w:gz') as tf:
             tf.add(inputFilesDir, arcname='')
-        atomic_move_to_spool(tmpdir / 'run_and_lumis.tar.gz', tarballDir)
-        atomic_move_to_spool(tmpdir / 'input_files.tar.gz', tarballDir)
+        # Atomic move back to SPOOL
+        atomic_move_to_spool(tmpRunAndLumisPath, tarballDir)
+        atomic_move_to_spool(tmpInputFilesPath, tarballDir)
         ### End: update tarball on local first then atomic move back to SPOOL ###
 
         shutil.rmtree(runAndLumisDir)
