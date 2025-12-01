@@ -24,6 +24,8 @@ import datetime
 import traceback
 import subprocess
 import contextlib
+import shutil
+from pathlib import Path
 
 if sys.version_info >= (3, 0):
     from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
@@ -434,6 +436,21 @@ def getLock(name):
         fcntl.flock(fd, fcntl.LOCK_EX)
         yield fd
 
+
+def atomic_move_to_spool(src, dst_spool_dir, suffix=".tmp"):
+    """
+    Guarantee atomicity, at last mile SPOOL destination filesystem via
+    copy `src` -> `temp` intermediates at spool -- then atomic mv/replace --> `final` at spool
+    """
+    src = Path(src)
+    dst_spool_dir = Path(dst_spool_dir)
+    temp_spool_path = dst_spool_dir / f"{src.name}{suffix}"
+    final_spool_path = dst_spool_dir / src.name
+
+    # from local to temp SPOOL
+    shutil.copy2(src, temp_spool_path)      # AFAIK, copy2 will preserve metatdata of file.
+    # from temp SPOOL to final SPOOL
+    temp_spool_path.replace(final_spool_path)     # More robust than os.system('mv x y')? Since, we don't have to handle errors ourself.
 
 def getHashLfn(lfn):
     """ Provide a hashed lfn from an lfn.
