@@ -452,6 +452,27 @@ def atomic_move_to_spool(src, dst_spool_dir, suffix=".tmp"):
     # from temp SPOOL to final SPOOL
     temp_spool_path.replace(final_spool_path)     # More robust than os.system('mv x y')? Since, we don't have to handle errors ourself.
 
+def rebuild_spool_tar_from_dir(spool_dir, tar_filename, src_dir):
+    """
+    Create `tar_filename` from `src_dir` on a local tmp dir,
+    then atomically publish it into `spool_dir`.
+    """
+    spool_dir = Path(spool_dir)
+    src_dir = Path(src_dir)
+
+    tmpLocalDir = Path(tempfile.mkdtemp())
+    tmpLocalTar = tmpLocaDir / tar_filename
+
+    with tarfile.open(tmpLocalTar, "w:gz") as local_tf:
+        local_tf.add(src_dir, arcname='')
+
+    atomic_move_to_spool(tmpLocalTar, spool_dir)
+    try:
+        shutil.rmtree(tmpLocalDir)
+    except OSError:
+        pass
+
+
 def getHashLfn(lfn):
     """ Provide a hashed lfn from an lfn.
     """

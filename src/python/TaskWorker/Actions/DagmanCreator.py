@@ -23,7 +23,7 @@ from urllib.parse import urlencode
 from pathlib import Path
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree, getLock, atomic_move_to_spool
+from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree, getLock, atomic_move_to_spool, rebuild_spool_tar_from_dir
 
 from CRABUtils.Utils import addToGZippedTarfile
 
@@ -762,26 +762,9 @@ class DagmanCreator(TaskAction):
         # make tarballs, if those file exists in tarballDir, they will be overwritten
         os.chdir(tarballDir)
 
-        ### Start: update tarball on local first then atomic move back to SPOOL ###
-        tmpdir = Path(tempfile.mkdtemp()) # local AP disk
-        runAndLumisSpoolPath = Path(tarballDir) / "run_and_lumis.tar.gz"
-        inputFilesSpoolPath = Path(tarballDir) / "input_files.tar.gz"
-        tmpRunAndLumisPath = tmpdir / "run_and_lumis.tar.gz"
-        tmpInputFilesPath = tmpdir / "input_files.tar.gz"
-        # Copy tarball back from SPOOL to Local
-        if runAndLumisSpoolPath.exists():
-            shutil.copy2(runAndLumisSpoolPath, tmpRunAndLumisPath)
-        if inputFilesSpoolPath.exists():
-            shutil.copy2(inputFilesSpoolPath, tmpInputFilesPath)
-        # Update Tarballs
-        with tarfile.open(tmpRunAndLumisPath, "w:gz") as tf:
-            tf.add(runAndLumisDir, arcname='')
-        with tarfile.open(tmpInputFilesPath, 'w:gz') as tf:
-            tf.add(inputFilesDir, arcname='')
-        # Atomic move back to SPOOL
-        atomic_move_to_spool(tmpRunAndLumisPath, tarballDir)
-        atomic_move_to_spool(tmpInputFilesPath, tarballDir)
-        ### End: update tarball on local first then atomic move back to SPOOL ###
+        ### rebuild tarball on local first then atomic move to SPOOL ###
+        rebuild_spool_tar_from_dir(tarballDir, "run_and_lumis.tar.gz", runAndLumisDir)
+        rebuild_spool_tar_from_dir(tarballDir, "input_files.tar.gz", inputFilesDir)
 
         shutil.rmtree(runAndLumisDir)
         shutil.rmtree(inputFilesDir)
