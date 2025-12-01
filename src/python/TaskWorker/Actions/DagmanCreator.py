@@ -20,6 +20,7 @@ import hashlib
 import tempfile
 from ast import literal_eval
 from urllib.parse import urlencode
+from pathlib import Path
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
 from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree, getLock, atomic_move_to_spool
@@ -760,12 +761,19 @@ class DagmanCreator(TaskAction):
                 fd.write(str(dagSpec['inputFiles']))
         # make tarballs, if those file exists in tarballDir, they will be overwritten
         os.chdir(tarballDir)
-        with getLock("run_and_lumis"):
-            with tarfile.open('run_and_lumis.tar.gz', "w:gz") as tf:
-                # use arcname='' to have only filename in the archive. w/o dir
-                tf.add(runAndLumisDir, arcname='')
-            with tarfile.open('input_files.tar.gz', 'w:gz') as tf:
-                tf.add(inputFilesDir, arcname='')
+
+        ### Start: update tarball on local first then atomic move back to SPOOL ###
+        tmpdir = Path(tempfile.mkdtemp()) # local AP disk
+        shutil.copy2('run_and_lumis.tar.gz', tmpdir / "run_and_lumis.tar.gz.tmp")
+        shutil.copy2('input_files.tar.gz', tmpdir / "input_files.tar.gz.tmp")
+        with tarfile.open(tmpdir / 'run_and_lumis.tar.gz', "w:gz") as tf:
+            tf.add(runAndLumisDir, arcname='')
+        with tarfile.open(tmpdir / 'input_files.tar.gz', 'w:gz') as tf:
+            tf.add(inputFilesDir, arcname='')
+        atomic_move_to_spool(tmpdir / 'run_and_lumis.tar.gz', tarballDir)
+        atomic_move_to_spool(tmpdir / 'input_files.tar.gz', tarballDir)
+        ### End: update tarball on local first then atomic move back to SPOOL ###
+
         shutil.rmtree(runAndLumisDir)
         shutil.rmtree(inputFilesDir)
         if self.runningInTW:
