@@ -462,7 +462,7 @@ def rebuildSpoolTarFromDir(spoolDir, tarFileName, srcDir):
     srcDir = Path(srcDir)
 
     tmpLocalDir = Path(tempfile.mkdtemp())
-    tmpLocalTar = tmpLocaDir / tarFileName
+    tmpLocalTar = tmpLocalDir / tarFileName
 
     with tarfile.open(tmpLocalTar, "w:gz") as tf:
         tf.add(srcDir, arcname='')
