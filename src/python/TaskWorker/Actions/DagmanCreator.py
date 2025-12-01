@@ -22,7 +22,7 @@ from ast import literal_eval
 from urllib.parse import urlencode
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree, getLock
+from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree, getLock, atomic_move_to_spool
 
 from CRABUtils.Utils import addToGZippedTarfile
 
@@ -775,8 +775,7 @@ class DagmanCreator(TaskAction):
         else:
             # still need to put run_and_lumis in SPOOL_DIR since automatic splitting code will
             # need access e.g. in PostJob.saveAutomaticSplittingData
-            with getLock("run_and_lumis"):
-                shutil.copy('run_and_lumis.tar.gz', workingDir)
+            atomic_move_to_spool('run_and_lumis.tar.gz', workingDir)
         # now list of input arguments needed for each jobs, again prepare it in the temp dir
         argdicts = self.prepareJobArguments(dagSpecs)
         argFileName = "input_args.json"
