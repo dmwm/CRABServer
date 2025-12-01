@@ -23,7 +23,7 @@ from urllib.parse import urlencode
 from pathlib import Path
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree, getLock, atomic_move_to_spool, rebuild_spool_tar_from_dir
+from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree, getLock, atomicMoveToSpool, rebuildSpoolTarFromDir
 
 from CRABUtils.Utils import addToGZippedTarfile
 
@@ -763,8 +763,8 @@ class DagmanCreator(TaskAction):
         os.chdir(tarballDir)
 
         ### rebuild tarball on local first then atomic move to SPOOL ###
-        rebuild_spool_tar_from_dir(tarballDir, "run_and_lumis.tar.gz", runAndLumisDir)
-        rebuild_spool_tar_from_dir(tarballDir, "input_files.tar.gz", inputFilesDir)
+        rebuildSpoolTarFromDir(tarballDir, "run_and_lumis.tar.gz", runAndLumisDir)
+        rebuildSpoolTarFromDir(tarballDir, "input_files.tar.gz", inputFilesDir)
 
         shutil.rmtree(runAndLumisDir)
         shutil.rmtree(inputFilesDir)
@@ -775,7 +775,7 @@ class DagmanCreator(TaskAction):
         else:
             # still need to put run_and_lumis in SPOOL_DIR since automatic splitting code will
             # need access e.g. in PostJob.saveAutomaticSplittingData
-            atomic_move_to_spool('run_and_lumis.tar.gz', workingDir)
+            atomicMoveToSpool('run_and_lumis.tar.gz', workingDir)
         # now list of input arguments needed for each jobs, again prepare it in the temp dir
         argdicts = self.prepareJobArguments(dagSpecs)
         argFileName = "input_args.json"

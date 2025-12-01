@@ -437,7 +437,7 @@ def getLock(name):
         yield fd
 
 
-def atomic_move_to_spool(src, dst_spool_dir, suffix=".tmp"):
+def atomicMoveToSpool(src, dst_spool_dir, suffix=".tmp"):
     """
     Guarantee atomicity, at last mile SPOOL destination filesystem via
     copy `src` -> `temp` intermediates at spool -- then atomic mv/replace --> `final` at spool
@@ -452,7 +452,7 @@ def atomic_move_to_spool(src, dst_spool_dir, suffix=".tmp"):
     # from temp SPOOL to final SPOOL
     temp_spool_path.replace(final_spool_path)     # More robust than os.system('mv x y')? Since, we don't have to handle errors ourself.
 
-def rebuild_spool_tar_from_dir(spool_dir, tar_filename, src_dir):
+def rebuildSpoolTarFromDir(spool_dir, tar_filename, src_dir):
     """
     Create `tar_filename` from `src_dir` on a local tmp dir,
     then atomically publish it into `spool_dir`.
