@@ -41,9 +41,6 @@ class RESTBaseAPI(DatabaseRESTApi):
 
         self.formats = [ ('application/json', JSONFormat()) ]
 
-        extconfig = ConfigCache(centralconfig=getCentralConfig(extconfigurl=config.extconfigurl),
-                                      cachetime=mktime(gmtime()))
-
         #Global initialization of Data objects. Parameters coming from the config should go here
         DataUserWorkflow.globalinit(config)
         DataWorkflow.globalinit(dbapi=self, config=config)
