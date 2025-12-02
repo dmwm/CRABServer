@@ -40,16 +40,6 @@ class RESTServerInfo(RESTEntity):
     def delegatedn(self, **kwargs):
         yield {'services': [self.config.delegateDN]}
 
-    def backendurls(self , **kwargs):
-        # need to keep this API until calls to it are removed from Client and TW
-
-        backendUrlsDict = {
-            "cacheSSL": "https://s3.cern.ch/crabcache",
-            "htcondorPool": [],
-            "htcondorSchedds": {}
-        }
-        yield backendUrlsDict
-
     def version(self , **kwargs):
         yield self.config.compatibleClientVersions
 
