@@ -148,11 +148,6 @@ class DataWorkflow(object):
            :arg dict userconfig: a dictionary of config.params which do not have a separate DB column
            :returns: a dict which contaians details of the request"""
 
-        backend_urls = copy.deepcopy(self.centralcfg.centralconfig.get("backend-urls", {}))
-        if collector:
-            backend_urls['htcondorPool'] = collector
-        else:
-            collector = backend_urls['htcondorPool']
 
         splitArgName = self.splitArgMap[splitalgo]
         dbSerializer = str
