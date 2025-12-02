@@ -46,9 +46,8 @@ class RESTBaseAPI(DatabaseRESTApi):
 
         #Global initialization of Data objects. Parameters coming from the config should go here
         DataUserWorkflow.globalinit(config)
-        DataWorkflow.globalinit(dbapi=self, centralcfg=extconfig, config=config)
+        DataWorkflow.globalinit(dbapi=self, config=config)
         DataFileMetadata.globalinit(dbapi=self, config=config)
-        RESTTask.globalinit(centralcfg=extconfig)
 
         ## TODO need a check to verify the format depending on the resource
         ##      the RESTFileMetadata has the specifc requirement of getting xml reports

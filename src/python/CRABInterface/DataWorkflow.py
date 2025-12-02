@@ -24,9 +24,8 @@ class DataWorkflow(object):
     failedList = ['failed']
 
     @staticmethod
-    def globalinit(dbapi, centralcfg=None, config=None):
+    def globalinit(dbapi, config=None):
         DataWorkflow.api = dbapi
-        DataWorkflow.centralcfg = centralcfg
         DataWorkflow.config = config
 
     def __init__(self, config):

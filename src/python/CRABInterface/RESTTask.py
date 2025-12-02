@@ -19,10 +19,6 @@ from ServerUtilities import getUsernameFromTaskname
 class RESTTask(RESTEntity):
     """REST entity to handle interactions between CAFTaskWorker and TaskManager database"""
 
-    @staticmethod
-    def globalinit(centralcfg=None):
-        RESTTask.centralcfg = centralcfg
-
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
         self.Task = getDBinstance(config, 'TaskDB', 'Task')
