@@ -23,7 +23,7 @@ from CRABInterface.Regexps import (RX_TASKNAME, RX_ACTIVITY, RX_JOBTYPE, RX_GENE
                                    RX_RUNS, RX_LUMIRANGE, RX_SCRIPTARGS, RX_SCHEDD_NAME, RX_COLLECTOR, RX_SUBRESTAT,
                                    RX_JOBID, RX_ADDFILE, RX_ANYTHING, RX_USERNAME, RX_DATE, RX_MANYLINES_SHORT,
                                    RX_CUDA_VERSION, RX_BLOCK, RX_RUCIODID, RX_RUCIOSCOPE)
-from CRABInterface.Utilities import conn_handler, getDBinstance, validate_dict
+from CRABInterface.Utilities import getDBinstance, validate_dict
 from ServerUtilities import checkOutLFN, generateTaskName
 
 
@@ -204,7 +204,6 @@ class RESTUserWorkflow(RESTEntity):
             #Need to log the message in the db for the users
             self.logger.warning(msg)
 
-    @conn_handler(services=['centralconfig'])
     def validate(self, apiobj, method, api, param, safe): #pylint: disable=unused-argument
         """Validating all the input parameter as enforced by the WMCore.REST module"""
 

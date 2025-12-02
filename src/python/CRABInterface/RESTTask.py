@@ -8,7 +8,7 @@ from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_strlist
 from WMCore.REST.Error import InvalidParameter, ExecutionError, NotAcceptable
 
-from CRABInterface.Utilities import conn_handler, getDBinstance
+from CRABInterface.Utilities import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match, authz_operator
 from CRABInterface.Regexps import RX_MANYLINES_SHORT, RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME,\
     RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE, RX_DATASET, RX_ANYTHING_10K, \
@@ -205,7 +205,6 @@ class RESTTask(RESTEntity):
             raise ExecutionError("Impossible to find task %s in the database." % kwargs['workflow']) from e
         yield row
 
-    @conn_handler(services=['centralconfig'])
     def webdirprx(self, **kwargs):
         """ Returns the proxied url for the schedd if the schedd has any, returns an empty list instead. Raises in case of other errors.
             To test it use:

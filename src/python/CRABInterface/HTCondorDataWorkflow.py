@@ -4,7 +4,6 @@
 from ast import literal_eval
 
 from CRABInterface.DataWorkflow import DataWorkflow
-from CRABInterface.Utilities import conn_handler
 from ServerUtilities import PUBLICATIONDB_STATES
 from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 
@@ -119,7 +118,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                   "username"         : ''} #from the db
         return [result]
 
-    @conn_handler(services=[])
     def publicationStatus(self, workflow, user):
         """Here is what basically the function return, a dict called publicationInfo in the subcalls:
                 publicationInfo['status']: something like {'publishing': 0, 'publication_failed': 0, 'not_published': 0, 'published': 5}.
