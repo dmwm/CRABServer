@@ -30,12 +30,11 @@ from ServerUtilities import checkOutLFN, generateTaskName
 class RESTUserWorkflow(RESTEntity):
     """REST entity for workflows from the user point of view and relative subresources"""
 
-    def __init__(self, app, api, config, mount, centralcfg):
+    def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
 
         self.logger = logging.getLogger("CRABLogger.RESTUserWorkflow")
         self.userworkflowmgr = DataUserWorkflow()
-        self.centralcfg = centralcfg
         self.task = getDBinstance(config, 'TaskDB', 'Task')
         self.tagCollector = TagCollector(logger = self.logger, anytype = 1, anyarch = 1)
 

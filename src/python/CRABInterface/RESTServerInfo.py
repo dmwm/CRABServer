@@ -14,10 +14,9 @@ from CRABInterface.Utilities import conn_handler
 class RESTServerInfo(RESTEntity):
     """REST entity for workflows and relative subresources"""
 
-    def __init__(self, app, api, config, mount, centralcfg):
+    def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
         self.config = config
-        self.centralcfg = centralcfg
         self.logger = logging.getLogger("CRABLogger.RESTServerInfo")
         #used by the client to get the url where to update the cache (cacheSSL)
 
@@ -48,8 +47,8 @@ class RESTServerInfo(RESTEntity):
 
         backendUrlsDict = {
             "cacheSSL": "https://s3.cern.ch/crabcache",
-            "htcondorPool": self.centralcfg.centralconfig['backend-urls']['htcondorPool'],
-            "htcondorSchedds": self.centralcfg.centralconfig['backend-urls'].get('htcondorSchedds', {})
+            "htcondorPool": [],
+            "htcondorSchedds": {}
         }
         yield backendUrlsDict
 

@@ -52,8 +52,8 @@ class RESTBaseAPI(DatabaseRESTApi):
 
         ## TODO need a check to verify the format depending on the resource
         ##      the RESTFileMetadata has the specifc requirement of getting xml reports
-        self._add( {'workflow': RESTUserWorkflow(app, self, config, mount, extconfig),
-                    'info': RESTServerInfo(app, self, config, mount, extconfig),
+        self._add( {'workflow': RESTUserWorkflow(app, self, config, mount),
+                    'info': RESTServerInfo(app, self, config, mount),
                     'filemetadata': RESTFileMetadata(app, self, config, mount),
                     'workflowdb': RESTWorkerWorkflow(app, self, config, mount),
                     'task': RESTTask(app, self, config, mount),
