@@ -13,7 +13,6 @@ from WMCore.REST.Server import DatabaseRESTApi, rows
 from WMCore.REST.Format import JSONFormat
 
 # CRABServer dependecies here
-from CRABInterface.Utilities import ConfigCache
 from CRABInterface.RESTUserWorkflow import RESTUserWorkflow
 from CRABInterface.RESTTask import RESTTask
 from CRABInterface.RESTServerInfo import RESTServerInfo

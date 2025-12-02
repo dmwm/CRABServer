@@ -20,7 +20,6 @@ from WMCore.Services.pycurl_manager import ResponseHeader
 from WMCore.REST.Server import RESTArgs
 
 CMSSitesCache = namedtuple("CMSSitesCache", ["cachetime", "sites"])
-ConfigCache = namedtuple("ConfigCache", ["cachetime", "centralconfig"])
 
 # These parameters are set in the globalinit (called in RESTBaseAPI)
 credServerPath = None
