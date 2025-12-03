@@ -240,7 +240,7 @@ class RESTTask(RESTEntity):
             proxiedUrl=f"{proxiedUrlBase}/{normalizedScheddId}{suffix}"
             self.logger.info("ProxiedUrl for task %s is: %s\nSchedd used for submission %s", workflow, proxiedUrl, row.schedd)
             yield proxiedUrl
-        except Exception:
+        except Exception: # pylint: disable=W0718
             self.logger.info("Could not determine ProxiedUrl for task %s", workflow)
 
     def counttasksbystatus(self, **kwargs):

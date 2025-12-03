@@ -6,7 +6,6 @@ import socket
 import os
 
 import cherrypy
-from time import mktime, gmtime
 
 # WMCore dependecies here
 from WMCore.REST.Server import DatabaseRESTApi, rows

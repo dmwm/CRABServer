@@ -5,18 +5,13 @@ The module contains some utility functions used by the various modules of the CR
 import os
 from contextlib import contextmanager
 from collections import namedtuple
-from time import mktime, gmtime
 import time
 import subprocess
-import io
 import json
 import copy
-import pycurl
-import cherrypy
 
 from WMCore.WMFactory import WMFactory
-from WMCore.REST.Error import ExecutionError, InvalidParameter
-from WMCore.Services.pycurl_manager import ResponseHeader
+from WMCore.REST.Error import InvalidParameter
 from WMCore.REST.Server import RESTArgs
 
 CMSSitesCache = namedtuple("CMSSitesCache", ["cachetime", "sites"])
