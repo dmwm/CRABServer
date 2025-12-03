@@ -8,7 +8,7 @@ from WMCore.REST.Server import RESTEntity, restcall
 from WMCore.REST.Validation import validate_str, validate_strlist
 from WMCore.REST.Error import InvalidParameter, ExecutionError, NotAcceptable
 
-from CRABInterface.Utilities import conn_handler, getDBinstance
+from CRABInterface.Utilities import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match, authz_operator
 from CRABInterface.Regexps import RX_MANYLINES_SHORT, RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME,\
     RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE, RX_DATASET, RX_ANYTHING_10K, \
@@ -18,10 +18,6 @@ from ServerUtilities import getUsernameFromTaskname
 
 class RESTTask(RESTEntity):
     """REST entity to handle interactions between CAFTaskWorker and TaskManager database"""
-
-    @staticmethod
-    def globalinit(centralcfg=None):
-        RESTTask.centralcfg = centralcfg
 
     def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
@@ -209,7 +205,6 @@ class RESTTask(RESTEntity):
             raise ExecutionError("Impossible to find task %s in the database." % kwargs['workflow']) from e
         yield row
 
-    @conn_handler(services=['centralconfig'])
     def webdirprx(self, **kwargs):
         """ Returns the proxied url for the schedd if the schedd has any, returns an empty list instead. Raises in case of other errors.
             To test it use:
@@ -233,28 +228,20 @@ class RESTTask(RESTEntity):
             yield "None"
             return
 
-        #=============================================================================
-        # scheddObj is a dictionary composed like this (see the value of htcondorSchedds):
-        # "htcondorSchedds": {
-        #  "crab3-5@vocms059.cern.ch": {
-        #      "proxiedurl": "https://cmsweb.cern.ch/scheddmon/5"
-        #  },
-        #  ...
-        # }
-        # so that they have a "proxied URL" to be used in case the schedd is
-        # behind a firewall.
-        #=============================================================================
-        scheddsObj = self.centralcfg.centralconfig['backend-urls'].get('htcondorSchedds', {})
-        self.logger.info("ScheddObj for task %s is: %s\nSchedd used for submission %s", workflow, scheddsObj, row.schedd)
-        #be careful that htcondorSchedds could be a list (backward compatibility). We might want to remove this in the future
-        if row.schedd in list(scheddsObj) and isinstance(scheddsObj, dict):
-            self.logger.debug("Found schedd %s", row.schedd)
-            proxiedurlbase = scheddsObj[row.schedd].get('proxiedurl')
-            self.logger.debug("Proxied url base is %s", proxiedurlbase)
-            if proxiedurlbase:
-                yield proxiedurlbase + suffix
-        else:
-            self.logger.info("Could not determine proxied url for task %s", workflow)
+        try:
+            # Examples:
+            # row.schedd values: crab3-5@vocms059.cern.ch, crab3@crab-preprod-scd03.cern.ch
+            # valid proxiedUrls: https://cmsweb.cern.ch/scheddmon/059, https://cmsweb.cern.ch/scheddmon/crab-preprod-scd03
+            matched = re.match(r"^[^@]*@([^.]+)\.cern\.ch$", row.schedd)
+            if not matched:
+                raise ValueError("ScheddID is not in a valid pattern.")
+            normalizedScheddId = matched.group(1).replace("vocms", "")
+            proxiedUrlBase="https://cmsweb.cern.ch/scheddmon"
+            proxiedUrl=f"{proxiedUrlBase}/{normalizedScheddId}{suffix}"
+            self.logger.info("ProxiedUrl for task %s is: %s\nSchedd used for submission %s", workflow, proxiedUrl, row.schedd)
+            yield proxiedUrl
+        except Exception: # pylint: disable=W0718
+            self.logger.info("Could not determine ProxiedUrl for task %s", workflow)
 
     def counttasksbystatus(self, **kwargs):
         """Retrieves all jobs of the specified user with the specified status

@@ -1,4 +1,3 @@
-import copy
 import time
 import logging
 import json
@@ -13,7 +12,7 @@ from ServerUtilities import PUBLICATIONDB_STATUSES
 from ServerUtilities import NUM_DAYS_FOR_RESUBMITDRAIN
 from ServerUtilities import getEpochFromDBTime
 
-from CRABInterface.Utilities import conn_handler, getDBinstance
+from CRABInterface.Utilities import getDBinstance
 from CRABInterface.RESTExtensions import BadRequestException
 
 class DataWorkflow(object):
@@ -24,9 +23,8 @@ class DataWorkflow(object):
     failedList = ['failed']
 
     @staticmethod
-    def globalinit(dbapi, centralcfg=None, config=None):
+    def globalinit(dbapi, config=None):
         DataWorkflow.api = dbapi
-        DataWorkflow.centralcfg = centralcfg
         DataWorkflow.config = config
 
     def __init__(self, config):
@@ -87,7 +85,6 @@ class DataWorkflow(object):
            :return: a generator of list of outputs"""
         raise NotImplementedError
 
-    @conn_handler(services=['centralconfig'])
     def submit(self, workflow, activity, jobtype, jobsw, jobarch, jobminuarch, use_parent, secondarydata, generator,
                events_per_lumi, siteblacklist, sitewhitelist, splitalgo, algoargs, cachefilename, cacheurl, addoutputfiles,
                username, userdn, savelogsflag, publication, publishname, publishname2, asyncdest, dbsurl, publishdbsurl, vorole, vogroup, tfileoutfiles, edmoutfiles,
@@ -148,11 +145,6 @@ class DataWorkflow(object):
            :arg dict userconfig: a dictionary of config.params which do not have a separate DB column
            :returns: a dict which contaians details of the request"""
 
-        backend_urls = copy.deepcopy(self.centralcfg.centralconfig.get("backend-urls", {}))
-        if collector:
-            backend_urls['htcondorPool'] = collector
-        else:
-            collector = backend_urls['htcondorPool']
 
         splitArgName = self.splitArgMap[splitalgo]
         dbSerializer = str
@@ -246,7 +238,6 @@ class DataWorkflow(object):
             publicationInfo['status'] = {'disabled': []}
         return publicationInfo
 
-    @conn_handler(services=[])
     def resubmit2(self, workflow, publication, jobids, siteblacklist, sitewhitelist, maxjobruntime, maxmemory, priority):
         """Request to reprocess what the workflow hasn't finished to reprocess.
            This needs to create a new workflow in the same campaign
@@ -363,7 +354,6 @@ class DataWorkflow(object):
         raise NotImplementedError
 
 
-    @conn_handler(services=['centralconfig'])
     def kill(self, workflow, killwarning=''):
         """Request to Abort a workflow.
 

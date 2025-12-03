@@ -8,16 +8,14 @@ from WMCore.REST.Validation import validate_str
 from CRABInterface.RESTExtensions import authz_login_valid
 from CRABInterface.Regexps import RX_SUBRES_SI, RX_TASKNAME
 from CRABInterface.__init__ import __version__
-from CRABInterface.Utilities import conn_handler
 
 
 class RESTServerInfo(RESTEntity):
     """REST entity for workflows and relative subresources"""
 
-    def __init__(self, app, api, config, mount, centralcfg):
+    def __init__(self, app, api, config, mount):
         RESTEntity.__init__(self, app, api, config, mount)
         self.config = config
-        self.centralcfg = centralcfg
         self.logger = logging.getLogger("CRABLogger.RESTServerInfo")
         #used by the client to get the url where to update the cache (cacheSSL)
 
@@ -41,17 +39,6 @@ class RESTServerInfo(RESTEntity):
 
     def delegatedn(self, **kwargs):
         yield {'services': [self.config.delegateDN]}
-
-    @conn_handler(services=['centralconfig'])
-    def backendurls(self , **kwargs):
-        # need to keep this API until calls to it are removed from Client and TW
-
-        backendUrlsDict = {
-            "cacheSSL": "https://s3.cern.ch/crabcache",
-            "htcondorPool": self.centralcfg.centralconfig['backend-urls']['htcondorPool'],
-            "htcondorSchedds": self.centralcfg.centralconfig['backend-urls'].get('htcondorSchedds', {})
-        }
-        yield backendUrlsDict
 
     def version(self , **kwargs):
         yield self.config.compatibleClientVersions

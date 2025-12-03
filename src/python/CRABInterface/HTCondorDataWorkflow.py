@@ -4,7 +4,6 @@
 from ast import literal_eval
 
 from CRABInterface.DataWorkflow import DataWorkflow
-from CRABInterface.Utilities import conn_handler
 from ServerUtilities import PUBLICATIONDB_STATES
 from Databases.FileMetaDataDB.Oracle.FileMetaData.FileMetaData import GetFromTaskAndType
 
@@ -17,11 +16,11 @@ class HTCondorDataWorkflow(DataWorkflow):
     """
 
     def logs2(self, workflow, howmany, jobids):
-        self.logger.info("About to get log of workflow: %s." % workflow)
+        self.logger.info(f"About to get log of workflow: {workflow}.")
         return self.getFiles2(workflow, howmany, jobids, ['LOG'])
 
     def output2(self, workflow, howmany, jobids):
-        self.logger.info("About to get output of workflow: %s." % workflow)
+        self.logger.info(f"About to get output of workflow: {workflow}.")
         return self.getFiles2(workflow, howmany, jobids, ['EDM', 'TFILE', 'FAKE'])
 
     def getFiles2(self, workflow, howmany, jobids, filetype):
@@ -38,7 +37,7 @@ class HTCondorDataWorkflow(DataWorkflow):
 
         file_type = 'log' if filetype == ['LOG'] else 'output'
 
-        self.logger.debug("Retrieving the %s files of the following jobs: %s" % (file_type, jobids))
+        self.logger.debug(f"Retrieving the {file_type} files of the following jobs: {jobids}")
         rows = self.api.query_load_all_rows(None, None, self.FileMetaData.GetFromTaskAndType_sql, filetype = ','.join(filetype), taskname = workflow, howmany = howmany)
 
         for row in rows:
@@ -64,7 +63,7 @@ class HTCondorDataWorkflow(DataWorkflow):
         res = {}
 
         ## Get the jobs status first.
-        self.logger.info("Fetching report2 information for workflow %s. Getting status first." % (workflow))
+        self.logger.info(f"Fetching report2 information for workflow {workflow}. Getting status first.")
 
         ## Get the information we need from the Task DB.
         row = next(self.api.query(None, None, self.Task.ID_sql, taskname = workflow))
@@ -119,7 +118,6 @@ class HTCondorDataWorkflow(DataWorkflow):
                   "username"         : ''} #from the db
         return [result]
 
-    @conn_handler(services=[])
     def publicationStatus(self, workflow, user):
         """Here is what basically the function return, a dict called publicationInfo in the subcalls:
                 publicationInfo['status']: something like {'publishing': 0, 'publication_failed': 0, 'not_published': 0, 'published': 5}.

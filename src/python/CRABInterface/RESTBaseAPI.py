@@ -6,14 +6,12 @@ import socket
 import os
 
 import cherrypy
-from time import mktime, gmtime
 
 # WMCore dependecies here
 from WMCore.REST.Server import DatabaseRESTApi, rows
 from WMCore.REST.Format import JSONFormat
 
 # CRABServer dependecies here
-from CRABInterface.Utilities import ConfigCache, getCentralConfig
 from CRABInterface.RESTUserWorkflow import RESTUserWorkflow
 from CRABInterface.RESTTask import RESTTask
 from CRABInterface.RESTServerInfo import RESTServerInfo
@@ -41,19 +39,15 @@ class RESTBaseAPI(DatabaseRESTApi):
 
         self.formats = [ ('application/json', JSONFormat()) ]
 
-        extconfig = ConfigCache(centralconfig=getCentralConfig(extconfigurl=config.extconfigurl),
-                                      cachetime=mktime(gmtime()))
-
         #Global initialization of Data objects. Parameters coming from the config should go here
         DataUserWorkflow.globalinit(config)
-        DataWorkflow.globalinit(dbapi=self, centralcfg=extconfig, config=config)
+        DataWorkflow.globalinit(dbapi=self, config=config)
         DataFileMetadata.globalinit(dbapi=self, config=config)
-        RESTTask.globalinit(centralcfg=extconfig)
 
         ## TODO need a check to verify the format depending on the resource
         ##      the RESTFileMetadata has the specifc requirement of getting xml reports
-        self._add( {'workflow': RESTUserWorkflow(app, self, config, mount, extconfig),
-                    'info': RESTServerInfo(app, self, config, mount, extconfig),
+        self._add( {'workflow': RESTUserWorkflow(app, self, config, mount),
+                    'info': RESTServerInfo(app, self, config, mount),
                     'filemetadata': RESTFileMetadata(app, self, config, mount),
                     'workflowdb': RESTWorkerWorkflow(app, self, config, mount),
                     'task': RESTTask(app, self, config, mount),
