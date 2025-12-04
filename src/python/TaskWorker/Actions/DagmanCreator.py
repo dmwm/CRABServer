@@ -757,7 +757,6 @@ class DagmanCreator(TaskAction):
             job_input_file_list = os.path.join(inputFilesDir, f"job_input_file_list_{dagSpec['count']}.txt")
             with open(job_input_file_list, "w", encoding='utf-8') as fd:
                 fd.write(str(dagSpec['inputFiles']))
-
         # make tarballs, if those file exists in tarballDir, they will be overwritten
         os.chdir(tarballDir)
         with tarfile.open('run_and_lumis.tar.gz', "w:gz") as tf:
