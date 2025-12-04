@@ -437,20 +437,21 @@ def getLock(name):
         yield fd
 
 
-def atomicMoveToSpool(src, dstSpoolDir, suffix=".tmp"):
+def atomicReplaceAcrossFS(src, dstDir, suffix=".tmp"):
     """
-    Guarantee atomicity, at last mile SPOOL destination filesystem via
-    copy `src` -> `temp` intermediates at spool -- then atomic mv/replace --> `final` at spool
+    Guaranteed atomic replacement across filesystems, e.g. at last mile SPOOL destination filesystem by
+    [1] Copying `src` -> `temp`, an intermediates at destination filesystem
+    [2] Executing atomic replace at destination filesystem -> `final`
     """
     src = Path(src)
-    dstSpoolDir = Path(dstSpoolDir)
-    tempSpoolPath = dstSpoolDir.joinpath(f"{src.name}{suffix}")
-    finalSpoolPath = dstSpoolDir.joinpath(src.name)
+    dstDir = Path(dstDir)
+    tempDstPath = dstDir.joinpath(f"{src.name}{suffix}")
+    finalDstPath = dstDir.joinpath(src.name)
 
     # from local to temp SPOOL
-    shutil.copy2(src, tempSpoolPath)      # AFAIK, copy2 will preserve metatdata of file.
+    shutil.copy2(src, tempDstPath)      # AFAIK, copy2 will preserve metatdata of file.
     # from temp SPOOL to final SPOOL
-    tempSpoolPath.replace(finalSpoolPath)     # More robust than os.system('mv x y')? Since, we don't have to handle errors ourself.
+    tempDstPath.replace(finalDstPath)     # More robust than os.system('mv x y')? Since, we don't have to handle errors ourself.
 
 def getHashLfn(lfn):
     """ Provide a hashed lfn from an lfn.
