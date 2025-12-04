@@ -759,23 +759,15 @@ class DagmanCreator(TaskAction):
             with open(job_input_file_list, "w", encoding='utf-8') as fd:
                 fd.write(str(dagSpec['inputFiles']))
 
-        # rebuild new local tarballs first then atomic move to SPOOL 
-        tmpLocalDir = tempfile.mkdtemp()
-        os.chdir(tmpLocalDir)
-        tmpLocalRunAnLumisTar = os.path.join(tmpLocalDir, "run_and_lumis.tar.gz")
-        tmpLocalInputFilesTar = os.path.join(tmpLocalDir, "input_files.tar.gz")
-        with tarfile.open(tmpLocalRunAnLumisTar, "w:gz") as tf:
+        # make tarballs, if those file exists in tarballDir, they will be overwritten
+        os.chdir(tarballDir)
+        with tarfile.open('run_and_lumis.tar.gz', "w:gz") as tf:
+            # use arcname='' to have only filename in the archive. w/o dir
             tf.add(runAndLumisDir, arcname='')
-        with tarfile.open(tmpLocalInputFilesTar, "w:gz") as tf:
+        with tarfile.open('input_files.tar.gz', 'w:gz') as tf:
             tf.add(inputFilesDir, arcname='')
-        atomicMoveToSpool(tmpLocalRunAnLumisTar, tarballDir)
-        atomicMoveToSpool(tmpLocalInputFilesTar, tarballDir)
-
-        shutil.rmtree(tmpLocalDir)
         shutil.rmtree(runAndLumisDir)
         shutil.rmtree(inputFilesDir)
-
-        os.chdir(tarballDir)
         if self.runningInTW:
             # simply put tarballs in correct directory, CMSRunAnalysis.tar.gz will be created later on
             shutil.copy('run_and_lumis.tar.gz', workingDir)
