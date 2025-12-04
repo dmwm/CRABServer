@@ -774,6 +774,7 @@ class DagmanCreator(TaskAction):
             # still need to put run_and_lumis in SPOOL_DIR since automatic splitting code will
             # need access e.g. in PostJob.saveAutomaticSplittingData
             atomicMoveToSpool('run_and_lumis.tar.gz', workingDir)
+            atomicMoveToSpool('input_files.tar.gz', workingDir)
         # now list of input arguments needed for each jobs, again prepare it in the temp dir
         argdicts = self.prepareJobArguments(dagSpecs)
         argFileName = "input_args.json"
@@ -789,8 +790,11 @@ class DagmanCreator(TaskAction):
             shutil.copy(argFileName, workingDir)
         else:  # i.e. not running in TW but in the AP
             # last effort, create new job wrapper tarball and replace old one
-            with tarfile.open(os.path.join(workingDir, 'CMSRunAnalysis.tar.gz'), 'w:gz') as tf:
+            localTempDir = tempfile.mkdtemp()
+            os.chdir(localTempDir)
+            with tarfile.open('CMSRunAnalysis.tar.gz', 'w:gz') as tf:
                 tf.add(tarballDir, arcname='')
+            atomicMoveToSpool('CMSRunAnalysis.tar.gz', workingDir)
         os.chdir(workingDir)
         shutil.rmtree(tarballDir)
 
