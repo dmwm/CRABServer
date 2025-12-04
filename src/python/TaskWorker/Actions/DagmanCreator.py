@@ -759,7 +759,7 @@ class DagmanCreator(TaskAction):
             with open(job_input_file_list, "w", encoding='utf-8') as fd:
                 fd.write(str(dagSpec['inputFiles']))
 
-        # rebuild tarballs on local first then atomic move to SPOOL 
+        # rebuild new local tarballs first then atomic move to SPOOL 
         tmpLocalDir = tempfile.mkdtemp()
         os.chdir(tmpLocalDir)
         tmpLocalRunAnLumisTar = os.path.join(tmpLocalDir, "run_and_lumis.tar.gz")
@@ -768,8 +768,9 @@ class DagmanCreator(TaskAction):
             tf.add(runAndLumisDir, arcname='')
         with tarfile.open(tmpLocalInputFilesTar, "w:gz") as tf:
             tf.add(inputFilesDir, arcname='')
-        atomicMoveToSpool('run_and_lumis.tar.gz', tarballDir)
-        atomicMoveToSpool('input_files.tar.gz', tarballDir)
+        atomicMoveToSpool(tmpLocalRunAnLumisTar, tarballDir)
+        atomicMoveToSpool(tmpLocalInputFilesTar, tarballDir)
+
         shutil.rmtree(tmpLocalDir)
         shutil.rmtree(runAndLumisDir)
         shutil.rmtree(inputFilesDir)
