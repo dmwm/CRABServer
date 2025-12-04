@@ -25,8 +25,6 @@ import traceback
 import subprocess
 import contextlib
 import shutil
-import tempfile
-import tarfile
 from pathlib import Path
 
 if sys.version_info >= (3, 0):
@@ -446,34 +444,13 @@ def atomicMoveToSpool(src, dstSpoolDir, suffix=".tmp"):
     """
     src = Path(src)
     dstSpoolDir = Path(dstSpoolDir)
-    tempSpoolPath = dstSpoolDir / f"{src.name}{suffix}"
-    finalSpoolPath = dstSpoolDir / src.name
+    tempSpoolPath = dstSpoolDir.joinpath(f"{src.name}{suffix}")
+    finalSpoolPath = dstSpoolDir.joinpath(src.name)
 
     # from local to temp SPOOL
     shutil.copy2(src, tempSpoolPath)      # AFAIK, copy2 will preserve metatdata of file.
     # from temp SPOOL to final SPOOL
     tempSpoolPath.replace(finalSpoolPath)     # More robust than os.system('mv x y')? Since, we don't have to handle errors ourself.
-
-def rebuildSpoolTarFromDir(spoolDir, tarFileName, srcDir):
-    """
-    Create `tarFileName` from `srcDir` on a local tmp dir,
-    then atomically publish it into `spoolDir`.
-    """
-    spoolDir = Path(spoolDir)
-    srcDir = Path(srcDir)
-
-    tmpLocalDir = Path(tempfile.mkdtemp())
-    tmpLocalTar = tmpLocalDir / tarFileName
-
-    with tarfile.open(tmpLocalTar, "w:gz") as tf:
-        tf.add(srcDir, arcname='')
-
-    atomicMoveToSpool(tmpLocalTar, spoolDir)
-    try:
-        shutil.rmtree(tmpLocalDir)
-    except OSError:
-        pass
-
 
 def getHashLfn(lfn):
     """ Provide a hashed lfn from an lfn.

@@ -23,7 +23,7 @@ from urllib.parse import urlencode
 from pathlib import Path
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree, atomicMoveToSpool, rebuildSpoolTarFromDir
+from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree, atomicMoveToSpool
 
 from CRABUtils.Utils import addToGZippedTarfile
 
@@ -758,15 +758,23 @@ class DagmanCreator(TaskAction):
             job_input_file_list = os.path.join(inputFilesDir, f"job_input_file_list_{dagSpec['count']}.txt")
             with open(job_input_file_list, "w", encoding='utf-8') as fd:
                 fd.write(str(dagSpec['inputFiles']))
-        # make tarballs, if those file exists in tarballDir, they will be overwritten
-        os.chdir(tarballDir)
 
-        ### rebuild tarball on local first then atomic move to SPOOL ###
-        rebuildSpoolTarFromDir(tarballDir, "run_and_lumis.tar.gz", runAndLumisDir)
-        rebuildSpoolTarFromDir(tarballDir, "input_files.tar.gz", inputFilesDir)
-
+        # rebuild tarballs on local first then atomic move to SPOOL 
+        tmpLocalDir = tempfile.mkdtemp()
+        os.chdir(tmpLocalDir)
+        tmpLocalRunAnLumisTar = os.path.join(tmpLocalDir, "run_and_lumis.tar.gz")
+        tmpLocalInputFilesTar = os.path.join(tmpLocalDir, "input_files.tar.gz")
+        with tarfile.open(tmpLocalRunAnLumisTar, "w:gz") as tf:
+            tf.add(runAndLumisDir, arcname='')
+        with tarfile.open(tmpLocalInputFilesTar, "w:gz") as tf:
+            tf.add(inputFilesDir, arcname='')
+        atomicMoveToSpool('run_and_lumis.tar.gz', tarballDir)
+        atomicMoveToSpool('input_files.tar.gz', tarballDir)
+        shutil.rmtree(tmpLocalDir)
         shutil.rmtree(runAndLumisDir)
         shutil.rmtree(inputFilesDir)
+
+        os.chdir(tarballDir)
         if self.runningInTW:
             # simply put tarballs in correct directory, CMSRunAnalysis.tar.gz will be created later on
             shutil.copy('run_and_lumis.tar.gz', workingDir)
