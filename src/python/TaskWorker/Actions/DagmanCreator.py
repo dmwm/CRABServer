@@ -20,7 +20,6 @@ import hashlib
 import tempfile
 from ast import literal_eval
 from urllib.parse import urlencode
-from pathlib import Path
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
 from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree, atomicMoveToSpool
