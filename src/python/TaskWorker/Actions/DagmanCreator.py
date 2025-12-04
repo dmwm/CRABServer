@@ -795,6 +795,7 @@ class DagmanCreator(TaskAction):
             with tarfile.open('CMSRunAnalysis.tar.gz', 'w:gz') as tf:
                 tf.add(tarballDir, arcname='')
             atomicReplaceCrossFS('CMSRunAnalysis.tar.gz', workingDir)
+            shutil.rmtree(localTempDir)
         os.chdir(workingDir)
         shutil.rmtree(tarballDir)
 
