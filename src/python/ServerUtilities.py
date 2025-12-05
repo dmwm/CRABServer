@@ -24,6 +24,8 @@ import datetime
 import traceback
 import subprocess
 import contextlib
+import shutil
+from pathlib import Path
 
 if sys.version_info >= (3, 0):
     from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
@@ -434,6 +436,22 @@ def getLock(name):
         fcntl.flock(fd, fcntl.LOCK_EX)
         yield fd
 
+
+def atomicReplaceAcrossFS(src, dstDir, suffix=".tmp"):
+    """
+    Guaranteed atomic replacement across filesystems, e.g. at last mile SPOOL destination filesystem by
+    [1] Copying `src` -> `temp`, an intermediates at destination filesystem
+    [2] Executing atomic replace at destination filesystem -> `final`
+    """
+    src = Path(src)
+    dstDir = Path(dstDir)
+    tempDstPath = dstDir.joinpath(f"{src.name}{suffix}")
+    finalDstPath = dstDir.joinpath(src.name)
+
+    # from local to temp SPOOL
+    shutil.copy2(src, tempDstPath)      # AFAIK, copy2 will preserve metatdata of file.
+    # from temp SPOOL to final SPOOL
+    tempDstPath.replace(finalDstPath)     # More robust than os.system('mv x y')? Since, we don't have to handle errors ourself.
 
 def getHashLfn(lfn):
     """ Provide a hashed lfn from an lfn.
