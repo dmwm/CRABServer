@@ -437,7 +437,7 @@ def getLock(name):
         yield fd
 
 
-def atomicReplaceCrossFS(src, dstDir, suffix=".tmp"):
+def atomicReplaceAcrossFS(src, dstDir, suffix=".tmp"):
     """
     Guaranteed atomic replacement across filesystems, e.g. at last mile SPOOL destination filesystem by
     [1] Copying `src` -> `temp`, an intermediates at destination filesystem

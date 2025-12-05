@@ -22,7 +22,7 @@ from ast import literal_eval
 from urllib.parse import urlencode
 
 from ServerUtilities import MAX_DISK_SPACE, MAX_IDLE_JOBS, MAX_POST_JOBS, TASKLIFETIME
-from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree, atomicReplaceCrossFS
+from ServerUtilities import checkS3Object, getColumn, pythonListToClassAdExprTree, atomicReplaceAcrossFS
 
 from CRABUtils.Utils import addToGZippedTarfile
 
@@ -773,8 +773,8 @@ class DagmanCreator(TaskAction):
         else:
             # still need to put run_and_lumis in SPOOL_DIR since automatic splitting code will
             # need access e.g. in PostJob.saveAutomaticSplittingData
-            atomicReplaceCrossFS('run_and_lumis.tar.gz', workingDir)
-            atomicReplaceCrossFS('input_files.tar.gz', workingDir)
+            atomicReplaceAcrossFS('run_and_lumis.tar.gz', workingDir)
+            atomicReplaceAcrossFS('input_files.tar.gz', workingDir)
         # now list of input arguments needed for each jobs, again prepare it in the temp dir
         argdicts = self.prepareJobArguments(dagSpecs)
         argFileName = "input_args.json"
@@ -794,7 +794,7 @@ class DagmanCreator(TaskAction):
             os.chdir(localTempDir)
             with tarfile.open('CMSRunAnalysis.tar.gz', 'w:gz') as tf:
                 tf.add(tarballDir, arcname='')
-            atomicReplaceCrossFS('CMSRunAnalysis.tar.gz', workingDir)
+            atomicReplaceAcrossFS('CMSRunAnalysis.tar.gz', workingDir)
             shutil.rmtree(localTempDir)
         os.chdir(workingDir)
         shutil.rmtree(tarballDir)
