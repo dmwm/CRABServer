@@ -1121,6 +1121,9 @@ class DagmanCreator(TaskAction):
             # some data that will be needed to be able to run in the scheduler
             dagFileName = "RunJobs.dag"
             dagConfigFileName = "RunJobs.dag.config"
+            # Save config too (next AS stages runs as subdags so use same config !)
+            with open(dagConfigFileName, "w", encoding="utf-8") as fd:
+                fd.write(DAGMAN_CONFIG)
             with open("datadiscovery.pkl", "wb") as fd:
                 pickle.dump(splitterResult[1], fd)  # Cache data discovery
             with open("taskinformation.pkl", "wb") as fd:
@@ -1132,17 +1135,13 @@ class DagmanCreator(TaskAction):
         else:
             dagFileName = f"RunJobs{parentDag}.subdag"
 
-        ## Cache site information
-        with open("site.ad.json", "w", encoding='utf-8') as fd:
-            json.dump(siteinfo, fd)
-
         ## Save the DAG into a file.
         with open(dagFileName, "w", encoding='utf-8') as fd:
             fd.write(dag)
 
-        # Save config too
-        with open(dagConfigFileName, "w", encoding="utf-8") as fd:
-            fd.write(DAGMAN_CONFIG)
+        ## Cache site information
+        with open("site.ad.json", "w", encoding='utf-8') as fd:
+            json.dump(siteinfo, fd)
 
         self.task['jobcount'] = len(dagSpecs)
 
