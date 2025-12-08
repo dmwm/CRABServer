@@ -46,6 +46,52 @@ class Client:
         else:
             return attr # Returns non-callable attributes directly from the wrapped client
 
+    def getRuleQuota(ruleId=None):
+        """ return quota needed by this rule in Bytes """
+        size = 0
+        try:
+            rule = self._client.get_replication_rule(ruleId)
+        except RuleNotFound:
+            return 0
+        files = self._client.list_files(scope=rule['scope'], name= rule['name'])
+        size = sum(file['bytes'] for file in files)
+        return size
+
+    def getRucioUsage(account=None, activity=None):
+        """ size of Rucio usage for this account (if provided) or by activity """
+        if activity is None:
+            if account is None:
+                totalusage = 0
+                raise ValueError("Error: Account and Activity both unspecified")
+            else:
+                usageGenerator = self._client.get_local_account_usage(account=account)
+                totalBytes = 0
+                for usage in usageGenerator:
+                    used = usage['bytes']
+                    totalBytes += used
+                totalusage = totalBytes
+        else:
+            filters = {'activity': activity}
+            if account is not None:
+                filters['account'] = account
+            rules = self._client.list_replication_rules(filters=filters)
+            if activity == 'Analysis Input':
+                valid_states = ['OK', 'REPLICATING', 'STUCK', 'SUSPENDED']
+            elif activity == 'Analysis TapeRecall':
+                valid_states = ['REPLICATING', 'STUCK', 'SUSPENDED']  # Exclude 'OK' state
+            else:
+                print("Error: Unknown activity selected in quota report.")
+                valid_states = []
+
+            # Calculate usage only if valid_states is set
+            # Rucio does not keep track by activity internally, so we need to find all rules and sum all files locked by each rule
+            if valid_states:
+                totalusage = sum(self._client.getRuleQuota(rule['id']) for rule in rules if rule['state'] in valid_states)
+            else:
+                totalusage = 0
+
+        return totalusage
+
 def getNativeRucioClient(config=None, logger=None):
     """
     instantiates a Rucio python Client for use in CRAB TaskWorker
