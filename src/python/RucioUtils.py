@@ -4,7 +4,6 @@ import time
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from rucio.client import Client as NativeClient
 from rucio.common.exception import RSENotFound, RuleNotFound, RucioException
-from requests.exceptions import ChunkedEncodingError
 
 class Client:
     # Wraps NativeClient with configurable retry logic and logging
@@ -188,11 +187,7 @@ def getRucioUsage(rucioClient=None, account=None, activity =None):
         # Calculate usage only if valid_states is set
         # Rucio does not keep track by activity internally, so we need to find all rules and sum all files locked by each rule
         if valid_states:
-            try:
-                totalusage = sum(getRuleQuota(rucioClient, rule['id']) for rule in rules if rule['state'] in valid_states)
-            except ChunkedEncodingError as e:
-                print(f"RuleId: {ruleId} encountered Incomplete reponse, Chunked encoding error.")
-                totalusage = -1
+            totalusage = sum(getRuleQuota(rucioClient, rule['id']) for rule in rules if rule['state'] in valid_states)
         else:
             totalusage = 0
 

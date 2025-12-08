@@ -9,6 +9,7 @@ from socket import gethostname
 import datetime
 
 import requests
+from requests.exceptions import ChunkedEncodingError
 from requests.auth import HTTPBasicAuth
 from RucioUtils import getRucioUsage, Client
 
@@ -82,12 +83,15 @@ def main(log):
     # input locking rules are all created by crab_input account and used quota can be obained very simply
     accounts = [{'name': None, 'activity': 'Analysis TapeRecall', 'tag': 'tape_recall_total_TB'},
                 {'name': 'crab_input', 'activity': None,  'tag': 'crab_input_total_TB'}]
-    for account in accounts:
-        report = createQuotaReport(rucioClient=rucioClient,
-                                   account=account['name'],
-                                   activity=account['activity'])
-        jsonDoc[account['tag']] = report['totalTB']
-    send_and_check(jsonDoc)
+    try:
+        for account in accounts:
+            report = createQuotaReport(rucioClient=rucioClient,
+                                       account=account['name'],
+                                       activity=account['activity'])
+            jsonDoc[account['tag']] = report['totalTB']
+        send_and_check(jsonDoc)
+    except ChunkedEncodingError as e:
+        log.info(f"Skipping, Chunked encoding error encountered: {e}")
 
 
 if __name__ == '__main__':
