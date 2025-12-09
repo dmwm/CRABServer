@@ -1,52 +1,76 @@
 """ a small set of utilities to work with Rucio used in various places """
 import logging
 import time
+from functools import wraps
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from rucio.client import Client as NativeClient
 from rucio.common.exception import RSENotFound, RuleNotFound, RucioException
 
+def withExponentialBackOffRetry(retryAttempts=5, fatalExceptions=(), retryExceptions=(Exception,)):
+    """
+    Generic Exponential Back-off Retry
+    - retryAttempts: The number of retry attempts to perform before giving up.
+        Guidances:
+            5 attempts -- Standard HTTP/Rucio API calls — use 5 attempts (≈ 1 minute tolerance, default).
+            10 attempts -- Long-running or critical operations such as job submission, task management, and tape recall (≈ 30 minutes tolerance).
+    - fatalExceptions: A tuple of exception types that should not be retried, raise immediately.
+    - retryExceptions: A tuple of exception types that are eligible for retry. Otherwise will be raise right away as well. (But our default is built-in Exception, so all exception will be catch and retry anyhow.
+    """
+    fatalExceptions = tuple(fatalExceptions)
+    retryExceptions = tuple(retryExceptions)
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # Ensure universally pick the right logger.
+            logger = None
+            if args: # Try to get a logger from `self`, probably initiailized by Class.
+                logger = getattr(args[0], "_logger", None) or getattr(args[0], "logger", None)
+
+            if logger is None: # Else, robustly retrieve from func module, or current modudle.
+                logging.getLogger(getattr(func, "__module__", __name__))
+
+            attempt = 0
+            name = func.__name__
+            while True:
+                try:
+                    return func(*args, **kwargs)
+                except fatalExceptions as e:
+                    # Fatal Exception will not be retry, raise immediately.
+                    logger.exception(f"Fatal exception in '{name}' : {e}")
+                    raise
+                except retryExceptions as e:
+                    if attempt >= retryAttempts:
+                        logger.error(f"Operation '{name}' failed after {attempt} retries: {e}")
+                        raise
+                    logger.warning(f"Retryable exception in '{name}' (attempt {attempt+1}/{retryAttempts}): {e}")
+                    sleepTime = 2 ** attempt # time in seconds
+                    time.sleep(sleepTime)
+                    attempt += 1
+        return wrapper
+    return decorator
+
 class Client:
     # Wraps NativeClient with configurable retry logic and logging
-    def __init__(self, *args, retries=3, delay=180, logger=None, **kwargs):
+    def __init__(self, *args, logger=None, **kwargs):
         self._client = NativeClient(*args, **kwargs)
-        self._retries = retries
-        self._delay = delay
         self._logger = logger or logging.getLogger(__name__)
 
-    # Intercepts attribute access to enable retry logic on method calls
+    # Intercepts Native Rucio Callable attributetes, wrap method calls to enable Exponential Retry.
     def __getattr__(self, name):
         attr = getattr(self._client, name)
-        if callable(attr):
-            def wrapper(*args, **kwargs):
-                attempt = 0
-                while attempt < self._retries:
-                    try:
-                        return attr(*args, **kwargs)
-                    except RucioException as e:
-                        self._logger.exception(
-                            "RucioException occurred in '%s': %s", name, str(e)
-                        )
-                        # Immediately raise
-                        raise
-                    except Exception as e:
-                        # Only retry on Exception other than RucioException
-                        self._logger.warning(
-                            "Exception other than RucioException occurred in '%s' (attempt %d/%d): %s",
-                            name, attempt + 1, self._retries, str(e)
-                        )
-                        attempt += 1
-                        if attempt < self._retries:
-                            time.sleep(self._delay)
-                        else:
-                            self._logger.error(
-                                "Operation '%s' failed after %d attempts", name, self._retries
-                            )
-                            raise
-            return wrapper
-        else:
-            return attr # Returns non-callable attributes directly from the wrapped client
+        if not callable(attr):
+            return attr
 
-    def getRuleQuota(ruleId=None):
+        @withExponentialBackOffRetry(fatalExceptions=(RucioException,))
+        @wraps(attr)
+        def call(*args, **kwargs):
+            return attr(*args, **kwargs)
+
+        return call
+
+    @withExponentialBackOffRetry()
+    def getRuleQuota(self, ruleId=None):
         """ return quota needed by this rule in Bytes """
         size = 0
         try:
@@ -57,7 +81,8 @@ class Client:
         size = sum(file['bytes'] for file in files)
         return size
 
-    def getRucioUsage(account=None, activity=None):
+    @withExponentialBackOffRetry()
+    def getRucioUsage(self, account=None, activity=None):
         """ size of Rucio usage for this account (if provided) or by activity """
         if activity is None:
             if account is None:
@@ -86,7 +111,7 @@ class Client:
             # Calculate usage only if valid_states is set
             # Rucio does not keep track by activity internally, so we need to find all rules and sum all files locked by each rule
             if valid_states:
-                totalusage = sum(self._client.getRuleQuota(rule['id']) for rule in rules if rule['state'] in valid_states)
+                totalusage = sum(self.getRuleQuota(rule['id']) for rule in rules if rule['state'] in valid_states)
             else:
                 totalusage = 0
 
