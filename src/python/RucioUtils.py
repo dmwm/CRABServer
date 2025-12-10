@@ -69,53 +69,6 @@ class Client:
 
         return call
 
-    @withExponentialBackOffRetry()
-    def getRuleQuota(self, ruleId=None):
-        """ return quota needed by this rule in Bytes """
-        size = 0
-        try:
-            rule = self._client.get_replication_rule(ruleId)
-        except RuleNotFound:
-            return 0
-        files = self._client.list_files(scope=rule['scope'], name= rule['name'])
-        size = sum(file['bytes'] for file in files)
-        return size
-
-    @withExponentialBackOffRetry()
-    def getRucioUsage(self, account=None, activity=None):
-        """ size of Rucio usage for this account (if provided) or by activity """
-        if activity is None:
-            if account is None:
-                totalusage = 0
-                raise ValueError("Error: Account and Activity both unspecified")
-            else:
-                usageGenerator = self._client.get_local_account_usage(account=account)
-                totalBytes = 0
-                for usage in usageGenerator:
-                    used = usage['bytes']
-                    totalBytes += used
-                totalusage = totalBytes
-        else:
-            filters = {'activity': activity}
-            if account is not None:
-                filters['account'] = account
-            rules = self._client.list_replication_rules(filters=filters)
-            if activity == 'Analysis Input':
-                valid_states = ['OK', 'REPLICATING', 'STUCK', 'SUSPENDED']
-            elif activity == 'Analysis TapeRecall':
-                valid_states = ['REPLICATING', 'STUCK', 'SUSPENDED']  # Exclude 'OK' state
-            else:
-                print("Error: Unknown activity selected in quota report.")
-                valid_states = []
-
-            # Calculate usage only if valid_states is set
-            # Rucio does not keep track by activity internally, so we need to find all rules and sum all files locked by each rule
-            if valid_states:
-                totalusage = sum(self.getRuleQuota(rule['id']) for rule in rules if rule['state'] in valid_states)
-            else:
-                totalusage = 0
-
-        return totalusage
 
 def getNativeRucioClient(config=None, logger=None):
     """
@@ -218,6 +171,7 @@ def getWritePFN(rucioClient=None, siteName='', lfn='',  # pylint: disable=danger
     return pfn
 
 
+@withExponentialBackOffRetry()
 def getRuleQuota(rucioClient=None, ruleId=None):
     """ return quota needed by this rule in Bytes """
     size = 0
@@ -229,6 +183,7 @@ def getRuleQuota(rucioClient=None, ruleId=None):
     size = sum(file['bytes'] for file in files)
     return size
 
+@withExponentialBackOffRetry()
 def getRucioUsage(rucioClient=None, account=None, activity =None):
     """ size of Rucio usage for this account (if provided) or by activity """
     if activity is None:

@@ -10,7 +10,7 @@ import datetime
 
 import requests
 from requests.auth import HTTPBasicAuth
-from RucioUtils import Client
+from RucioUtils import getRucioUsage, Client
 
 FMT = "%Y-%m-%dT%H:%M:%S%z"
 WORKDIR = '/data/srv/monit/'
@@ -32,7 +32,7 @@ def createQuotaReport(rucioClient=None, account=None, activity=None):
     create a dictionary with the quota report to be sent to MONIT
     returns {'totalTB':TBypte}
     """
-    totalBytes = rucioClient.getRucioUsage(account=account,activity=activity)
+    totalBytes = getRucioUsage(rucioClient=rucioClient,account=account,activity=activity)
     report = {}
     totalTB = totalBytes // 1e12
     report['totalTB'] = totalTB
@@ -48,7 +48,7 @@ def send(document):
     :param document:
     :return:
     """
-    return requests.post(f"{MONITURL}", 
+    return requests.post(f"{MONITURL}",
                         auth=HTTPBasicAuth(MONITUSER, MONITPWD),
                          data=json.dumps(document),
                          headers={"Content-Type": "application/json; charset=UTF-8"},
