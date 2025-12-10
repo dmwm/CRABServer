@@ -28,7 +28,7 @@ def withExponentialBackOffRetry(retryAttempts=5, fatalExceptions=(), retryExcept
                 logger = getattr(args[0], "_logger", None) or getattr(args[0], "logger", None)
 
             if logger is None: # Else, robustly retrieve from func module, or current modudle.
-                logging.getLogger(getattr(func, "__module__", __name__))
+                logger = logging.getLogger(getattr(func, "__module__", __name__))
 
             attempt = 0
             name = func.__name__
@@ -43,8 +43,8 @@ def withExponentialBackOffRetry(retryAttempts=5, fatalExceptions=(), retryExcept
                     if attempt >= retryAttempts:
                         logger.error(f"Operation '{name}' failed after {attempt} retries: {e}")
                         raise
-                    logger.warning(f"Retryable exception in '{name}' (attempt {attempt+1}/{retryAttempts}): {e}")
                     sleepTime = 2 ** attempt # time in seconds
+                    logger.warning(f"Retryable exception in '{name}' (attempt {attempt+1}/{retryAttempts}): {e}, waiting for {sleepTime} seconds...")
                     time.sleep(sleepTime)
                     attempt += 1
         return wrapper
@@ -169,17 +169,6 @@ def getWritePFN(rucioClient=None, siteName='', lfn='',  # pylint: disable=danger
     logger.info(f"Will use {pfn} as stageout location")
 
     return pfn
-
-
-def mock_fail():
-    import random
-    from rucio.common.exceptions import RucioException
-    if random.random() < 0.2:
-        print("[MOCK] Fail on Rucio 503 with 20% chances...")
-        raise RucioException("[Mock 503] An unknown exception occurred...")
-    if random.random() < 0.2:
-        print("[MOCK] Non-RucioException with 20% chances...")
-        raise ValueError("[Mock] Non-RucioException inside RucioNative Client call...")
 
 @withExponentialBackOffRetry()
 def getRuleQuota(rucioClient=None, ruleId=None):

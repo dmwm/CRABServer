@@ -48,7 +48,7 @@ def send(document):
     :param document:
     :return:
     """
-    return requests.post(f"{MONITURL}",
+    return requests.post(f"{MONITURL}", 
                         auth=HTTPBasicAuth(MONITUSER, MONITPWD),
                          data=json.dumps(document),
                          headers={"Content-Type": "application/json; charset=UTF-8"},
