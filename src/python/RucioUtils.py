@@ -173,10 +173,13 @@ def getWritePFN(rucioClient=None, siteName='', lfn='',  # pylint: disable=danger
 
 def mock_fail():
     import random
-    from requests.exceptions import ChunkedEncodingError
-    if random.random() < 0.3:
-        print("[MOCK] Random failure with 30% chances...")
-        raise ChunkedEncodingError("Random ChunkedEncodingError for testing")
+    from rucio.common.exceptions import RucioException
+    if random.random() < 0.2:
+        print("[MOCK] Fail on Rucio 503 with 20% chances...")
+        raise RucioException("[Mock 503] An unknown exception occurred...")
+    if random.random() < 0.2:
+        print("[MOCK] Non-RucioException with 20% chances...")
+        raise ValueError("[Mock] Non-RucioException inside RucioNative Client call...")
 
 @withExponentialBackOffRetry()
 def getRuleQuota(rucioClient=None, ruleId=None):
@@ -187,7 +190,6 @@ def getRuleQuota(rucioClient=None, ruleId=None):
     except RuleNotFound:
         return 0
     files = rucioClient.list_files(scope=rule['scope'], name= rule['name'])
-    mock_fail()
     size = sum(file['bytes'] for file in files)
     return size
 
