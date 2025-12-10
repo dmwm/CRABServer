@@ -171,6 +171,13 @@ def getWritePFN(rucioClient=None, siteName='', lfn='',  # pylint: disable=danger
     return pfn
 
 
+def mock_fail():
+    import random
+    from requests.exceptions import ChunkedEncodingError
+    if random.random() < 0.3:
+        print("[MOCK] Random failure with 30% chances...")
+        raise ChunkedEncodingError("Random ChunkedEncodingError for testing")
+
 @withExponentialBackOffRetry()
 def getRuleQuota(rucioClient=None, ruleId=None):
     """ return quota needed by this rule in Bytes """
@@ -180,6 +187,7 @@ def getRuleQuota(rucioClient=None, ruleId=None):
     except RuleNotFound:
         return 0
     files = rucioClient.list_files(scope=rule['scope'], name= rule['name'])
+    mock_fail()
     size = sum(file['bytes'] for file in files)
     return size
 
