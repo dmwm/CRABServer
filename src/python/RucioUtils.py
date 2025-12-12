@@ -1,50 +1,79 @@
 """ a small set of utilities to work with Rucio used in various places """
 import logging
 import time
+import traceback
+from functools import wraps
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from rucio.client import Client as NativeClient
 from rucio.common.exception import RSENotFound, RuleNotFound, RucioException
 
+def withExponentialBackOffRetry(retryAttempts=5, fatalExceptions=(), retryExceptions=(Exception,)):
+    """
+    Generic Exponential Back-off Retry
+    - retryAttempts: The number of retry attempts to perform before giving up.
+        Guidances:
+            5 attempts -- Industrial Standard for HTTP API calls — (≈ 30 seconds tolerance, default).
+            8 attempts -- Standard HTTP around Rucio API calls — (≈ 8.5 mins tolerance).
+            9/10 attempts -- Long-running or critical operations such as job submission, task management, and tape recall (≈ 17/34 minutes tolerance).
+    - fatalExceptions: A tuple of exception types that should not be retried, raise immediately.
+    - retryExceptions: A tuple of exception types that are eligible for retry. Otherwise will be raise right away as well. (But our default is built-in Exception, so all exception will be catch and retry anyhow.
+    """
+    fatalExceptions = tuple(fatalExceptions)
+    retryExceptions = tuple(retryExceptions)
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # Ensure universally pick the right logger.
+            logger = None
+            if args: # Try to get a logger from `self`, probably initiailized by Class.
+                logger = getattr(args[0], "_logger", None) or getattr(args[0], "logger", None)
+
+            if logger is None: # Else, robustly retrieve from func module, or current modudle.
+                logger = logging.getLogger(getattr(func, "__module__", __name__))
+
+            attempt = 0
+            name = func.__name__
+            while True:
+                try:
+                    return func(*args, **kwargs)
+                except fatalExceptions as e:
+                    # Fatal Exception will not be retry, raise immediately.
+                    logger.exception(f"Fatal exception in '{name}' : {e}")
+                    logger.exception(f"Type of Exception: {type(e)}")
+                    logger.exception(f"repr(): {repr(e)}")
+                    traceback.print_exc()
+                    raise
+                except retryExceptions as e:
+                    if attempt > retryAttempts:
+                        logger.error(f"Operation '{name}' failed after {attempt} retries: {e}")
+                        raise
+                    sleepTime = 2 ** attempt # time in seconds
+                    logger.warning(f"Retryable exception in '{name}' (attempt {attempt+1}/{retryAttempts}): {e}, waiting for {sleepTime} seconds...")
+                    time.sleep(sleepTime)
+                    attempt += 1
+        return wrapper
+    return decorator
+
 class Client:
     # Wraps NativeClient with configurable retry logic and logging
-    def __init__(self, *args, retries=3, delay=180, logger=None, **kwargs):
+    def __init__(self, *args, logger=None, **kwargs):
         self._client = NativeClient(*args, **kwargs)
-        self._retries = retries
-        self._delay = delay
         self._logger = logger or logging.getLogger(__name__)
 
-    # Intercepts attribute access to enable retry logic on method calls
+    # Intercepts Native Rucio Callable attributetes, wrap method calls to enable Exponential Retry.
     def __getattr__(self, name):
         attr = getattr(self._client, name)
-        if callable(attr):
-            def wrapper(*args, **kwargs):
-                attempt = 0
-                while attempt < self._retries:
-                    try:
-                        return attr(*args, **kwargs)
-                    except RucioException as e:
-                        self._logger.exception(
-                            "RucioException occurred in '%s': %s", name, str(e)
-                        )
-                        # Immediately raise
-                        raise
-                    except Exception as e:
-                        # Only retry on Exception other than RucioException
-                        self._logger.warning(
-                            "Exception other than RucioException occurred in '%s' (attempt %d/%d): %s",
-                            name, attempt + 1, self._retries, str(e)
-                        )
-                        attempt += 1
-                        if attempt < self._retries:
-                            time.sleep(self._delay)
-                        else:
-                            self._logger.error(
-                                "Operation '%s' failed after %d attempts", name, self._retries
-                            )
-                            raise
-            return wrapper
-        else:
-            return attr # Returns non-callable attributes directly from the wrapped client
+        if not callable(attr):
+            return attr
+
+        @withExponentialBackOffRetry(retryAttempts=8, fatalExceptions=(RucioException,))
+        @wraps(attr)
+        def call(*args, **kwargs):
+            return attr(*args, **kwargs)
+
+        return call
+
 
 def getNativeRucioClient(config=None, logger=None):
     """
@@ -146,7 +175,7 @@ def getWritePFN(rucioClient=None, siteName='', lfn='',  # pylint: disable=danger
 
     return pfn
 
-
+@withExponentialBackOffRetry(retryAttempts=8, fatalExceptions=(RucioException,))
 def getRuleQuota(rucioClient=None, ruleId=None):
     """ return quota needed by this rule in Bytes """
     size = 0
@@ -158,6 +187,7 @@ def getRuleQuota(rucioClient=None, ruleId=None):
     size = sum(file['bytes'] for file in files)
     return size
 
+@withExponentialBackOffRetry(retryAttempts=8, fatalExceptions=(RucioException,))
 def getRucioUsage(rucioClient=None, account=None, activity =None):
     """ size of Rucio usage for this account (if provided) or by activity """
     if activity is None:
