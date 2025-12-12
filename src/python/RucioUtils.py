@@ -113,9 +113,7 @@ def getNativeRucioClient(config=None, logger=None):
         account=rucioConfig.Rucio_account,
         creds={"client_cert": rucioCert, "client_key": rucioKey},
         auth_type='x509',
-        logger=rucioLogger,
-        retries=3,
-        delay=180
+        logger=rucioLogger
     )
 
     # Initial check: these calls now retry automatically
