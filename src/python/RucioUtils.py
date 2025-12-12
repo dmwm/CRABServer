@@ -1,6 +1,7 @@
 """ a small set of utilities to work with Rucio used in various places """
 import logging
 import time
+import traceback
 from functools import wraps
 from TaskWorker.WorkerExceptions import TaskWorkerException
 from rucio.client import Client as NativeClient
@@ -11,8 +12,9 @@ def withExponentialBackOffRetry(retryAttempts=5, fatalExceptions=(), retryExcept
     Generic Exponential Back-off Retry
     - retryAttempts: The number of retry attempts to perform before giving up.
         Guidances:
-            5 attempts -- Standard HTTP/Rucio API calls — use 5 attempts (≈ 1 minute tolerance, default).
-            10 attempts -- Long-running or critical operations such as job submission, task management, and tape recall (≈ 30 minutes tolerance).
+            5 attempts -- Industrial Standard for HTTP API calls — (≈ 30 seconds tolerance, default).
+            8 attempts -- Standard HTTP around Rucio API calls — (≈ 8.5 mins tolerance).
+            9/10 attempts -- Long-running or critical operations such as job submission, task management, and tape recall (≈ 17/34 minutes tolerance).
     - fatalExceptions: A tuple of exception types that should not be retried, raise immediately.
     - retryExceptions: A tuple of exception types that are eligible for retry. Otherwise will be raise right away as well. (But our default is built-in Exception, so all exception will be catch and retry anyhow.
     """
@@ -38,9 +40,12 @@ def withExponentialBackOffRetry(retryAttempts=5, fatalExceptions=(), retryExcept
                 except fatalExceptions as e:
                     # Fatal Exception will not be retry, raise immediately.
                     logger.exception(f"Fatal exception in '{name}' : {e}")
+                    logger.exception(f"Type of Exception: {type(e)}")
+                    logger.exception(f"repr(): {repr(e)}")
+                    traceback.print_exc()
                     raise
                 except retryExceptions as e:
-                    if attempt >= retryAttempts:
+                    if attempt > retryAttempts:
                         logger.error(f"Operation '{name}' failed after {attempt} retries: {e}")
                         raise
                     sleepTime = 2 ** attempt # time in seconds
@@ -62,7 +67,7 @@ class Client:
         if not callable(attr):
             return attr
 
-        @withExponentialBackOffRetry(fatalExceptions=(RucioException,))
+        @withExponentialBackOffRetry(retryAttempts=8, fatalExceptions=(RucioException,))
         @wraps(attr)
         def call(*args, **kwargs):
             return attr(*args, **kwargs)
@@ -170,7 +175,7 @@ def getWritePFN(rucioClient=None, siteName='', lfn='',  # pylint: disable=danger
 
     return pfn
 
-@withExponentialBackOffRetry()
+@withExponentialBackOffRetry(retryAttempts=8, fatalExceptions=(RucioException,))
 def getRuleQuota(rucioClient=None, ruleId=None):
     """ return quota needed by this rule in Bytes """
     size = 0
@@ -182,7 +187,7 @@ def getRuleQuota(rucioClient=None, ruleId=None):
     size = sum(file['bytes'] for file in files)
     return size
 
-@withExponentialBackOffRetry()
+@withExponentialBackOffRetry(retryAttempts=8, fatalExceptions=(RucioException,))
 def getRucioUsage(rucioClient=None, account=None, activity =None):
     """ size of Rucio usage for this account (if provided) or by activity """
     if activity is None:
