@@ -25,7 +25,6 @@ import traceback
 import subprocess
 import contextlib
 import shutil
-from pathlib import Path
 
 if sys.version_info >= (3, 0):
     from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
@@ -443,15 +442,18 @@ def atomicReplaceAcrossFS(src, dstDir, suffix=".tmp"):
     [1] Copying `src` -> `temp`, an intermediates at destination filesystem
     [2] Executing atomic replace at destination filesystem -> `final`
     """
-    src = Path(src)
-    dstDir = Path(dstDir)
-    tempDstPath = dstDir.joinpath(f"{src.name}{suffix}")
-    finalDstPath = dstDir.joinpath(src.name)
+    # Normalize paths
+    src = os.path.abspath(src)
+    dstDir = os.path.abspath(dstDir)
+
+    srcName = os.path.basename(src)
+    tempDstPath = os.path.join(dstDir, srcName + suffix)
+    finalDstPath = os.path.join(dstDir, srcName)
 
     # from local to temp SPOOL
     shutil.copy2(src, tempDstPath)      # AFAIK, copy2 will preserve metatdata of file.
     # from temp SPOOL to final SPOOL
-    tempDstPath.replace(finalDstPath)     # More robust than os.system('mv x y')? Since, we don't have to handle errors ourself.
+    os.rename(tempDstPath, finalDstPath)     # OS.rename is atomic as long as tempDstPath and finalDstPath are on same FS
 
 def getHashLfn(lfn):
     """ Provide a hashed lfn from an lfn.
