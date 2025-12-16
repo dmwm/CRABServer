@@ -1,5 +1,5 @@
 # create data files ./data
-FROM python:3.8 AS build-data
+FROM python:3.12-trixie AS build-data
 SHELL ["/bin/bash", "-c"]
 RUN mkdir /build \
     && apt-get update \
@@ -36,7 +36,7 @@ RUN pushd /data/miniconda \
 FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 AS cern-cc7
 
 # start image
-FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
+FROM registry.cern.ch/cmsweb/wmagent-base:wm-freeze
 SHELL ["/bin/bash", "-c"]
 ENV USER=crab3
 ENV WDIR=/data

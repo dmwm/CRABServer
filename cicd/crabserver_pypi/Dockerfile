@@ -4,7 +4,7 @@ FROM registry.cern.ch/cmsweb/cmsweb:20230427-stable AS cmsweb
 # Use `wmagent-base` image as our baseimage:
 # https://github.com/dmwm/CMSKubernetes/blob/2b0454f9205cb8f97fecb91bf6661b59e4b31424/docker/pypi/wmagent-base/Dockerfile
 
-FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
+FROM registry.cern.ch/cmsweb/wmagent-base:wm-freeze
 SHELL ["/bin/bash", "-c"]
 ENV WDIR=/data
 ENV USER=crab3

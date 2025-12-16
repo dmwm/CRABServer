@@ -65,6 +65,11 @@ env['COMMAND'] = args.command
 env['MODE'] = args.mode if hasattr(args, 'mode') else ''
 env['DEBUG'] = args.debug if hasattr(args, 'debug') else ''
 env['SERVICE'] = args.service if hasattr(args, 'service') else ''
+env['PYTHONDEVMODE'] = '1'
+env['PYTHONWARNINGS'] = (
+    'error::DeprecationWarning,'
+    'error::PendingDeprecationWarning'
+)
 
 # debug
 #print(args)
