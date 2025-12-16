@@ -67,6 +67,10 @@ env['DEBUG'] = args.debug if hasattr(args, 'debug') else ''
 env['SERVICE'] = args.service if hasattr(args, 'service') else ''
 env['PYTHONDEVMODE'] = '1'
 env['PYTHONWARNINGS'] = (
+    'ignore:.*Python 3\.14.*:DeprecationWarning,'
+    'ignore:.*Python 3\.15.*:DeprecationWarning,'
+    'ignore:.*Python 3\.16.*:DeprecationWarning,'
+    'ignore:.*Python 3\.17.*:DeprecationWarning,'
     'error::DeprecationWarning,'
     'error::PendingDeprecationWarning'
 )
