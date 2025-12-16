@@ -2,7 +2,7 @@
 # update deps version when bump wmcore version
 
 dbs3-client~=4.0.12
-future~=0.18.2
+future~=1.0.0
 htcondor~=25.0.3
 psutil~=5.9.1
 pycurl~=7.45.1
