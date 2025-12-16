@@ -66,11 +66,12 @@ env['MODE'] = args.mode if hasattr(args, 'mode') else ''
 env['DEBUG'] = args.debug if hasattr(args, 'debug') else ''
 env['SERVICE'] = args.service if hasattr(args, 'service') else ''
 env['PYTHONDEVMODE'] = '1'
-env['PYTHONWARNINGS'] = ",".join([
-    r"ignore:the load_module\(\) method is deprecated and slated for removal in Python 3\.15:DeprecationWarning",
-    r"error::DeprecationWarning",
-    r"error::PendingDeprecationWarning",
-])
+env['PYTHONWARNINGS'] = "default"
+# env['PYTHONWARNINGS'] = ",".join([
+#     r"ignore:the load_module\(\) method is deprecated and slated for removal in Python 3\.15:DeprecationWarning",
+#     r"error::DeprecationWarning",
+#     r"error::PendingDeprecationWarning",
+# ])
 
 # debug
 #print(args)
