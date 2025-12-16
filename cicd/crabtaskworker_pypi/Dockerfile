@@ -3,7 +3,7 @@ FROM python:3.12-trixie AS build-data
 SHELL ["/bin/bash", "-c"]
 RUN mkdir /build \
     && apt-get update \
-    && apt-get install -y curl zip git python3-setuptools python3-wheel \
+    && apt-get install -y curl zip git \
     && apt-get clean all
 WORKDIR /build
 COPY cicd/crabtaskworker_pypi/buildTWTarballs.sh \
@@ -12,6 +12,9 @@ COPY cicd/crabtaskworker_pypi/buildTWTarballs.sh \
 COPY setup.py /build
 COPY src /build/src
 COPY scripts /build/scripts
+
+# Install buildtools for the right intrepreter
+RUN python -m pip install -U pip setuptools wheel
 
 RUN wmcore_repo="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f1)" \
     && wmcore_version="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f2)" \
