@@ -1,5 +1,5 @@
 # Original dependencies from WMCore's requirements.txt
-# https://github.com/dmwm/WMCore/blob/2.3.7.1/requirements.txt
+# https://github.com/dmwm/WMCore/blob/2.4.5.2/requirements.txt
 # Lesser deps but match the version with upstream.
 Cheetah3==3.2.6.post1
 CherryPy==18.8.0
