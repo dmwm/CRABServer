@@ -2,7 +2,7 @@
 # https://github.com/dmwm/WMCore/blob/2.4.5.2/requirements.txt
 # Lesser deps but match the version with upstream.
 Cheetah3==3.2.6.post1
-CherryPy==18.8.0
+CherryPy~=18.10.0
 CMSMonitoring==0.6.11
 dbs3-client==4.0.12
 future~=1.0.0
