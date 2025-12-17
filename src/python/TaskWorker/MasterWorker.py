@@ -236,7 +236,7 @@ class MasterWorker(object):
 
     def getRecurringActionInst(self, actionName):
         try:
-            mod = importlib.import_module('TaskWorker.Actions.Recurring.%s' % actionName, fromlist=actionName)
+            mod = importlib.import_module('TaskWorker.Actions.Recurring.%s' % actionName)
         except ModuleNotFoundError:
             self.logger.error('Recurring Action module "%s" not found, skipping', actionName)
             return
