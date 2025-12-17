@@ -15,7 +15,7 @@ import logging
 import subprocess
 import traceback
 from xml.etree import ElementTree
-from optparse import OptionParser, BadOptionError, AmbiguousOptionError  # pylint: disable=deprecated-module
+from argparse import ArgumentParser
 
 from TweakPSet import prepareTweakingScript
 
@@ -81,24 +81,6 @@ def mintime():
         sys.stderr.flush()
         time.sleep(remaining)
         print(f"==== Failure sleep FINISHED at {UTCNow()} ====")
-
-
-class PassThroughOptionParser(OptionParser):
-    """
-    An unknown option pass-through implementation of OptionParser.
-
-    When unknown arguments are encountered, bundle with largs and try again,
-    until rargs is depleted.
-
-    sys.exit(status) will still be called if a known argument is passed
-    incorrectly (e.g. missing arguments or bad argument types, etc.)
-    """
-    def _process_args(self, largs, rargs, values):
-        while rargs:
-            try:
-                OptionParser._process_args(self, largs, rargs, values)
-            except (BadOptionError, AmbiguousOptionError) as err:
-                largs.append(err.opt_str)
 
 
 def parseAd():
@@ -284,10 +266,10 @@ def handleException(exitAcronym, exitCode, exitMsg):
 
 
 def parseArgs():
-    parser = PassThroughOptionParser()
-    parser.add_option('--jobId', dest='jobId', type='string')
+    parser = ArgumentParser(allow_abbrev=False)
+    parser.add_argument('--jobId', dest='jobId', type='string')
 
-    (input_params, _) = parser.parse_args(sys.argv[1:])
+    (input_params, _) = parser.parse_known_args(sys.argv[1:])
     jobId = input_params.jobId
 
     # allow for arguments simply be the jobId (a string because automtic splitting has format like N-M
