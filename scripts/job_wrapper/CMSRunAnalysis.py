@@ -267,7 +267,7 @@ def handleException(exitAcronym, exitCode, exitMsg):
 
 def parseArgs():
     parser = ArgumentParser(allow_abbrev=False)
-    parser.add_argument('--jobId', dest='jobId', type='string')
+    parser.add_argument('--jobId', dest='jobId', type=str)
 
     (input_params, _) = parser.parse_known_args(sys.argv[1:])
     jobId = input_params.jobId
