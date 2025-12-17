@@ -14,11 +14,25 @@ import warnings
 import sys
 from datetime import datetime
 from pprint import pformat
-from distutils.util import strtobool
 
 import htcondor
 import classad
 
+# Replacement of distutils.util.strtobool, py310 deprecated-module. See original source: https://github.com/python/cpython/blob/882f62bd93fcd5775068c3b3d1e5ce62f2feaba3/Lib/distutils/util.py#L307-L320
+def strtobool (val):
+    """Convert a string representation of truth to true (1) or false (0).
+
+    True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
+    are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
+    'val' is anything else.
+    """
+    val = val.lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+        return 1
+    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+        return 0
+    else:
+        raise ValueError("invalid truth value %r" % (val,))
 
 class GwmsmonAlarm():
     """
