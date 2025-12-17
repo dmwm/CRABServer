@@ -1,4 +1,5 @@
 import logging
+import importlib
 
 
 class DataUserWorkflow(object):
@@ -12,7 +13,7 @@ class DataUserWorkflow(object):
 
     def __init__(self):
         self.logger = logging.getLogger("CRABLogger.DataUserWorkflow")
-        mod = __import__('CRABInterface.%s' % self.workflowManager, fromlist=self.workflowManager)
+        mod = importlib.import_module('CRABInterface.%s' % self.workflowManager, fromlist=self.workflowManager)
         self.workflow = getattr(mod, self.workflowManager)(DataUserWorkflow.config)
 
     def getLatests(self, username, timestamp):
