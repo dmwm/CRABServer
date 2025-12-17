@@ -12,6 +12,7 @@ import uuid
 import logging
 import cherrypy
 import boto3
+import importlib
 from botocore.exceptions import ClientError
 
 # WMCore dependecies here
@@ -83,7 +84,7 @@ class RESTCache(RESTEntity):
         # following lines are copied from
         # https://github.com/dmwm/WMCore/blob/77a1ae719757a1eef766f8fb0c9f29ce6fcd2275/src/python/WMCore/REST/Server.py#L1735
         modname, item = config.s3.rsplit(".", 1)
-        module = __import__(modname, globals(), locals(), [item])
+        module = importlib.import_module(modname, globals(), locals(), [item])
         s3Dict = getattr(module, item)
         access_key = s3Dict['access_key']
         secret_key = s3Dict['secret_key']
