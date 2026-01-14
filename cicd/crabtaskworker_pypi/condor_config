@@ -1,3 +1,4 @@
 # This file is intentionally empty
 # We do not need a condor_config in the TaskWorker, but
 # having it avoid complaints and/or error from HTC bindings
+DELEGATE_JOB_GSI_CREDENTIALS=False
