@@ -511,7 +511,6 @@ class PreJob:
             sys.stderr = sys.stdout
             msg = "Pre-job started with output redirected to %s" % (prejob_log_file_name)
             self.logger.info(msg)
-            self.logger.info("execute() arguments and crab_retry: dag_retry=%s job_id=%s taskname=%s backend=%s stage=%s crab_retry=%s",self.dag_retry, self.job_id, self.taskname, self.backend, self.stage, crab_retry)
 
         msg = "calculate_crab_retry returned the following message: %s" % (calculate_crab_retry_msg)
         self.logger.info(msg)
