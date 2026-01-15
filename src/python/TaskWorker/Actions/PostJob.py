@@ -1621,7 +1621,6 @@ class PostJob():
         # Get/update the crab retry.
         calculate_crab_retry_retval, self.crab_retry = self.calculate_crab_retry()
 
-        self.logger.info("PostJob context: job_id=%s dag_jobid=%s dag_retry=%d max_retries=%d DEFER_NUM=%d crab_retry=%s",self.job_id,self.dag_jobid,self.dag_retry,self.max_retries,DEFER_NUM,str(self.crab_retry))
         # Define the name of the post-job log file.
         if self.crab_retry is None:
             self.postjob_log_file_name = "postjob.%s.error.txt" % (self.job_id)
@@ -1919,7 +1918,7 @@ class PostJob():
         used_job_ad = False
         if self.dag_clusterid == -1:
             # the grid job did not run, see the comments in execute() method
-            job_ad_file_name = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.crab_retry))
+            job_ad_file_name = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.dag_retry))
         else:
             condor_history_dir = os.environ.get("_CONDOR_PER_JOB_HISTORY_DIR", "")
             job_ad_file_name = os.path.join(condor_history_dir, str("history." + str(self.dag_jobid)))
@@ -1930,7 +1929,7 @@ class PostJob():
             if not os.path.exists(job_ad_file_name):
                 self.logger.info('PER_JOB_HISTORY file %s not found , look in ./finished_jobs', job_ad_file_name)
                 jobad_in_condor_history = False
-                job_ad_file_name = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.crab_retry))
+                job_ad_file_name = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.dag_retry))
             if not os.path.exists(job_ad_file_name):
                 self.logger.info('History file not found in ./finished_jobs. Create it by querying schedd')
                 counter = 0
@@ -1974,7 +1973,7 @@ class PostJob():
                     try:
                         shutil.copy2(job_ad_file_name, './finished_jobs/')
                         job_ad_source = "history.%s" % (self.dag_jobid)
-                        job_ad_symlink = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.crab_retry))
+                        job_ad_symlink = os.path.join(".", "finished_jobs", "job.%s.%d" % (self.job_id, self.dag_retry))
                         os.symlink(job_ad_source, job_ad_symlink)
                         self.logger.info("       -----> Succeeded to copy job ad file.")
                     except Exception:

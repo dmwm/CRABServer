@@ -52,8 +52,8 @@ NODE_STATUS_FILE node_state{nodestate} 120 ALWAYS-UPDATE
 
 DAG_FRAGMENT = """
 JOB Job{count} Job.{count}.submit
-SCRIPT {prescriptDefer} DEBUG prescript.debug ALL PRE Job{count} dag_bootstrap.sh PREJOB $RETRY {count} {taskname} {backend} {stage}
-SCRIPT DEFER 4 1800 DEBUG postscript.debug ALL POST Job{count} dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES {taskname} {count} {tempDest} {outputDest} cmsRun_{count}.log.tar.gz {stage} {remoteOutputFiles}
+SCRIPT {prescriptDefer} PRE  Job{count} dag_bootstrap.sh PREJOB $RETRY {count} {taskname} {backend} {stage}
+SCRIPT DEFER 4 1800 POST Job{count} dag_bootstrap.sh POSTJOB $JOBID $RETURN $RETRY $MAX_RETRIES {taskname} {count} {tempDest} {outputDest} cmsRun_{count}.log.tar.gz {stage} {remoteOutputFiles}
 #PRE_SKIP Job{count} 3
 RETRY Job{count} {maxretries} UNLESS-EXIT 2
 VARS Job{count} count="{count}"
@@ -62,6 +62,7 @@ VARS Job{count} count="{count}"
 VARS Job{count} My.CRAB_localOutputFiles="\\"{localOutputFiles}\\""
 VARS Job{count} My.CRAB_DataBlock="\\"{block}\\""
 VARS Job{count} My.CRAB_Destination="\\"{destination}\\""
+ABORT-DAG-ON Job{count} 3
 """
 
 
