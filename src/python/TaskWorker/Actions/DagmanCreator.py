@@ -522,18 +522,21 @@ class DagmanCreator(TaskAction):
         if task['tm_user_config']['requireaccelerator']:
             # hardcoding accelerator to GPU (SI currently only have nvidia GPU)
             jobSubmit['My.RequiresGPU'] = "1"
-            jobSubmit['request_GPUs'] = "1"
+            jobSubmit['request_gpus'] = "1"
             if task['tm_user_config']['acceleratorparams']:
                 gpuMemoryMB = task['tm_user_config']['acceleratorparams'].get('GPUMemoryMB', None)
-                cudaCapabilities = task['tm_user_config']['acceleratorparams'].get('CUDACapabilities', None)
-                cudaRuntime = task['tm_user_config']['acceleratorparams'].get('CUDARuntime', None)
-                if gpuMemoryMB:
-                    jobSubmit['My.GPUMemoryMB'] = classad.quote(gpuMemoryMB)
-                if cudaCapabilities:
-                    cudaCapability = ','.join(sorted(cudaCapabilities))
-                    jobSubmit['My.CUDACapability'] = classad.quote(cudaCapability)
-                if cudaRuntime:
-                    jobSubmit['My.CUDARuntime'] = classad.quote(cudaRuntime)
+                gpuMinimumCapability = task['tm_user_config']['acceleratorparams'].get('GPUMinimumCapability', "0.0")
+                gpuMaximumCapability = task['tm_user_config']['acceleratorparams'].get('GPUMaximumCapability', None)
+                gpuRuntime = task['tm_user_config']['acceleratorparams'].get('GPURuntime', None)
+                jobSubmit['My.DESIRED_GPUMemoryMB'] = str(gpuMemoryMB) if gpuMemoryMB else classad.undefined
+                jobSubmit['My.DESIRED_GPUMinimumCapability'] = str(gpuMinimumCapability) if gpuMinimumCapability else classad.undefined
+                jobSubmit['My.DESIRED_GPUMaximumCapability'] = str(gpuMaximumCapability) if gpuMaximumCapability else classad.undefined
+                jobSubmit['My.DESIRED_GPURuntime'] = str(gpuRuntime) if gpuRuntime else classad.undefined
+
+                jobSubmit['gpus_minimum_memory'] = jobSubmit['My.DESIRED_GPUMemoryMB']
+                jobSubmit['gpus_minimum_capability'] = jobSubmit['My.DESIRED_GPUMinimumCapability']
+                jobSubmit['gpus_maximum_capability'] = jobSubmit['My.DESIRED_GPUMaximumCapability']
+                jobSubmit['gpus_minimum_runtime'] = jobSubmit['My.DESIRED_GPURuntime']
 
         with open("Job.submit", "w", encoding='utf-8') as fd:
             print(jobSubmit, file=fd)
