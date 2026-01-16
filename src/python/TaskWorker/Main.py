@@ -1,7 +1,7 @@
 """
 Top driver for TaskWorker service
 """
-from optparse import OptionParser  # pylint: disable=deprecated-module
+from argparse import ArgumentParser  # pylint: disable=deprecated-module
 import signal
 import os
 import logging
@@ -32,40 +32,40 @@ def main():
     parse args and run.
     """
     usage = "usage: %prog [options] [args]"
-    parser = OptionParser(usage=usage)
+    parser = ArgumentParser(usage=usage)
 
-    parser.add_option("-d", "--logDebug",
+    parser.add_argument("-d", "--logDebug",
                       action="store_true",
                       dest="logDebug",
                       default=False,
                       help="print extra messages to stdout")
-    parser.add_option("-w", "--logWarning",
+    parser.add_argument("-w", "--logWarning",
                       action="store_true",
                       dest="logWarning",
                       default=False,
                       help="don't print any messages to stdout")
-    parser.add_option("-s", "--sequential",
+    parser.add_argument("-s", "--sequential",
                       action="store_true",
                       dest="sequential",
                       default=False,
                       help="run in sequential (no subprocesses) mode")
-    parser.add_option("-c", "--console",
+    parser.add_argument("-c", "--console",
                       action="store_true",
                       dest="console",
                       default=False,
                       help="log to console")
-    parser.add_option("--config",
+    parser.add_argument("--config",
                       dest="config",
                       default=None,
                       metavar="FILE",
                       help="configuration file path")
-    parser.add_option("--pdb",
+    parser.add_argument("--pdb",
                       action="store_true",
                       dest="pdb",
                       default=False,
                       help="Enter pdb mode. Set up TW to run sequential mode and invoke pdb.")
 
-    (options, args) = parser.parse_args()  # pylint: disable=unused-variable
+    (options, args) = parser.parse_known_args()  # pylint: disable=unused-variable
 
 
     if not options.config:

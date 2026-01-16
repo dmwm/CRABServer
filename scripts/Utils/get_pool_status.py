@@ -3,7 +3,7 @@
 from __future__ import print_function
 import re
 import pprint
-import optparse  # pylint: disable=deprecated-module
+import argparse
 
 import htcondor2 as htcondor
 
@@ -127,9 +127,9 @@ class PoolStatus(object):
 
 
 if __name__ == '__main__':
-    parser = optparse.OptionParser()
-    parser.add_option("-p", "--pool", dest="pool", help="Location of the HTCondor pool")
-    opts, args = parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-p", "--pool", dest="pool", help="Location of the HTCondor pool")
+    opts, args = parser.parse_known_args()
 
     p = PoolStatus(opts.pool)
     p.execute()
