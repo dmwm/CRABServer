@@ -41,9 +41,11 @@ FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 AS cern-cc7
 ####### Expected Patch #######
 FROM registry.cern.ch/cmsweb/oracle:23_9-go1.25-oci8-deb13-aio-stable AS oracle
 FROM registry.cern.ch/cmsweb/dmwm-base:alma9-py3.12-20250728-stable
+ENV RHEL_VER=9
+ENV BASE_ARCH=x86_64
 
-# install CERN / WLCG repo for retrieving myproxy and voms*.
-RUN dnf install -y https://linuxsoft.cern.ch/wlcg/wlcg-release-latest.noarch.rpm
+# install CERN RHEL repo for retrieving myproxy and voms*, See https://linux.web.cern.ch/rhel/rhel9/install/
+RUN dnf --repofrompath='tmpcern,https://linuxsoft.cern.ch/cern/rhel/$RHEL_VER/CERN/$BASE_ARCH/' install -y redhat-release --nogpgcheck
 
 RUN dnf -y update && \
     dnf -y install \
