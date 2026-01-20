@@ -12,4 +12,4 @@ rucio-clients~=1.29.10
 PyJWT~=2.4.0
 
 # crab deps
-python-ldap==3.4.3
+python-ldap>=3.4.3

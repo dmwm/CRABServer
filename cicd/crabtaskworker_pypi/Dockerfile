@@ -96,7 +96,7 @@ RUN dnf -y update && \
     dnf -y install \
       tini zip git \
       cyrus-sasl-devel \
-      python3-devel \
+      python3.12-devel \
       python3-setuptools \
       openldap-devel \
       openssl-devel \
