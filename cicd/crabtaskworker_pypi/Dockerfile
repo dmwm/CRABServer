@@ -40,7 +40,7 @@ FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 AS cern-cc7
 # FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
 ####### Expected Patch #######
 FROM registry.cern.ch/cmsweb/oracle:23_9-go1.25-oci8-deb13-aio-stable AS oracle
-FROM registry.cern.ch/cmsweb/dmwm-base:alma9-py3.9-20250703
+FROM registry.cern.ch/cmsweb/dmwm-base:alma9-py3.12-20250728-stable
 
 RUN dnf -y update && \
     dnf -y install \
