@@ -41,8 +41,8 @@ FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 AS cern-cc7
 ####### Expected Patch #######
 FROM registry.cern.ch/cmsweb/oracle:23_9-go1.25-oci8-deb13-aio-stable AS oracle
 FROM registry.cern.ch/cmsweb/dmwm-base:alma9-py3.12-20250728-stable
-ENV RHEL_VER=9
-ENV BASE_ARCH=x86_64
+# hot patch, specific dmwm-alma9-base, dmwm team forgot to link pip
+RUN ln -sf /usr/bin/pip3.12 /usr/bin/pip
 
 RUN dnf install -y epel-release # required by rlwrap package.
 RUN dnf -y update && \
