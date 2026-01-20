@@ -44,16 +44,13 @@ FROM registry.cern.ch/cmsweb/dmwm-base:alma9-py3.12-20250728-stable
 ENV RHEL_VER=9
 ENV BASE_ARCH=x86_64
 
-# install CERN RHEL repo for retrieving myproxy and voms*, See https://linux.web.cern.ch/rhel/rhel9/install/
-RUN dnf --repofrompath='tmpcern,https://linuxsoft.cern.ch/cern/rhel/$RHEL_VER/CERN/$BASE_ARCH/' install -y redhat-release --nogpgcheck
-
+RUN dnf install -y epel-release # required by rlwrap package.
 RUN dnf -y update && \
     dnf -y install \
-      # basic OS packages
+      # basic OS packages, myproxy was deprecated in el9
       cronie cronie-anacron \
       mariadb-server mariadb-connector-c-devel \
-      myproxy \
-      # voms-clients, voms-clients-java included in cern/alma9
+      voms-clients \
       rlwrap libaio \
       # build-essential
       gcc gcc-c++ make glibc-devel \
@@ -69,7 +66,7 @@ RUN dnf -y update && \
 
 # copy oracle client:
 COPY --from=oracle /usr/lib/oracle /usr/lib/oracle
-# Renaming are not necessary in alma9, unlike debian which introduced t64 suffix for ABI split.
+# Renaming are not necessary in alma9, Since libaio live well in /usr/lib64/libaio.so.1
 # RUN ln -s /usr/lib/x86_64-linux-gnu/libaio.so.1t64.0.2 /usr/lib/x86_64-linux-gnu/libaio.so.1
 ENV LD_LIBRARY_PATH=/usr/lib/oracle
 ENV PATH=$PATH:/usr/lib/oracle
