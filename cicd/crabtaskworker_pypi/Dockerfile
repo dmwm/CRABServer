@@ -47,10 +47,10 @@ RUN ln -sf /usr/bin/pip3.12 /usr/bin/pip
 RUN dnf install -y epel-release # required by rlwrap package.
 RUN dnf -y update && \
     dnf -y install \
-      # basic OS packages, myproxy was deprecated in el9
+      # basic OS packages
       cronie cronie-anacron \
       mariadb-server mariadb-connector-c-devel \
-      voms-clients \
+      myproxy voms-clients \
       rlwrap libaio \
       # build-essential
       gcc gcc-c++ make glibc-devel \
