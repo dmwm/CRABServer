@@ -71,6 +71,13 @@ SUBDAG EXTERNAL Job{count}SubJobs RunJobs{count}.subdag NOOP
 SCRIPT DEFER 4 300 PRE Job{count}SubJobs dag_bootstrap.sh PREDAG {stage} {completion} {count}
 """
 
+# A file to customize DAGMAN as per
+# https://htcondor.readthedocs.io/en/latest/admin-manual/configuration-macros.html#dagman-configuration-file-entries
+# If nothing is needed, use and empty string. A file must be there in order not to break our code.
+DAGMAN_CONFIG = """
+DAGMAN_VERBOSITY=2
+"""
+
 
 SPLIT_ARG_MAP = {"Automatic": "minutes_per_job",
                  "LumiBased": "lumis_per_job",
@@ -822,6 +829,7 @@ class DagmanCreator(TaskAction):
          FILES TO BE USED BY SCRIPTS IN THE HTC AccessPoint (aka scheduler) TO BE PLACED IN TaskManagerRun.tar.gz
           RunJobs.dag : the initial DAGMAN which will be submitted by DagmanSubmitter
           RunJobs{0,1,2,3}.subdag : the DAGMAN description for processing and tail subdags
+          RunJobs.dag.config : the DAGMAN_CONFIG_FILE where Dagman running can be customized
           datadiscovery.pkl : the object returned in output from DataDiscovery action, PreDag will need it
                              in order to call Splitter and create the correct subdags
           taskinformation.pkl : the content of the task dictionary
@@ -1118,6 +1126,10 @@ class DagmanCreator(TaskAction):
             # this stages means that we run in TW, so let's also save as pickles
             # some data that will be needed to be able to run in the scheduler
             dagFileName = "RunJobs.dag"
+            dagConfigFileName = "RunJobs.dag.config"
+            # Save config too (next AS stages runs as subdags so use same config !)
+            with open(dagConfigFileName, "w", encoding="utf-8") as fd:
+                fd.write(DAGMAN_CONFIG)
             with open("datadiscovery.pkl", "wb") as fd:
                 pickle.dump(splitterResult[1], fd)  # Cache data discovery
             with open("taskinformation.pkl", "wb") as fd:
@@ -1129,13 +1141,13 @@ class DagmanCreator(TaskAction):
         else:
             dagFileName = f"RunJobs{parentDag}.subdag"
 
-        ## Cache site information
-        with open("site.ad.json", "w", encoding='utf-8') as fd:
-            json.dump(siteinfo, fd)
-
         ## Save the DAG into a file.
         with open(dagFileName, "w", encoding='utf-8') as fd:
             fd.write(dag)
+
+        ## Cache site information
+        with open("site.ad.json", "w", encoding='utf-8') as fd:
+            json.dump(siteinfo, fd)
 
         self.task['jobcount'] = len(dagSpecs)
 
@@ -1272,7 +1284,7 @@ class DagmanCreator(TaskAction):
         with tarfile.open('TaskManagerRun.tar.gz',  mode='r:gz') as tf:
             tf.extract('dag_bootstrap_startup.sh', path=os.getcwd())
         # and add to the "code" tarball the files created by TW
-        filesToAdd = ['site.ad.json', 'RunJobs.dag', 'Job.submit',
+        filesToAdd = ['site.ad.json', 'RunJobs.dag', 'RunJobs.dag.config', 'Job.submit',
                       'datadiscovery.pkl', 'taskinformation.pkl',
                       'taskworkerconfig.pkl', 'splitting-summary.json']
         if self.task['tm_input_dataset']:
