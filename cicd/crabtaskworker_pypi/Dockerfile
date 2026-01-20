@@ -39,7 +39,7 @@ FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 AS cern-cc7
 ####### Expected to be replaced derived image #######
 # FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
 ####### Expected Patch #######
-FROM registry.cern.ch/cmsweb/oracle:23_9-go1.25-oci8-deb13-aio-stable as oracle
+FROM registry.cern.ch/cmsweb/oracle:23_9-go1.25-oci8-deb13-aio-stable AS oracle
 FROM registry.cern.ch/cmsweb/dmwm-base:alma9-py3.9-20250703
 
 RUN dnf -y update && \
