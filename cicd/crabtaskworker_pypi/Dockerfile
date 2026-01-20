@@ -89,11 +89,24 @@ RUN ln -sf ${WDIR}/miniconda/bin/gfal-ls /usr/bin/gfal-ls \
     && ln -sf ${WDIR}/miniconda/bin/gfal-copy /usr/bin/gfal-copy \
     && ln -sf ${WDIR}/miniconda/bin/gfal-sum /usr/bin/gfal-sum
 
+####### START CRAB Patch for Alma9 #######
 # install package from debian repository
 # deps for openldap: libsasl2-dev python3-dev libldap-dev libssl-dev
-RUN apt-get update \
-    && apt-get install -y tini voms-clients-java libsasl2-dev python3-dev libldap-dev libssl-dev zip git fd-find ripgrep bash-completion \
-    && apt-get clean all
+RUN dnf -y update && \
+    dnf -y install \
+      tini zip git \
+      cyrus-sasl-devel \
+      python3-devel \
+      python3-setuptools \
+      openldap-devel \
+      openssl-devel \
+      # required EPEL packages
+      fd-find ripgrep bash-completion && \
+    dnf -y clean all
+# RUN apt-get update \
+#     && apt-get install -y tini voms-clients-java libsasl2-dev python3-dev libldap-dev libssl-dev zip git fd-find ripgrep bash-completion \
+#     && apt-get clean all
+####### END CRAB Patch for Alma9 #######
 
 # local timezone (hardcode)
 RUN ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
