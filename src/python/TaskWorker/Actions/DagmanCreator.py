@@ -530,17 +530,17 @@ class DagmanCreator(TaskAction):
                 gpuRuntime = task['tm_user_config']['acceleratorparams'].get('GPURuntime', None)
                 if gpuMemoryMB:
                     jobSubmit['My.DESIRED_GPUMemoryMB'] = str(gpuMemoryMB)
+                    jobSubmit['gpus_minimum_memory'] = jobSubmit['My.DESIRED_GPUMemoryMB']
                 if gpuMinimumCapability:
                     jobSubmit['My.DESIRED_GPUMinimumCapability'] = str(gpuMinimumCapability)
+                    jobSubmit['gpus_minimum_capability'] = jobSubmit['My.DESIRED_GPUMinimumCapability']
                 if gpuMaximumCapability:
                     jobSubmit['My.DESIRED_GPUMaximumCapability'] = str(gpuMaximumCapability)
+                    jobSubmit['gpus_maximum_capability'] = jobSubmit['My.DESIRED_GPUMaximumCapability']
                 if gpuRuntime:
                     jobSubmit['My.DESIRED_GPURuntime'] = str(gpuRuntime)
+                    jobSubmit['gpus_minimum_runtime'] = jobSubmit['My.DESIRED_GPURuntime']
 
-                jobSubmit['gpus_minimum_memory'] = jobSubmit['My.DESIRED_GPUMemoryMB']
-                jobSubmit['gpus_minimum_capability'] = jobSubmit['My.DESIRED_GPUMinimumCapability']
-                jobSubmit['gpus_maximum_capability'] = jobSubmit['My.DESIRED_GPUMaximumCapability']
-                jobSubmit['gpus_minimum_runtime'] = jobSubmit['My.DESIRED_GPURuntime']
 
         with open("Job.submit", "w", encoding='utf-8') as fd:
             print(jobSubmit, file=fd)
