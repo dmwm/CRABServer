@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-
+#we need to be py2 compatible in this script if we ever want to do changes. Remember that not all crab commands work in e.g. CMSSW_7 (SL6)
 from __future__ import print_function
 from __future__ import division
 
@@ -140,13 +140,17 @@ def main():
     checkPublication = True if Check_Publication_Status == 'Yes' else False
 
     # Read all tasks from the specified files into a single list
-    tasks = [
-    line 
-    for file_name in [f"submitted_tasks_TS_{os.environ['CI_PIPELINE_ID']}_{os.environ['CMSSW_release']}"]
-    if os.path.exists(f'{work_dir}/{file_name}')
-    for line in open(f'{work_dir}/{file_name}').readlines()
-    ]
+    file_name = "submitted_tasks_TS_{}_{}".format(
+        os.environ.get('CI_PIPELINE_ID'),
+        os.environ.get('CMSSW_release')
+    )
 
+    file_path = os.path.join(work_dir, file_name)
+
+    if os.path.exists(file_path):
+        tasks = [line for line in open(file_path).readlines()]
+    else:
+        tasks = []
 
     for task in tasks:
         # when testing it helps to reuse already made directories
