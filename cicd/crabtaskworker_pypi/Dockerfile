@@ -40,9 +40,33 @@ FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 AS cern-cc7
 # FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
 ####### Expected Patch #######
 FROM registry.cern.ch/cmsweb/oracle:23_9-go1.25-oci8-deb13-aio-stable AS oracle
-FROM registry.cern.ch/cmsweb/dmwm-base:alma9-py3.12-20250728-stable
-# hot patch, specific dmwm-alma9-base, dmwm team forgot to link pip
+####### Expected to be replaced derived image #######
+# FROM registry.cern.ch/cmsweb/dmwm-base:alma9-py3.12-20250728-stable
+####### Start Expected Nested Image Patch #######
+FROM registry.cern.ch/cmsweb/exporters AS exporters
+FROM cern/alma9-base:latest
+
+# Required OS packages
+RUN dnf -y upgrade && \
+    dnf -y install --skip-broken curl libcurl && \
+    dnf -y install sudo vim less procps && \
+    dnf -y install python3.12 python3.12-pip python3-pycurl pip && \
+    dnf clean all
+RUN ln -s /usr/bin/python3.12 /usr/bin/python
 RUN ln -sf /usr/bin/pip3.12 /usr/bin/pip
+
+# base image stuff: certificates, monitoring, exporters, etc
+COPY --from=exporters /data/cmsweb-ping /usr/bin/cmsweb-ping
+COPY --from=exporters /data/process_exporter /usr/bin/process_exporter
+COPY --from=exporters /data/cpy_exporter /usr/bin/cpy_exporter
+
+
+ENV WDIR=/data
+ADD cicd/crabtaskworker_pypi/run.sh $WDIR/run.sh
+ADD cicd/crabserver_pypi/monitor.sh $WDIR/monitor.sh
+ADD cicd/crabtaskworker_pypi/manage $WDIR/manage
+WORKDIR /data
+####### END Expected Nested Image Patch #######
 
 RUN dnf install -y epel-release # required by rlwrap package.
 RUN dnf -y update && \

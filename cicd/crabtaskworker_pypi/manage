@@ -1,0 +1,105 @@
+#!/bin/bash
+##H Usage: manage ACTION [ATTRIBUTE] [SECURITY-STRING]
+##H
+##H Available actions:
+##H   help        show this help
+##H   version     get current version of the service
+##H   status      show current service's status
+##H   restart     (re)start the service
+##H   start       (re)start the service
+##H   stop        stop the service
+
+# common settings to prettify output
+echo_e=-e
+COLOR_OK="\\033[0;32m"
+COLOR_WARN="\\033[0;31m"
+COLOR_NORMAL="\\033[0;39m"
+
+# service settings
+srv=`echo $USER | sed -e "s,_,,g" | sed -e "s,t0req,t0_req,g"`
+LOGDIR=/data/srv/logs/$srv
+AUTHDIR=/data/srv/current/auth/$srv
+STATEDIR=/data/srv/state/$srv
+CFGDIR=/data/srv/current/config/$srv
+CFGFILE=$CFGDIR/config.py
+# some MS services uses different config naming convention, therefore we'll
+# adjust CFGFILE assingment
+for c in monitor output ruleCleaner transferor unmerged; do
+    if [ -f $CFGDIR/config-${c}.py ]; then
+        CFGFILE=$CFGDIR/config-${c}.py
+    fi
+done
+
+# necessary env settings for all WM services
+export PYTHONPATH=$PYTHONPATH:/etc/secrets:/data/srv/current/config/$srv
+export X509_USER_KEY=$AUTHDIR/dmwm-service-key.pem
+export X509_USER_CERT=$AUTHDIR/dmwm-service-cert.pem
+export REQMGR_CACHE_DIR=$STATEDIR
+export WMCORE_CACHE_DIR=$STATEDIR
+# MSUnmerged also needs to access a proxy with additional voms roles
+if [ -f $AUTHDIR/proxy.cert ]; then
+    export X509_USER_PROXY=$AUTHDIR/proxy.cert
+fi
+
+# by default Rucio relies on /opt/rucio/etc/config.cfg
+# if necessary we may setup RUCIO_HOME which should provide this location
+# but in k8s we mount rucio config.cfg under /opt/rucio/etc area
+
+usage()
+{
+    cat $0 | grep "^##H" | sed -e "s,##H,,g"
+}
+
+start_srv()
+{
+    wmc-httpd -r -d $STATEDIR -l "$LOGDIR/$srv-`hostname -s`.log" $CFGFILE
+}
+
+stop_srv()
+{
+    local pid=`ps auxwww | egrep "wmc-httpd" | grep -v grep | awk 'BEGIN{ORS=" "} {print $2}'`
+    echo "Stop $srv service... ${pid}"
+    if [ -n "${pid}" ]; then
+        kill -9 ${pid}
+    fi
+}
+
+status_srv()
+{
+    local pid=`ps auxwww | egrep "wmc-httpd" | grep -v grep | awk 'BEGIN{ORS=" "} {print $2}'`
+    if  [ -z "${pid}" ]; then
+        echo "$srv service is not running"
+        return
+    fi
+    if [ ! -z "${pid}" ]; then
+        echo $echo_e "$srv service is ${COLOR_OK}RUNNING${COLOR_NORMAL}, PID=${pid}"
+        ps -f -wwww -p ${pid}
+    else
+        echo $echo_e "$srv service is ${COLOR_WARN}NOT RUNNING${COLOR_NORMAL}"
+    fi
+}
+
+# Main routine, perform action requested on command line.
+case ${1:-status} in
+  start | restart )
+    stop_srv
+    start_srv
+    ;;
+
+  status )
+    status_srv
+    ;;
+
+  stop )
+    stop_srv
+    ;;
+
+  help )
+    usage
+    ;;
+
+  * )
+    echo "$0: unknown action '$1', please try '$0 help' or documentation." 1>&2
+    exit 1
+    ;;
+esac
