@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-
+#we need to be py2 compatible in this script if we ever want to do changes. Remember that not all crab commands work in e.g. CMSSW_7 (SL6)
 from __future__ import print_function
 from __future__ import division
 
