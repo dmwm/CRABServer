@@ -7,7 +7,7 @@ echo "As user: $(whoami)"
 set -x
 
 # Touch a bunch of files to make sure job doesn't go on hold for missing files
-for FILE in $1.dagman.out RunJobs.dag.dagman.out dbs_discovery.err dbs_discovery.out job_splitting.err job_splitting.out; do
+for FILE in $1.dagman.out $1.config RunJobs.dag.dagman.out dbs_discovery.err dbs_discovery.out job_splitting.err job_splitting.out; do
     touch $FILE
 done
 
@@ -183,6 +183,7 @@ else
     exit 1
 fi
 
+export _CONDOR_DAGMAN_CONFIG_FILE=$PWD/$1.config
 export _CONDOR_DAGMAN_LOG=$PWD/$1.dagman.out
 export _CONDOR_DAGMAN_GENERATE_SUBDAG_SUBMITS=False
 export _CONDOR_MAX_DAGMAN_LOG=0

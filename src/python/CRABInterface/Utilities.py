@@ -112,8 +112,9 @@ def validate_dict(argname, param, safe, maxjsonsize=1024):
         with validate_dict("acceleratorparams", param, safe) as (accParams, accSafe):
             custom_err = "Incorrect '{}' parameter. Parameter is also required when Site.requireAccelerator is True"
             validate_num("GPUMemoryMB", accParams, accSafe, minval=0, custom_err=custom_err.format("GPUMemoryMB"))
-            validate_strlist("CUDACapabilities", accParams, accSafe, RX_CUDA_VERSION)
-            validate_str("CUDARuntime", accParams, accSafe, RX_CUDA_VERSION, optional=True)
+            validate_str("GPUMinimumCapability", accParams, accSafe, RX_CUDA_VERSION, optional=True)
+            validate_str("GPUMaximumCapability", accParams, accSafe, RX_CUDA_VERSION, optional=True)
+            validate_str("GPURuntime", accParams, accSafe, RX_CUDA_VERSION, optional=True)
     else:
         safe.kwargs["acceleratorparams"] = None
     """

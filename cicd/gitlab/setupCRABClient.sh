@@ -50,6 +50,8 @@ case $CRABClient_version in
     # TODO: specific fork/commit of crabclient repo still not support
     MY_CRAB=${PWD}/CRABClient
     rm -rf CRABClient
+    # drop GIT-* env vars set by CMSSW which point to old/obsolete git + CA bundle
+    env -u GIT_SSL_CAINFO -u GIT_EXEC_PATH \
     git clone https://github.com/dmwm/CRABClient ${MY_CRAB} -b master
     cp ${ROOT_DIR}/src/python/ServerUtilities.py ${MY_CRAB}/src/python/
     cp ${ROOT_DIR}/src/python/RESTInteractions.py ${MY_CRAB}/src/python/
