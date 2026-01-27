@@ -64,7 +64,6 @@ COPY --from=exporters /data/process_monitor.sh /usr/bin/process_monitor.sh
 ENV WDIR=/data
 ADD cicd/crabtaskworker_pypi/run.sh $WDIR/run.sh
 ADD cicd/crabserver_pypi/monitor.sh $WDIR/monitor.sh
-ADD cicd/crabtaskworker_pypi/manage $WDIR/manage
 WORKDIR /data
 ####### END Expected Nested Image Patch #######
 
