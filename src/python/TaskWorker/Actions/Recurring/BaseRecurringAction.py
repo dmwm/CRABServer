@@ -2,13 +2,14 @@
 import time
 import logging
 import os
+import importlib
 
 from TaskWorker.DataObjects.Result import Result
 
 def handleRecurring(resthost, dbInstance, config, task, procnum, action):
     """ hanldes recurring actions """
     actionClass = action.split('.')[-1]
-    mod = __import__(action, fromlist=actionClass)
+    mod = importlib.import_module(action)
     result = getattr(mod, actionClass)(config.TaskWorker.logsDir).execute(resthost, dbInstance, config, task, procnum)
     return result
 

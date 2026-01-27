@@ -1,8 +1,8 @@
-# https://github.com/dmwm/WMCore/blob/2.3.7.1/requirements.txt
+# https://github.com/dmwm/WMCore/blob/2.4.5.2/requirements.txt
 # update deps version when bump wmcore version
 
 dbs3-client~=4.0.12
-future~=0.18.2
+future~=1.0.0
 htcondor~=25.0.3
 psutil~=5.9.1
 pycurl~=7.45.1
