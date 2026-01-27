@@ -1,5 +1,5 @@
 # Get CERN tsanames.ora, process_exporter from cmsweb rpm image
-FROM registry.cern.ch/cmsweb/cmsweb:20230427-stable AS cmsweb
+FROM registry.cern.ch/cmsweb/cmsweb:wm-freeze AS cmsweb
 FROM registry.cern.ch/cmsweb/exporters:20250519-stable AS exporters
 
 # Use `wmagent-base` image as our baseimage:
@@ -15,10 +15,8 @@ FROM cern/alma9-base:latest
 RUN dnf -y upgrade && \
     dnf -y install --skip-broken curl libcurl && \
     dnf -y install sudo vim less procps && \
-    dnf -y install python3.12 python3.12-pip python3-pycurl pip && \
+    dnf -y install python3-pycurl pip && \
     dnf clean all
-RUN ln -s /usr/bin/python3.12 /usr/bin/python
-RUN ln -sf /usr/bin/pip3.12 /usr/bin/pip
 
 ENV WDIR=/data
 ADD cicd/crabtaskworker_pypi/run.sh $WDIR/run.sh
@@ -46,7 +44,6 @@ RUN dnf -y update && \
       s-nail && \
     dnf -y clean all && \
     rm -rf /var/cache/dnf
-
 
 # Import Oracle OL9 key
 RUN curl -fsSL https://linuxsoft.cern.ch/mirror/yum.oracle.com/RPM-GPG-KEY-oracle-ol9 \
@@ -80,10 +77,20 @@ RUN useradd -m ${USER} \
     && install -o ${USER} -d ${WDIR} \
     && echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3
 
-# install packages from debian official repo
-RUN apt-get update \
-    && apt-get install -y tini git bash-completion fd-find ripgrep \
-    && apt-get clean all
+# install packages from alma9 official repo
+RUN dnf -y update && \
+    dnf -y install \
+      tini git \
+      fd-find ripgrep bash-completion \
+      gcc \
+      make \
+      python3-devel \
+      python3-setuptools \
+      libcurl-devel \
+      openssl-devel \
+      libaio-devel \
+   && dnf clean all \
+   && rm -rf /var/cache/dnf
 
 # local timezone (hardcode)
 RUN ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
