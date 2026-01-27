@@ -2,84 +2,62 @@
 FROM registry.cern.ch/cmsweb/cmsweb:wm-freeze AS cmsweb
 FROM registry.cern.ch/cmsweb/exporters:20250519-stable AS exporters
 
-# Use `wmagent-base` image as our baseimage:
-# https://github.com/dmwm/CMSKubernetes/blob/2b0454f9205cb8f97fecb91bf6661b59e4b31424/docker/pypi/wmagent-base/Dockerfile
-
-FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
-####### Expected to be replaced derived image #######
-# FROM registry.cern.ch/cmsweb/dmwm-base:alma9-py3.12-20250728-stable
-####### Start Expected Nested Image Patch #######
 FROM cern/alma9-base:latest
-
-# Required OS packages
-RUN dnf -y upgrade && \
-    dnf -y install --skip-broken curl libcurl && \
-    dnf -y install sudo vim less procps && \
-    dnf -y install python3-pycurl pip && \
-    dnf clean all
-
-RUN ln -s /usr/bin/python3.9 /usr/bin/python
-
-ENV WDIR=/data
-ADD cicd/crabtaskworker_pypi/run.sh $WDIR/run.sh
-ADD cicd/crabserver_pypi/monitor.sh $WDIR/monitor.sh
-ADD cicd/crabtaskworker_pypi/manage $WDIR/manage
-WORKDIR /data
-####### END Expected Nested Image Patch #######
-
-RUN dnf install -y epel-release # required by rlwrap package.
-RUN dnf -y update && \
-    dnf -y install \
-      # basic OS packages
-      cronie cronie-anacron \
-      mariadb-server mariadb-connector-c-devel \
-      myproxy voms-clients \
-      rlwrap libaio \
-      # build-essential
-      gcc gcc-c++ make glibc-devel \
-      # required for yui
-      wget unzip \
-      # debugging
-      hostname net-tools iputils procps-ng jq \
-      # Install recursive ps utility tool (pstree, a replacement of pslist)
-      psmisc \
-      s-nail && \
-    dnf -y clean all && \
-    rm -rf /var/cache/dnf
 
 # Add Oracle OL9 key, repo, importing key
 ADD https://linuxsoft.cern.ch/mirror/yum.oracle.com/RPM-GPG-KEY-oracle-ol9 /etc/pki/rpm-gpg/RPM-GPG-KEY-oracle-ol9
 ADD cicd/crabserver_pypi/oracle-instantclient-ol9.repo /etc/yum.repos.d/oracle-instantclient-ol9.repo
 RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-oracle-ol9
 
-SHELL ["/bin/bash", "-c"]
 ENV WDIR=/data
 ENV USER=crab3
-RUN useradd -m ${USER} \
-    && install -o ${USER} -d ${WDIR} \
-    && echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3
 
-# install packages from alma9 official repo
+RUN dnf install -y epel-release # epel required by rlwrap package.
 RUN dnf -y update && \
+    dnf -y install --skip-broken curl libcurl && \
     dnf -y install \
+      # basic OS packages \
+      sudo vim less procps \
       tini git \
       fd-find ripgrep bash-completion \
+      wget unzip \
+      # debugging & recursive ps utility tool (pstree, a replacement of pslist) \
+      hostname net-tools iputils procps-ng jq \
+      psmisc s-nail \
+      # base OS packages \
+      cronie cronie-anacron \
+      mariadb-server mariadb-connector-c-devel \
+      rlwrap \
+      # CERN Oracle client packages in Alma9 \
       oracle-instantclient19.29-basic \
       oracle-instantclient19.29-sqlplus \
       oracle-instantclient19.29-devel \
       oracle-instantclient19.29-tools \
-      gcc \
-      make \
+      # build-essential \
+      gcc gcc-c++ make glibc-devel \
+      # CRAB & WLCG specfic deps & Python deps in Alma9 \
+      pip \
+      python3-pycurl \
       python3-devel \
       python3-setuptools \
       libcurl-devel \
       openssl-devel \
       libaio-devel \
+      libaio \
+      myproxy \
+      voms-clients \
    && dnf clean all \
    && rm -rf /var/cache/dnf
 
+# enforce python version
+RUN ln -s /usr/bin/python3.9 /usr/bin/python
 # local timezone (hardcode)
 RUN ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
+# Add CRAB User
+RUN useradd -m ${USER} \
+    && install -o ${USER} -d ${WDIR} \
+    && echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3
+
 
 # Copy CERN tnsnames.ora
 COPY --from=cmsweb /etc/tnsnames.ora /etc/tnsnames.ora
@@ -88,8 +66,6 @@ COPY --from=exporters /data/cmsweb-ping /usr/bin/cmsweb-ping
 COPY --from=exporters /data/process_exporter /usr/bin/process_exporter
 COPY --from=exporters /data/cpy_exporter /usr/bin/cpy_exporter
 COPY --from=exporters /data/process_monitor.sh /usr/bin/process_monitor.sh
-
-COPY --chown=${USER}:${USER} cicd/crabserver_pypi/monitor.sh ${WDIR}/monitor.sh
 
 RUN mkdir /build
 WORKDIR /build
@@ -131,9 +107,6 @@ RUN ls ${WDIR}/srv/current/ \
     && install -d -o ${USER} -g ${USER} ${WDIR}/srv/current/auth/crabserver \
     && install -d -o ${USER} -g ${USER} ${WDIR}/srv/current/config/crabserver
 
-# remove unuse /data/manage come from baseimage to prevent confusion
-RUN rm ${WDIR}/manage
-
 # copy running script files
 COPY --chown=${USER}:${USER} cicd/crabserver_pypi/run.sh \
      cicd/crabserver_pypi/manage.sh \
@@ -143,7 +116,8 @@ COPY --chown=${USER}:${USER} cicd/crabserver_pypi/run.sh \
      cicd/crabserver_pypi/start.sh \
      cicd/crabserver_pypi/stop.sh \
      cicd/crabserver_pypi/status.sh \
-     /data
+     cicd/crabserver_pypi/monitor.sh \
+     ${WDIR}
 
 USER ${USER}
 
