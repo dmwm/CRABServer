@@ -39,7 +39,6 @@ FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 AS cern-cc7
 ####### Expected to be replaced derived image #######
 # FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
 ####### Expected Patch #######
-FROM registry.cern.ch/cmsweb/oracle:23_9-go1.25-oci8-deb13-aio-stable AS oracle
 ####### Expected to be replaced derived image #######
 # FROM registry.cern.ch/cmsweb/dmwm-base:alma9-py3.12-20250728-stable
 ####### Start Expected Nested Image Patch #######
@@ -74,7 +73,6 @@ RUN dnf -y update && \
     dnf -y install \
       # basic OS packages
       cronie cronie-anacron \
-      mariadb-server mariadb-connector-c-devel \
       myproxy voms-clients \
       rlwrap libaio \
       # build-essential
@@ -88,14 +86,6 @@ RUN dnf -y update && \
       s-nail && \
     dnf -y clean all && \
     rm -rf /var/cache/dnf
-
-# copy oracle client:
-COPY --from=oracle /usr/lib/oracle /usr/lib/oracle
-# Renaming are not necessary in alma9, Since libaio live well in /usr/lib64/libaio.so.1
-# RUN ln -s /usr/lib/x86_64-linux-gnu/libaio.so.1t64.0.2 /usr/lib/x86_64-linux-gnu/libaio.so.1
-ENV LD_LIBRARY_PATH=/usr/lib/oracle
-ENV PATH=$PATH:/usr/lib/oracle
-ENV PKG_CONFIG_PATH=/usr/lib/oracle
 ####### End Expected Patch #######
 
 SHELL ["/bin/bash", "-c"]
