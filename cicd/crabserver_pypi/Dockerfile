@@ -18,6 +18,8 @@ RUN dnf -y upgrade && \
     dnf -y install python3-pycurl pip && \
     dnf clean all
 
+RUN ln -s /usr/bin/python3.9 /usr/bin/python
+
 ENV WDIR=/data
 ADD cicd/crabtaskworker_pypi/run.sh $WDIR/run.sh
 ADD cicd/crabserver_pypi/monitor.sh $WDIR/monitor.sh
@@ -45,30 +47,10 @@ RUN dnf -y update && \
     dnf -y clean all && \
     rm -rf /var/cache/dnf
 
-# Import Oracle OL9 key
-RUN curl -fsSL https://linuxsoft.cern.ch/mirror/yum.oracle.com/RPM-GPG-KEY-oracle-ol9 \
-    -o /etc/pki/rpm-gpg/RPM-GPG-KEY-oracle-ol9 \
- && rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-oracle-ol9
-
-# Add CERN-mirrored Instant Client repo
-RUN tee /etc/yum.repos.d/oracle-instantclient-ol9.repo > /dev/null <<'EOF'
-[oracle-instantclient-ol9]
-name=Oracle Instant Client OL9 (CERN mirror)
-baseurl=https://linuxsoft.cern.ch/mirror/yum.oracle.com/repo/OracleLinux/OL9/oracle/instantclient/x86_64/
-enabled=1
-gpgcheck=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-oracle-ol9
-EOF
-
-# Install pinned 19.29 LTS client
-RUN dnf -y install \
-    oracle-instantclient19.29-basic \
-    oracle-instantclient19.29-sqlplus \
-    oracle-instantclient19.29-devel \
-    oracle-instantclient19.29-tools \
- && dnf clean all \
- && rm -rf /var/cache/dnf
-
+# Add Oracle OL9 key, repo, importing key
+ADD https://linuxsoft.cern.ch/mirror/yum.oracle.com/RPM-GPG-KEY-oracle-ol9 /etc/pki/rpm-gpg/RPM-GPG-KEY-oracle-ol9
+ADD cicd/crabserver_pypi/oracle-instantclient-ol9.repo /etc/yum.repos.d/oracle-instantclient-ol9.repo
+RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-oracle-ol9
 
 SHELL ["/bin/bash", "-c"]
 ENV WDIR=/data
@@ -82,6 +64,10 @@ RUN dnf -y update && \
     dnf -y install \
       tini git \
       fd-find ripgrep bash-completion \
+      oracle-instantclient19.29-basic \
+      oracle-instantclient19.29-sqlplus \
+      oracle-instantclient19.29-devel \
+      oracle-instantclient19.29-tools \
       gcc \
       make \
       python3-devel \
