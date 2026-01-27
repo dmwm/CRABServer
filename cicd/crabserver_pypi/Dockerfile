@@ -6,7 +6,6 @@ FROM registry.cern.ch/cmsweb/exporters:20250519-stable AS exporters
 # https://github.com/dmwm/CMSKubernetes/blob/2b0454f9205cb8f97fecb91bf6661b59e4b31424/docker/pypi/wmagent-base/Dockerfile
 
 FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
-FROM registry.cern.ch/cmsweb/oracle:23_9-go1.25-oci8-deb13-aio-stable AS oracle
 ####### Expected to be replaced derived image #######
 # FROM registry.cern.ch/cmsweb/dmwm-base:alma9-py3.12-20250728-stable
 ####### Start Expected Nested Image Patch #######
@@ -48,13 +47,31 @@ RUN dnf -y update && \
     dnf -y clean all && \
     rm -rf /var/cache/dnf
 
-# copy oracle client:
-COPY --from=oracle /usr/lib/oracle /usr/lib/oracle
-# Renaming are not necessary in alma9, Since libaio live well in /usr/lib64/libaio.so.1
-# RUN ln -s /usr/lib/x86_64-linux-gnu/libaio.so.1t64.0.2 /usr/lib/x86_64-linux-gnu/libaio.so.1
-ENV LD_LIBRARY_PATH=/usr/lib/oracle
-ENV PATH=$PATH:/usr/lib/oracle
-ENV PKG_CONFIG_PATH=/usr/lib/oracle
+
+# Import Oracle OL9 key
+RUN curl -fsSL https://linuxsoft.cern.ch/mirror/yum.oracle.com/RPM-GPG-KEY-oracle-ol9 \
+    -o /etc/pki/rpm-gpg/RPM-GPG-KEY-oracle-ol9 \
+ && rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-oracle-ol9
+
+# Add CERN-mirrored Instant Client repo
+RUN tee /etc/yum.repos.d/oracle-instantclient-ol9.repo > /dev/null <<'EOF'
+[oracle-instantclient-ol9]
+name=Oracle Instant Client OL9 (CERN mirror)
+baseurl=https://linuxsoft.cern.ch/mirror/yum.oracle.com/repo/OracleLinux/OL9/oracle/instantclient/x86_64/
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-oracle-ol9
+EOF
+
+# Install pinned 19.29 LTS client
+RUN dnf -y install \
+    oracle-instantclient19.29-basic \
+    oracle-instantclient19.29-sqlplus \
+    oracle-instantclient19.29-devel \
+    oracle-instantclient19.29-tools \
+ && dnf clean all \
+ && rm -rf /var/cache/dnf
+
 
 SHELL ["/bin/bash", "-c"]
 ENV WDIR=/data
