@@ -1,5 +1,6 @@
 # Get CERN tsanames.ora, process_exporter from cmsweb rpm image
 FROM registry.cern.ch/cmsweb/cmsweb:20230427-stable AS cmsweb
+FROM registry.cern.ch/cmsweb/exporters:20250519-stable AS exporters
 
 # Use `wmagent-base` image as our baseimage:
 # https://github.com/dmwm/CMSKubernetes/blob/2b0454f9205cb8f97fecb91bf6661b59e4b31424/docker/pypi/wmagent-base/Dockerfile
@@ -22,10 +23,12 @@ RUN ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
 
 # Copy CERN tnsnames.ora
 COPY --from=cmsweb /etc/tnsnames.ora /etc/tnsnames.ora
-# Copy process exporter
-COPY --from=cmsweb ${WDIR}/cmsweb/bin/process_monitor.sh \
-     ${WDIR}/cmsweb/bin/process_exporter \
-     /usr/local/bin
+# CMSWEB utilities: certificates, monitoring, exporters, etc
+COPY --from=exporters /data/cmsweb-ping /usr/bin/cmsweb-ping
+COPY --from=exporters /data/process_exporter /usr/bin/process_exporter
+COPY --from=exporters /data/cpy_exporter /usr/bin/cpy_exporter
+COPY --from=exporters /data/process_monitor.sh /usr/bin/process_monitor.sh
+
 COPY --chown=${USER}:${USER} cicd/crabserver_pypi/monitor.sh ${WDIR}/monitor.sh
 
 RUN mkdir /build

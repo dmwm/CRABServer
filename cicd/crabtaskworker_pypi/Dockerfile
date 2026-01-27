@@ -43,7 +43,7 @@ FROM registry.cern.ch/cmsweb/oracle:23_9-go1.25-oci8-deb13-aio-stable AS oracle
 ####### Expected to be replaced derived image #######
 # FROM registry.cern.ch/cmsweb/dmwm-base:alma9-py3.12-20250728-stable
 ####### Start Expected Nested Image Patch #######
-FROM registry.cern.ch/cmsweb/exporters AS exporters
+FROM registry.cern.ch/cmsweb/exporters:20250519-stable AS exporters
 FROM cern/alma9-base:latest
 
 # Required OS packages
@@ -55,10 +55,11 @@ RUN dnf -y upgrade && \
 RUN ln -s /usr/bin/python3.12 /usr/bin/python
 RUN ln -sf /usr/bin/pip3.12 /usr/bin/pip
 
-# base image stuff: certificates, monitoring, exporters, etc
+# CMSWEB utilities: certificates, monitoring, exporters, etc
 COPY --from=exporters /data/cmsweb-ping /usr/bin/cmsweb-ping
 COPY --from=exporters /data/process_exporter /usr/bin/process_exporter
 COPY --from=exporters /data/cpy_exporter /usr/bin/cpy_exporter
+COPY --from=exporters /data/process_monitor.sh /usr/bin/process_monitor.sh
 
 
 ENV WDIR=/data
