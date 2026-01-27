@@ -32,18 +32,67 @@ RUN pushd /data/miniconda \
     && popd \
     && rm -rf gfal2-util
 
+
+### Start Run-time environment ###
 # cern ldap config
 FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 AS cern-cc7
+FROM registry.cern.ch/cmsweb/exporters:20250519-stable AS exporters
+FROM cern/alma9-base:latest
 
-# start image
-FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
-SHELL ["/bin/bash", "-c"]
 ENV USER=crab3
 ENV WDIR=/data
+WORKDIR /data
 
-# add new user
+RUN dnf install -y epel-release # epel required by rlwrap package.
+RUN dnf -y update && \
+    dnf -y install --skip-broken curl libcurl && \
+    dnf -y install \
+      # basic OS packages \
+      sudo vim less procps \
+      tini git \
+      zip \
+      fd-find ripgrep bash-completion \
+      wget unzip \
+      # debugging & recursive ps utility tool (pstree, a replacement of pslist) \
+      hostname net-tools iputils procps-ng jq \
+      psmisc s-nail \
+      # base OS packages \
+      cronie cronie-anacron \
+      mariadb-server mariadb-connector-c-devel \
+      rlwrap \
+      # build-essential \
+      gcc gcc-c++ make glibc-devel \
+      # CRAB & WLCG specfic deps & Python deps in Alma9 \
+      pip \
+      python3-pycurl \
+      python3-devel \
+      python3-setuptools \
+      libcurl-devel \
+      # deps packages for openldap \
+      cyrus-sasl-devel \
+      openldap-devel \
+      openssl-devel \
+      libaio-devel \
+      libaio \
+      myproxy \
+      voms-clients \
+   && dnf clean all \
+   && rm -rf /var/cache/dnf
+
+# enforce python version
+RUN ln -s /usr/bin/python3.9 /usr/bin/python
+# local timezone (hardcode)
+RUN ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
+
+# add CRAB user
 RUN useradd -m ${USER} \
     && install -o ${USER} -d ${WDIR}
+
+# CMSWEB utilities: certificates, monitoring, exporters, etc
+COPY --from=exporters /data/cmsweb-ping /usr/bin/cmsweb-ping
+COPY --from=exporters /data/process_exporter /usr/bin/process_exporter
+COPY --from=exporters /data/cpy_exporter /usr/bin/cpy_exporter
+COPY --from=exporters /data/process_monitor.sh /usr/bin/process_monitor.sh
 
 # install gfal
 # symlink to workaround calling gfal from absolute path
@@ -52,15 +101,6 @@ RUN ln -sf ${WDIR}/miniconda/bin/gfal-ls /usr/bin/gfal-ls \
     && ln -sf ${WDIR}/miniconda/bin/gfal-rm /usr/bin/gfal-rm \
     && ln -sf ${WDIR}/miniconda/bin/gfal-copy /usr/bin/gfal-copy \
     && ln -sf ${WDIR}/miniconda/bin/gfal-sum /usr/bin/gfal-sum
-
-# install package from debian repository
-# deps for openldap: libsasl2-dev python3-dev libldap-dev libssl-dev
-RUN apt-get update \
-    && apt-get install -y tini voms-clients-java libsasl2-dev python3-dev libldap-dev libssl-dev zip git fd-find ripgrep bash-completion \
-    && apt-get clean all
-
-# local timezone (hardcode)
-RUN ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
 
 # prepare build
 RUN mkdir /build
@@ -153,7 +193,9 @@ COPY --chown=${USER}:${USER} cicd/crabserver_pypi/start.sh \
 COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/bin/crab-taskworker cicd/crabtaskworker_pypi/bin/crab-publisher /usr/local/bin/
 
 ## entrypoint
-COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/run.sh /data/
+COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/run.sh \
+  cicd/crabserver_pypi/monitor.sh \
+  $WDIR
 
 # for debuggin purpose
 RUN echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3
