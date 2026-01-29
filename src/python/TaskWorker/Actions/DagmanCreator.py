@@ -30,8 +30,9 @@ import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.Actions.Splitter import SplittingSummary
 from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedException
+from TaskWorker.WorkerUtilities import getHighPrioUsersFromCRIC
 from RucioUtils import getWritePFN
-from CMSGroupMapper import get_egroup_users, map_user_to_groups
+from CMSGroupMapper import map_user_to_groups
 
 from WMCore import Lexicon
 from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS, SCRAM_TO_ARCH
@@ -421,9 +422,10 @@ class DagmanCreator(TaskAction):
         #
         # now actual HTC Job Submission commands, here right hand side can be simply strings
         #
-
-        egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
-        if egroups and task['tm_username'] in self.getHighPrioUsers(egroups):
+        hiPrioUsers = getHighPrioUsersFromCRIC(cert=self.config.TaskWorker.cmscert,
+                                               key=self.config.TaskWorker.cmskey,
+                                               logger=self.logger)
+        if  task['tm_username'] in hiPrioUsers:
             jobSubmit['accounting_group'] = 'highprio'
         else:
             jobSubmit['accounting_group'] = 'analysis'
@@ -1186,21 +1188,6 @@ class DagmanCreator(TaskAction):
         self.reportNumJobToDB(len(dagSpecs))
 
         return jobSubmit, splitterResult, subdags
-
-    def getHighPrioUsers(self, egroups):
-        """ get the list of high priority users """
-
-        highPrioUsers = set()
-        try:
-            for egroup in egroups:
-                highPrioUsers.update(get_egroup_users(egroup))
-        except Exception as ex:  # pylint: disable=broad-except
-            msg = "Error when getting the high priority users list." \
-                  " Will ignore the high priority list and continue normally." \
-                  f" Error reason: {ex}"
-            self.logger.error(msg)
-            return []
-        return highPrioUsers
 
     def reportNumJobToDB(self, nJobs):
         """ update numner of jobs in this task in task table. """
