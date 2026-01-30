@@ -32,9 +32,6 @@ RUN pushd /data/miniconda \
     && popd \
     && rm -rf gfal2-util
 
-# cern ldap config
-FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 AS cern-cc7
-
 # start image
 FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
 SHELL ["/bin/bash", "-c"]
@@ -54,9 +51,8 @@ RUN ln -sf ${WDIR}/miniconda/bin/gfal-ls /usr/bin/gfal-ls \
     && ln -sf ${WDIR}/miniconda/bin/gfal-sum /usr/bin/gfal-sum
 
 # install package from debian repository
-# deps for openldap: libsasl2-dev python3-dev libldap-dev libssl-dev
 RUN apt-get update \
-    && apt-get install -y tini voms-clients-java libsasl2-dev python3-dev libldap-dev libssl-dev zip git fd-find ripgrep bash-completion \
+    && apt-get install -y tini voms-clients-java zip git fd-find ripgrep bash-completion \
     && apt-get clean all
 
 # local timezone (hardcode)
@@ -90,9 +86,6 @@ COPY --chown=${USER}:${USER} --from=build-data /build/data_files/data ${WDIR}/sr
 # copy htcondor config
 RUN mkdir /etc/condor
 COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/condor_config /etc/condor/
-
-# copy cern openldap config
-COPY --chown=${USER}:${USER} --from=cern-cc7 /etc/openldap /etc/openldap/
 
 # copy rucio config
 RUN mkdir -p /opt/rucio/etc/
