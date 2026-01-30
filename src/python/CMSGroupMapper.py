@@ -2,15 +2,6 @@ from __future__ import print_function
 
 import os
 import re
-USE_LDAP = False
-try:
-    import ldap
-    USE_LDAP = True
-except ImportError:
-    #At import time the logging framework is not set up. This message will go to stdout,
-    #likely the nohup.out file
-    print("Cannot import ldap")
-
 import time
 
 g_cache = {}
@@ -58,25 +49,6 @@ def cache_users(log_function=print):
             except OSError as ose:
                 log_function("Cannot list SITECONF directories in cvmfs:" + str(ose))
                 raise
-        #then do the same for users in local-egroups.txt
-        full_path = os.path.join(base_dir, entry, 'GlideinConfig', 'local-egroups.txt')
-        if os.path.isfile(full_path) and USE_LDAP:
-            egroup = ''
-            try:
-                fd = open(full_path)
-                for egroup in fd:
-                    egroup = egroup.strip()
-                    users = get_egroup_users(egroup)
-                    for user in users:
-                        if user_re.match(user):
-                            group_set = cache.setdefault(user, set())
-                            group_set.add(entry)
-            except OSError as ose:
-                log_function("Cannot list SITECONF egroups in cvmfs:" + str(ose))
-                raise
-            except ldap.LDAPError as le:
-                log_function("Cannot get user list from egroup: %s. Error: %s\n\t" % (egroup, str(le)))
-
     g_cache = cache
     g_expire_time = time.time() + 15*60
 
