@@ -16,38 +16,6 @@ import time
 g_cache = {}
 g_expire_time = 0
 
-
-def get_egroup_users(egroup_name):
-    """ Given an egroup name it returns the whole list of user contained in this egroup
-    """
-    res = set()
-
-    # Need to set the location of trusted CA certs, they should be here by default.
-
-    # Use /etc/openldap/cacerts/CERN-bundle.pem if exists.
-    # libldap 2.4 that come with debian 11 is built with gnutls which does not support cacertdir.
-    # https://git.openldap.org/openldap/openldap/-/blob/3b03d6bea27f29b7f7f91b3d5488fbd6e69b6c29/libraries/libldap/tls_g.c#L187-190
-    ca_cert_file = "/etc/openldap/cacerts/CERN-bundle.pem"
-    ca_cert_dir = "/etc/openldap/cacerts"
-    if os.path.isfile(ca_cert_file):
-        ldap.set_option(ldap.OPT_X_TLS_CACERTFILE, ca_cert_file)
-    else:
-        ldap.set_option(ldap.OPT_X_TLS_CACERTDIR, ca_cert_dir)
-    l = ldap.initialize("ldaps://xldap.cern.ch:636")
-    search_filter = "memberOf=CN=%s,OU=e-groups,OU=Workgroups,DC=cern,DC=ch" % egroup_name
-    search_attribute = ["sAMAccountName"]
-    basedn = "DC=cern,DC=ch"
-    search_scope = ldap.SCOPE_SUBTREE
-
-    ldap_result_id = l.search(basedn, search_scope, search_filter, search_attribute)
-
-    result_type, result_data = l.result(ldap_result_id, timeout=100)
-    for item in result_data:
-        user = item[1]['sAMAccountName'][0]
-        res.add(user)
-
-    return res
-
 def cache_users(log_function=print):
     """ Cache the entries in the variuos local-users.txt files
         Those entries are saved in a global variable with this
