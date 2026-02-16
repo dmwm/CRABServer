@@ -58,7 +58,6 @@ RUN dnf -y update && \
       gcc gcc-c++ make glibc-devel \
       # CRAB & WLCG specfic deps & Python deps in Alma9 \
       pip \
-      python3-pycurl \
       python3-devel \
       python3-setuptools \
       python3-wheel \
