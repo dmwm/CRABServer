@@ -35,7 +35,6 @@ RUN pushd /data/miniconda \
 
 ### Start Run-time environment ###
 # cern ldap config
-FROM gitlab-registry.cern.ch/linuxsupport/cc7-base:20231001-1.x86_64 AS cern-cc7
 FROM registry.cern.ch/cmsweb/exporters:20250519-stable AS exporters
 FROM cern/alma9-base:latest
 
@@ -68,10 +67,6 @@ RUN dnf -y update && \
       python3-devel \
       python3-setuptools \
       libcurl-devel \
-      # deps packages for openldap \
-      cyrus-sasl-devel \
-      openldap-devel \
-      openssl-devel \
       libaio-devel \
       libaio \
       myproxy \
@@ -130,9 +125,6 @@ COPY --chown=${USER}:${USER} --from=build-data /build/data_files/data ${WDIR}/sr
 # copy htcondor config
 RUN mkdir /etc/condor
 COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/condor_config /etc/condor/
-
-# copy cern openldap config
-COPY --chown=${USER}:${USER} --from=cern-cc7 /etc/openldap /etc/openldap/
 
 # copy rucio config
 RUN mkdir -p /opt/rucio/etc/
