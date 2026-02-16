@@ -31,7 +31,13 @@ ENV USER=crab3
 ENV WDIR=/data
 WORKDIR /data
 
-RUN dnf install -y epel-release # epel required by rlwrap package.
+# Add CERN Everything EPEL 9 repo with GPG_KEY.
+ADD cern-epel9.repo /etc/yum.repos.d/cern-epel9.repo
+ADD RPM-GPG-KEY-EPEL-9 /etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-9
+
+# Import GPG_KEY
+RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-9
+
 RUN dnf -y update && \
     dnf -y install --skip-broken curl libcurl && \
     dnf -y install \
@@ -61,16 +67,12 @@ RUN dnf -y update && \
       libaio \
       myproxy \
       voms-clients \
-      # rucio-clients from RPM instead, due to missing wheel in sdist idx for Alma9 \
-      rucio-clients \
       # gfal via RPM \
       gfal2 \
-      gfal2-util \
+      gfal2-util-scripts \
       gfal2-plugin-file \
       gfal2-plugin-http \
       gfal2-plugin-xrootd \
-      gfal2-plugin-gridftp \
-      gfal2-plugin-srm \
    && dnf clean all \
    && rm -rf /var/cache/dnf
 
