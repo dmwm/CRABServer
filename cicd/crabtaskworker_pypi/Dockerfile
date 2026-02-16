@@ -23,7 +23,6 @@ RUN WMCOREDIR=./WMCore \
     bash buildDatafiles.sh
 
 ### Start Run-time environment ###
-# cern ldap config
 FROM registry.cern.ch/cmsweb/exporters:20250519-stable AS exporters
 FROM cern/alma9-base:latest
 

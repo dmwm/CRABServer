@@ -30,8 +30,9 @@ import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.Actions.Splitter import SplittingSummary
 from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedException
+from TaskWorker.WorkerUtilities import getHighPrioUsersFromCRIC
 from RucioUtils import getWritePFN
-from CMSGroupMapper import get_egroup_users, map_user_to_groups
+from CMSGroupMapper import map_user_to_groups
 
 from WMCore import Lexicon
 from WMCore.WMRuntime.Tools.Scram import ARCH_TO_OS, SCRAM_TO_ARCH
@@ -69,6 +70,13 @@ ABORT-DAG-ON Job{count} 3
 SUBDAG_FRAGMENT = """
 SUBDAG EXTERNAL Job{count}SubJobs RunJobs{count}.subdag NOOP
 SCRIPT DEFER 4 300 PRE Job{count}SubJobs dag_bootstrap.sh PREDAG {stage} {completion} {count}
+"""
+
+# A file to customize DAGMAN as per
+# https://htcondor.readthedocs.io/en/latest/admin-manual/configuration-macros.html#dagman-configuration-file-entries
+# If nothing is needed, use and empty string. A file must be there in order not to break our code.
+DAGMAN_CONFIG = """
+DAGMAN_VERBOSITY=2
 """
 
 
@@ -414,9 +422,10 @@ class DagmanCreator(TaskAction):
         #
         # now actual HTC Job Submission commands, here right hand side can be simply strings
         #
-
-        egroups = getattr(self.config.TaskWorker, 'highPrioEgroups', [])
-        if egroups and task['tm_username'] in self.getHighPrioUsers(egroups):
+        hiPrioUsers = getHighPrioUsersFromCRIC(cert=self.config.TaskWorker.cmscert,
+                                               key=self.config.TaskWorker.cmskey,
+                                               logger=self.logger)
+        if  task['tm_username'] in hiPrioUsers:
             jobSubmit['accounting_group'] = 'highprio'
         else:
             jobSubmit['accounting_group'] = 'analysis'
@@ -522,18 +531,25 @@ class DagmanCreator(TaskAction):
         if task['tm_user_config']['requireaccelerator']:
             # hardcoding accelerator to GPU (SI currently only have nvidia GPU)
             jobSubmit['My.RequiresGPU'] = "1"
-            jobSubmit['request_GPUs'] = "1"
+            jobSubmit['request_gpus'] = "1"
             if task['tm_user_config']['acceleratorparams']:
                 gpuMemoryMB = task['tm_user_config']['acceleratorparams'].get('GPUMemoryMB', None)
-                cudaCapabilities = task['tm_user_config']['acceleratorparams'].get('CUDACapabilities', None)
-                cudaRuntime = task['tm_user_config']['acceleratorparams'].get('CUDARuntime', None)
+                gpuMinimumCapability = task['tm_user_config']['acceleratorparams'].get('GPUMinimumCapability', "0.0")
+                gpuMaximumCapability = task['tm_user_config']['acceleratorparams'].get('GPUMaximumCapability', None)
+                gpuRuntime = task['tm_user_config']['acceleratorparams'].get('GPURuntime', None)
                 if gpuMemoryMB:
-                    jobSubmit['My.GPUMemoryMB'] = classad.quote(gpuMemoryMB)
-                if cudaCapabilities:
-                    cudaCapability = ','.join(sorted(cudaCapabilities))
-                    jobSubmit['My.CUDACapability'] = classad.quote(cudaCapability)
-                if cudaRuntime:
-                    jobSubmit['My.CUDARuntime'] = classad.quote(cudaRuntime)
+                    jobSubmit['My.DESIRED_GPUMemoryMB'] = str(gpuMemoryMB)
+                    jobSubmit['gpus_minimum_memory'] = jobSubmit['My.DESIRED_GPUMemoryMB']
+                if gpuMinimumCapability:
+                    jobSubmit['My.DESIRED_GPUMinimumCapability'] = str(gpuMinimumCapability)
+                    jobSubmit['gpus_minimum_capability'] = jobSubmit['My.DESIRED_GPUMinimumCapability']
+                if gpuMaximumCapability:
+                    jobSubmit['My.DESIRED_GPUMaximumCapability'] = str(gpuMaximumCapability)
+                    jobSubmit['gpus_maximum_capability'] = jobSubmit['My.DESIRED_GPUMaximumCapability']
+                if gpuRuntime:
+                    jobSubmit['My.DESIRED_GPURuntime'] = str(gpuRuntime)
+                    jobSubmit['gpus_minimum_runtime'] = jobSubmit['My.DESIRED_GPURuntime']
+
 
         with open("Job.submit", "w", encoding='utf-8') as fd:
             print(jobSubmit, file=fd)
@@ -822,6 +838,7 @@ class DagmanCreator(TaskAction):
          FILES TO BE USED BY SCRIPTS IN THE HTC AccessPoint (aka scheduler) TO BE PLACED IN TaskManagerRun.tar.gz
           RunJobs.dag : the initial DAGMAN which will be submitted by DagmanSubmitter
           RunJobs{0,1,2,3}.subdag : the DAGMAN description for processing and tail subdags
+          RunJobs.dag.config : the DAGMAN_CONFIG_FILE where Dagman running can be customized
           datadiscovery.pkl : the object returned in output from DataDiscovery action, PreDag will need it
                              in order to call Splitter and create the correct subdags
           taskinformation.pkl : the content of the task dictionary
@@ -1118,6 +1135,10 @@ class DagmanCreator(TaskAction):
             # this stages means that we run in TW, so let's also save as pickles
             # some data that will be needed to be able to run in the scheduler
             dagFileName = "RunJobs.dag"
+            dagConfigFileName = "RunJobs.dag.config"
+            # Save config too (next AS stages runs as subdags so use same config !)
+            with open(dagConfigFileName, "w", encoding="utf-8") as fd:
+                fd.write(DAGMAN_CONFIG)
             with open("datadiscovery.pkl", "wb") as fd:
                 pickle.dump(splitterResult[1], fd)  # Cache data discovery
             with open("taskinformation.pkl", "wb") as fd:
@@ -1129,13 +1150,13 @@ class DagmanCreator(TaskAction):
         else:
             dagFileName = f"RunJobs{parentDag}.subdag"
 
-        ## Cache site information
-        with open("site.ad.json", "w", encoding='utf-8') as fd:
-            json.dump(siteinfo, fd)
-
         ## Save the DAG into a file.
         with open(dagFileName, "w", encoding='utf-8') as fd:
             fd.write(dag)
+
+        ## Cache site information
+        with open("site.ad.json", "w", encoding='utf-8') as fd:
+            json.dump(siteinfo, fd)
 
         self.task['jobcount'] = len(dagSpecs)
 
@@ -1167,21 +1188,6 @@ class DagmanCreator(TaskAction):
         self.reportNumJobToDB(len(dagSpecs))
 
         return jobSubmit, splitterResult, subdags
-
-    def getHighPrioUsers(self, egroups):
-        """ get the list of high priority users """
-
-        highPrioUsers = set()
-        try:
-            for egroup in egroups:
-                highPrioUsers.update(get_egroup_users(egroup))
-        except Exception as ex:  # pylint: disable=broad-except
-            msg = "Error when getting the high priority users list." \
-                  " Will ignore the high priority list and continue normally." \
-                  f" Error reason: {ex}"
-            self.logger.error(msg)
-            return []
-        return highPrioUsers
 
     def reportNumJobToDB(self, nJobs):
         """ update numner of jobs in this task in task table. """
@@ -1272,7 +1278,7 @@ class DagmanCreator(TaskAction):
         with tarfile.open('TaskManagerRun.tar.gz',  mode='r:gz') as tf:
             tf.extract('dag_bootstrap_startup.sh', path=os.getcwd())
         # and add to the "code" tarball the files created by TW
-        filesToAdd = ['site.ad.json', 'RunJobs.dag', 'Job.submit',
+        filesToAdd = ['site.ad.json', 'RunJobs.dag', 'RunJobs.dag.config', 'Job.submit',
                       'datadiscovery.pkl', 'taskinformation.pkl',
                       'taskworkerconfig.pkl', 'splitting-summary.json']
         if self.task['tm_input_dataset']:
