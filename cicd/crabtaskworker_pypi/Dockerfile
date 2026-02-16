@@ -95,6 +95,10 @@ COPY --from=exporters /data/process_monitor.sh /usr/bin/process_monitor.sh
 RUN mkdir /build
 WORKDIR /build
 
+# Fix rucio-client's build script still imports pkg_resources
+RUN python -m pip install -U pip \
+ && python -m pip install "setuptools<82" wheel
+
 # install dependencies
 COPY cicd/crabtaskworker_pypi/requirements.txt ./
 RUN pip install -r requirements.txt \
