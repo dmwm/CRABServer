@@ -22,17 +22,6 @@ RUN WMCOREDIR=./WMCore \
     DATAFILES_WORKDIR=./data_files\
     bash buildDatafiles.sh
 
-# gfal, wmcore only has gfal lib but not cli
-FROM registry.cern.ch/cmsweb/gfal:latest AS wmcore-gfal
-SHELL ["/bin/bash", "-c"]
-RUN pushd /data/miniconda \
-    && git clone https://gitlab.cern.ch/dmc/gfal2-util -b v1.8.0 \
-    && pushd gfal2-util \
-    && python setup.py install \
-    && popd \
-    && rm -rf gfal2-util
-
-
 ### Start Run-time environment ###
 # cern ldap config
 FROM registry.cern.ch/cmsweb/exporters:20250519-stable AS exporters
@@ -66,11 +55,22 @@ RUN dnf -y update && \
       python3-pycurl \
       python3-devel \
       python3-setuptools \
+      python3-wheel \
       libcurl-devel \
       libaio-devel \
       libaio \
       myproxy \
       voms-clients \
+      # rucio-clients from RPM instead, due to missing wheel in sdist idx for Alma9 \
+      rucio-clients \
+      # gfal via RPM \
+      gfal2 \
+      gfal2-util \
+      gfal2-plugin-file \
+      gfal2-plugin-http \
+      gfal2-plugin-xrootd \
+      gfal2-plugin-gridftp \
+      gfal2-plugin-srm \
    && dnf clean all \
    && rm -rf /var/cache/dnf
 
@@ -88,14 +88,6 @@ COPY --from=exporters /data/cmsweb-ping /usr/bin/cmsweb-ping
 COPY --from=exporters /data/process_exporter /usr/bin/process_exporter
 COPY --from=exporters /data/cpy_exporter /usr/bin/cpy_exporter
 COPY --from=exporters /data/process_monitor.sh /usr/bin/process_monitor.sh
-
-# install gfal
-# symlink to workaround calling gfal from absolute path
-COPY --chown=${USER}:${USER} --from=wmcore-gfal ${WDIR}/miniconda ${WDIR}/miniconda/
-RUN ln -sf ${WDIR}/miniconda/bin/gfal-ls /usr/bin/gfal-ls \
-    && ln -sf ${WDIR}/miniconda/bin/gfal-rm /usr/bin/gfal-rm \
-    && ln -sf ${WDIR}/miniconda/bin/gfal-copy /usr/bin/gfal-copy \
-    && ln -sf ${WDIR}/miniconda/bin/gfal-sum /usr/bin/gfal-sum
 
 # prepare build
 RUN mkdir /build
