@@ -1,5 +1,5 @@
 # create data files ./data
-FROM python:3.8 AS build-data
+FROM python:3.12-trixie AS build-data
 SHELL ["/bin/bash", "-c"]
 RUN mkdir /build \
     && apt-get update \
@@ -12,6 +12,9 @@ COPY cicd/crabtaskworker_pypi/buildTWTarballs.sh \
 COPY setup.py /build
 COPY src /build/src
 COPY scripts /build/scripts
+
+# Install buildtools for the right intrepreter
+RUN python -m pip install -U pip setuptools wheel
 
 RUN wmcore_repo="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f1)" \
     && wmcore_version="$(grep -v '^\s*#' wmcore_requirements.txt | cut -d' ' -f2)" \
@@ -33,7 +36,7 @@ RUN pushd /data/miniconda \
     && rm -rf gfal2-util
 
 # start image
-FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
+FROM registry.cern.ch/cmsweb/wmagent-base:wm-freeze
 SHELL ["/bin/bash", "-c"]
 ENV USER=crab3
 ENV WDIR=/data

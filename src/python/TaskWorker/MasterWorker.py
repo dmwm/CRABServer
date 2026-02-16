@@ -8,6 +8,7 @@ import shutil
 import sys
 import time
 import logging
+import importlib
 
 from http.client import HTTPException
 from urllib.parse import urlencode
@@ -235,7 +236,7 @@ class MasterWorker(object):
 
     def getRecurringActionInst(self, actionName):
         try:
-            mod = __import__('TaskWorker.Actions.Recurring.%s' % actionName, fromlist=actionName)
+            mod = importlib.import_module('TaskWorker.Actions.Recurring.%s' % actionName)
         except ModuleNotFoundError:
             self.logger.error('Recurring Action module "%s" not found, skipping', actionName)
             return
