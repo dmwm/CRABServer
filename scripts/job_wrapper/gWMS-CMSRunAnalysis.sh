@@ -240,7 +240,7 @@ if [[ -e $TOKEN_PATH ]]; then
       # only for selected CMSSW releases
       JOB_CMSSW=`grep '^CRAB_JobSW =' $_CONDOR_JOB_AD|tr -d '"'|tr -d ' '|cut -d = -f 2`
       JOB_CMSSW_Major=`echo $JOB_CMSSW | cut -d '_' -f 2`
-      if [[ $JOB_CMSSW_Major -ge 13 ]]; then
+      if [[ $JOB_CMSSW_Major -ge 15 ]]; then
         echo "$JOB_CMSSW is OK."
         # only at selected sites
         TOKEN_READY_SITES=( T2_BE_IIHE \
