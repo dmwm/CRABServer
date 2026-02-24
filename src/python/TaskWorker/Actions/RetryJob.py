@@ -133,25 +133,49 @@ class RetryJob():
 
     # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+    def store_retry_delay(self, delay):
+        retry_info_file = f"resubmit_info/job.{self.job_id}.txt"
+        retry_info = {}
+        if os.path.exists(retry_info_file):
+            try:
+                with open(retry_info_file, "r", encoding="utf-8") as fd:
+                    retry_info = eval(fd.read())
+            except Exception:
+                retry_info = {}
+
+        key = str(self.crab_retry)
+        if key not in retry_info:
+            retry_info[key] = {}
+
+        retry_info[key]["retry_delay_until"] = time.time() + delay
+
+        with open(retry_info_file + ".tmp", "w", encoding="utf-8") as fd:
+            fd.write(str(retry_info))
+        os.rename(retry_info_file + ".tmp", retry_info_file)
+
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+
     def apply_retry_policy(self, exitCode):
-    """
-    Enforce exit-code dependent retry limits and delay.
-    Raises FatalError if retry limit exceeded.
-    """
-    policy = EXIT_RETRY_POLICY.get(exitCode, EXIT_RETRY_POLICY["default"])
+        """
+        Enforce exit-code dependent retry limits and delay.
+        Raises FatalError if retry limit exceeded.
+        """
+        policy = EXIT_RETRY_POLICY.get(exitCode, EXIT_RETRY_POLICY["default"])
 
-    if policy["type"] == "recoverable":
-        if self.crab_retry >= policy["max_retries"]:
-            raise FatalError(f"Retry limit reached for exit {exitCode}: {policy['msg']}")
-        delay = policy.get("delay", 900)
-        self.logger.info(f"Sleeping {delay} seconds before retry (exit code {exitCode})")
-        time.sleep(delay)
-        if exitCode in [8020, 8021, 8022, 8028, 84, 85, 86, 92, 134, 8001, 65]:
+        if policy["type"] == "recoverable":
+            if self.crab_retry >= policy["max_retries"]:
+                raise FatalError(f"Retry limit reached for exit {exitCode}: {policy['msg']}")
+            delay = policy.get("delay", 900)
+            self.logger.info(f"Sleeping {delay} seconds before retry (exit code {exitCode})")
+            self.store_retry_delay(delay)
+            if exitCode in [8020, 8021, 8022, 8028, 84, 85, 86, 92, 134, 8001, 65]:
+                return
+            raise RecoverableError(policy["msg"])
+
+        if policy["type"] == "neutral":
             return
-        raise RecoverableError(policy["msg"])
-
-    if policy["type"] == "neutral":
-        return
+            
     # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def get_job_ad_from_file(self):

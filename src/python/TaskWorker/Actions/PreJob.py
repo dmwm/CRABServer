@@ -456,19 +456,38 @@ class PreJob:
             slow release of jobs in a task.
             The function return True if CRAB_JobReleaseTimeout is defined and not 0, and if the submit
             time of the task plus the defer time is greater than the current time.
+            Additionally retry policy delay
         """
         deferTime = int(self.task_ad.get("CRAB_JobReleaseTimeout", 0))
+
+        currentTime = time.time()
+
+        # Check retry delay from resubmit_info
+        retry_info_file = f"resubmit_info/job.{self.job_id}.txt"
+        if os.path.exists(retry_info_file):
+            try:
+                with open(retry_info_file, "r", encoding="utf-8") as fd:
+                    retry_info = literal_eval(fd.read())
+                key = str(self.dag_retry)
+                if key in retry_info:
+                    retry_delay_until = retry_info[key].get("retry_delay_until")
+                    if retry_delay_until and currentTime < retry_delay_until:
+                        wait = int(retry_delay_until - currentTime)
+                        self.logger.info(f"Retry delay not elapsed yet. Deferring for {wait} seconds.")
+                        return True
+            except Exception:
+                self.logger.exception("Error checking retry delay in resubmit_info")
+
         if deferTime:
             self.logger.info('Release timeout specified in extraJDL:')
             totalDefer = deferTime * int(self.job_id)
             submitTime = int(self.task_ad["CRAB_TaskSubmitTime"])
-            currentTime = time.time()
             if currentTime < (submitTime + totalDefer):
                 msg = f"  Defer time of this job ({totalDefer} seconds since initial task submission)"
                 msg += f" not elapsed yet, deferring for {totalDefer} seconds"
                 self.logger.info(msg)
                 return True
-            self.logger.info('  Continuing normally since current time is greater than requested starttime of the job')
+            self.logger.info('Continuing normally since current time is greater than requested starttime of the job')
         return False
 
     def execute(self, *args):
