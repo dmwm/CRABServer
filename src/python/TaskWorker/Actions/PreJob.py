@@ -298,6 +298,25 @@ class PreJob:
             maxmemory     = self.resubmit_info[inkey].get('maxmemory')
             numcores      = self.resubmit_info[inkey].get('numcores')
             priority      = self.resubmit_info[inkey].get('priority')
+
+            #ExitCode Dependent change in resubmission parameters for retries
+
+            retry_data = self.resubmit_info.get(inkey, {})
+
+            if retry_data.get("increase_memory") and maxmemory:
+                factor = retry_data.get("memory_factor", 1.2)
+                new_memory = int(int(maxmemory) * factor)
+                if hasattr(self, "MAX_MEMORY"):
+                    new_memory = min(new_memory, self.MAX_MEMORY)
+                self.logger.info(f"Increasing memory from {maxmemory} to {new_memory}")
+                maxmemory = new_memory
+
+            if retry_data.get("increase_runtime") and maxjobruntime:
+                factor = retry_data.get("runtime_factor", 1.2)
+                new_runtime = int(int(maxjobruntime) * factor)
+                self.logger.info(f"Increasing walltime from {maxjobruntime} to {new_runtime}")
+                maxjobruntime = new_runtime
+
         ## Save the (new) values of the resubmission parameters in self.resubmit_info
         ## for the current job retry number.
         outkey = str(crab_retry)
@@ -414,6 +433,15 @@ class PreJob:
             self.logger.error("Can not submit since DESIRED_Sites list is empty")
             self.prejob_exit_code = 1
             sys.exit(self.prejob_exit_code)
+            
+        # ExitCode Dependent discard of previous_site
+        retry_data = self.resubmit_info.get(str(crab_retry), {})
+        previous_site = retry_data.get("previous_site")
+        if retry_data.get("change_site") and previous_site:
+            if previous_site in availableSet:
+                self.logger.info(f"Removing previous site {previous_site} from candidate sites")
+                availableSet.discard(previous_site)
+
         ## Make sure that attributest which will be used in MatchMaking are SORTED lists
         available = list(availableSet)
         available.sort()
@@ -456,19 +484,38 @@ class PreJob:
             slow release of jobs in a task.
             The function return True if CRAB_JobReleaseTimeout is defined and not 0, and if the submit
             time of the task plus the defer time is greater than the current time.
+            Additionally retry policy delay
         """
         deferTime = int(self.task_ad.get("CRAB_JobReleaseTimeout", 0))
+
+        currentTime = time.time()
+
+        # Check retry delay from resubmit_info
+        retry_info_file = f"resubmit_info/job.{self.job_id}.txt"
+        if os.path.exists(retry_info_file):
+            try:
+                with open(retry_info_file, "r", encoding="utf-8") as fd:
+                    retry_info = literal_eval(fd.read())
+                key = str(self.dag_retry)
+                if key in retry_info:
+                    retry_delay_until = retry_info[key].get("retry_delay_until")
+                    if retry_delay_until and currentTime < retry_delay_until:
+                        wait = int(retry_delay_until - currentTime)
+                        self.logger.info(f"Retry delay not elapsed yet. Deferring for {wait} seconds.")
+                        return True
+            except Exception:
+                self.logger.exception("Error checking retry delay in resubmit_info")
+
         if deferTime:
             self.logger.info('Release timeout specified in extraJDL:')
             totalDefer = deferTime * int(self.job_id)
             submitTime = int(self.task_ad["CRAB_TaskSubmitTime"])
-            currentTime = time.time()
             if currentTime < (submitTime + totalDefer):
                 msg = f"  Defer time of this job ({totalDefer} seconds since initial task submission)"
                 msg += f" not elapsed yet, deferring for {totalDefer} seconds"
                 self.logger.info(msg)
                 return True
-            self.logger.info('  Continuing normally since current time is greater than requested starttime of the job')
+            self.logger.info('Continuing normally since current time is greater than requested starttime of the job')
         return False
 
     def execute(self, *args):
