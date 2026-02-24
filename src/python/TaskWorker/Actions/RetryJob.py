@@ -5,6 +5,7 @@ import json
 import shutil
 import subprocess
 import socket
+import time
 from collections import namedtuple
 
 from ServerUtilities import executeCommand, getLock
@@ -14,6 +15,40 @@ import classad2 as classad
 
 
 JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERROR')(0, 1, 2)
+
+# ----------------------------------------------------------------------
+# Exit-code dependent retry policy
+# ----------------------------------------------------------------------
+
+EXIT_RETRY_POLICY = {
+    1: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to bootstrap CMSSW; likely a worker node issue."},
+    50513: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job did not find functioning CMSSW on worker node."},
+    81: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job did not find functioning CMSSW on worker node."},
+    50115: {"type": "recoverable", "max_retries": 9, "delay": 900, "msg": "Job did not produce a FJR; will retry."},
+    195: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job did not produce a FJR; will retry."},
+    137: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "SIGKILL; likely an unrelated batch system kill."},
+    10034: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Required application version not found at the site."},
+    50: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Required application version not found at the site."},
+    10040: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Site Error: failed to generate cmsRun cfg file at runtime."},
+    60403: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Timeout during attempted file stageout."},
+    243: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Timeout during attempted file stageout."},
+    60307: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
+    147: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
+    60311: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
+    151: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
+    8028: {"type": "recoverable", "max_retries": 9, "delay": 900, "msg": "Job failed to open local and fallback files."},
+    8021: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileReadError (May be a site error)."},
+    8020: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileOpenError (Likely a site error)."},
+    8022: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FatalRootError."},
+    84: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Some required file not found; check logs for name of missing file."},
+    85: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files."},
+    86: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files."},
+    92: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files."},
+    134: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Abort (ANSI) or IOT trap (4.2 BSD) (most likely user application crashed)."},
+    8001: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Other CMS Exception."},
+    65: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "End of job from user application (CMSSW)."},
+    "default": {"type": "neutral", "max_retries": 2, "delay": 900, "msg": "Taking default exit code retry policy route."}
+}
 
 # strings in fatal root exception text which indicate code problem, not corrupted file
 # a small "knowledge data base"
@@ -96,6 +131,27 @@ class RetryJob():
                 self.ads.append(ad)
         self.ad = self.ads[-1]
 
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def apply_retry_policy(self, exitCode):
+    """
+    Enforce exit-code dependent retry limits and delay.
+    Raises FatalError if retry limit exceeded.
+    """
+    policy = EXIT_RETRY_POLICY.get(exitCode, EXIT_RETRY_POLICY["default"])
+
+    if policy["type"] == "recoverable":
+        if self.crab_retry >= policy["max_retries"]:
+            raise FatalError(f"Retry limit reached for exit {exitCode}: {policy['msg']}")
+        delay = policy.get("delay", 900)
+        self.logger.info(f"Sleeping {delay} seconds before retry (exit code {exitCode})")
+        time.sleep(delay)
+        if exitCode in [8020, 8021, 8022, 8028, 84, 85, 86, 92, 134, 8001, 65]:
+            return
+        raise RecoverableError(policy["msg"])
+
+    if policy["type"] == "neutral":
+        return
     # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def get_job_ad_from_file(self):
@@ -307,6 +363,8 @@ class RetryJob():
             return 1
         try:
             exitCode = int(self.report['exitCode'])
+            # Apply retry policy
+            self.apply_retry_policy(exitCode)
         except ValueError:
             msg = "Unable to extract job's wrapper exit code from job report."
             self.logger.warning(msg)
@@ -319,7 +377,6 @@ class RetryJob():
             return 0
 
         msg = "Job or stageout wrapper finished with exit code %d." % (exitCode)
-        msg += " Trying to determine the meaning of the exit code and if it is a recoverable or fatal error."
         self.logger.info(msg)
 
         # Wrapper script sometimes returns the posix return code (8 bits).
@@ -334,17 +391,6 @@ class RetryJob():
                 exitMsg = "Fatal Root Error maybe a corrupted input file. This error is being reported"
                 self.create_fake_fjr(exitMsg, 8022, 8022, fatalError=False)  # retry the job
             raise RecoverableError("Job failed to open local and fallback files.")
-
-        if exitCode == 1:
-            raise RecoverableError("Job failed to bootstrap CMSSW; likely a worker node issue.")
-
-        if exitCode == 50513 or exitCode == 81:
-            raise RecoverableError("Job did not find functioning CMSSW on worker node.")
-
-        # This is a difficult one -- right now CMSRunAnalysis.py will turn things like
-        # segfaults into an invalid FJR.  Will revisit this decision later.
-        if exitCode == 50115 or exitCode == 195:
-            raise RecoverableError("Job did not produce a FJR; will retry.")
 
         if exitCode == 134:
             recoverable_signal = False
@@ -378,28 +424,6 @@ class RetryJob():
                 self.logger.exception(msg)
             if cvmfs_issue:
                 raise RecoverableError("CVMFS issue detected.")
-
-        # Another difficult case -- so far, SIGKILL has mostly been observed at T2_CH_CERN, and it has nothing to do
-        # with an issue of the job itself. Typically, this isn't the user code's fault
-        # it was often a site or pilot misconfiguration that led to the pilot exhausting its allocated runtime.
-        # We should revisit this issue if we see SIGKILL happening for other cases that are the users' fault.
-        if exitCode == 137:
-            raise RecoverableError("SIGKILL; likely an unrelated batch system kill.")
-
-        if exitCode == 10034 or exitCode == 50:
-            raise RecoverableError("Required application version not found at the site.")
-
-        if exitCode == 10040:
-            raise RecoverableError("Site Error: failed to generate cmsRun cfg file at runtime.")
-
-        if exitCode == 60403 or exitCode == 243:
-            raise RecoverableError("Timeout during attempted file stageout.")
-
-        if exitCode == 60307 or exitCode == 147:
-            raise RecoverableError("Error during attempted file stageout.")
-
-        if exitCode == 60311 or exitCode == 151:
-            raise RecoverableError("Error during attempted file stageout.")
 
         if exitCode:
             raise FatalError("Job wrapper finished with exit code %d.\nExit message:\n  %s" % (exitCode, exitMsg.replace('\n', '\n  ')))
