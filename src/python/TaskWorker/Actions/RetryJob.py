@@ -7,6 +7,7 @@ import subprocess
 import socket
 import time
 from collections import namedtuple
+from ast import literal_eval
 
 from ServerUtilities import executeCommand, getLock
 from ServerUtilities import MAX_DISK_SPACE, MAX_WALLTIME, MAX_MEMORY
@@ -24,21 +25,21 @@ EXIT_RETRY_POLICY = {
     1: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to bootstrap CMSSW; likely a worker node issue."},
     50513: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job did not find functioning CMSSW on worker node."},
     81: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job did not find functioning CMSSW on worker node."},
-    50115: {"type": "recoverable", "max_retries": 9, "delay": 900, "msg": "Job did not produce a FJR; will retry."},
-    195: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job did not produce a FJR; will retry."},
+    50115: {"type": "recoverable", "max_retries": 9, "delay": 900, "msg": "Job did not produce a FJR; will retry.", "increase_memory": True, "memory_factor": 1.3},
+    195: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job did not produce a FJR; will retry.", "increase_memory": True, "memory_factor": 1.3},
     137: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "SIGKILL; likely an unrelated batch system kill."},
     10034: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Required application version not found at the site."},
     50: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Required application version not found at the site."},
     10040: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Site Error: failed to generate cmsRun cfg file at runtime."},
-    60403: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Timeout during attempted file stageout."},
-    243: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Timeout during attempted file stageout."},
+    60403: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Timeout during attempted file stageout.", "increase_runtime": True, "runtime_factor": 1.3},
+    243: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Timeout during attempted file stageout.", "increase_runtime": True, "runtime_factor": 1.3},
     60307: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
     147: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
     60311: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
     151: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
     8028: {"type": "recoverable", "max_retries": 9, "delay": 900, "msg": "Job failed to open local and fallback files."},
-    8021: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileReadError (May be a site error)."},
-    8020: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileOpenError (Likely a site error)."},
+    8021: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileReadError (May be a site error).", "change_site": True},
+    8020: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileOpenError (Likely a site error).", "change_site": True},
     8022: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FatalRootError."},
     84: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Some required file not found; check logs for name of missing file."},
     85: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files."},
@@ -133,13 +134,14 @@ class RetryJob():
 
     # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def store_retry_delay(self, delay):
+    def store_retry_actions(self, policy):
         retry_info_file = f"resubmit_info/job.{self.job_id}.txt"
         retry_info = {}
+
         if os.path.exists(retry_info_file):
             try:
                 with open(retry_info_file, "r", encoding="utf-8") as fd:
-                    retry_info = eval(fd.read())
+                    retry_info = literal_eval(fd.read())
             except Exception:
                 retry_info = {}
 
@@ -147,7 +149,15 @@ class RetryJob():
         if key not in retry_info:
             retry_info[key] = {}
 
+        delay = policy.get("delay", 900)
         retry_info[key]["retry_delay_until"] = time.time() + delay
+
+        retry_info[key]["increase_memory"] = policy.get("increase_memory", False)
+        retry_info[key]["increase_runtime"] = policy.get("increase_runtime", False)
+        retry_info[key]["change_site"] = policy.get("change_site", False)
+        retry_info[key]["memory_factor"] = policy.get("memory_factor", 1.0)
+        retry_info[key]["runtime_factor"] = policy.get("runtime_factor", 1.0)
+        retry_info[key]["previous_site"] = getattr(self, "site", None)
 
         with open(retry_info_file + ".tmp", "w", encoding="utf-8") as fd:
             fd.write(str(retry_info))
@@ -166,9 +176,8 @@ class RetryJob():
         if policy["type"] == "recoverable":
             if self.crab_retry >= policy["max_retries"]:
                 raise FatalError(f"Retry limit reached for exit {exitCode}: {policy['msg']}")
-            delay = policy.get("delay", 900)
-            self.logger.info(f"Sleeping {delay} seconds before retry (exit code {exitCode})")
-            self.store_retry_delay(delay)
+            self.logger.info(f"Applying retry policy for exit code {exitCode}")
+            self.store_retry_actions(policy)
             if exitCode in [8020, 8021, 8022, 8028, 84, 85, 86, 92, 134, 8001, 65]:
                 return
             raise RecoverableError(policy["msg"])

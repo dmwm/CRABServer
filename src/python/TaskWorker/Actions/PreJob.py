@@ -298,6 +298,25 @@ class PreJob:
             maxmemory     = self.resubmit_info[inkey].get('maxmemory')
             numcores      = self.resubmit_info[inkey].get('numcores')
             priority      = self.resubmit_info[inkey].get('priority')
+
+            #ExitCode Dependent change in resubmission parameters for retries
+
+            retry_data = self.resubmit_info.get(inkey, {})
+
+            if retry_data.get("increase_memory") and maxmemory:
+                factor = retry_data.get("memory_factor", 1.2)
+                new_memory = int(int(maxmemory) * factor)
+                if hasattr(self, "MAX_MEMORY"):
+                    new_memory = min(new_memory, self.MAX_MEMORY)
+                self.logger.info(f"Increasing memory from {maxmemory} to {new_memory}")
+                maxmemory = new_memory
+
+            if retry_data.get("increase_runtime") and maxjobruntime:
+                factor = retry_data.get("runtime_factor", 1.2)
+                new_runtime = int(int(maxjobruntime) * factor)
+                self.logger.info(f"Increasing walltime from {maxjobruntime} to {new_runtime}")
+                maxjobruntime = new_runtime
+
         ## Save the (new) values of the resubmission parameters in self.resubmit_info
         ## for the current job retry number.
         outkey = str(crab_retry)
@@ -414,6 +433,15 @@ class PreJob:
             self.logger.error("Can not submit since DESIRED_Sites list is empty")
             self.prejob_exit_code = 1
             sys.exit(self.prejob_exit_code)
+            
+        # ExitCode Dependent discard of previous_site
+        retry_data = self.resubmit_info.get(str(crab_retry), {})
+        previous_site = retry_data.get("previous_site")
+        if retry_data.get("change_site") and previous_site:
+            if previous_site in availableSet:
+                self.logger.info(f"Removing previous site {previous_site} from candidate sites")
+                availableSet.discard(previous_site)
+
         ## Make sure that attributest which will be used in MatchMaking are SORTED lists
         available = list(availableSet)
         available.sort()
