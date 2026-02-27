@@ -38,7 +38,5 @@ else
     git clone  --depth 1 "${wmcore_repo}" -b "${wmcore_version}" WMCore
     cp -rp WMCore/src/python/* "${installpath}"
     cp -rp WMCore/bin/wmc-httpd /usr/local/bin
-    # Patch shebang to python3 (only if it matches the old one)
-    sed -i '1 s|^#!/usr/bin/env python$|#!/usr/bin/env python3|' /usr/local/bin/wmc-httpd
     rm -rf WMCore
 fi

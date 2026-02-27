@@ -101,6 +101,9 @@ USER ${USER}
 RUN bash addGH.sh
 USER root
 
+# Patch shebang to enforce python3
+RUN sed -i '1 s|^#!/usr/bin/env python$|#!/usr/bin/env python3|' /usr/local/bin/wmc-httpd
+
 # create mandatory directory
 RUN ls ${WDIR}/srv/current/ \
     && install -d -o ${USER} -g ${USER} ${WDIR}/srv/logs/crabserver \
