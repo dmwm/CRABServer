@@ -51,7 +51,6 @@ RUN dnf -y update && \
       psmisc s-nail \
       # base OS packages \
       cronie cronie-anacron \
-      mariadb-server mariadb-connector-c-devel \
       rlwrap \
       # build-essential \
       gcc gcc-c++ make glibc-devel \
