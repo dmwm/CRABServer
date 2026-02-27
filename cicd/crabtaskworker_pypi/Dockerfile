@@ -22,49 +22,75 @@ RUN WMCOREDIR=./WMCore \
     DATAFILES_WORKDIR=./data_files\
     bash buildDatafiles.sh
 
-# gfal, wmcore only has gfal lib but not cli
-FROM registry.cern.ch/cmsweb/gfal:latest AS wmcore-gfal
-SHELL ["/bin/bash", "-c"]
-RUN pushd /data/miniconda \
-    && git clone https://gitlab.cern.ch/dmc/gfal2-util -b v1.8.0 \
-    && pushd gfal2-util \
-    && python setup.py install \
-    && popd \
-    && rm -rf gfal2-util
+### Start Run-time environment ###
+FROM registry.cern.ch/cmsweb/exporters:20250519-stable AS exporters
+FROM cern/alma9-base:latest
 
-# start image
-FROM registry.cern.ch/cmsweb/wmagent-base:pypi-20230705
-SHELL ["/bin/bash", "-c"]
 ENV USER=crab3
 ENV WDIR=/data
+WORKDIR /data
 
-# add new user
-RUN useradd -m ${USER} \
-    && install -o ${USER} -d ${WDIR}
+# Add CERN Everything EPEL 9 repo with GPG_KEY.
+ADD cicd/crabtaskworker_pypi/cern-epel9.repo /etc/yum.repos.d/cern-epel9.repo
+ADD cicd/crabtaskworker_pypi/RPM-GPG-KEY-EPEL-9 /etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-9
 
-# install gfal
-# symlink to workaround calling gfal from absolute path
-COPY --chown=${USER}:${USER} --from=wmcore-gfal ${WDIR}/miniconda ${WDIR}/miniconda/
-RUN ln -sf ${WDIR}/miniconda/bin/gfal-ls /usr/bin/gfal-ls \
-    && ln -sf ${WDIR}/miniconda/bin/gfal-rm /usr/bin/gfal-rm \
-    && ln -sf ${WDIR}/miniconda/bin/gfal-copy /usr/bin/gfal-copy \
-    && ln -sf ${WDIR}/miniconda/bin/gfal-sum /usr/bin/gfal-sum
+# Import GPG_KEY
+RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-9
 
-# install package from debian repository
-RUN apt-get update \
-    && apt-get install -y tini voms-clients-java zip git fd-find ripgrep bash-completion \
-    && apt-get clean all
+RUN dnf -y update && \
+    dnf -y install --skip-broken curl libcurl && \
+    dnf -y install \
+      # basic OS packages \
+      sudo vim less procps \
+      tini git \
+      zip \
+      fd-find ripgrep bash-completion \
+      wget unzip \
+      # debugging & recursive ps utility tool (pstree, a replacement of pslist) \
+      hostname net-tools iputils procps-ng jq \
+      psmisc s-nail \
+      # base OS packages \
+      cronie cronie-anacron \
+      rlwrap \
+      # build-essential \
+      gcc gcc-c++ make glibc-devel \
+      # CRAB & WLCG specfic deps & Python deps in Alma9 \
+      pip \
+      python3-devel \
+      python3-setuptools \
+      python3-wheel \
+      libcurl-devel \
+      libaio-devel \
+      libaio \
+      myproxy \
+      voms-clients \
+      # gfal via RPM \
+      gfal2 \
+      gfal2-util-scripts \
+      gfal2-plugin-file \
+      gfal2-plugin-http \
+      gfal2-plugin-xrootd \
+   && dnf clean all \
+   && rm -rf /var/cache/dnf
 
 # local timezone (hardcode)
 RUN ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
+
+# add CRAB user
+RUN useradd -m ${USER} \
+    && install -o ${USER} -d ${WDIR}
 
 # prepare build
 RUN mkdir /build
 WORKDIR /build
 
+# Fix rucio-client's build script can't built in isolation missing setuputils and pkg_resources, even force installed.
+RUN python3 -m pip install -U pip \
+ && python3 -m pip install "setuptools<82" wheel
+
 # install dependencies
 COPY cicd/crabtaskworker_pypi/requirements.txt ./
-RUN pip install -r requirements.txt \
+RUN pip install --no-build-isolation -r requirements.txt \
     && pip cache purge
 
 # create install dir
@@ -146,7 +172,9 @@ COPY --chown=${USER}:${USER} cicd/crabserver_pypi/start.sh \
 COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/bin/crab-taskworker cicd/crabtaskworker_pypi/bin/crab-publisher /usr/local/bin/
 
 ## entrypoint
-COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/run.sh /data/
+COPY --chown=${USER}:${USER} cicd/crabtaskworker_pypi/run.sh \
+  cicd/crabserver_pypi/monitor.sh \
+  $WDIR
 
 # for debuggin purpose
 RUN echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-crab3

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # pylint: disable=line-too-long
 """
 needs to be run in a TW container or some other way to have the

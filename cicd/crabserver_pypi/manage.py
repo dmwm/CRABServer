@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 The python helper to parse args (use pure bash is a nightmare).
 We can even convert shell script in to python to increase code maintainability.

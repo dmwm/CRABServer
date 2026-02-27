@@ -1,0 +1,7 @@
+[cern-epel9]
+name=CERN mirror - EPEL 9 Everything
+baseurl=https://linuxsoft.cern.ch/epel/9/Everything/$basearch/
+enabled=1
+gpgcheck=1
+repo_gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-9
