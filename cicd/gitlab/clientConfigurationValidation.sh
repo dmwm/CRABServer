@@ -1,5 +1,13 @@
-set -x
+echo "Running clientConfigurationValidation.sh"
 set -euo pipefail
+
+echo "Verbose env.var. is set to $Verbose"
+export Verbose
+if [ X$Verbose == "X3" ]
+then
+  echo "enable bash trace"
+  set -x
+fi
 
 # validate env var
 # note: $PWD is (default to `./workdir`)

@@ -1,3 +1,4 @@
+CMSSW_release=CMSSW_15_0_18;SCRAM_ARCH=el8_amd64_gcc12;inputDataset=/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM;master=no;
 CMSSW_release=CMSSW_13_0_2;SCRAM_ARCH=el8_amd64_gcc11;inputDataset=/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM;master=no;
 CMSSW_release=CMSSW_12_6_4;SCRAM_ARCH=el8_amd64_gcc10;inputDataset=/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM;master=no;
 CMSSW_release=CMSSW_12_5_0;SCRAM_ARCH=el8_amd64_gcc10;inputDataset=/GenericTTbar/HC-CMSSW_9_2_6_91X_mcRun1_realistic_v2-v2/AODSIM;master=no;

@@ -5,6 +5,7 @@ default:
     - crab3
 
 variables:
+  VERBOSE: "0"  # will pass $Verbose env. var. to various scripts 0=~silent, 1=medium, 2=long, 3=fullblown
   IMAGE_TAG: "${CI_COMMIT_REF_SLUG}"  # to distinct it from commit tag and final image tag
   RELEASE_IMAGE_TAG: "${CI_COMMIT_TAG}-stable" # final tag name, e.g., v3.240904-stable
   # The `DOCKER_TLS_CERTDIR` variables is needed to run Docker-in-Docker, `DOCKER_BUILDKIT` is to make sure the docker build use the new BuildKit.
@@ -279,7 +280,7 @@ deploy_publisher_rucio:
 
 task_submission:
   variables:
-    CMSSW_release: CMSSW_13_0_2 
+    CMSSW_release: CMSSW_15_0_18
   rules:
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, skip_check]
@@ -298,7 +299,8 @@ task_submission:
     - export Task_Submission_Status_Tracking=$STATUS_TRACKING
     - export Client_Configuration_Validation=$CLIENT_CONFIGURATION_VALIDATION
     - export Client_Validation_Suite=$CLIENT_VALIDATION
-    - bash -x cicd/gitlab/executeTests.sh
+    - export Verbose=$VERBOSE
+    - bash cicd/gitlab/submitTestTasks.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
@@ -329,7 +331,8 @@ task_submission_release:
     - export Task_Submission_Status_Tracking=$STATUS_TRACKING
     - export Client_Configuration_Validation=$CLIENT_CONFIGURATION_VALIDATION
     - export Client_Validation_Suite=$CLIENT_VALIDATION
-    - bash -x cicd/gitlab/executeTests.sh
+    - export Verbose=$VERBOSE
+    - bash cicd/gitlab/submitTestTasks.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
@@ -340,7 +343,7 @@ task_submission_release:
 
 sleep_before_validation:
   variables:
-    CMSSW_release: CMSSW_13_0_2
+    CMSSW_release: CMSSW_15_0_18
   rules:
     - !reference [.default_rules, skip_submit]
     - !reference [.default_rules, default]
@@ -348,8 +351,8 @@ sleep_before_validation:
   tags:
     - crab3-shell
   script:
-    - echo "Sleeping for 20 minutes after task submission"
-    - sleep 1200
+    - echo "Sleeping for 5 minutes after task submission"
+    - sleep 300
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
@@ -381,7 +384,7 @@ sleep_before_validation_release:
 
 client_validation_suite:
   variables:
-    CMSSW_release: CMSSW_13_0_2
+    CMSSW_release: CMSSW_15_0_18
   rules:
     - if: '$CLIENT_VALIDATION == "false"'
       when: never
@@ -399,8 +402,14 @@ client_validation_suite:
     - export ROOT_DIR
     - export CMSSW_release=$CMSSW_release
     - export Client_Validation_Suite=true
+    - export Verbose=$VERBOSE
     - ls workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
-    - bash -x cicd/gitlab/CV_config.sh
+    # CV test uses one task, wait up to 2h checking every 5 minutes for that to complete
+    # (5 min is the status cache refresh time in the AP, half an hour is needed to detect
+    # successful transfer after submission to FTS
+    - export RETRY_SLEEP_SECONDS=300
+    - export RETRY_MAX=24
+    - bash cicd/gitlab/retry.sh bash cicd/gitlab/CV_config.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
@@ -428,8 +437,9 @@ client_validation_suite_release:
     - export ROOT_DIR
     - export CMSSW_release=$CMSSW_release
     - export Client_Validation_Suite=true
+    - export Verbose=$VERBOSE
     - ls workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
-    - bash -x cicd/gitlab/CV_config.sh
+    - bash cicd/gitlab/retry.sh bash cicd/gitlab/CV_config.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
@@ -439,7 +449,7 @@ client_validation_suite_release:
 
 client_configuration_validation:
   variables:
-    CMSSW_release: CMSSW_13_0_2
+    CMSSW_release: CMSSW_15_0_18
   rules:
     - if: '$CLIENT_CONFIGURATION_VALIDATION == "false"'
       when: never
@@ -457,8 +467,9 @@ client_configuration_validation:
     - export ROOT_DIR
     - export CMSSW_release=$CMSSW_release
     - export Client_Configuration_Validation=true
+    - export Verbose=$VERBOSE
     - ls workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
-    - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/CCV_config.sh
+    - bash cicd/gitlab/retry.sh bash cicd/gitlab/CCV_config.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
@@ -486,8 +497,9 @@ client_configuration_validation_release:
     - export ROOT_DIR
     - export CMSSW_release=$CMSSW_release
     - export Client_Configuration_Validation=true
+    - export Verbose=$VERBOSE
     - ls workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
-    - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/CCV_config.sh
+    - bash cicd/gitlab/retry.sh bash cicd/gitlab/CCV_config.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
@@ -497,7 +509,7 @@ client_configuration_validation_release:
 
 check_status_tracking:
   variables:
-    CMSSW_release: CMSSW_13_0_2
+    CMSSW_release: CMSSW_15_0_18
   rules:
     - if: '$STATUS_TRACKING == "false"'
       when: never
@@ -516,7 +528,8 @@ check_status_tracking:
     - export SCRAM_ARCH=el8_amd64_gcc11
     - export Check_Publication_Status=Yes
     - export RETRY_SLEEP_SECONDS=1800
-    - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
+    - export Verbose=$VERBOSE
+    - bash cicd/gitlab/retry.sh bash cicd/gitlab/executeStatusTracking.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
@@ -544,7 +557,8 @@ check_status_tracking_release:
     - export CMSSW_release=$CMSSW_release
     - export SCRAM_ARCH=$SCRAM_ARCH
     - export Check_Publication_Status=Yes
-    - bash cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
+    - export Verbose=$VERBOSE
+    - bash cicd/gitlab/retry.sh bash cicd/gitlab/executeStatusTracking.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:

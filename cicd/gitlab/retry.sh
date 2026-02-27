@@ -1,5 +1,5 @@
 #! /bin/bash
-# retry
+# retry command (script) passed as argument if it exits with code=4
 
 set -euo pipefail
 
@@ -20,7 +20,7 @@ while true; do
                 exit 1
             fi
             echo -n "Sleep for ${RETRY_SLEEP_SECONDS} seconds."
-	    echo " Until " `date -d "now + ${RETRY_SLEEP_SECONDS} seconds" +"%H:%M %Z"` 
+	          echo " Until " `date -d "now + ${RETRY_SLEEP_SECONDS} seconds" +"%H:%M %Z"`
             sleep "${RETRY_SLEEP_SECONDS}"
             RETRY=$((RETRY + 1))
             continue

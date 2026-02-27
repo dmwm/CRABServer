@@ -1,7 +1,7 @@
 #!/bin/bash
 # NOTE: This file suppose to run inside cmssw sigularity (cc7,el8,el9)
+echo "== Running setupCRABClient.sh"
 
-set -x
 set -euo pipefail
 
 #Script can be used to setup CRABClient:
@@ -19,7 +19,8 @@ set -euo pipefail
 scramv1 project ${CMSSW_release}
 cd ${CMSSW_release}/src
 eval "$(scramv1 runtime -sh)"
-scram build
+echo "Verbose is: $Verbose"
+scram build > /dev/null
 
 mkdir -p ../venv
 
@@ -74,4 +75,5 @@ case $CRABClient_version in
 esac
 
 #cd "${CURRENT_DIR}"
+echo "== CRABClient setup completed"
 crab --version

@@ -1,8 +1,16 @@
 #!/bin/bash
 # NOTE: This file suppose to run inside cmssw sigularity (cc6,el7,el8)
 
-set -x
+echo "Starting taskSubmission.sh"
 set -euo pipefail
+
+echo "Verbose env.var. is set to $Verbose"
+export Verbose
+if [ X$Verbose == "X3" ]
+then
+  echo "enable bash trace"
+  set -x
+fi
 
 #Script submits tasks for testing. 3 types of testing can be started using this script:
 # 1. Client_Validation_Suite: tests different CRABClient commands;
@@ -28,10 +36,10 @@ submitTasks() {
   for file_name in ${filesToSubmit};
   do
       echo -e "\nSubmitting file: ${file_name}"
-      cat "${file_name}"
+      [ $Verbose -ge 2 ] && cat "${file_name}"
       output=$(crab submit -c ${file_name} --proxy=${X509_USER_PROXY} 2>&1)
       submitExitCode=$?
-      echo ${output}
+      [ $Verbose -ge 1 ] && echo ${output}
       if [ $submitExitCode != 0 ]; then
           echo ${file_name} >> "${WORK_DIR}"/failed_tasks_${CI_PIPELINE_ID}_${CMSSW_release}
           killAfterFailure

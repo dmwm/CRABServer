@@ -1,4 +1,7 @@
 #!/bin/bash
+# this script is called in gitlab pipeline to execute ClientValidation step
+# it assumes to be run with PWD as the top of a CRABServer GH clone
+
 set -euo pipefail
 
 # default values
@@ -37,12 +40,18 @@ if [[ "$singularity" == "6" || "$singularity" == "7" || "$singularity" == "8" ]]
     if [ "X${singularity}" == X6 ]; then scramprefix=cc${singularity}; fi
     if [ "X${singularity}" == X7 ]; then scramprefix=cc${singularity}; fi
     if [ "X${singularity}" == X8 ]; then scramprefix=el${singularity}; fi
-    
-    /cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- "${ROOT_DIR}/cicd/gitlab/clientValidation.sh" || ERR=true
-    
+
+    CV_EC=0
+    /cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- "${ROOT_DIR}/cicd/gitlab/clientValidation.sh" || CV_EC=$?
+    echo "clientValidation.sh ended with exit code: $CV_EC"
 else 
     echo "!!! I am not prepared to run for slc${singularity}."
     exit 1
+fi
+
+if [[ $CV_EC -eq 4 ]]; then
+  echo "Task has not completed yet, wait"
+  exit 4
 fi
 
 # Extract test results from the log

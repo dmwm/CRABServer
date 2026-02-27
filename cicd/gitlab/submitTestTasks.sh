@@ -1,6 +1,14 @@
 #! /bin/bash
 set -euo pipefail
 
+echo "Verbose env.var. is set to $Verbose"
+export Verbose
+if [ X$Verbose == "X3" ]
+then
+  echo "enable bash trace"
+  set -x
+fi
+
 # default values
 export Client_Validation_Suite="${Client_Validation_Suite:-}"
 export Client_Configuration_Validation="${Client_Configuration_Validation:-}"
