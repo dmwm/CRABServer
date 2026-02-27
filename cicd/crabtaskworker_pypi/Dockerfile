@@ -86,9 +86,13 @@ RUN useradd -m ${USER} \
 RUN mkdir /build
 WORKDIR /build
 
+# Fix rucio-client's build script can't built in isolation missing setuputils and pkg_resources, even force installed.
+RUN python -m pip install -U pip \
+ && python -m pip install "setuptools<82" wheel
+
 # install dependencies
 COPY cicd/crabtaskworker_pypi/requirements.txt ./
-RUN pip install -r requirements.txt \
+RUN pip install --no-build-isolation -r requirements.txt \
     && pip cache purge
 
 # create install dir
