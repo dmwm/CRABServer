@@ -9,10 +9,13 @@ ADD https://linuxsoft.cern.ch/mirror/yum.oracle.com/RPM-GPG-KEY-oracle-ol9 /etc/
 ADD cicd/crabserver_pypi/oracle-instantclient-ol9.repo /etc/yum.repos.d/oracle-instantclient-ol9.repo
 RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-oracle-ol9
 
+# Add CERN Everything EPEL 9 repo with GPG_KEY.
+ADD cicd/crabtaskworker_pypi/cern-epel9.repo /etc/yum.repos.d/cern-epel9.repo
+ADD cicd/crabtaskworker_pypi/RPM-GPG-KEY-EPEL-9 /etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-9
+
 ENV WDIR=/data
 ENV USER=crab3
 
-RUN dnf install -y epel-release # epel required by rlwrap package.
 RUN dnf -y update && \
     dnf -y install --skip-broken curl libcurl && \
     dnf -y install \
