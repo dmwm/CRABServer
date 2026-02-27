@@ -4,7 +4,6 @@
 Cheetah3~=3.2.6.post1
 CherryPy~=18.10.0
 CMSMonitoring~=0.6.11
-dbs3-client~=4.0.12
 future~=1.0.0
 httplib2~=0.20.4
 psutil~=5.9.5
