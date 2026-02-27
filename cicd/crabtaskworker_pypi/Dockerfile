@@ -82,12 +82,6 @@ RUN ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
 RUN useradd -m ${USER} \
     && install -o ${USER} -d ${WDIR}
 
-# CMSWEB utilities: certificates, monitoring, exporters, etc
-COPY --from=exporters /data/cmsweb-ping /usr/bin/cmsweb-ping
-COPY --from=exporters /data/process_exporter /usr/bin/process_exporter
-COPY --from=exporters /data/cpy_exporter /usr/bin/cpy_exporter
-COPY --from=exporters /data/process_monitor.sh /usr/bin/process_monitor.sh
-
 # prepare build
 RUN mkdir /build
 WORKDIR /build
