@@ -52,8 +52,6 @@ RUN dnf -y update && \
    && dnf clean all \
    && rm -rf /var/cache/dnf
 
-# enforce python version
-RUN ln -s /usr/bin/python3.9 /usr/bin/python
 # local timezone (hardcode)
 RUN ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
 # Add CRAB User

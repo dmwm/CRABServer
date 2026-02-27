@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from cherrypy.test.test import CommandLineParser
 import os, sys, glob

@@ -91,7 +91,7 @@ if [ "${Client_Configuration_Validation}" = true ]; then
     echo -e "\nStarting task submission for Client Configuration Validation testing.\n"
     # mkdir -p tmpWorkDir
     # cd tmpWorkDir
-    python ${ROOT_DIR}/test/makeTests.py
+    python3 ${ROOT_DIR}/test/makeTests.py
     filesToSubmit=`find . -maxdepth 1 -type f -name '*.py' ! -name '*PSET*'`
     submitTasks "${filesToSubmit}" "CCV"
     tasksToCheck=`cat ${WORK_DIR}/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}`

@@ -73,8 +73,6 @@ RUN dnf -y update && \
    && dnf clean all \
    && rm -rf /var/cache/dnf
 
-# enforce python version
-RUN ln -s /usr/bin/python3.9 /usr/bin/python
 # local timezone (hardcode)
 RUN ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
 
@@ -87,8 +85,8 @@ RUN mkdir /build
 WORKDIR /build
 
 # Fix rucio-client's build script can't built in isolation missing setuputils and pkg_resources, even force installed.
-RUN python -m pip install -U pip \
- && python -m pip install "setuptools<82" wheel
+RUN python3 -m pip install -U pip \
+ && python3 -m pip install "setuptools<82" wheel
 
 # install dependencies
 COPY cicd/crabtaskworker_pypi/requirements.txt ./
