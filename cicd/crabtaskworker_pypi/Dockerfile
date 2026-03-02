@@ -48,7 +48,7 @@ RUN dnf -y update && \
       wget unzip \
       # debugging & recursive ps utility tool (pstree, a replacement of pslist) \
       hostname net-tools iputils procps-ng jq \
-      psmisc s-nail \
+      psmisc \
       # base OS packages \
       cronie cronie-anacron \
       rlwrap \
