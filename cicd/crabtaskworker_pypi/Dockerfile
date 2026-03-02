@@ -31,8 +31,8 @@ ENV WDIR=/data
 WORKDIR /data
 
 # Add CERN Everything EPEL 9 repo with GPG_KEY.
-ADD cicd/crabtaskworker_pypi/cern-epel9.repo /etc/yum.repos.d/cern-epel9.repo
-ADD cicd/crabtaskworker_pypi/RPM-GPG-KEY-EPEL-9 /etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-9
+ADD cicd/crabserver_pypi/cern-epel9.repo /etc/yum.repos.d/cern-epel9.repo
+ADD cicd/crabserver_pypi/RPM-GPG-KEY-EPEL-9 /etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-9
 
 # Import GPG_KEY
 RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-9
