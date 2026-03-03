@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import importlib
 import CRABInterface.CRABServerBase as CRABServerBase
 
 def getTestRoot():
@@ -190,7 +191,7 @@ def testImport_t():
             yield importOne, toImport
 
 def importOne(val):
-    __import__(val)
+    importlib.import_module(val)
 
 # https://cmsweb.cern.ch/das/request?view=plain&limit=1000&instance=cms_dbs_prod_global&input=site+dataset%3D%2FGenericTTbar%2FHC-CMSSW_5_3_1_START53_V5-v1%2FGEN-SIM-RECO
 allSitesRaw = """T1_CH_CERN_Buffer
