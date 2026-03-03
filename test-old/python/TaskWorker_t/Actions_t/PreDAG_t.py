@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 """ Test module for the PreDAG class
 """
 from __future__ import division

@@ -16,7 +16,7 @@ echo "(debug) X509_USER_PROXY=${X509_USER_PROXY}"
 
 # Setup CRABClient
 source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
-python ${ROOT_DIR}/test/makeTests.py
+python3 ${ROOT_DIR}/test/makeTests.py
 
 # Ensure the log files exist (creating successful_tests (if doesn't exist) and deleting/recreating retry_tests and failed_tests)
 touch ${WORK_DIR}/successful_tests_${CI_PIPELINE_ID}_${CMSSW_release}

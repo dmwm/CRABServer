@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # This is a long term issue and to maintain ~3k lines of code in one file is hard.
 # The code it is hard to read: workflow, taskname, reqname. All are the same....
 # pylint: disable=too-many-lines, too-many-arguments

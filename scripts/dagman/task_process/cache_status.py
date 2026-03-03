@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 """
 VERSION OF CACHE_STATUS USING HTCONDOR JobEventLog API
 THIS REQUIRES HTCONDOR 8.9.3 OR ABOVE
