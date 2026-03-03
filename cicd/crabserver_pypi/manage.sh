@@ -59,12 +59,12 @@ script_env() {
 # flag and ready to use.
 start_srv() {
     script_env
-    python3 wmc-httpd -r -d $STATEDIR -l "$STATEDIR/crabserver-fifo" $CFGFILE
+    python3 /usr/local/bin/wmc-httpd -r -d $STATEDIR -l "$STATEDIR/crabserver-fifo" $CFGFILE
 }
 
 stop_srv() {
     script_env
-    python3 wmc-httpd -k -d $STATEDIR $CFGFILE
+    python3 /usr/local/bin/wmc-httpd -k -d $STATEDIR $CFGFILE
 }
 
 status_srv() {
