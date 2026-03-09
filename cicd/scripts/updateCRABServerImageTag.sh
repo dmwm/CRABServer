@@ -2,33 +2,28 @@ set -euo pipefail
 DEPLOY_ENV="${DEPLOY_ENV:?DEPLOY_ENV is required}"
 NEW_IMAGE_TAG="${NEW_IMAGE_TAG:?NEW_IMAGE_TAG is required}"
 
-UPSTREAM_IAC_REPO_URL="${UPSTREAM_IAC_REPO_URL:=https://github.com/sinonkt/CMSKubernetes}"
-UPSTREAM_IAC_BRANCH="${UPSTREAM_IAC_BRANCH:=migrate-to-argocd}"
-GITLAB_SIDECAR_REPO_URL="${GITLAB_SIDECAR_REPO_URL:=gitlab.cern.ch/crab3/crab-k8s-overlays}"
-GITLAB_SIDECAR_REPO_BRANCH="${GITLAB_SIDECAR_REPO_BRANCH:=master}"
-GITLAB_SIDECAR_REPO_PAT="${GITLAB_SIDECAR_REPO_PAT:?GITLAB_SIDECAR_REPO_PAT is required}"
-CI_BOT_USER_NAME="${CI_BOT_USER_NAME:=crabserver-ci-bot}"
+UPSTREAM_IAC_REPO_URL="${UPSTREAM_IAC_REPO_URL:=github.com/nausikt/CMSKubernetes}"
+UPSTREAM_IAC_BRANCH="${UPSTREAM_IAC_BRANCH:=crab}"
+UPSTREAM_IAC_REPO_PAT="${UPSTREAM_IAC_REPO_PAT:?UPSTREAM_IAC_REPO_PAT is required}"
+CI_BOT_USER_NAME="${CI_BOT_USER_NAME:=crab-gitlab-ci}"
 CI_BOT_USER_EMAIL="${CI_BOT_USER_NAME:=krittin.phornsiricharoenphant@cern.ch}"
+CI_COMMIT_AUTHOR="${CI_COMMIT_AUTHOR:=crab-gitlab-ci}"
 
 LATEST_COMMIT_SHA=$(git ls-remote "$UPSTREAM_IAC_REPO_URL" "$UPSTREAM_IAC_BRANCH" | awk '{print $1}')
 
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "$WORKDIR"' EXIT
 
-git clone --branch ${GITLAB_SIDECAR_REPO_BRANCH} \
-  "https://oauth2:${GITLAB_SIDECAR_REPO_PAT}@${GITLAB_SIDECAR_REPO_URL}" \
-  $WORKDIR/crab-k8s-overlays
-
-# Workaround, automatically bump chart via vendoring until we have clear helm chart registry. then we bumped chart version instead.
-yq -i -y --arg LATEST_COMMIT_SHA "$LATEST_COMMIT_SHA" '.directories[0].contents[0].git.ref = $LATEST_COMMIT_SHA' $WORKDIR/crab-k8s-overlays/vendir.yml
+git clone --branch ${UPSTREAM_IAC_BRANCH} \
+  "https://${UPSTREAM_IAC_REPO_PAT}@${UPSTREAM_IAC_REPO_URL}" \
+  $WORKDIR/CMSKubernetes
 
 # Automatically bump image regarding DevOperator desired image.
-yq -i -y --arg NEW_IMAGE_TAG "$NEW_IMAGE_TAG" '.image.tag = $NEW_IMAGE_TAG' $WORKDIR/crab-k8s-overlays/helm/crabserver/values-$DEPLOY_ENV.yaml
+yq -i -y --arg NEW_IMAGE_TAG "$NEW_IMAGE_TAG" '.image.tag = $NEW_IMAGE_TAG' $WORKDIR/CMSKubernetes/helm/crabserver/values-$DEPLOY_ENV.yaml
 
-pushd $WORKDIR/crab-k8s-overlays
-vendir sync
+pushd $WORKDIR/CMSKubernetes
 git config user.name  "$CI_BOT_USER_NAME"
 git config user.email "$CI_BOT_USER_EMAIL"
-git commit -am "bumped ${DEPLOY_ENV}'s crabserver:${NEW_IMAGE_TAG}, chart:${LATEST_COMMIT_SHA}"
-git push -u origin $GITLAB_SIDECAR_REPO_BRANCH
+git commit -am "deploy(${DEPLOY_ENV}): crabserver=${NEW_IMAGE_TAG} chart=${LATEST_COMMIT_SHA:0:7} by ${CI_COMMIT_AUTHOR}"
+git push -u origin $UPSTREAM_IAC_BRANCH
 popd
