@@ -69,7 +69,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "transferOutputs: Retrieval failure job_out.1.*.txt"
 lookFor "JOB AD: CRAB_TransferOutputs = 0" "${workDir}/results/job_out.1.*.txt" || echo "transferOutputs: Retrieval failure JOB AD"
@@ -86,10 +96,21 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "transferLogs: Retrieval failure job_out.1.*.txt"
-lookFor "JOB AD: CRAB_SaveLogsFlag = 1" "${workDir}/results/job_out.1.*.txt" || echo "transferLogs: Retrieval failure JOB AD"
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
+# return test failure if any of following functions fails i.e. returns exit code 1
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || (echo "transferLogs: Retrieval failure job_out.1.*.txt"; return 1)
+lookFor "JOB AD: CRAB_SaveLogsFlag = 1" "${workDir}/results/job_out.1.*.txt" || (echo "transferLogs: Retrieval failure JOB AD"; return 1)
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -103,7 +124,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "JOB AD: CMS_Type = \\"Test\\"" "${workDir}/results/job_out.1.*.txt" || echo "activity: Retrieval failure JOB AD"
 lookFor "JOB AD: CMS_TaskType = \\"hctestnew\\"" "${workDir}/results/job_out.1.*.txt" || echo "activity: Retrieval failure JOB AD"
@@ -129,7 +160,17 @@ lookInTarFor "^centos-release" ${workDir}/inputs/*default.tgz || echo "inputFile
 validationScript = """
 checkStatus ${taskName} SUBMITTED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -143,7 +184,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "disableAutomaticOutputCollection: Retrieval failure job_out.1.*.txt"
 lookFor "^Output files.*: \$" "${workDir}/results/job_out.1.*.txt" || echo "disableAutomaticOutputCollection: Retrieval failure Output files"
@@ -166,7 +217,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getoutput "--jobids=1 --proxy=$PROXY"
 lookFor "Success in retrieving output_1.root " commandLog.txt || echo "outputFiles: Retrieval failure output_1.root"
 lookFor "Success in retrieving My_output_1.txt " commandLog.txt  || echo "outputFiles: Retrieval failure My_output_1.txt"
@@ -186,7 +247,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} SUBMITTED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -200,7 +271,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "maxMemoryMB: Retrieval failure job_out.1.*.txt"
 lookFor "JOB AD: RequestMemory = 2500" "${workDir}/results/job_out.1.*.txt" || echo "maxMemoryMB: Retrieval failure JOB AD"
@@ -217,7 +298,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "maxJobRuntimeMin: Retrieval failure job_out.1.*.txt"
 lookFor "JOB AD: MaxWallTimeMins_RAW = 100" "${workDir}/results/job_out.1.*.txt" || echo "maxJobRuntimeMin: Retrieval failure JOB AD"
@@ -239,7 +330,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "numCores: Retrieval failure job_out.1.*.txt"
 lookFor "JOB AD: RequestCpus = 8" "${workDir}/results/job_out.1.*.txt" || echo "numCores: Retrieval failure JOB AD"
@@ -258,7 +359,17 @@ lookInTarFor "^SIMPLE-SCRIPT.sh" ${workDir}/inputs/*default.tgz || echo "scriptE
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "scriptExe: Retrieval failure job_out.1.*.txt"
 lookFor "SB CMSRUN starting" "${workDir}/results/job_out.1.*.txt" || echo "scriptExe: Retrieval failure SB CMSRUN start"
@@ -281,7 +392,17 @@ lookInTarFor "^SIMPLE-SCRIPT.sh" ${workDir}/inputs/*default.tgz || echo "scriptA
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "scriptArgs: Retrieval failure job_out.1.*.txt"
 lookFor "SB CMSRUN starting" "${workDir}/results/job_out.1.*.txt" || echo "scriptArgs: Retrieval failure SB CMSRUN start"
@@ -303,7 +424,17 @@ lookInTarFor "^venv/" ${workDir}/inputs/*default.tgz || echo "sendVenvFolder: Ta
 validationScript = """
 checkStatus ${taskName} SUBMITTED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -320,7 +451,17 @@ lookInTarFor "^external/" ${workDir}/inputs/*default.tgz || echo "sendExternalFo
 validationScript = """
 checkStatus ${taskName} SUBMITTED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -344,7 +485,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} SUBMITTED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -359,7 +510,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPFAIL
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "useParent: Retrieval failure job_out.1.*.txt"
 lookFor "request to open.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt" || echo "useParent: Retrieval failure"
@@ -380,7 +541,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPFAIL
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "secondaryInputDataset: Retrieval failure job_out.1.*.txt"
 lookFor "request to open.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt" || echo "secondaryInputDataset: Retrieval failure"
@@ -403,7 +574,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "lumiMask-File: Retrieval failure job_out.1.*.txt"
 lookFor "== JOB AD: CRAB_AlgoArgs.*1,10,20,25" "${workDir}/results/job_out.1.*.txt" || echo "lumiMask-File: Retrieval failure JOB AD"
@@ -429,7 +610,17 @@ if not SL6:  # skip on SL6, can't fetch lumMask from URL inside singularity
     validationScript = """
     checkStatus ${taskName} COMPLETED
     statusCode=$?
-    ([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+    case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
     crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
     lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "lumiMask-URL: Retrieval failure job_out.1.*.txt"
     lookFor "== JOB AD: CRAB_AlgoArgs.*273158" "${workDir}/results/job_out.1.*.txt" || echo "lumiMask-URL: Retrieval failure JOB AD"
@@ -446,7 +637,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getoutput "--dump --jobids=1 --proxy=$PROXY"
 lookFor "OLFNtest/Adir" commandLog.txt || echo "outLFNDirBase: Retrieval failure"
 """
@@ -470,7 +671,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "runRange: Retrieval failure job_out.1.*.txt"
 lookFor "== JOB AD: CRAB_AlgoArgs.*273150" "${workDir}/results/job_out.1.*.txt"|| echo "runRange: Retrieval failure JOB AD"
@@ -496,7 +707,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand status "--long --proxy=$PROXY"
 lookFor "T2_CH_CERN" commandLog.txt || echo "ignoreLocality: Retrieval failure"
 """
@@ -521,7 +742,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 """
 if SL6:  # skip: those input files can't be read with CMSSW_7
     validationScript = dummyTestScript
@@ -544,7 +775,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "whitelist: Retrieval failure job_out.1.*.txt"
 lookFor "JOB AD: DESIRED_SITES = \\"T2_DE_DESY\\"" "${workDir}/results/job_out.1.*.txt" || echo "whitelist: Retrieval failure JOB AD"
@@ -569,7 +810,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "blacklist: Retrieval failure job_out.1.*.txt"
 lookFor "JOB AD: JOB_CMSSite = \\"T1_US_FNAL\\"" "${workDir}/results/job_out.1.*.txt" || echo "blacklist: Retrieval failure JOB AD"
@@ -590,7 +841,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -608,7 +869,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "voGroup: Retrieval failure job_out.1.*.txt"
 lookFor "JOB AD: CRAB_UserGroup = \\"itcms\\"" "${workDir}/results/job_out.1.*.txt" || echo "voGroup: Retrieval failure JOB AD"
@@ -632,7 +903,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -646,7 +927,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} SUBMITTED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 lookFor "crab3@vocms059.cern.ch" statusLog.txt || echo "scheddName: Retrieval failure"
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
@@ -666,7 +957,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} SUBMITTED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -680,7 +981,17 @@ testSubmitScript = dummyTestScript
 validationScript = """
 checkStatus ${taskName} COMPLETED
 statusCode=$?
-([ $statusCode -eq 0 ] || [ $statusCode -eq 2 ]) || exit 1
+case $statusCode in
+  0)
+    :  # colon means continue in bash !
+    ;;
+  1)
+    return 1  # test failed
+    ;;
+  2)
+    return 2  # run me again later
+    ;;
+esac
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
 lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "extraJDL: Retrieval failure job_out.1.*.txt"
 lookFor "JOB AD: CMS_ALLOW_OVERFLOW = false" "${workDir}/results/job_out.1.*.txt" || echo "extraJDL: Retrieval failure JOB AD"

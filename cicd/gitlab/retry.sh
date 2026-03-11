@@ -13,13 +13,13 @@ while true; do
     rc=0
     "$@" || rc=$?
     if [[ $rc != 0 ]]; then
-        echo "Command fail with exit code ${rc} (${RETRY}/${RETRY_MAX} attempted)"
+        echo "Script attempt ${RETRY}/${RETRY_MAX} completed with exit code ${rc}. Try again ? "
         if [[ $rc == 4 ]]; then
             if [[ $RETRY -eq $RETRY_MAX ]]; then
-                echo "Reach max retry count: $RETRY"
+                echo "Reach max retry count: $RETRY. End test"
                 exit 1
             fi
-            echo -n "Sleep for ${RETRY_SLEEP_SECONDS} seconds."
+            echo -n "Sleep for ${RETRY_SLEEP_SECONDS} seconds before retry."
 	          echo " Until " `date -d "now + ${RETRY_SLEEP_SECONDS} seconds" +"%H:%M %Z"`
             sleep "${RETRY_SLEEP_SECONDS}"
             RETRY=$((RETRY + 1))
@@ -30,6 +30,7 @@ while true; do
         fi
 
     else
+        echo "Script successful after attempt ${RETRY}/${RETRY_MAX}"
         break
     fi
 done

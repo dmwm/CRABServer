@@ -36,7 +36,10 @@ if [ "X${singularity}" == X6 ] || [ "X${singularity}" == X7 ] || [ "X${singulari
     if [ "X${singularity}" == X8 ]; then scramprefix=el${singularity}; fi
     ERR=false;
     /cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- "${ROOT_DIR}/cicd/gitlab/clientConfigurationValidation.sh"
-    ERR=$([[ $? -eq 0 || $? -eq 2 ]] && echo "false" || echo "true") #ERR is true if return is other than 0 or 2
+    CCV_EC=$?
+    echo "clientConfigurationValidation.sh script ended wih exit code $CCV_EC"
+    ERR=$([[ $CCV_EC -eq 0 || $CCV_EC -eq 2 ]] && echo "false" || echo "true") #ERR is true if return is other than 0 or 2
+    Check=
 else
     echo "!!! I am not prepared to run for slc${singularity}."
     exit 1
@@ -46,60 +49,41 @@ if [ "$ERR" == true ]; then
     echo "clientConfigurationValidation.sh script failed to run properly."
     exit 1
 fi
-# Change to the working directory
-# cd ${WORK_DIR}
 
-# Set retry variables (GitLab does not have NAGINATOR; you can set these manually or use GitLab CI variables)
-export RETRY=${CI_PIPELINE_RETRY_COUNT:-0}
-export MAX_RETRY=${CI_PIPELINE_MAX_RETRIES:-4}
 
-# 2. test results
-TEST_RESULT='FAILED'
-MESSAGE='Test failed. Investigate manually'
+# Check if the tests passed or failed. Logic is:
+# if some tests needs retrying, run again CCV script (will skip tests already done)
+# when all tests have run (no retry) if at least one test failed, CCV failed
+# otherwise CCV is successful
 
-# Define an associative array to hold the test results
-declare -A results=( ["SUCCESSFUL"]="successful_tests_${CI_PIPELINE_ID}_${CMSSW_release}" ["FAILED"]="failed_tests_${CI_PIPELINE_ID}_${CMSSW_release}" ["RETRY"]="retry_tests_${CI_PIPELINE_ID}_${CMSSW_release}" )
-
-for result in "${!results[@]}"; do
-	if [ -s "${results[$result]}" ]; then
-		test_result=$(cat "${results[$result]}")
-		echo -e "\n${result} TESTS:\n${test_result}" >> message_CCVResult_interim
-
-		# Handle retry logic
-		if [ "${results[$result]}" == "retry_tests_${CI_PIPELINE_ID}_${CMSSW_release}" ]; then
-            TEST_RESULT='FULL-STATUS-UNKNOWN'
-            if [ "$RETRY" -ge "$MAX_RETRY" ]; then
-                MESSAGE='Exceeded configured retries. If needed restart manually.'
-            else
-                MESSAGE='Will run again.'
-            fi
-        fi
-	else
-		echo -e "\n${result} TESTS:\n none" >> message_CCVResult_interim
-	fi
-done
-
-# Check if the tests passed or failed
-if [ -s "failed_tests_${CI_PIPELINE_ID}_${CMSSW_release}" ]; then
+if [ -s "retry_tests_${CI_PIPELINE_ID}_${CMSSW_release}" ]; then
+    # file size is > 0
+    TEST_RESULT='FULL-STATUS-UNKNOWN'  # means: wait and then run tests again
+else
+  # no more retries are needed
+  if [ -s "failed_tests_${CI_PIPELINE_ID}_${CMSSW_release}" ]; then
+    # file not empty, some tests failed
     TEST_RESULT='FAILED'
-elif [ -s "retry_tests_${CI_PIPELINE_ID}_${CMSSW_release}" ]; then
-    TEST_RESULT='FULL-STATUS-UNKNOWN'
-elif [ -s "successful_tests_${CI_PIPELINE_ID}_${CMSSW_release}" ]; then
+  elif [ -s "successful_tests_${CI_PIPELINE_ID}_${CMSSW_release}" ]; then
+    # sanity check... this file better be not empty now !
     TEST_RESULT='SUCCEEDED'
-    MESSAGE='Test is done.'
+  else
+    echo "Test summary files are all empty !! ?? Things went REALLY BAD. Please investigate"
+    exit 1
+  fi
 fi
 
-# Create the final result message
+# Write out the final result message
 echo -e "**Test:** Client configuration validation\n\
 **Result:** ${TEST_RESULT}\n\
-**Attempt:** ${RETRY} out of ${MAX_RETRY}. ${MESSAGE}\n\
-**Finished at:** $(date '+%Y-%m-%d %H:%M:%S')\n\
+**Finished at:** $(date '+%Y-%m-%d %H:%M:%S %Z')\n\
 **Test log:** ${CI_JOB_URL}\n" > message_CCVResult
 
-# Append interim result to the final message
-echo -e "\`\`\`$(cat message_CCVResult_interim)\n\`\`\`"  >> message_CCVResult
+cat message_CCVResult
 
-popd
+popd > /dev/null
+
+echo "CCV test iteration completed with status: ${TEST_RESULT}"
 
 if [[ ${TEST_RESULT} == 'FULL-STATUS-UNKNOWN' ]]; then
     exit 4

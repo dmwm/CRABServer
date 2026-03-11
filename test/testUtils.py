@@ -16,18 +16,47 @@ function checkStatus {
   # Fail test if command fails or status is not good
   local taskName="$1"
   local targetStatus="$2"
+  
+  if [ $Verbose -ge 1 ]; then
+    echo "look for status: $targetStatus"
+  fi
 
-  crab remake --task ${taskName} --instance=REST_Instance --proxy=$PROXY 2>&1 | tee remakeLog.txt 
-  [ $? -ne 0 ] && exit 1  # if remake fails, abort
-  grep -q Success remakeLog.txt || exit 1  # if log does not contain "Success" string, abort
-  workDir=`grep Success remakeLog.txt | awk '{print $NF}'`
-  crab status -d $workDir --proxy=$PROXY 2>&1 | tee  statusLog.txt
-  [ $? -ne 0 ] && exit 1  # if crab status fails, abort
-
+  # temporarily unset "exit on error" if any so to properly catch exit status and act on it
+  exitStatus=$(
+    set +e
+    crab status --task ${taskName} --instance=REST_Instance --proxy=$PROXY 2>&1 >  statusLog.txt
+    echo $?
+  )
+  if [ $exitStatus -ne 0 ]; then
+    echo "crab status command failed:"
+    cat statusLog.txt
+    echo "====  ABORT"
+    exit 1
+  fi
+  workDir=$(grep "CRAB project directory" statusLog.txt | awk '{print $NF}')
+  [ $Verbose -ge 1 ] && grep  "Status on the CRAB server" statusLog.txt  # print relevant line from log
+  statusOnServer=$(grep  "Status on the CRAB server" statusLog.txt | awk '{print $NF}')
+  case $statusOnServer in
+    SUBMITFAILED | SUBMITREFUSED)
+      # fail immediately on failed submission
+      cat statusLog.txt; return 1 ;;  
+    SUBMITTED)
+      [ $Verbose -ge 1 ] && echo "All OK. Go on with test" ;;
+    *)
+      [ $Verbose -ge 1 ] && echo "Need to wait"; return 2 ;;
+  esac
+  
+  # if task was submitted, check status on condor side
+  
   local isSub=0
+  local isRunning=0
   local isDone=0
   local isFailed=0
+  
+  [ $Verbose -ge 1 ] && grep -E "bootstrap|Status on the scheduler" statusLog.txt  # print log relevant lines
+  grep -q "bootstrap" statusLog.txt 2>&1 && isSub=1  # waiting for bootstrap
   grep -q "Status on the scheduler:.*SUBMITTED" statusLog.txt 2>&1 && isSub=1
+  grep -q "Status on the scheduler:.*RUNNING" statusLog.txt 2>&1 && isRunning=1
   grep -q "Status on the scheduler:.*COMPLETED" statusLog.txt 2>&1 && isDone=1
   grep -q "Status on the scheduler:.*FAILED" statusLog.txt 2>&1 && isFailed=1
 
@@ -36,15 +65,15 @@ function checkStatus {
       # no check is needed
       ;;
     SUBMITTED)
-      # any of SUBMITTED or COMPLETED or FAILED are OK
-      [ ${isSub} -eq 0 ] && [ ${isDone} -eq 0 ] && [ ${isFailed} -eq 0 ] && exit 1
+      # any of SUBMITTED or RUNNING or COMPLETED or FAILED are OK
+      [ ${isSub} -eq 0 ] && [ ${isDone} -eq 0 ] && [ ${isRunning} -eq 0 ] && [ ${isFailed} -eq 0 ] && exit 1
       ;;
     COMPLETED)
-      [ ${isSub} -eq 1 ] && return 2  # ask for a check later on
+      ( [ ${isSub} -eq 1 ] || [ ${isRunning} -eq 1 ] ) && return 2  # ask for a check later on
       [ ${isDone} -eq 0 ] && exit 1
       ;;
     COMPFAIL)
-      [ ${isSub} -eq 1 ] && return 2  # ask for a check later on
+      ( [ ${isSub} -eq 1 ] || [ ${isRunning} -eq 1 ] ) && return 2  # ask for a check later on
       [ ${isDone} -eq 0 ] && [ ${isFailed} -eq 0 ] && exit 1
   esac
   return 0
@@ -54,8 +83,10 @@ function lookFor {
   # looks for string in file. Fail test if not found
   local string="$1"
   local file="$2"
-  grep -q "${string}" ${file}
-  [ $? -ne 0 ] && return 1
+  [ $Verbose -ge 1 ] && echo "look for string $1 in file $2"
+  found=1
+  grep -q "${string}" ${file} || found=0
+  [ $found -ne 1 ] && return 1
   return 0
 }
 
@@ -63,18 +94,27 @@ function lookInTarFor {
   # looks for file in tarball. Fail test if not found
   local file="$1"
   local tarball="$2"
-  tar tf ${tarball} | grep -q ${file}
-  [ $? -ne 0 ] && return 1
+  [ $Verbose -ge 1 ] && echo "look for file $1 in tarball $2"
+  found=1
+  tar tf ${tarball} | grep -q ${file} || found=0
+  [ $found -ne 1 ] && return 1
   return 0
 }
 
 function crabCommand() {
-  # execute crab command and write commandLog.txt.
+  # execute crab command and write commandLog.txt
   # Fails test if command exit code is non 0
   local cmd="$1"
   local params="$2"
-  crab $cmd $params 2>&1 | tee commandLog.txt
-  [ $? -ne 0 ] && exit 1
+  # it is a bit tricky to capture crab command exit status w/o exiting due to
+  # set -eou pipefail because crab get* prints something on stdout in spite of redirection
+  # Temporarily unset set -e if set using trick from ref: https://superuser.com/a/1458830
+  oldopt=$-
+  set +e
+  crab $cmd $params 2>&1 > commandLog.txt
+  exitCode=$?
+  set -$oldopt || true  # add true for extra-safety in case the set fails after setting -e (e.g. interactive test)
+  [ $exitCode -ne 0 ] && (echo "crab $cmd FAILED"; cat commandLog.txt; return 1)
   return 0
 }
 """

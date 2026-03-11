@@ -17,7 +17,7 @@ source /cvmfs/cms-ib.cern.ch/latest/cmsset_default.sh
 set -euo pipefail
 
 scramv1 project ${CMSSW_release}
-cd ${CMSSW_release}/src
+pushd ${CMSSW_release}/src
 eval "$(scramv1 runtime -sh)"
 echo "Verbose is: $Verbose"
 scram build > /dev/null
@@ -77,3 +77,4 @@ esac
 #cd "${CURRENT_DIR}"
 echo "== CRABClient setup completed"
 crab --version
+
