@@ -24,6 +24,8 @@ The three files are:
     0 if all OK
     1 if FAIL
     2 to main "wait and run me again later"
+  NOTE: validation script musts always use 'return', never 'exit' else they cause
+        premature exit of all nested scripts which calls them
    there is no validation of the task name argument, a bad one results in exit code 1
    These script need to be executed like:
      bash <scriptName> <taskName>     or
@@ -80,9 +82,9 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "transferOutputs: Retrieval failure job_out.1.*.txt"
-lookFor "JOB AD: CRAB_TransferOutputs = 0" "${workDir}/results/job_out.1.*.txt" || echo "transferOutputs: Retrieval failure JOB AD"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+lookFor "JOB AD: CRAB_TransferOutputs = 0" "${workDir}/results/job_out.1.*.txt" || return 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -109,8 +111,8 @@ case $statusCode in
 esac
 # return test failure if any of following functions fails i.e. returns exit code 1
 crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || (echo "transferLogs: Retrieval failure job_out.1.*.txt"; return 1)
-lookFor "JOB AD: CRAB_SaveLogsFlag = 1" "${workDir}/results/job_out.1.*.txt" || (echo "transferLogs: Retrieval failure JOB AD"; return 1)
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+lookFor "JOB AD: CRAB_SaveLogsFlag = 1" "${workDir}/results/job_out.1.*.txt" || return 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -135,9 +137,9 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "JOB AD: CMS_Type = \\"Test\\"" "${workDir}/results/job_out.1.*.txt" || echo "activity: Retrieval failure JOB AD"
-lookFor "JOB AD: CMS_TaskType = \\"hctestnew\\"" "${workDir}/results/job_out.1.*.txt" || echo "activity: Retrieval failure JOB AD"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "JOB AD: CMS_Type = \\"Test\\"" "${workDir}/results/job_out.1.*.txt" || return 1
+lookFor "JOB AD: CMS_TaskType = \\"hctestnew\\"" "${workDir}/results/job_out.1.*.txt" || return 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -150,12 +152,12 @@ writeValidationScript(testName=name, validationScript=validationScript)
 # inputFiles
 name = 'inputFiles'
 inFile1 = '/etc/hosts'
-inFile2 = '/etc/centos-release'
+inFile2 = '/etc/os-release'
 changeDict = {'param': name, 'section': 'JobType', 'value': [inFile1, inFile2]}
 confChangesList = [changeDict]
 testSubmitScript = """
-lookInTarFor "^hosts" ${workDir}/inputs/*default.tgz || echo "inputFiles: Retrieval failure in Tarlookup of hosts"
-lookInTarFor "^centos-release" ${workDir}/inputs/*default.tgz || echo "inputFiles: Retrieval failure in Tarlookup of centos-release"
+lookInTarFor "^hosts" ${workDir}/inputs/*default.tgz
+lookInTarFor "^os-release" ${workDir}/inputs/*default.tgz
 """
 validationScript = """
 checkStatus ${taskName} SUBMITTED
@@ -195,9 +197,9 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "disableAutomaticOutputCollection: Retrieval failure job_out.1.*.txt"
-lookFor "^Output files.*: \$" "${workDir}/results/job_out.1.*.txt" || echo "disableAutomaticOutputCollection: Retrieval failure Output files"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+lookFor "^Output files.*: \$" "${workDir}/results/job_out.1.*.txt" || return 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -228,9 +230,8 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getoutput "--jobids=1 --proxy=$PROXY"
-lookFor "Success in retrieving output_1.root " commandLog.txt || echo "outputFiles: Retrieval failure output_1.root"
-lookFor "Success in retrieving My_output_1.txt " commandLog.txt  || echo "outputFiles: Retrieval failure My_output_1.txt"
+crabCommand getoutput "--jobids=1 --proxy=$PROXY" || return 1
+lookFor "Success: All files successfully retrieved" commandLog.txt  || return 1
 """
 if SL6:  # skip: singularity, no gfal_copy, crab getoutput can't work
     validationScript = dummyTestScript
@@ -282,9 +283,9 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "maxMemoryMB: Retrieval failure job_out.1.*.txt"
-lookFor "JOB AD: RequestMemory = 2500" "${workDir}/results/job_out.1.*.txt" || echo "maxMemoryMB: Retrieval failure JOB AD"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+lookFor "JOB AD: RequestMemory = 2500" "${workDir}/results/job_out.1.*.txt" || return 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -309,9 +310,9 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "maxJobRuntimeMin: Retrieval failure job_out.1.*.txt"
-lookFor "JOB AD: MaxWallTimeMins_RAW = 100" "${workDir}/results/job_out.1.*.txt" || echo "maxJobRuntimeMin: Retrieval failure JOB AD"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+lookFor "JOB AD: MaxWallTimeMins_RAW = 100" "${workDir}/results/job_out.1.*.txt" || return 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -341,9 +342,9 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "numCores: Retrieval failure job_out.1.*.txt"
-lookFor "JOB AD: RequestCpus = 8" "${workDir}/results/job_out.1.*.txt" || echo "numCores: Retrieval failure JOB AD"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+lookFor "JOB AD: RequestCpus = 8" "${workDir}/results/job_out.1.*.txt" || return 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -354,7 +355,7 @@ name = 'scriptExe'
 changeDict = {'param': name, 'value': '"SIMPLE-SCRIPT.sh"', 'section': 'JobType'}
 confChangesList = [changeDict]
 testSubmitScript = """
-lookInTarFor "^SIMPLE-SCRIPT.sh" ${workDir}/inputs/*default.tgz || echo "scriptExe: Tarlookup failure"
+lookInTarFor "^SIMPLE-SCRIPT.sh" ${workDir}/inputs/*default.tgz
 """
 validationScript = """
 checkStatus ${taskName} COMPLETED
@@ -370,10 +371,10 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "scriptExe: Retrieval failure job_out.1.*.txt"
-lookFor "SB CMSRUN starting" "${workDir}/results/job_out.1.*.txt" || echo "scriptExe: Retrieval failure SB CMSRUN start"
-lookFor "====== arg checking: \$1 = 1" "${workDir}/results/job_out.1.*.txt" || echo "scriptExe: Retrieval failure arg checking"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+lookFor "SB CMSRUN starting" "${workDir}/results/job_out.1.*.txt" || return 1
+lookFor "====== arg checking: \$1 = 1" "${workDir}/results/job_out.1.*.txt" || return 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -387,7 +388,7 @@ confChangesList.append(changeDict)
 changeDict = {'param': name, 'value': ['exitCode=666', 'gotArgs=Yes'], 'section': 'JobType'}
 confChangesList.append(changeDict)
 testSubmitScript = """
-lookInTarFor "^SIMPLE-SCRIPT.sh" ${workDir}/inputs/*default.tgz || echo "scriptArgs: Tarlookup failure"
+lookInTarFor "^SIMPLE-SCRIPT.sh" ${workDir}/inputs/*default.tgz
 """
 validationScript = """
 checkStatus ${taskName} COMPLETED
@@ -403,12 +404,12 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "scriptArgs: Retrieval failure job_out.1.*.txt"
-lookFor "SB CMSRUN starting" "${workDir}/results/job_out.1.*.txt" || echo "scriptArgs: Retrieval failure SB CMSRUN start"
-lookFor "====== arg checking: \$1 = 1" "${workDir}/results/job_out.1.*.txt" || echo "scriptArgs: Retrieval failure arg checking"
-lookFor "====== arg checking: \$2 = exitCode=666" "${workDir}/results/job_out.1.*.txt" || echo "scriptArgs: Retrieval failure arg checking"
-lookFor "====== arg checking: \$3 = gotArgs=Yes" "${workDir}/results/job_out.1.*.txt" || echo "scriptArgs: Retrieval failure arg checking"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+lookFor "SB CMSRUN starting" "${workDir}/results/job_out.1.*.txt" || return 1
+lookFor "====== arg checking: \$1 = 1" "${workDir}/results/job_out.1.*.txt" || return 1
+lookFor "====== arg checking: \$2 = exitCode=666" "${workDir}/results/job_out.1.*.txt" || return 1
+lookFor "====== arg checking: \$3 = gotArgs=Yes" "${workDir}/results/job_out.1.*.txt" || return 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -419,7 +420,7 @@ name = 'sendVenvFolder'
 changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
 confChangesList = [changeDict]
 testSubmitScript = """
-lookInTarFor "^venv/" ${workDir}/inputs/*default.tgz || echo "sendVenvFolder: Tarlookup failure"
+lookInTarFor "^CMSSW_.*/venv/" ${workDir}/inputs/*default.tgz
 """
 validationScript = """
 checkStatus ${taskName} SUBMITTED
@@ -446,7 +447,7 @@ name = 'sendExternalFolder'
 changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
 confChangesList = [changeDict]
 testSubmitScript = """
-lookInTarFor "^external/" ${workDir}/inputs/*default.tgz || echo "sendExternalFolder: Tarlookup failure"
+lookInTarFor "^CMSSW_.*/external/" ${workDir}/inputs/*default.tgz
 """
 validationScript = """
 checkStatus ${taskName} SUBMITTED
@@ -521,9 +522,9 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "useParent: Retrieval failure job_out.1.*.txt"
-lookFor "request to open.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt" || echo "useParent: Retrieval failure"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+lookFor "request to open.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt" || return 1
 """
 if CMSSW8:  # skip: needed parent dataset for the sample that we can read witn CMSSW_8 is not on disk
     validationScript = dummyTestScript
@@ -552,9 +553,9 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "secondaryInputDataset: Retrieval failure job_out.1.*.txt"
-lookFor "request to open.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt" || echo "secondaryInputDataset: Retrieval failure"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+lookFor "request to open.*GenericTTbar/GEN-SIM-RAW" "${workDir}/results/job_out.1.*.txt" || return 1
 """
 if SL6:  # skip: primary input used for CMSSW_7 has different lumisection numbers from the dataset above
     validationScript = dummyTestScript
@@ -585,9 +586,9 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "lumiMask-File: Retrieval failure job_out.1.*.txt"
-lookFor "== JOB AD: CRAB_AlgoArgs.*1,10,20,25" "${workDir}/results/job_out.1.*.txt" || echo "lumiMask-File: Retrieval failure JOB AD"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+lookFor "== JOB AD: CRAB_AlgoArgs.*1,10,20,25" "${workDir}/results/job_out.1.*.txt" || return 1
 """
 if SL6:  # skip: our lumiMask does not work on the primary input used for CMSSW_7 tests
     validationScript = dummyTestScript
@@ -621,9 +622,9 @@ if not SL6:  # skip on SL6, can't fetch lumMask from URL inside singularity
     return 2  # run me again later
     ;;
 esac
-    crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-    lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "lumiMask-URL: Retrieval failure job_out.1.*.txt"
-    lookFor "== JOB AD: CRAB_AlgoArgs.*273158" "${workDir}/results/job_out.1.*.txt" || echo "lumiMask-URL: Retrieval failure JOB AD"
+    crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+    lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+    lookFor "== JOB AD: CRAB_AlgoArgs.*273158" "${workDir}/results/job_out.1.*.txt" || return 1
     """
     writeConfigFile(testName=name, listOfDicts=confChangesList)
     writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -648,8 +649,8 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getoutput "--dump --jobids=1 --proxy=$PROXY"
-lookFor "OLFNtest/Adir" commandLog.txt || echo "outLFNDirBase: Retrieval failure"
+crabCommand getoutput "--dump --jobids=1 --proxy=$PROXY" || return 1
+lookFor "OLFNtest/Adir" commandLog.txt || return 1
 """
 if SL6:  # skip: singularity, no gfal_copy, crab getoutput can't work
     validationScript = dummyTestScript
@@ -682,9 +683,9 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "runRange: Retrieval failure job_out.1.*.txt"
-lookFor "== JOB AD: CRAB_AlgoArgs.*273150" "${workDir}/results/job_out.1.*.txt"|| echo "runRange: Retrieval failure JOB AD"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+lookFor "== JOB AD: CRAB_AlgoArgs.*273150" "${workDir}/results/job_out.1.*.txt" || return 1
 """
 if SL6:  # skip: our runRange does not work on the primary input used for CMSSW_7 tests
     validationScript = dummyTestScript
@@ -718,8 +719,8 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand status "--long --proxy=$PROXY"
-lookFor "T2_CH_CERN" commandLog.txt || echo "ignoreLocality: Retrieval failure"
+crabCommand status "--long --proxy=$PROXY" || return 1
+lookFor "T2_CH_CERN" commandLog.txt || return 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -786,9 +787,9 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "whitelist: Retrieval failure job_out.1.*.txt"
-lookFor "JOB AD: DESIRED_SITES = \\"T2_DE_DESY\\"" "${workDir}/results/job_out.1.*.txt" || echo "whitelist: Retrieval failure JOB AD"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+lookFor "JOB AD: DESIRED_SITES = \\"T2_DE_DESY\\"" "${workDir}/results/job_out.1.*.txt" || return 1
 """
 if SL6:  # skip: old dataset for CMSSW_7 has not enough locations to test this
     validationScript = dummyTestScript
@@ -821,9 +822,9 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "blacklist: Retrieval failure job_out.1.*.txt"
-lookFor "JOB AD: JOB_CMSSite = \\"T1_US_FNAL\\"" "${workDir}/results/job_out.1.*.txt" || echo "blacklist: Retrieval failure JOB AD"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+lookFor "JOB AD: JOB_CMSSite = \\"T1_US_FNAL\\"" "${workDir}/results/job_out.1.*.txt" || return 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -880,10 +881,10 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "voGroup: Retrieval failure job_out.1.*.txt"
-lookFor "JOB AD: CRAB_UserGroup = \\"itcms\\"" "${workDir}/results/job_out.1.*.txt" || echo "voGroup: Retrieval failure JOB AD"
-lookFor "attribute : /cms/itcms/Role=NULL/Capability=NULL" "${workDir}/results/job_out.1.*.txt" || echo "voGroup: Retrieval failure attribute"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+lookFor "JOB AD: CRAB_UserGroup = \\"itcms\\"" "${workDir}/results/job_out.1.*.txt" || return 1
+lookFor "attribute : /cms/itcms/Role=NULL/Capability=NULL" "${workDir}/results/job_out.1.*.txt" || return 1
 # now that condor does not fill x509UserProxyFirstFQAN anymore we lack a good way to check the FirstFQAN
 #lookFor "JOB AD: x509UserProxyFirstFQAN = \\"/cms/itcms/Role=NULL/Capability=NULL\\"" "${workDir}/results/job_out.1.*.txt"
 """
@@ -938,7 +939,7 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-lookFor "crab3@vocms059.cern.ch" statusLog.txt || echo "scheddName: Retrieval failure"
+lookFor "crab3@vocms059.cern.ch" statusLog.txt || return 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)
@@ -992,10 +993,10 @@ case $statusCode in
     return 2  # run me again later
     ;;
 esac
-crabCommand getlog "--short --jobids=1 --proxy=$PROXY"
-lookFor "Retrieved job_out.1.*.txt" commandLog.txt || echo "extraJDL: Retrieval failure job_out.1.*.txt"
-lookFor "JOB AD: CMS_ALLOW_OVERFLOW = false" "${workDir}/results/job_out.1.*.txt" || echo "extraJDL: Retrieval failure JOB AD"
-lookFor "JOB AD: CRAB_StageoutPolicy = \\"remote\\"" "${workDir}/results/job_out.1.*.txt" || echo "extraJDL: Retrieval failure JOB AD"
+crabCommand getlog "--short --jobids=1 --proxy=$PROXY" || return 1
+lookFor "Retrieved job_out.1.*.txt" commandLog.txt || return 1
+lookFor "JOB AD: CMS_ALLOW_OVERFLOW = false" "${workDir}/results/job_out.1.*.txt" || return 1
+lookFor "JOB AD: CRAB_StageoutPolicy = \\"remote\\"" "${workDir}/results/job_out.1.*.txt" || return 1
 """
 writeConfigFile(testName=name, listOfDicts=confChangesList)
 writeTestSubmitScript(testName=name, testSubmitScript=testSubmitScript)

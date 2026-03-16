@@ -5,6 +5,10 @@ import os
 
 commonBashFunctions = """#!/bin/bash
 # a few utility functions for submission and check scripts
+# NOTE: this will be executed inside another shell script, so bash functions must
+# always end with 'return' and never do 'exit 1' which would abruptly exit the shell
+# including the calling script
+#
 # exit status meaning:
 # 0: OK   1: FAIL   2: TRY AGAIN LATER
 
@@ -31,7 +35,7 @@ function checkStatus {
     echo "crab status command failed:"
     cat statusLog.txt
     echo "====  ABORT"
-    exit 1
+    return 1
   fi
   workDir=$(grep "CRAB project directory" statusLog.txt | awk '{print $NF}')
   [ $Verbose -ge 1 ] && grep  "Status on the CRAB server" statusLog.txt  # print relevant line from log
@@ -66,15 +70,15 @@ function checkStatus {
       ;;
     SUBMITTED)
       # any of SUBMITTED or RUNNING or COMPLETED or FAILED are OK
-      [ ${isSub} -eq 0 ] && [ ${isDone} -eq 0 ] && [ ${isRunning} -eq 0 ] && [ ${isFailed} -eq 0 ] && exit 1
+      [ ${isSub} -eq 0 ] && [ ${isDone} -eq 0 ] && [ ${isRunning} -eq 0 ] && [ ${isFailed} -eq 0 ] && return 1
       ;;
     COMPLETED)
       ( [ ${isSub} -eq 1 ] || [ ${isRunning} -eq 1 ] ) && return 2  # ask for a check later on
-      [ ${isDone} -eq 0 ] && exit 1
+      [ ${isDone} -eq 0 ] && return 1
       ;;
     COMPFAIL)
       ( [ ${isSub} -eq 1 ] || [ ${isRunning} -eq 1 ] ) && return 2  # ask for a check later on
-      [ ${isDone} -eq 0 ] && [ ${isFailed} -eq 0 ] && exit 1
+      [ ${isDone} -eq 0 ] && [ ${isFailed} -eq 0 ] && return 1
   esac
   return 0
 }
@@ -83,22 +87,32 @@ function lookFor {
   # looks for string in file. Fail test if not found
   local string="$1"
   local file="$2"
-  [ $Verbose -ge 1 ] && echo "look for string $1 in file $2"
-  found=1
-  grep -q "${string}" ${file} || found=0
-  [ $found -ne 1 ] && return 1
-  return 0
+  [ $Verbose -ge 1 ] && echo "look for string \'$1\' in file $2"
+  found="True"
+  grep -q "${string}" ${file} || found="False"
+  if  [ $found == "True" ]; then
+    [ $Verbose -ge 1 ] && echo "OK"
+    return 0
+  else
+    echo "==> TEST FAILED: string \'${string}\' not found in file ${file}"
+    return 1
+  fi
 }
 
 function lookInTarFor {
   # looks for file in tarball. Fail test if not found
   local file="$1"
   local tarball="$2"
-  [ $Verbose -ge 1 ] && echo "look for file $1 in tarball $2"
-  found=1
-  tar tf ${tarball} | grep -q ${file} || found=0
-  [ $found -ne 1 ] && return 1
-  return 0
+  [ $Verbose -ge 1 ] && echo "look for file \'$1\' in tarball $2"
+  found="True"
+  tar tf ${tarball} | grep -q ${file} || found="False"
+  if  [ $found == "True" ]; then
+    [ $Verbose -ge 1 ] && echo "OK"
+    return 0
+  else
+    echo "==> TEST FAILED: file \'${file}\' not found in tarball ${tarball}"
+    return 1
+  fi
 }
 
 function crabCommand() {
@@ -107,15 +121,20 @@ function crabCommand() {
   local cmd="$1"
   local params="$2"
   # it is a bit tricky to capture crab command exit status w/o exiting due to
-  # set -eou pipefail because crab get* prints something on stdout in spite of redirection
+  # set -eou pipefail because crab get* prints something to stdout in spite of redirection
   # Temporarily unset set -e if set using trick from ref: https://superuser.com/a/1458830
   oldopt=$-
   set +e
   crab $cmd $params 2>&1 > commandLog.txt
   exitCode=$?
   set -$oldopt || true  # add true for extra-safety in case the set fails after setting -e (e.g. interactive test)
-  [ $exitCode -ne 0 ] && (echo "crab $cmd FAILED"; cat commandLog.txt; return 1)
-  return 0
+  if [ $exitCode -ne 0 ]; then
+    echo "==> TEST FAILED: crab $cmd FAILED"
+    cat commandLog.txt
+    return 1
+  else
+    return 0
+  fi
 }
 """
 
@@ -131,7 +150,7 @@ config = Configuration()
 
 config.section_('General')
 config.General.instance = 'REST_Instance'
-config.General.workArea = 'ROOT_DIR'
+config.General.workArea = os.getenv('WORK_DIR', os.getcwd())
 config.General.requestName = REQUESTNAME
 
 config.section_('JobType')

@@ -2,7 +2,17 @@
 # this script is called in gitlab pipeline to execute ClientValidation step
 # it assumes to be run with PWD as the top of a CRABServer GH clone
 
+echo "Starting CV_config.sh"
+
 set -euo pipefail
+
+echo "Verbose env.var. is set to $Verbose"
+export Verbose
+if [ X$Verbose == "X3" ]
+then
+  echo "enable bash trace"
+  set -x
+fi
 
 # default values
 export Client_Validation_Suite="${Client_Validation_Suite:-}"

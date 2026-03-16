@@ -304,9 +304,9 @@ task_submission:
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
-        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
-        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
-        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CV
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CCV
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_TS
       policy: push
 
 task_submission_release:
@@ -336,9 +336,9 @@ task_submission_release:
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
-        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
-        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
-        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CV
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CCV
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_TS
       policy: push
 
 sleep_before_validation:
@@ -356,9 +356,9 @@ sleep_before_validation:
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
-        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
-        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
-        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CV
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CCV
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_TS
       policy: pull
 
 sleep_before_validation_release:
@@ -377,9 +377,9 @@ sleep_before_validation_release:
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
-        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
-        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
-        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CV
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CCV
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_TS
       policy: pull
 
 client_validation_suite:
@@ -403,7 +403,7 @@ client_validation_suite:
     - export CMSSW_release=$CMSSW_release
     - export Client_Validation_Suite=true
     - export Verbose=$VERBOSE
-    - ls workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
+    - ls workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CV
     # CV test uses one task, wait up to 2h checking every 5 minutes for that to complete
     # (5 min is the status cache refresh time in the AP, half an hour is needed to detect
     # successful transfer after submission to FTS
@@ -413,7 +413,7 @@ client_validation_suite:
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
-        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CV
       policy: pull
 
 client_validation_suite_release:
@@ -438,12 +438,12 @@ client_validation_suite_release:
     - export CMSSW_release=$CMSSW_release
     - export Client_Validation_Suite=true
     - export Verbose=$VERBOSE
-    - ls workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
+    - ls workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CV
     - bash cicd/gitlab/retry.sh bash cicd/gitlab/CV_config.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
-        - workdir/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CV
       policy: pull
   allow_failure: true
 
@@ -468,12 +468,12 @@ client_configuration_validation:
     - export CMSSW_release=$CMSSW_release
     - export Client_Configuration_Validation=true
     - export Verbose=$VERBOSE
-    - ls workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
+    - ls workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CCV
     - bash cicd/gitlab/retry.sh bash cicd/gitlab/CCV_config.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
-        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CCV
       policy: pull
 
 client_configuration_validation_release:
@@ -498,12 +498,12 @@ client_configuration_validation_release:
     - export CMSSW_release=$CMSSW_release
     - export Client_Configuration_Validation=true
     - export Verbose=$VERBOSE
-    - ls workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
+    - ls workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CCV
     - bash cicd/gitlab/retry.sh bash cicd/gitlab/CCV_config.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
-        - workdir/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CCV
       policy: pull
   allow_failure: true
 
@@ -533,7 +533,7 @@ check_status_tracking:
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
-        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_TS
       policy: pull
 
 check_status_tracking_release:
@@ -562,7 +562,7 @@ check_status_tracking_release:
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:
-        - workdir/submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release}
+        - workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_TS
       policy: pull
   allow_failure: true
 
