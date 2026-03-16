@@ -439,6 +439,8 @@ client_validation_suite_release:
     - export Client_Validation_Suite=true
     - export Verbose=$VERBOSE
     - ls workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CV
+    - export RETRY_SLEEP_SECONDS=300
+    - export RETRY_MAX=24
     - bash cicd/gitlab/retry.sh bash cicd/gitlab/CV_config.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
@@ -469,6 +471,8 @@ client_configuration_validation:
     - export Client_Configuration_Validation=true
     - export Verbose=$VERBOSE
     - ls workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CCV
+    - export RETRY_SLEEP_SECONDS=300
+    - export RETRY_MAX=24
     - bash cicd/gitlab/retry.sh bash cicd/gitlab/CCV_config.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
@@ -499,6 +503,8 @@ client_configuration_validation_release:
     - export Client_Configuration_Validation=true
     - export Verbose=$VERBOSE
     - ls workdir_${CI_PIPELINE_ID}_${CMSSW_release}/submitted_tasks_CCV
+    - export RETRY_SLEEP_SECONDS=300
+    - export RETRY_MAX=24
     - bash cicd/gitlab/retry.sh bash cicd/gitlab/CCV_config.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
@@ -529,6 +535,8 @@ check_status_tracking:
     - export Check_Publication_Status=Yes
     - export RETRY_SLEEP_SECONDS=1800
     - export Verbose=$VERBOSE
+    - export RETRY_SLEEP_SECONDS=900
+    - export RETRY_MAX=16
     - bash cicd/gitlab/retry.sh bash cicd/gitlab/executeStatusTracking.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
@@ -558,6 +566,8 @@ check_status_tracking_release:
     - export SCRAM_ARCH=$SCRAM_ARCH
     - export Check_Publication_Status=Yes
     - export Verbose=$VERBOSE
+    - export RETRY_SLEEP_SECONDS=900
+    - export RETRY_MAX=16
     - bash cicd/gitlab/retry.sh bash cicd/gitlab/executeStatusTracking.sh
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
