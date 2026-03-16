@@ -1,18 +1,14 @@
 #! /usr/bin/env python3
-#we need to be py2 compatible in this script if we ever want to do changes. Remember that not all crab commands work in e.g. CMSSW_7 (SL6)
-from __future__ import print_function
-from __future__ import division
 
 import os
 import subprocess
 
-try:
-    from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
-except:  # pylint: disable=bare-except
-    from httplib import HTTPException  # old Python 2 version in CMSSW_7
+from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
 
 from CRABAPI.RawCommand import crabCommand
 from CRABClient.ClientExceptions import ClientException
+
+print("Running statusTracking.py")
 
 def crab_cmd(configuration):
 

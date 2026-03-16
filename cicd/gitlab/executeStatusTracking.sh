@@ -1,6 +1,16 @@
 #! /bin/bash
 
+echo "Running executeStatusTracking.sh"
+
 set -euo pipefail
+
+echo "Verbose env.var. is set to $Verbose"
+export Verbose
+if [ X$Verbose == "X3" ]
+then
+  echo "enable bash trace"
+  set -x
+fi
 
 # check parameters
 echo "(DEBUG) X509_USER_PROXY=${X509_USER_PROXY}"
@@ -12,20 +22,21 @@ echo "(DEBUG) CRABClient_version=${CRABClient_version}"
 
 #0. Prepare environment
 export ROOT_DIR="${PWD}"
-export WORK_DIR="${PWD}/workdir"
+export WORK_DIR="${PWD}/workdir_${CI_PIPELINE_ID}_${CMSSW_release}"
 if [ ! -d "$WORK_DIR" ]; then
   mkdir -p "$WORK_DIR"
 fi
 pushd "${WORK_DIR}"
 
-#1.2. Run tests
-singularity=$(echo ${SCRAM_ARCH} | cut -d"_" -f 1 | tail -c 2)
-scramprefix=cc${singularity}
-if [ "X${singularity}" == X6 ]; then scramprefix=cc${singularity}; fi
-if [ "X${singularity}" == X8 ]; then scramprefix=el${singularity}; fi
+#1.2. Run tests.
+# use CMSSW_15 and python3 to run CCV tests, those tests do not depend on
+# what release was used for submitting
+CMSSW_release=CMSSW_15_0_18
+SCRAM_ARCH=el8_amd64_gcc12
+scramprefix=el8
 
 ERR=false
-/cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- bash -x "${ROOT_DIR}"/cicd/gitlab/st/statusTracking.sh || ERR=true
+/cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- bash  "${ROOT_DIR}"/cicd/gitlab/st/statusTracking.sh || ERR=true
 
 if [ "$ERR" == true ]; then
     echo "statusTracking.sh script failed to run properly."
