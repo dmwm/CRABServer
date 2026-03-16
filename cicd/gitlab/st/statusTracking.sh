@@ -13,4 +13,25 @@ echo "(DEBUG) CMSSW_release=${CMSSW_release}"
 echo "(DEBUG) SCRIPT_DIR=${SCRIPT_DIR}"
 
 source "${ROOT_DIR}"/cicd/gitlab/setupCRABClient.sh
-CM=${CMSSW_release#CMSSW_};  python3 "${SCRIPT_DIR}/statusTracking.py"
+rc=0
+python3 "${SCRIPT_DIR}/statusTracking.py" 2>&1 > statusTracking.log || rc=$?
+printLog=0
+if [ $rc -eq 1 ]; then
+  echo "==> FAILED> StatusTracking.py failed. Here's log:"
+  printLog=1
+fi
+if [ $Verbose -ge 2 ]; then
+  echo " Verbose is $Verbose. Printing statusTracking.py log "
+  printLog=1
+fi
+if [ $printLog -eq 1 ]; then
+  echo "--------------------------------------------------------"
+  cat statusTracking.log
+  echo "--------------------------------------------------------"
+fi
+if [ $rc -eq 1 ]; then
+  return 1
+fi
+
+echo "statusTracking.py executed"
+

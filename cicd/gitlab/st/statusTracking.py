@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 import os
+import json
 import subprocess
 
 from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
@@ -8,10 +9,8 @@ from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
 from CRABAPI.RawCommand import crabCommand
 from CRABClient.ClientExceptions import ClientException
 
-print("Running statusTracking.py")
 
 def crab_cmd(configuration):
-
     try:
         output = crabCommand(configuration['cmd'], **configuration['args'])
         return output
@@ -24,7 +23,6 @@ def crab_cmd(configuration):
 
 
 def parse_result(listOfTasks, checkPublication=False):
-
     testResult = []
 
     for task in listOfTasks:
@@ -65,7 +63,7 @@ def parse_result(listOfTasks, checkPublication=False):
                     result = 'TestPassed'
                 else:
                     needToResubmit = True
-                if checkPublication and 'nopublication' not in task['taskName']:
+                if checkPublication and 'nopub' not in task['taskName']:
                     if published_in_transfersdb == total_jobs and published_in_dbs == total_jobs:
                         result = 'TestPassed'
                     elif failedPublications:
@@ -126,35 +124,41 @@ def main():
     if TestRunning is present: run the test again after some time
     if TestFailed is present" declare the test FAILED
     """
-    import json
-    print(json.dumps(dict(os.environ), indent=4))
+
+    print("Running statusTracking.py")
+
     listOfTasks = []
+    verbose = int(os.getenv('Verbose', 0))
+    if verbose == 3:
+        print(json.dumps(dict(os.environ), indent=4))
     instance = os.getenv('REST_Instance', 'preprod')
     work_dir = os.getenv('WORK_DIR', 'dummy_workdir')
+    print(f"work_dir is {work_dir}")
     Check_Publication_Status = os.getenv('Check_Publication_Status', 'No')
     print("Check_Publication_Status is : ", Check_Publication_Status )
     checkPublication = True if Check_Publication_Status == 'Yes' else False
 
     # Read all tasks from the specified files into a single list
-    file_name = "submitted_tasks_TS_{}_{}".format(
-        os.environ.get('CI_PIPELINE_ID'),
-        os.environ.get('CMSSW_release')
-    )
+    file_name = "submitted_tasks_TS"
 
     file_path = os.path.join(work_dir, file_name)
 
     if os.path.exists(file_path):
-        tasks = [line for line in open(file_path).readlines()]
+        tasks = [line.rstrip() for line in open(file_path).readlines()]
     else:
         tasks = []
 
     for task in tasks:
-        # when testing it helps to reuse already made directories
-        remake_dir = '_'.join(task.rstrip().split('_')[-3:])
-        if not os.path.isdir(remake_dir):
-            remake_dict = {'task': task, 'instance': instance}
-            outputDict = crab_cmd({'cmd': 'remake', 'args': remake_dict})
-            remake_dir = outputDict['workDir']
+        print(f"check task: {task}")
+
+        # with "post-2024" CRABClient one does not need to run crab remake
+        # as a separate step and project dire reuse is automatic,
+        # but while crab remake returns the new project dir name,
+        # crab status does not, so let's be pedantic. The task project dir
+        # is needed in case we need to resubmit in parse_result
+        remake_dict = {'task': task, 'instance': instance}
+        outputDict = crab_cmd({'cmd': 'remake', 'args': remake_dict})
+        remake_dir = outputDict['workDir']
 
         status_dict = {'dir': remake_dir}
         status_command_output = crab_cmd({'cmd': 'status', 'args': status_dict})
@@ -170,6 +174,10 @@ def main():
     with open('%s/result' %work_dir, 'w') as fp:
         for result in summary:
             fp.write("%s\n" % result)
+
+    with open('%s/result.json' %work_dir, 'w') as fp:
+        json.dump(summary, fp)
+
 
 if __name__ == '__main__':
     main()

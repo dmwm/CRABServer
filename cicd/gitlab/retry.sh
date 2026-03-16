@@ -8,9 +8,10 @@ export RETRY_SLEEP_SECONDS=${RETRY_SLEEP_SECONDS:-900}
 
 RETRY=1
 while true; do
-    echo "${RETRY}/${RETRY_MAX} attempt."
     export RETRY RETRY_MAX
     rc=0
+    echo "============================================"
+    echo -e " Starting test attempt ${RETRY} out of ${RETRY_MAX}\n"
     "$@" || rc=$?
     if [[ $rc != 0 ]]; then
         echo "Script attempt ${RETRY}/${RETRY_MAX} completed with exit code ${rc}. Try again ? "

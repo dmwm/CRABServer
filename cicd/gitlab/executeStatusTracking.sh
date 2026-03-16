@@ -28,6 +28,12 @@ if [ ! -d "$WORK_DIR" ]; then
 fi
 pushd "${WORK_DIR}"
 
+if [ $RETRY -eq 1 ]; then
+  echo -e "\nWill check status of tasks:"
+  cat submitted_tasks_TS
+  echo -e "\n"
+fi
+
 #1.2. Run tests.
 # use CMSSW_15 and python3 to run CCV tests, those tests do not depend on
 # what release was used for submitting
@@ -43,15 +49,19 @@ if [ "$ERR" == true ]; then
     exit 1
 fi
 
-#3. Update issue with submission results
+#3. Print summary
+
+python3 ${ROOT_DIR}"/cicd/gitlab/st/printStatusTrackingSummary.py"
+
+#4. Determine final status and decide if OK/Retry/FAIL
 TEST_RESULT='FAILED'
 if [ ! -s "./result" ]; then
-	MESSAGE='Something went wrong. Investigate manually.'
-elif grep -E "(SUBMITFAILED|SUBMITREFUSED)" ./result; then
+	MESSAGE='Result file is empty. Something went wrong. Investigate manually.'
+elif grep -q -E "(SUBMITFAILED|SUBMITREFUSED)" ./result; then
     MESSAGE='Task(s) has "SUBMITFAILED" status. Investigate manually.'
-elif grep "TestFailed" ./result ; then
+elif grep -q "TestFailed" ./result ; then
 	MESSAGE='Test failed. Investigate manually'
-elif grep "TestRunning" result || grep "TestResubmitted" ./result; then
+elif grep -q "TestRunning" result || grep -q "TestResubmitted" ./result; then
     MESSAGE='Will run again.'
    	TEST_RESULT='FULL-STATUS-UNKNOWN'
 else
@@ -59,13 +69,12 @@ else
    	TEST_RESULT='SUCCEEDED'
 fi
 
+echo "======================================================"
 echo -e """**Test:** Task Submission Status Tracking\n\
 **Result:** ${TEST_RESULT}\n\
 **Attempt:** ${RETRY} out of ${RETRY_MAX}. ${MESSAGE}\n\
 **Finished at:** `(date '+%Y-%m-%d %H:%M:%S %Z')`\n\
 """
-
-echo -e "\`\`\`\n`cat result`\n\`\`\`" || true
 
 popd
 
