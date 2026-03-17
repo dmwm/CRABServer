@@ -5,7 +5,7 @@ NEW_IMAGE_TAG="${NEW_IMAGE_TAG:?NEW_IMAGE_TAG is required}"
 UPSTREAM_IAC_REPO="${UPSTREAM_IAC_REPO:=nausikt/CMSKubernetes}"
 UPSTREAM_IAC_BRANCH="${UPSTREAM_IAC_BRANCH:=crab}"
 CI_BOT_USER_NAME="${CI_BOT_USER_NAME:=crab-gitlab-ci}"
-CI_BOT_USER_EMAIL="${CI_BOT_USER_EMAIL:=krittin.phornsiricharoenphant@cern.ch}"
+CI_BOT_USER_EMAIL="${CI_BOT_USER_EMAIL:=cms-service-crab-operators@cern.ch}"
 CI_COMMIT_AUTHOR="${CI_COMMIT_AUTHOR:=crab-gitlab-ci}"
 
 # Setup SSH deploy key
