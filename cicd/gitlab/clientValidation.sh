@@ -131,7 +131,7 @@ source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
   ##################################################
 
   ### 0. Make sure that the test task has completed successfully
-  TASKTOTRACK=`cat ${WORK_DIR}/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}`
+  TASKTOTRACK=`cat ${WORK_DIR}/submitted_tasks_CV`
   echo "check if task $TASKTOTRACK has completed"
   crab status --task=$TASKTOTRACK --instance=$REST_Instance --proxy=$PROXY > TaskStatus.txt
   echo "crab status executed with exit code $?"
