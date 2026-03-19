@@ -128,7 +128,7 @@ def main():
     print("Running statusTracking.py")
 
     listOfTasks = []
-    verbose = int(os.getenv('Verbose', 0))
+    verbose = int(os.getenv('Verbose', '0'))
     if verbose == 3:
         print(json.dumps(dict(os.environ), indent=4))
     instance = os.getenv('REST_Instance', 'preprod')
@@ -144,7 +144,7 @@ def main():
     file_path = os.path.join(work_dir, file_name)
 
     if os.path.exists(file_path):
-        tasks = [line.rstrip() for line in open(file_path).readlines()]
+        tasks = [line.rstrip() for line in open(file_path, 'r', encoding='utf-8').readlines()]
     else:
         tasks = []
 
@@ -171,11 +171,11 @@ def main():
 
     summary = parse_result(listOfTasks,checkPublication)
 
-    with open('%s/result' %work_dir, 'w') as fp:
+    with open('%s/result' %work_dir, 'w', encoding='utf-8') as fp:
         for result in summary:
             fp.write("%s\n" % result)
 
-    with open('%s/result.json' %work_dir, 'w') as fp:
+    with open('%s/result.json' %work_dir, 'w', encoding='utf-8') as fp:
         json.dump(summary, fp)
 
 
