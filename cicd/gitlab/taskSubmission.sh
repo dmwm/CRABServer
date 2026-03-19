@@ -127,7 +127,8 @@ if [ "${Task_Submission_Status_Tracking}" = true ]; then
     pushd "${ROOT_DIR}"/test/statusTrackingTasks/
     # for test
     if [[ -n ${DEBUG_TEST:-} ]]; then
-        filesToSubmit=$(find . -type f -name '*.py' ! -name '*pset*' | grep HC-splitByLumi.py)
+        #filesToSubmit=$(find . -type f -name '*.py' ! -name '*pset*' | grep HC-splitByLumi.py)
+        filesToSubmit=$(find . -type f -name '*.py' ! -name '*pset*' | grep Pythia.py)
     else
         filesToSubmit=$(find . -type f -name '*.py' ! -name '*pset*')
     fi
