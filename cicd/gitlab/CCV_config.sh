@@ -6,7 +6,7 @@ set -euo pipefail
 
 echo "Verbose env.var. is set to $Verbose"
 export Verbose
-if [ X$Verbose == "X3" ]
+if [ $Verbose -eq 3 ]
 then
   echo "enable bash trace"
   set -x
