@@ -28,7 +28,7 @@ function checkStatus {
   # temporarily unset "exit on error" if any so to properly catch exit status and act on it
   exitStatus=$(
     set +e
-    crab status --task ${taskName} --instance=REST_Instance --proxy=$PROXY 2>&1 >  statusLog.txt
+    crab status --task ${taskName} --instance=REST_Instance --proxy=$PROXY  >  statusLog.txt 2>&1
     echo $?
   )
   if [ $exitStatus -ne 0 ]; then
@@ -125,7 +125,7 @@ function crabCommand() {
   # Temporarily unset set -e if set using trick from ref: https://superuser.com/a/1458830
   oldopt=$-
   set +e
-  crab $cmd $params 2>&1 > commandLog.txt
+  crab $cmd $params > commandLog.txt 2>&1
   exitCode=$?
   set -$oldopt || true  # add true for extra-safety in case the set fails after setting -e (e.g. interactive test)
   if [ $exitCode -ne 0 ]; then

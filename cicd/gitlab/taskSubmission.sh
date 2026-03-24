@@ -67,7 +67,7 @@ immediateCheck(){
       else
         trace=""
       fi
-     bash ${trace} ${test_to_execute}-testSubmit.sh ${task_dir} 2>&1 > testLog.txt && \
+     bash ${trace} ${test_to_execute}-testSubmit.sh ${task_dir} > testLog.txt 2>&1 && \
        (echo "${test_to_execute}-testSubmit.sh - ${task}" >> ${WORK_DIR}/successfully_submitted_CCV_tests; echo OK) || \
        (echo "${test_to_execute}-testSubmit.sh - ${task}" >> ${WORK_DIR}/failed_CCV_tests; echo FAIL; cat testLog.txt)
  done

@@ -63,7 +63,7 @@ source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
     else
       echo "== Test \"crab $cmd\"  command"
     	echo -ne "TEST_COMMAND: crab $cmd $parms \n" | tee -a CV_Summary.txt
-    	crab --debug $cmd $parms 2>&1 > $TMP_BUFFER
+    	crab --debug $cmd $parms > $TMP_BUFFER 2>&1
     	if [ $? != 0 ]; then
           echo " TEST_RESULT: FAILED" | tee -a CV_Summary.txt
           cat $TMP_BUFFER
