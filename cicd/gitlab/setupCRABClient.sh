@@ -11,6 +11,14 @@ set -euo pipefail
 # Variables ${SCRAM_ARCH}, ${CMSSW_release}, ${CRABClient_version}
 # comes from caller/CI variables
 
+echo "Verbose env.var. is set to $Verbose"
+export Verbose
+if [ $Verbose -eq 3 ]
+then
+  echo "enable bash trace"
+  set -x
+fi
+
 # ignore all bash fail from script from /cvmfs/cms-ib.cern.ch
 set +euo pipefail
 source /cvmfs/cms-ib.cern.ch/latest/cmsset_default.sh
@@ -19,7 +27,6 @@ set -euo pipefail
 scramv1 project ${CMSSW_release}
 pushd ${CMSSW_release}/src
 eval "$(scramv1 runtime -sh)"
-echo "Verbose is: $Verbose"
 scram build > /dev/null
 
 mkdir -p ../venv
