@@ -26,6 +26,12 @@ echo "(debug) Client_Validation_Suite=${Client_Validation_Suite}"
 
 # always run inside ./workdir
 export ROOT_DIR=$PWD
+export WORK_DIR="${PWD}/workdir_${CI_PIPELINE_ID}_${CMSSW_release}"
+if [ ! -d "$WORK_DIR" ]; then
+  mkdir -p "$WORK_DIR"
+  echo "(DEBUG) workdir was created as $WORK_DIR"
+fi
+
 export WORK_DIR=$PWD/workdir
 mkdir -p workdir
 pushd "${WORK_DIR}"
