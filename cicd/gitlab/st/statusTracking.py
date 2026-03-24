@@ -3,6 +3,7 @@
 import os
 import json
 import subprocess
+import ast
 
 from http.client import HTTPException  # Python 3 and Python 2 in modern CMSSW
 
@@ -45,7 +46,7 @@ def parse_result(listOfTasks, checkPublication=False):
             # with string first character being '['
             # beware that soon after submission this is not defined.
             # reference: https://github.com/dmwm/CRABClient/blob/549c4e3b6158e8344315437d1d128f2288551d47/src/python/CRABClient/Commands/status.py#L1059
-            outdataset = eval(task['outdatasets'])[0] if task['outdatasets'] else None
+            outdataset = ast.literal_eval(task['outdatasets'])[0] if task['outdatasets'] else None
             if task['outdatasets'] == 'None':
                 outdataset = None
             if outdataset:
