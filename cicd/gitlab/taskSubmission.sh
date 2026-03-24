@@ -94,7 +94,7 @@ killAfterFailure(){
 
 if [ "${Client_Validation_Suite}" = true ]; then
     echo -e "\nStarting task submission for Client Validation testing.\n"
-    pushd "${WORK_DIR}/test/clientValidationTasks/"
+    pushd "${ROOT_DIR}/test/clientValidationTasks/"
     filesToSubmit=`find . -type f -name '*.py' ! -name '*pset*'`
     submitTasks "${filesToSubmit}" "CV"
     cd ${WORK_DIR}
