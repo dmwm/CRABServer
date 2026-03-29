@@ -242,7 +242,7 @@ writeValidationScript(testName=name, validationScript=validationScript)
 
 # allowUndistributedCMSSW
 name = 'allowUndistributedCMSSW'
-#TODO need a real test here, e.g. using a non-prod version of CMSSW
+# we'd need a real test here, e.g. using a non-prod version of CMSSW
 changeDict = {'param': name, 'value': 'True', 'section': 'JobType'}
 confChangesList = [changeDict]
 testSubmitScript = dummyTestScript
