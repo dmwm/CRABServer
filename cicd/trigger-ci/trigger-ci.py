@@ -11,7 +11,7 @@ The push target is always the 'gitlab' remote (matching the shell scripts).
 Boolean variables accept:  true/false/yes/no/1/0  (case-insensitive).
 Passing a boolean flag without a value sets it to true.
 
-CI variables (from the shell scripts)
+CI variables (from the shell scripts) - default false
 --------------------------------------
   -cv  / --client-validation          CLIENT_VALIDATION
   -ccv / --client-config-validation   CLIENT_CONFIGURATION_VALIDATION
