@@ -9,7 +9,7 @@
 
 #setup CRABClient
 source setupCRABClient.sh
-python3 ${WORK_DIR}/CRABServer/test/makeTests.py
+env -u PYTHONPATH -u PYTHONHOME python3 ${WORK_DIR}/CRABServer/test/makeTests.py
 
 while read task ; do
   echo "$task"
