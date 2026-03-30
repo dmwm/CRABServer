@@ -109,7 +109,7 @@ if [ "${Client_Configuration_Validation}" = true ]; then
       touch ${WORK_DIR}/submitted_tasks_CCV
     else
       python3 ${ROOT_DIR}/test/makeTests.py
-      if [[ -n ${DEBUG_TEST:-} ]]; then
+      if [[ ${DEBUG_TEST:-"false"} == "true" ]]; then
         filesToSubmit=$(find . -type f -name '*.py' ! -name '*pset*' | grep scheddName.py)
       else
         filesToSubmit=`find . -maxdepth 1 -type f -name '*.py' ! -name '*PSET*'`
@@ -142,7 +142,7 @@ if [ "${Task_Submission_Status_Tracking}" = true ]; then
     else
       pushd "${ROOT_DIR}"/test/statusTrackingTasks/
       # for test
-      if [[ -n ${DEBUG_TEST:-} ]]; then
+      if [[ ${DEBUG_TEST:-"false"} == "true" ]]; then
           filesToSubmit=$(find . -type f -name '*.py' ! -name '*pset*' | grep Pythia.py)
       else
           filesToSubmit=$(find . -type f -name '*.py' ! -name '*pset*')
