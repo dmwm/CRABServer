@@ -303,8 +303,6 @@ task_submission:
     - export Client_Validation_Suite=$CLIENT_VALIDATION
     - export Verbose=$VERBOSE
     - bash cicd/gitlab/submitTestTasks.sh
-    - pwd
-    - ls -ltrR
   cache:
     - key: "Key_${CI_PIPELINE_ID}_${CMSSW_release}"
       paths:

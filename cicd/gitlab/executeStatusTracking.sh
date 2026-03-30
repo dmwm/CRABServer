@@ -32,7 +32,6 @@ fi
 pushd "${WORK_DIR}" > /dev/null
 echo "(DEBUG) Current working directory: ${WORK_DIR}"
 
-ls -ltr 
 cat submitted_tasks_ST || true
 
 # make sure there is something to do
