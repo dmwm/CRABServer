@@ -165,6 +165,29 @@ class RetryJob():
 
     # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+    def calculate_effective_max_retries(self, policy):
+        retry_info_file = f"resubmit_info/job.{self.job_id}.txt"
+        retry_info = {}
+
+        if os.path.exists(retry_info_file):
+            try:
+                with open(retry_info_file, "r", encoding="utf-8") as fd:
+                    retry_info = literal_eval(fd.read())
+            except Exception:
+                retry_info = {}
+
+        key = str(self.crab_retry)
+        if key not in retry_info:
+            retry_info[key] = {}
+
+        entry = retry_info.get(key, {})
+        resubmit_counter = entry.get("resubmit_counter", 0)
+        base_max = policy["max_retries"]
+        effective_max_retries = (base_max + 1)*(resubmit_counter + 1) - 1
+        self.logger.info(f"Resubmit counter = {resubmit_counter}, effective max retries = {effective_max_retries}")
+
+        return effective_max_retries
+
 
     def apply_retry_policy(self, exitCode):
         """
@@ -174,7 +197,8 @@ class RetryJob():
         policy = EXIT_RETRY_POLICY.get(exitCode, EXIT_RETRY_POLICY["default"])
 
         if policy["type"] == "recoverable":
-            if self.crab_retry >= policy["max_retries"]:
+            effective_max_retries = self.calculate_effective_max_retries(policy)
+            if self.crab_retry >= effective_max_retries:
                 raise FatalError(f"Retry limit reached for exit {exitCode}: {policy['msg']}")
             self.logger.info(f"Applying retry policy for exit code {exitCode}")
             self.store_retry_actions(policy)

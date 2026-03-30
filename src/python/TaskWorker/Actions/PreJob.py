@@ -319,6 +319,8 @@ class PreJob:
 
         ## Save the (new) values of the resubmission parameters in self.resubmit_info
         ## for the current job retry number.
+        #get resubmission counter
+        resubmit_counter = int(self.task_ad.get("CRAB_ResubmitCounter", 0))
         outkey = str(crab_retry)
         if outkey not in self.resubmit_info:
             self.resubmit_info[outkey] = {}
@@ -328,7 +330,7 @@ class PreJob:
         self.resubmit_info[outkey]['priority']      = priority
         self.resubmit_info[outkey]['use_resubmit_info'] = use_resubmit_info
         self.resubmit_info[outkey]['CRAB_ResubmitList_in_taskad'] = CRAB_ResubmitList_in_taskad
-
+        self.resubmit_info[outkey]["resubmit_counter"] = resubmit_counter
         ## Add the resubmission parameters to the Job.<job_id>.submit content.
         ##
         if self.stage == "probe":
