@@ -5,8 +5,8 @@ import sys
 import time
 import logging
 
-import classad
-import htcondor
+import classad2 as classad
+import htcondor2 as htcondor
 
 from WMCore.Credential.Proxy import Proxy
 from WMCore.Configuration import loadConfigurationFile

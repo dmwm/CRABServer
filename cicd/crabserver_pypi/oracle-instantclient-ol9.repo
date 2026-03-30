@@ -1,0 +1,6 @@
+[oracle-instantclient-ol9]
+name=Oracle Instant Client OL9 (CERN mirror)
+baseurl=https://linuxsoft.cern.ch/mirror/yum.oracle.com/repo/OracleLinux/OL9/oracle/instantclient/x86_64/
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-oracle-ol9

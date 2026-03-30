@@ -4,13 +4,9 @@ Common functions to be reused around TW and Publisher
 
 import logging
 import functools
-import time
-import random
 
 from http.client import HTTPException
 from urllib.parse import urlencode
-
-import requests
 
 from ServerUtilities import truncateError, tempSetLogLevel, SERVICE_INSTANCES
 from RESTInteractions import CRABRest
@@ -146,47 +142,3 @@ class CRICService(CRIC):
     def PNNstoPSNs(self, *args, **kwargs):
         """ maps PhexedNodeNames (i.e. RSE's) to ProcessingSiteNames (i.e. sites) """
         return super().PNNstoPSNs(*args, **kwargs)
-
-
-def getHighPrioUsersFromCRIC(cert, key, logger=None):
-    """
-    get the list of high priority users from CRIC with retries
-    arguments:
-      cert,key : string : absolute path name for PEM file to use for authentication
-      logger : a logging.logger object
-    """
-
-    cricGroup = 'CMS_CRAB_HighPrioUsers'
-    cricUrl = f"https://cms-cric.cern.ch//api/accounts/group/query/?json&name={cricGroup}"
-    capath = '/etc/grid-security/certificates'
-
-    # make requests less verbose
-    # can not use suppressExternalServiceLogging above because it requires self.logger
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-
-    nRetries = 4
-    for i in range(nRetries + 1):
-        try:
-            # make HTTP GET
-            r = requests.get(url=cricUrl, cert=(cert, key), verify=capath, timeout=10)
-            # get JSON output and parse it
-            highPrioUsers = []
-            for user in r.json()[cricGroup]['users']:
-                highPrioUsers.append(user['login'])
-        except Exception as ex:  # pylint: disable=broad-except
-            if i < nRetries:
-                sleeptime = 20 * (i + 1) + random.randint(-10, 10)
-                msg = f"Sleeping {sleeptime} seconds after HTTP error. Error details:\n{ex}"
-                logger.debug(msg)
-                time.sleep(sleeptime)
-            else:
-                # this was the last retry
-                msg = "Error when getting the high priority users list from CRIC." \
-                      " Will ignore the high priority list and continue normally." \
-                      f" Error reason:\n{ex}"
-                logger.error(msg)
-                highPrioUsers = []
-                break
-        else:
-            break
-    return highPrioUsers

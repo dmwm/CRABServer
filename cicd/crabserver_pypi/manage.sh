@@ -59,12 +59,12 @@ script_env() {
 # flag and ready to use.
 start_srv() {
     script_env
-    wmc-httpd -r -d $STATEDIR -l "$STATEDIR/crabserver-fifo" $CFGFILE
+    python3 /usr/local/bin/wmc-httpd -r -d $STATEDIR -l "$STATEDIR/crabserver-fifo" $CFGFILE
 }
 
 stop_srv() {
     script_env
-    wmc-httpd -k -d $STATEDIR $CFGFILE
+    python3 /usr/local/bin/wmc-httpd -k -d $STATEDIR $CFGFILE
 }
 
 status_srv() {
@@ -83,7 +83,7 @@ status_srv() {
         pypath=$(cat /proc/"${pid}"/environ | tr '\0' '\n' | grep PYTHONPATH | cut -d= -f2-)
         echo "PYTHONPATH=$pypath"
         export PYTHONPATH="$pypath"
-        python -c 'from CRABInterface import __version__; print(f"Runnning version {__version__}")'
+        python3 -c 'from CRABInterface import __version__; print(f"Runnning version {__version__}")'
     fi
     exit "${rc}"
 }

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # pylint: disable=line-too-long, broad-except, invalid-name
 """
 for lack of a better place, I record here the current situation with

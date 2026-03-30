@@ -10,11 +10,11 @@ cat PSet.py
 
 # This is what you need if you want to look at the tweaked parameter set!!
 echo "================= Dumping PSet ===================="
-python -c "import PSet; print PSet.process.dumpPython()"
+python3 -c "import PSet; print PSet.process.dumpPython()"
 
 # This script is not running Cmsrun.
 echo "================= Dumping Input files ===================="
-python -c "import PSet; print '\n'.join(list(PSet.process.source.fileNames))"
+python3 -c "import PSet; print '\n'.join(list(PSet.process.source.fileNames))"
 
 # $@ will point to the all job passed job parameters
 echo "I am a simple output for job "$@ > simpleoutput.txt

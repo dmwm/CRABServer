@@ -30,7 +30,6 @@ import TaskWorker.DataObjects.Result
 from TaskWorker.Actions.TaskAction import TaskAction
 from TaskWorker.Actions.Splitter import SplittingSummary
 from TaskWorker.WorkerExceptions import TaskWorkerException, SubmissionRefusedException
-from TaskWorker.WorkerUtilities import getHighPrioUsersFromCRIC
 from RucioUtils import getWritePFN
 from CMSGroupMapper import map_user_to_groups
 
@@ -422,9 +421,8 @@ class DagmanCreator(TaskAction):
         #
         # now actual HTC Job Submission commands, here right hand side can be simply strings
         #
-        hiPrioUsers = getHighPrioUsersFromCRIC(cert=self.config.TaskWorker.cmscert,
-                                               key=self.config.TaskWorker.cmskey,
-                                               logger=self.logger)
+        with open('/data/hostdisk/TaskWorker/groups/highPriorityUsers.json', 'r', encoding='utf-8') as fd:
+            hiPrioUsers = json.load(fd)
         if  task['tm_username'] in hiPrioUsers:
             jobSubmit['accounting_group'] = 'highprio'
         else:

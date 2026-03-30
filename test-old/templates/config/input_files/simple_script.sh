@@ -10,7 +10,7 @@ cat PSet.py
 
 # This is what you need if you want to look at the tweaked parameter set!!
 echo "================= Dumping PSet ===================="
-python -c "import PSet; print PSet.process.dumpPython()"
+python3 -c "import PSet; print PSet.process.dumpPython()"
 
 # Ok, let's stop fooling around and execute the job:
 cmsRun -j FrameworkJobReport.xml PSet.py

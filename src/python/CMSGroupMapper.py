@@ -21,7 +21,7 @@ def cache_users(log_function=print):
     global g_expire_time
     global g_cache
 
-    base_dir = '/cvmfs/cms.cern.ch/SITECONF'
+    base_dir = '/data/hostdisk/TaskWorker/groups/SITECONF'
     cache = {}
     user_re = re.compile(r'[-_A-Za-z0-9.]+')
     sites = None

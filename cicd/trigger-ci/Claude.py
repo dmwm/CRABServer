@@ -1,0 +1,240 @@
+#!/usr/bin/env python3
+"""
+trigger_ci.py  –  Trigger CRABServer GitLab CI via git tag + push.
+
+Replicates the logic of the shell scripts in cicd/trigger-ci/, allowing any
+combination of ci.variable values to be set in a single command.
+
+The tag format matches the shell scripts:  pypi-{ENV}-{unix_timestamp}
+The push target is always the 'gitlab' remote (matching the shell scripts).
+
+Boolean variables accept:  true/false/yes/no/1/0  (case-insensitive).
+Passing a boolean flag without a value sets it to true.
+
+CI variables (from the shell scripts)
+--------------------------------------
+  -cv  / --client-validation          CLIENT_VALIDATION
+  -ccv / --client-config-validation   CLIENT_CONFIGURATION_VALIDATION
+  -st  / --status-tracking            STATUS_TRACKING
+  -sb  / --skip-build                 SKIP_BUILD
+  -sd  / --skip-deploy                SKIP_DEPLOY
+  -ss  / --skip-submit                SKIP_SUBMIT
+
+Extra variables (requested additions)
+--------------------------------------
+  -V N / --verbose N                  VERBOSE  (integer, default 0)
+  -D   / --debug-test                 DEBUG_TEST (bool, default false)
+
+Other options
+-------------
+  -e ENV / --env ENV   Override ENV (default: test2, or read from ./env file)
+  -n     / --dry-run   Print tag + git command without executing anything
+
+Examples
+--------
+  # Equivalent to tag_and_push_CV.sh
+  python trigger_ci.py -cv
+
+  # Equivalent to tag_and_push_skip_build.sh + tag_and_push_skip_deploy.sh combined
+  python trigger_ci.py -sb -sd
+
+  # Client validation + verbose level 2 + debug
+  python trigger_ci.py -cv -V 2 -D
+
+  # Use a custom ENV, dry-run to inspect the command first
+  python trigger_ci.py -cv -st -e test3 --dry-run
+"""
+
+import argparse
+import os
+import subprocess
+import sys
+import time
+
+
+# ---------------------------------------------------------------------------
+# Boolean argument helper
+# ---------------------------------------------------------------------------
+def parse_bool(value: str) -> bool:
+    if value.lower() in ("1", "true", "yes", "on"):
+        return True
+    if value.lower() in ("0", "false", "no", "off"):
+        return False
+    raise argparse.ArgumentTypeError(
+        f"Expected true/false/yes/no/1/0, got: {value!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# CI variable definitions
+# (long_flag, short_flag, ci_variable_name, default, help_text)
+# ---------------------------------------------------------------------------
+BOOL_VARS = [
+    ("--client-validation",        "-cv",  "CLIENT_VALIDATION",               False, "Run client validation test           [tag_and_push_CV.sh]"),
+    ("--client-config-validation", "-ccv", "CLIENT_CONFIGURATION_VALIDATION", False, "Run client configuration validation  [tag_and_push_CCV.sh]"),
+    ("--status-tracking",          "-st",  "STATUS_TRACKING",                 False, "Run status tracking test              [tag_and_push_ST.sh]"),
+    ("--skip-build",               "-sb",  "SKIP_BUILD",                      False, "Skip the Docker image build step      [tag_and_push_skip_build.sh]"),
+    ("--skip-deploy",              "-sd",  "SKIP_DEPLOY",                     False, "Skip the deployment step              [tag_and_push_skip_deploy.sh]"),
+    ("--skip-submit",              "-ss",  "SKIP_SUBMIT",                     False, "Skip submit tests                     [tag_and_push_skip_submit_tests.sh]"),
+    ("--debug-test",               "-D",   "DEBUG_TEST",                      False, "Enable debug mode in tests            [extra]"),
+]
+
+INT_VARS = [
+    ("--verbose", "-V", "VERBOSE", 0, "Verbosity level (0 = default, higher = more output)  [extra]"),
+]
+
+
+# ---------------------------------------------------------------------------
+# Read ENV from ./env file (mirrors `[[ -f ./env ]] && source ./env`)
+# ---------------------------------------------------------------------------
+def read_env_file(path: str = "./env") -> dict:
+    """Parse a simple KEY=VALUE shell env file, ignoring comments."""
+    env = {}
+    if not os.path.isfile(path):
+        return env
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, _, val = line.partition("=")
+                # Strip surrounding quotes if present
+                val = val.strip().strip('"').strip("'")
+                env[key.strip()] = val
+    return env
+
+
+# ---------------------------------------------------------------------------
+# Build argument parser
+# ---------------------------------------------------------------------------
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="trigger_ci.py",
+        description=(
+            "Trigger CRABServer GitLab CI by creating a git tag and pushing it\n"
+            "to the 'gitlab' remote with -o ci.variable=KEY=VALUE push options.\n\n"
+            "Tag format:  pypi-{ENV}-{unix_timestamp}"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+
+    ci_group = parser.add_argument_group("CI variables")
+
+    for long, short, varname, default, help_text in BOOL_VARS:
+        ci_group.add_argument(
+            long, short,
+            dest=varname,
+            metavar="BOOL",
+            nargs="?",        # bare flag → true
+            const="true",
+            default=str(default).lower(),
+            type=str,
+            help=f"{help_text}  (default: {str(default).lower()})",
+        )
+
+    for long, short, varname, default, help_text in INT_VARS:
+        ci_group.add_argument(
+            long, short,
+            dest=varname,
+            metavar="N",
+            type=int,
+            default=default,
+            help=f"{help_text}  (default: {default})",
+        )
+
+    other = parser.add_argument_group("other options")
+    other.add_argument(
+        "--env", "-e",
+        default=None,
+        metavar="ENV",
+        help="Override ENV value (default: 'test2', or value from ./env file)",
+    )
+    other.add_argument(
+        "--dry-run", "-n",
+        action="store_true",
+        help="Print the tag name and git command without executing anything",
+    )
+
+    return parser
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+def main() -> None:
+    parser = build_parser()
+    args = vars(parser.parse_args())
+
+    dry_run = args.pop("dry_run")
+    env_override = args.pop("env")
+
+    # Resolve ENV: CLI flag > ./env file > default 'test2'
+    file_env = read_env_file("./env")
+    env = env_override or file_env.get("ENV", "test2")
+
+    # Resolve boolean CI variables
+    ci_variables: dict[str, str] = {}
+    for _, _, varname, _, _ in BOOL_VARS:
+        raw = args[varname]
+        try:
+            resolved = parse_bool(raw)
+        except argparse.ArgumentTypeError as exc:
+            parser.error(f"{varname}: {exc}")
+        ci_variables[varname] = "true" if resolved else "false"
+
+    # Resolve integer CI variables
+    for _, _, varname, _, _ in INT_VARS:
+        ci_variables[varname] = str(args[varname])
+
+    # Build tag name (matches shell script pattern)
+    timestamp = int(time.time())
+    tag = f"pypi-{env}-{timestamp}"
+
+    # Build push-option arguments:  -o ci.variable=KEY=VALUE
+    push_options = []
+    for key, value in sorted(ci_variables.items()):
+        push_options += ["-o", f"ci.variable={key}={value}"]
+
+    tag_cmd  = ["git", "tag", tag]
+    push_cmd = ["git", "push", "gitlab", tag] + push_options
+
+    # -----------------------------------------------------------------------
+    # Pretty summary
+    # -----------------------------------------------------------------------
+    print("=" * 62)
+    print(f"  ENV  : {env}")
+    print(f"  TAG  : {tag}")
+    print("  CI variables:")
+    for key, value in sorted(ci_variables.items()):
+        print(f"    {key:40s} = {value}")
+    print("=" * 62)
+    print("Commands to run:")
+    print(f"  {' '.join(tag_cmd)}")
+    # Pretty-print push command with one -o per line
+    push_display = f"  git push gitlab {tag}"
+    for i in range(0, len(push_options), 2):
+        push_display += f" \\\n    {push_options[i]} {push_options[i+1]}"
+    print(push_display)
+    print()
+
+    if dry_run:
+        print("[dry-run] Commands NOT executed.")
+        return
+
+    # -----------------------------------------------------------------------
+    # Execute
+    # -----------------------------------------------------------------------
+    print(f"[1/2] Creating tag '{tag}' ...")
+    result = subprocess.run(tag_cmd)
+    if result.returncode != 0:
+        sys.exit(f"[ERROR] git tag failed with exit code {result.returncode}")
+
+    print(f"[2/2] Pushing tag to gitlab ...")
+    result = subprocess.run(push_cmd)
+    sys.exit(result.returncode)
+
+
+if __name__ == "__main__":
+    main()
