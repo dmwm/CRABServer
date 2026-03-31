@@ -96,9 +96,11 @@ class DagmanResubmitter(TaskAction):
                         else:
                             newAdValue = str(task['resubmit_'+taskparam])
                         schedd.edit(rootConst, adparam, newAdValue)
-                # Set CRAB_ResubmitCounter
+                # Set CRAB_ResubmitCounter - increment on both DAG ad and individual job ads
                 resubmitCounterExpr = classad.ExprTree("ifThenElse(isUndefined(CRAB_ResubmitCounter), 1, CRAB_ResubmitCounter + 1)")
+                jobConst = f"(CRAB_ReqName =?= {classad.quote(workflow)} && CRAB_DAGType =?= \"Job\")"
                 schedd.edit(rootConst, "CRAB_ResubmitCounter", resubmitCounterExpr)
+                schedd.edit(jobConst, "CRAB_ResubmitCounter", resubmitCounterExpr)
                 # finally restart the dagman with the 3 lines below
                 schedd.act(htcondor.JobAction.Hold, rootConst)
                 schedd.edit(rootConst, "HoldKillSig", 'SIGUSR1')
