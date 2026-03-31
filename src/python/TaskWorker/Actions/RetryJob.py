@@ -202,8 +202,6 @@ class RetryJob():
                 raise FatalError(f"Retry limit reached for exit {exitCode}: {policy['msg']}")
             self.logger.info(f"Applying retry policy for exit code {exitCode}")
             self.store_retry_actions(policy)
-            if exitCode in [8020, 8021, 8022, 8028, 84, 85, 86, 92, 134, 8001, 65]:
-                return
             raise RecoverableError(policy["msg"])
 
         if policy["type"] == "neutral":
@@ -432,58 +430,58 @@ class RetryJob():
             msg = "Job and stageout wrappers finished successfully (exit code %d)." % (exitCode)
             self.logger.info(msg)
             return 0
+        # else:
+        #     raise FatalError("Job wrapper finished with exit code %d.\nExit message:\n  %s" % (exitCode, exitMsg.replace('\n', '\n  ')))
 
         msg = "Job or stageout wrapper finished with exit code %d." % (exitCode)
         self.logger.info(msg)
 
-        # Wrapper script sometimes returns the posix return code (8 bits).
-        if exitCode in [8020, 8021, 8022, 8028] or exitCode in [84, 85, 86, 92]:
-            try:  # the following is still a bit experimental, make sure it never crashes the PJ
-                corruptedInputFile = self.check_corrupted_file(exitCode)
-            except Exception as e:  # pylint: disable=broad-except
-                msg = f"check_corrupted_file raised an exception:\n{e}\nIgnore and go on"
-                self.logger.error(msg)
-                corruptedInputFile = False
-            if corruptedInputFile:
-                exitMsg = "Fatal Root Error maybe a corrupted input file. This error is being reported"
-                self.create_fake_fjr(exitMsg, 8022, 8022, fatalError=False)  # retry the job
-            raise RecoverableError("Job failed to open local and fallback files.")
+        # # Wrapper script sometimes returns the posix return code (8 bits).
+        # if exitCode in [8020, 8021, 8022, 8028] or exitCode in [84, 85, 86, 92]:
+        #     try:  # the following is still a bit experimental, make sure it never crashes the PJ
+        #         corruptedInputFile = self.check_corrupted_file(exitCode)
+        #     except Exception as e:  # pylint: disable=broad-except
+        #         msg = f"check_corrupted_file raised an exception:\n{e}\nIgnore and go on"
+        #         self.logger.error(msg)
+        #         corruptedInputFile = False
+        #     if corruptedInputFile:
+        #         exitMsg = "Fatal Root Error maybe a corrupted input file. This error is being reported"
+        #         self.create_fake_fjr(exitMsg, 8022, 8022, fatalError=False)  # retry the job
+        #     raise RecoverableError("Job failed to open local and fallback files.")
 
-        if exitCode == 134:
-            recoverable_signal = False
-            try:
-                fname = os.path.realpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
-                with open(fname, encoding='utf-8') as fd:
-                    for line in fd:
-                        if line.startswith("== CMSSW:  A fatal system signal has occurred: illegal instruction"):
-                            recoverable_signal = True
-                            break
-            except Exception:  # pylint: disable=broad-except
-                msg = "Error analyzing abort signal."
-                msg += "\nDetails follow:"
-                self.logger.exception(msg)
-            if recoverable_signal:
-                raise RecoverableError("SIGILL; may indicate a worker node issue.")
+        # if exitCode == 134:
+        #     recoverable_signal = False
+        #     try:
+        #         fname = os.path.realpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
+        #         with open(fname, encoding='utf-8') as fd:
+        #             for line in fd:
+        #                 if line.startswith("== CMSSW:  A fatal system signal has occurred: illegal instruction"):
+        #                     recoverable_signal = True
+        #                     break
+        #     except Exception:  # pylint: disable=broad-except
+        #         msg = "Error analyzing abort signal."
+        #         msg += "\nDetails follow:"
+        #         self.logger.exception(msg)
+        #     if recoverable_signal:
+        #         raise RecoverableError("SIGILL; may indicate a worker node issue.")
 
-        if exitCode == 8001 or exitCode == 65:
-            cvmfs_issue = False
-            try:
-                fname = os.path.relpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
-                cvmfs_issue_re = re.compile("== CMSSW:  unable to load /cvmfs/.*file too short")
-                with open(fname, encoding='utf-8') as fd:
-                    for line in fd:
-                        if cvmfs_issue_re.match(line):
-                            cvmfs_issue = True
-                            break
-            except Exception:  # pylint: disable=broad-except
-                msg = "Error analyzing output for CVMFS issues."
-                msg += "\nDetails follow:"
-                self.logger.exception(msg)
-            if cvmfs_issue:
-                raise RecoverableError("CVMFS issue detected.")
-
-        if exitCode:
-            raise FatalError("Job wrapper finished with exit code %d.\nExit message:\n  %s" % (exitCode, exitMsg.replace('\n', '\n  ')))
+        # if exitCode == 8001 or exitCode == 65:
+        #     cvmfs_issue = False
+        #     try:
+        #         fname = os.path.relpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
+        #         cvmfs_issue_re = re.compile("== CMSSW:  unable to load /cvmfs/.*file too short")
+        #         with open(fname, encoding='utf-8') as fd:
+        #             for line in fd:
+        #                 if cvmfs_issue_re.match(line):
+        #                     cvmfs_issue = True
+        #                     break
+        #     except Exception:  # pylint: disable=broad-except
+        #         msg = "Error analyzing output for CVMFS issues."
+        #         msg += "\nDetails follow:"
+        #         self.logger.exception(msg)
+        #     if cvmfs_issue:
+        #         raise RecoverableError("CVMFS issue detected.")
+            
 
         return 0
 
