@@ -87,6 +87,7 @@ def addJobSubmitInfoToDagJobJDL(dagJdl, jobSubmit):
         'My.CMS_Type',
         'My.CMS_WMTool',
         'My.CMS_TaskType',
+        'My.CRAB_ResubmitCounter',
     ]
 
     for adName in adsToPort:
