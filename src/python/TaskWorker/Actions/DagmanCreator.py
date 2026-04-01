@@ -62,7 +62,6 @@ VARS Job{count} count="{count}"
 VARS Job{count} My.CRAB_localOutputFiles="\\"{localOutputFiles}\\""
 VARS Job{count} My.CRAB_DataBlock="\\"{block}\\""
 VARS Job{count} My.CRAB_Destination="\\"{destination}\\""
-ABORT-DAG-ON Job{count} 3
 """
 
 
@@ -346,7 +345,7 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_Publish'] =  "1" if task['tm_publication'] == 'T' else "0"
         jobSubmit['My.CRAB_PublishDBSURL'] = classad.quote(task['tm_publish_dbs_url'])
         jobSubmit['My.CRAB_ISB'] = classad.quote(task['tm_cache_url'])
-
+        jobSubmit['My.CRAB_ResubmitCounter'] = "0"
 
         # note about Lists
         # in the JDL everything is a string, we can't use the simple classAd[name]=somelist
@@ -885,7 +884,7 @@ class DagmanCreator(TaskAction):
 
         ## In the future this parameter may be set by the user in the CRAB configuration
         ## file and we would take it from the Task DB.
-        self.task['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
+        self.task['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 9)
 
         runtime = self.task['tm_split_args'].get('minutes_per_job', -1)
 
