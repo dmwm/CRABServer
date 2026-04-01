@@ -394,6 +394,9 @@ class PreJob:
         siteWhiteList = []
         siteBlackSet = set()
         siteWhiteSet = set()
+        inkey = str(crab_retry) if crab_retry == 0 else str(crab_retry - 1)
+        while inkey not in self.resubmit_info and int(inkey) > 0:
+            inkey = str(int(inkey) -  1)
         if not use_resubmit_info:
             if 'CRAB_SiteBlacklist' in self.task_ad:
                 if self.task_ad['CRAB_SiteBlacklist']:  # skip ad=''
@@ -404,9 +407,6 @@ class PreJob:
                     siteWhiteList = self.task_ad['CRAB_SiteWhitelist']
                     siteWhiteSet = set(siteWhiteList)
         else:
-            inkey = str(crab_retry) if crab_retry == 0 else str(crab_retry - 1)
-            while inkey not in self.resubmit_info and int(inkey) > 0:
-                inkey = str(int(inkey) -  1)
             siteBlackSet = set(self.resubmit_info[inkey].get('site_blacklist', []))
             siteWhiteSet = set(self.resubmit_info[inkey].get('site_whitelist', []))
         ## Save the current site black- and whitelists in self.resubmit_info for the
@@ -437,12 +437,15 @@ class PreJob:
             sys.exit(self.prejob_exit_code)
             
         # ExitCode Dependent discard of previous_site
-        retry_data = self.resubmit_info.get(str(crab_retry), {})
+        retry_data = self.resubmit_info.get(inkey, {})
         previous_site = retry_data.get("previous_site")
         if retry_data.get("change_site") and previous_site:
+            self.logger.info(f"Last Exit Code indicated that a change in site might help. inkey was {inkey}")
             if previous_site in availableSet:
                 self.logger.info(f"Removing previous site {previous_site} from candidate sites")
                 availableSet.discard(previous_site)
+        else:
+            self.logger.info(f"No need to discard last site. inkey was {inkey}")
 
         ## Make sure that attributest which will be used in MatchMaking are SORTED lists
         available = list(availableSet)
