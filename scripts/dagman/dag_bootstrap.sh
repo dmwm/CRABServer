@@ -26,12 +26,18 @@ outputDest=$9
 if [[ $scriptKind == "POSTJOB" ]] && [[ $outputDest =~ "/rucio/" ]] ; then
   pjlog=postjob.$crabId.$retry.txt
   defers=`grep -c DEFERRING $pjlog`  # there's one defer every 30min, so this counts time !
+  lastPJdate=`grep 'Deferring the execution' $pjlog |tail -1|cut -d ':' -f 1-3`
+  lastPJEpochTime=`date -d "$lastPJdate" +%s`
+  now=`date +%s`
+  let halfHoursSinceLastPJRun=($now-$lastPJEpochTime)/1800
   prob=1
   [[ $defers -ge 8 ]] && prob=$(($defers/4))  # see https://github.com/dmwm/CRABServer/issues/9079
   test=`shuf -i 1-$prob -n 1`  # a random integer in [`1...$prob]
   # the PostJob python script is only run if the random draw equals to 1
   # for the first 4 hours, $defers is < 8 and $prob is always 1 so $test is always 1
   # after 4 hours  we give it a 4/defers probability to actually run the python check
+  # Anyhow we run the test if 8 hours have passed since last time
+  if [ $halfHoursSinceLastPJRun -ge 16 ]; then test=1; fi
   if [ $test -ne 1 ] ; then
     echo `date` "dag_boostrap.sh DEFERRING. PostJob will run again after 30 min" >> $pjlog
     exit 4  # tells Dagman to re-run me after DEFER time indicated in Dagman file
