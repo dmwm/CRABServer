@@ -75,7 +75,7 @@ status_srv() {
     # Note that PID is actually PGID.
     script_env
     rc=0
-    out="$(wmc-httpd -s -d $STATEDIR $CFGFILE)" || rc=$?
+    out="$(python3 /usr/local/bin/wmc-httpd -s -d $STATEDIR $CFGFILE)" || rc=$?
     echo "${out}"
     pgid=$(echo "${out}" | awk '{print $NF}')
     if [[ "${pgid}" =~ ^[0-9]+$ ]]; then
