@@ -1,7 +1,10 @@
 from __future__ import division
-import time
-from WMCore.Configuration import Configuration
+
 import os
+import time
+import datetime
+
+from WMCore.Configuration import Configuration
 
 config = Configuration()
 
@@ -9,6 +12,9 @@ config.section_("General")
 config.General.instance = os.getenv('REST_Instance','test2')
 config.General.restHost = ''
 config.General.dbInstance = ''
+now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+filename_nopy =  __file__.split('/')[-1][:-3]
+config.General.requestName = filename_nopy + '_' + now_str
 config.General.workArea = '/tmp/crabStatusTracking_{}'.format(os.environ["CMSSW_release"])
 
 config.section_("JobType")

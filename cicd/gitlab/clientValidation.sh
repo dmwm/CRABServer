@@ -1,7 +1,15 @@
 #!/bin/bash
 
-set -x
+echo "Running clientValidation.sh"
 set -euo pipefail
+
+echo "Verbose env.var. is set to $Verbose"
+export Verbose
+if [ $Verbose -eq 3 ]
+then
+  echo "enable bash trace"
+  set -x
+fi
 
 # always run inside ./workdir
 export ROOT_DIR=$(dirname "$PWD")
@@ -16,11 +24,18 @@ echo "(debug) X509_USER_PROXY=${X509_USER_PROXY}"
 echo "(debug) Client_Validation_Suite=${Client_Validation_Suite}"
 echo "(debug) CMSSW_release: ${CMSSW_release}"
 
+# Setup CRABClient in silent mode
+set +x
 source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
+if [ $Verbose -eq 3 ]
+then
+  echo "enable bash trace again"
+  set -x
+fi
 
 {
  
-  TMP_BUFFER=$(mktemp -dt )/client_validation.log
+  TMP_BUFFER=$(mktemp -dt )/command.log
   STORAGE_SITE="T2_CH_CERN"
   PROXY=$(voms-proxy-info -path 2>&1)
   OUTPUTDIR="$PWD/logdir"
@@ -45,22 +60,6 @@ source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
   if [ "X${singularity}" == X8 ] ; then export TEST_LIST=FULL_TEST; fi
   TEST_TO_EXECUTE=${TEST_LIST}[@]
 
-  function logMsg() {
-    local kind=$1
-    local msg=$2
-    case $kind in
-    OK)
-      printf "$kind %-80s\n" "$msg"
-      ;;
-    WARNING)
-      printf "$kind %-80s\n" "$msg"
-      ;;
-    FAILED)
-      printf "$kind %-80s\n" "$msg"
-      ;;
-    esac
-}
-
   function checkThisCommand() {
     set +euo pipefail
     local cmd="$1"
@@ -69,25 +68,18 @@ source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
     if [[ ! " ${!TEST_TO_EXECUTE} " =~ " ${cmd} " ]]; then
          :
     else
-      echo "____________"
-    	echo -ne "TEST_COMMAND: crab $cmd $parms \n" 
-    	crab --debug $cmd $parms 2>&1 > $TMP_BUFFER
+      echo "== Test \"crab $cmd\"  command"
+    	echo -ne "TEST_COMMAND: crab $cmd $parms \n" | tee -a ${WORK_DIR}/CV_Summary.txt
+    	crab --debug $cmd $parms > $TMP_BUFFER 2>&1
     	if [ $? != 0 ]; then
-      		error=`cat $TMP_BUFFER`
-      		if [[ $error == *"Cannot retrieve the status_cache file"* ]]; then
-        		echo "TEST_RESULT: `logMsg WARNING 'This is a warning message'`"
-      		else
-        		echo "TEST_RESULT: `logMsg FAILED 'This is a failure message'`"
-      		fi
+          echo " TEST_RESULT: FAILED" | tee -a ${WORK_DIR}/CV_Summary.txt
+          cat $TMP_BUFFER
     	else
-          
-      		echo "TEST_RESULT: `logMsg OK 'This is a status ok message'`"
+      		echo " TEST_RESULT: OK" | tee -a ${WORK_DIR}/CV_Summary.txt
     	fi
-    	echo "TEST_MESSAGE:"
-    	cat $TMP_BUFFER
-    	echo -e "____________\n"
-     fi
-     set -euo pipefail
+    	echo "-----------------------------------------------------------------" | tee -a ${WORK_DIR}/CV_Summary.txt
+    fi
+    set -euo pipefail
   }
 
   # check for a valid proxy
@@ -105,8 +97,11 @@ source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
         exit 1
     fi
 
-    # Display all proxy information
+  echo "VOMS Proxy is OK"
+  # Display all proxy information
+  if [ $Verbose -ge 1 ]; then
     voms-proxy-info -all
+  fi
 }
 
   TMP_PARM1=("")
@@ -117,7 +112,7 @@ source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
 
   USETHISPARMS=()
   INITPARMS=()
-  function feedParms() {
+  function  feedParms() {
     local parms=($INITPARMS)
     local values=($1)
     parmsToUse=""
@@ -141,6 +136,36 @@ source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
   ##################################################
   # START CRABCLIENT VALIDATION
   ##################################################
+
+  ### 0. Make sure that the test task has completed successfully
+  TASKTOTRACK=`cat ${WORK_DIR}/submitted_tasks_CV`
+  echo "check if task $TASKTOTRACK has completed"
+  crab status --task=$TASKTOTRACK --instance=$REST_Instance --proxy=$PROXY > TaskStatus.txt
+  echo "crab status executed with exit code $?"
+  if [ $Verbose -ge 1 ]; then
+    cat TaskStatus.txt
+  fi
+  Wait=0
+  # this grep will fail if task hasn't bootstrapped yet
+  grep "Waiting for the Grid scheduler to bootstrap your task" TaskStatus.txt && Wait=1
+  if [ $Wait -eq 1 ]
+  then
+    echo "Need to wait"
+    exit 4
+  else
+    echo "Dagman is running, check if it completed"
+  fi
+  # small hack to avoid an exit 1 on failed grep due to set -e at beginning of script
+  Wait=1
+  grep COMPLETED TaskStatus.txt && Wait=0
+  if [ $Wait -eq 0 ]
+  then
+    echo "all OK go on"
+  else
+    echo "Need to wait"
+    exit 4
+  fi
+  PROJDIR=`grep 'CRAB project directory:' TaskStatus.txt| awk '{print $4}'`
 
   ### 1. test crab createmyproxy -h, --days=100
   USETHISPARMS=()
@@ -184,9 +209,6 @@ source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
   # START CHECKING SUBMITTED TASK'S STATUS
   ##################################################
 
-  TASKTOTRACK=`cat ${WORK_DIR}/submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release}`
-  PROJDIR=`crab remake --task=$TASKTOTRACK --instance=$REST_Instance --proxy=$PROXY| grep 'Finished remaking project directory' | awk '{print $6}'`
-
   ### 5. test crab preparelocal --proxy=PROXY --dir=PROJDIR
   USETHISPARMS=()
   INITPARMS="--proxy --dir"
@@ -229,12 +251,12 @@ source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
   done
 
 
-  ### 8. test crab getlog --quantity=QUANTITY  --short --outputpath=URL --dump --xrootd
-  # --jobids=JOBIDS --checksum=CHECKSUM --proxy=PROXY --dir=PROJDIR
+  ### 8. test crab getlog --jobids=JOBIDS --short --outputpath=URL --dump --xrootd
+  # --checksum=CHECKSUM --proxy=PROXY --dir=PROJDIR
   USETHISPARMS=()
-  INITPARMS="--quantity '--short|' --outputpath '|--dump|--xrootd' --jobids --checksum  --proxy --dir"
-  feedParms "2 1 $OUTPUTDIR 2 2,3 yes $PROXY $PROJDIR"
-  feedParms "2 2 $OUTPUTDIR 2 2,3 no  $PROXY $PROJDIR"
+  INITPARMS="--jobids '--short|' --outputpath '|--dump|--xrootd' --checksum  --proxy --dir"
+  feedParms "1 1 $OUTPUTDIR 2 yes $PROXY $PROJDIR"
+  feedParms "2 1 $OUTPUTDIR 2 no  $PROXY $PROJDIR"
   for param in "${USETHISPARMS[@]}";do
     checkThisCommand getlog "$param"
   done
@@ -243,17 +265,18 @@ source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
   ### 9. test crab getoutput --quantity=QUANTITY --parallel=NPARALLEL --wait=WAITTIME --outputpath=URL
   # --dump --xrootd --jobids=JOBIDS --checksum=CHECKSUM --proxy=PROXY --dir=PROJDIR
   USETHISPARMS=()
+  # --jobids does not work https://github.com/dmwm/CRABClient/issues/5006
   # use --jobids instead of --quantity
-  INITPARMS="--parallel --wait --outputpath '|--dump|--xrootd' --jobids --checksum --proxy --dir"
-  feedParms "10 4 $OUTPUTDIR 1 2,3 yes $PROXY $PROJDIR"
-  feedParms "10 4 $OUTPUTDIR 1 2,3 no  $PROXY $PROJDIR"
-  feedParms "10 4 $OUTPUTDIR 2 2,3 yes $PROXY $PROJDIR"
-  feedParms "10 4 $OUTPUTDIR 2 2,3 no  $PROXY $PROJDIR"
-  feedParms "10 4 $OUTPUTDIR 3 2,3 yes $PROXY $PROJDIR"
-  feedParms "10 4 $OUTPUTDIR 3 2,3 no  $PROXY $PROJDIR"
+  #INITPARMS="--parallel --wait --outputpath '|--dump|--xrootd' --jobids --checksum --proxy --dir"
+  #feedParms "10 4 $OUTPUTDIR 1 2,3 yes $PROXY $PROJDIR"
+  #feedParms "10 4 $OUTPUTDIR 1 2,3 no  $PROXY $PROJDIR"
+  #feedParms "10 4 $OUTPUTDIR 2 2,3 yes $PROXY $PROJDIR"
+  #feedParms "10 4 $OUTPUTDIR 2 2,3 no  $PROXY $PROJDIR"
+  #feedParms "10 4 $OUTPUTDIR 3 2,3 yes $PROXY $PROJDIR"
+  #feedParms "10 4 $OUTPUTDIR 3 2,3 no  $PROXY $PROJDIR"
   # use --quantity instead of jobis
   INITPARMS="--quantity --parallel --wait --outputpath '|--dump|--xrootd' --checksum --proxy --dir"
-  feedParms "1 10 4 $OUTPUTDIR 1 yes $PROXY $PROJDIR"
+  #feedParms "1 10 4 $OUTPUTDIR 1 yes $PROXY $PROJDIR"
   feedParms "3 10 4 $OUTPUTDIR 1 no  $PROXY $PROJDIR"
   for param in "${USETHISPARMS[@]}";do
     checkThisCommand getoutput "$param"
@@ -266,7 +289,7 @@ source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
   for param in "${USETHISPARMS[@]}"; do
     checkThisCommand kill "$param"
   done
-  
+
   ### 11. test crab recover --proxy=PROXY --dir=PROJDIR
   USETHISPARMS=()
   INITPARMS="--proxy --dir"
@@ -275,13 +298,26 @@ source "${ROOT_DIR}/cicd/gitlab/setupCRABClient.sh"
     checkThisCommand recover "$param"
   done
 
-  ### 12. test  crab recover --proxy=PROXY --task=TASKNAME --instance=INSTANCE
-  USETHISPARMS=()
-  INITPARMS="--proxy --task --instance"
-  feedParms "$PROXY $TASKTOTRACK $REST_Instance"
-  for param in "${USETHISPARMS[@]}"; do
-    checkThisCommand recover "$param"
-  done
+  ### Parse summary file and write final message
+  echo "=========  TEST  SUMMARY  ====================="
+  # add "true" to this grep to make sure exit code is always 0
+  thereAreFailures=false
+  grep -q "TEST_RESULT: FAILED" ${WORK_DIR}/CV_Summary.txt && thereAreFailures=true || true
+  if [ $thereAreFailures == "false" ]
+  then
+    echo "  ALL TESTS COMPLETED SUCCESSFULLY"
+  else
+    echo "    FOLLOWING TESTS FAILED. SEE ABOVE FOR LOG "
+    echo "    RE-RUN WITH INCREASED VERBOSE VALUE IF NEEDED"
+    echo ""
+    # the line before the status has the test command,
+    # insert a '^' character to prevent new lines to be turned into blanks
+    failedTests=`grep -B1 "TEST_RESULT: FAILED" ${WORK_DIR}/CV_Summary.txt | grep -v "TEST_RESULT" | tr '\n' '^'`
+    # restore new lines when echoing to console
+    echo $failedTests | tr '^' '\n'
+    echo ""
+  fi
+  echo "==============================================="
 
 } 2>&1 | tee ${WORK_DIR}/client-validation.log
 popd

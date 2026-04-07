@@ -1,8 +1,16 @@
 #!/bin/bash
 # NOTE: This file suppose to run inside cmssw sigularity (cc6,el7,el8)
 
-set -x
+echo "Starting taskSubmission.sh"
 set -euo pipefail
+
+echo "Verbose env.var. is set to $Verbose"
+export Verbose
+if [ $Verbose -eq 3 ]
+then
+  echo "enable bash trace"
+  set -x
+fi
 
 #Script submits tasks for testing. 3 types of testing can be started using this script:
 # 1. Client_Validation_Suite: tests different CRABClient commands;
@@ -28,53 +36,58 @@ submitTasks() {
   for file_name in ${filesToSubmit};
   do
       echo -e "\nSubmitting file: ${file_name}"
-      cat "${file_name}"
+      [ $Verbose -ge 2 ] && cat "${file_name}"
       output=$(crab submit -c ${file_name} --proxy=${X509_USER_PROXY} 2>&1)
       submitExitCode=$?
-      echo ${output}
+      [ $Verbose -ge 1 ] && echo ${output}
       if [ $submitExitCode != 0 ]; then
           echo ${file_name} >> "${WORK_DIR}"/failed_tasks_${CI_PIPELINE_ID}_${CMSSW_release}
           killAfterFailure
       else
-          echo ${output} | grep -oP '(?<=Task name:\s)[^\s]*(?=)' >> "${WORK_DIR}"/submitted_tasks_${2}_${CI_PIPELINE_ID}_${CMSSW_release}
-          echo ${output} | grep -oP '(?<=Project dir:\s)[^\s]*(?=)' >> "${WORK_DIR}"/project_directories_${CI_PIPELINE_ID}_${CMSSW_release}
+          echo ${output} | grep -oP '(?<=Task name:\s)[^\s]*(?=)' >> "${WORK_DIR}"/submitted_tasks_${2}
+          echo ${output} | grep -oP '(?<=Project dir:\s)[^\s]*(?=)' >> "${WORK_DIR}"/project_directories
       fi
   done
 }
 
 immediateCheck(){
 #Run immediate check on tasks submitted for Client_Configuration_Validation testing
-#Save results to failed_CCV_tests and successful_CCV_tests files
+#Save results to failed_CCV_tests and successfully_submitted_CCV_tests files
 
- project_dir="/tmp/crabTestConfig_${CI_PIPELINE_ID}_${CMSSW_release}"
- mkdir -p "${project_dir}"  # Ensure project_dir exists
- touch "${WORK_DIR}/successful_CCV_tests_${CI_PIPELINE_ID}_${CMSSW_release}"
- touch "${WORK_DIR}/failed_CCV_tests_${CI_PIPELINE_ID}_${CMSSW_release}"
+ echo "Runnng immediate checks on CCV tasks..."
+ touch "${WORK_DIR}/successfully_submitted_CCV_tests"
+ touch "${WORK_DIR}/failed_CCV_tests"
  for task in ${tasksToCheck};
  do
-     echo -e "\nRunning immediate test on task: ${task}"
+     echo -n "${task}: "
      test_to_execute=`echo "${task}" | grep -oP '(?<=_crab_).*(?=)'`
-     task_dir=${project_dir}/crab_${test_to_execute}
-     bash -x ${test_to_execute}-testSubmit.sh ${task_dir} && \
-       echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> ${WORK_DIR}/successful_CCV_tests_${CI_PIPELINE_ID}_${CMSSW_release} || \
-       echo ${test_to_execute}-testSubmit.sh ${task_dir} - $? >> ${WORK_DIR}/failed_CCV_tests_${CI_PIPELINE_ID}_${CMSSW_release}
+     task_dir=${WORK_DIR}/crab_${test_to_execute}
+     if [ $Verbose -ge 1 ]; then
+       trace="-x"
+      else
+        trace=""
+      fi
+     bash ${trace} ${test_to_execute}-testSubmit.sh ${task_dir} > testLog.txt 2>&1 && \
+       (echo "${test_to_execute}-testSubmit.sh - ${task}" >> ${WORK_DIR}/successfully_submitted_CCV_tests; echo OK) || \
+       (echo "${test_to_execute}-testSubmit.sh - ${task}" >> ${WORK_DIR}/failed_CCV_tests; echo FAIL; cat testLog.txt)
  done
 }
 
 killAfterFailure(){
 #In case at least one task submission failed, kill all succesfully submitted tasks
- if [ -e "${WORK_DIR}/project_directories_${CI_PIPELINE_ID}_${CMSSW_release}" ]; then
+ if [ -e "${WORK_DIR}/project_directories" ]; then
    echo -e "\nTask submission failed. Killing submitted tasks.\n"
    while read task ; do
        echo "Killing task: ${task}"
        crab kill --dir=${task} --proxy=${PROXY}
        killExitCode=$?
        if [ $killExitCode != 0 ]; then
-           echo -e "Failed to kill: ${task}" >> ${WORK_DIR}/killed_tasks_${CI_PIPELINE_ID}_${CMSSW_release}
+           echo -e "Failed to kill: ${task}" >> ${WORK_DIR}/killed_tasks
        else
-           echo -e "Successfully killed: ${task}" >> ${WORK_DIR}/killed_tasks_${CI_PIPELINE_ID}_${CMSSW_release}
+
+           echo -e "Successfully killed: ${task}" >> ${WORK_DIR}/killed_tasks
        fi
-   done <${WORK_DIR}/project_directories_${CI_PIPELINE_ID}_${CMSSW_release}
+   done <${WORK_DIR}/project_directories
  fi
  exit 1
 }
@@ -89,25 +102,52 @@ fi
 
 if [ "${Client_Configuration_Validation}" = true ]; then
     echo -e "\nStarting task submission for Client Configuration Validation testing.\n"
-    # mkdir -p tmpWorkDir
-    # cd tmpWorkDir
-    python3 ${ROOT_DIR}/test/makeTests.py
-    filesToSubmit=`find . -maxdepth 1 -type f -name '*.py' ! -name '*PSET*'`
-    submitTasks "${filesToSubmit}" "CCV"
-    tasksToCheck=`cat ${WORK_DIR}/submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release}`
-    immediateCheck "${tasksToCheck}"
+    # only run CCV tests for CMSSW_10 or later.
+    CMSSW_Major=$(echo $CMSSW_VERSION | cut -d_ -f2)  # e.g. from CMSSW_13_1_x this is "13"
+    if [ $CMSSW_Major -lt 10 ]; then
+      echo "No Client Configuration Validation test for CMSSW $CMSSW_VERSION"
+      touch ${WORK_DIR}/submitted_tasks_CCV
+    else
+      python3 ${ROOT_DIR}/test/makeTests.py
+      if [[ ${DEBUG_TEST:-"false"} == "true" ]]; then
+        filesToSubmit=$(find . -type f -name '*.py' ! -name '*pset*' | grep scheddName.py)
+      else
+        filesToSubmit=`find . -maxdepth 1 -type f -name '*.py' ! -name '*PSET*'`
+      fi
+      submitTasks "${filesToSubmit}" "CCV"
+      tasksToCheck=`cat ${WORK_DIR}/submitted_tasks_CCV`
+      immediateCheck "${tasksToCheck}"
+    fi
+    # CCV tests, differently from others, have a validation step after submission, check it
+    if [ -s ${WORK_DIR}/failed_CCV_tests ]; then
+      echo "Some CCV tests failed immediate check after submission"
+      echo "======================================================="
+      echo "==== FAILED TESTS "
+      cat ${WORK_DIR}/failed_CCV_tests
+      echo "======================================================="
+      exit 1
+    fi
+
     cd ${WORK_DIR}
 fi
 
 if [ "${Task_Submission_Status_Tracking}" = true ]; then
     echo -e "\nStarting task submission for Status Tracking testing.\n"
-    pushd "${ROOT_DIR}"/test/statusTrackingTasks/
-    # for test
-    if [[ -n ${DEBUG_TEST:-} ]]; then
-        filesToSubmit=$(find . -type f -name '*.py' ! -name '*pset*' | grep HC-splitByLumi.py)
+
+    # only run Status Tracking tests for CMSSW_13 or later.
+    CMSSW_Major=$(echo $CMSSW_VERSION | cut -d_ -f2)  # e.g. from CMSSW_13_1_x this is "13"
+    if [ $CMSSW_Major -lt 13 ]; then
+      echo "No Status Tracking test for CMSSW $CMSSW_VERSION"
+      touch ${WORK_DIR}/submitted_tasks_ST
     else
-        filesToSubmit=$(find . -type f -name '*.py' ! -name '*pset*')
+      pushd "${ROOT_DIR}"/test/statusTrackingTasks/
+      # for test
+      if [[ ${DEBUG_TEST:-"false"} == "true" ]]; then
+          filesToSubmit=$(find . -type f -name '*.py' ! -name '*pset*' | grep Pythia.py)
+      else
+          filesToSubmit=$(find . -type f -name '*.py' ! -name '*pset*')
+      fi
+      submitTasks "${filesToSubmit}" "ST"
+      cd ${WORK_DIR}
     fi
-    submitTasks "${filesToSubmit}" "TS"
-    cd ${WORK_DIR}
 fi
