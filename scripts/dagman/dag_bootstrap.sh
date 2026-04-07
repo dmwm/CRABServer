@@ -37,7 +37,7 @@ if [[ $scriptKind == "POSTJOB" ]] && [[ $outputDest =~ "/rucio/" ]] ; then
   # for the first 4 hours, $defers is < 8 and $prob is always 1 so $test is always 1
   # after 4 hours  we give it a 4/defers probability to actually run the python check
   # Anyhow we run the test if 8 hours have passed since last time
-  if [ $halfHoursSinceLastPJRun -eq 16 ]; then test=1; fi
+  if [ $halfHoursSinceLastPJRun -ge 16 ]; then test=1; fi
   if [ $test -ne 1 ] ; then
     echo `date` "dag_boostrap.sh DEFERRING. PostJob will run again after 30 min" >> $pjlog
     exit 4  # tells Dagman to re-run me after DEFER time indicated in Dagman file
