@@ -5,6 +5,8 @@ default:
     - crab3
 
 variables:
+  # having descriptions, options and value simplifies manually triggering the pipeline
+  # Ref: https://docs.gitlab.com/ci/pipelines/#prefill-variables-in-manual-pipelines
   VERBOSE:
     description: "Will pass $Verbose env. var. to various scripts 0=~silent, 1=medium, 2=long, 3=fullblown"
     options:
@@ -14,6 +16,17 @@ variables:
       - "3"
     value: "0"
   # DEBUG _TEST do not uncomment !! if not set, is ignored, if set (any value) ST will use only one task to allow quick debug
+  ENV_NAME:
+    description: "the target for deployment and test: preprod or testX, if empty will be taken from tag name"
+    options:
+      - ""
+      - "preprod"
+      - "test1"
+      - "test2"
+      - "test11"
+      - "test12"
+      - "test14"
+    value: ""
   IMAGE_TAG:
     description: "tag for the image to be built/deployed"
     value: "${CI_COMMIT_REF_SLUG}"  # to distinct it from commit tag and final image tag
