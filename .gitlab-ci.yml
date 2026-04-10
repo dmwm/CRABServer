@@ -5,9 +5,31 @@ default:
     - crab3
 
 variables:
-  VERBOSE: "0"  # will pass $Verbose env. var. to various scripts 0=~silent, 1=medium, 2=long, 3=fullblown
+  # having descriptions, options and value simplifies manually triggering the pipeline
+  # Ref: https://docs.gitlab.com/ci/pipelines/#prefill-variables-in-manual-pipelines
+  VERBOSE:
+    description: "Will pass $Verbose env. var. to various scripts 0=~silent, 1=medium, 2=long, 3=fullblown"
+    options:
+      - "0"
+      - "1"
+      - "2"
+      - "3"
+    value: "0"
   # DEBUG _TEST do not uncomment !! if not set, is ignored, if set (any value) ST will use only one task to allow quick debug
-  IMAGE_TAG: "${CI_COMMIT_REF_SLUG}"  # to distinct it from commit tag and final image tag
+  ENV_NAME:
+    description: "the target for deployment and test: preprod or testX, if empty will be taken from tag name"
+    options:
+      - ""
+      - "preprod"
+      - "test1"
+      - "test2"
+      - "test11"
+      - "test12"
+      - "test14"
+    value: ""
+  IMAGE_TAG:
+    description: "tag for the image to be built/deployed"
+    value: "${CI_COMMIT_REF_SLUG}"  # to distinct it from commit tag and final image tag
   RELEASE_IMAGE_TAG: "${CI_COMMIT_TAG}-stable" # final tag name, e.g., v3.240904-stable
   # The `DOCKER_TLS_CERTDIR` variables is needed to run Docker-in-Docker, `DOCKER_BUILDKIT` is to make sure the docker build use the new BuildKit.
   # https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#docker-in-docker-with-tls-enabled-in-the-docker-executor
@@ -15,13 +37,48 @@ variables:
   # https://docs.docker.com/build/cache/backends/
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
-  STATUS_TRACKING: "true"
-  CLIENT_CONFIGURATION_VALIDATION: "true"
-  CLIENT_VALIDATION: "true"
-  SKIP_BUILD: "false"
-  SKIP_DEPLOY: "false"
-  SKIP_SUBMIT: "false"
-  SKIP_CLEANUP: "false"
+  STATUS_TRACKING:
+    description: "Whether to execute StatusTracking tests"
+    options:
+      - "true"
+      - "false"
+    value: "true"
+  CLIENT_CONFIGURATION_VALIDATION:
+    description: "Whether to execute CCV tests"
+    options:
+      - "true"
+      - "false"
+    value: "true"
+  CLIENT_VALIDATION:
+    description: "Whether to execute CV tests"
+    options:
+      - "true"
+      - "false"
+    value: "true"
+  SKIP_BUILD:
+    description: "Skip build step"
+    options:
+      - "true"
+      - "false"
+    value: "false"
+  SKIP_DEPLOY:
+    description: "Skip deploy step"
+    options:
+      - "true"
+      - "false"
+    value: "false"
+  SKIP_SUBMIT:
+    description: "Skip submit step"
+    options:
+      - "true"
+      - "false"
+    value: "false"
+  SKIP_CLEANUP:
+    description: "Skip Rucio rules cleanup step"
+    options:
+      - "true"
+      - "false"
+    value: "false"
 
 # This key define variables which are later used in `!reference` tag in `rules`.
 # Ref https://docs.gitlab.com/ee/ci/jobs/index.html#hide-jobs
