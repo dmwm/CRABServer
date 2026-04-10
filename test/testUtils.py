@@ -1,10 +1,17 @@
-from __future__ import division
-from __future__ import print_function
+# we need \$ in some strings, sorry pylint !
+# pylint: disable=anomalous-backslash-in-string
+"""
+BEWARE: MUST KEEP THIS COMPATIBLE WITH PYTHON 2.7
+"""
 
 import os
 
 commonBashFunctions = """#!/bin/bash
 # a few utility functions for submission and check scripts
+# NOTE: this will be executed inside another shell script, so bash functions must
+# always end with 'return' and never do 'exit 1' which would abruptly exit the shell
+# including the calling script
+#
 # exit status meaning:
 # 0: OK   1: FAIL   2: TRY AGAIN LATER
 
@@ -16,18 +23,47 @@ function checkStatus {
   # Fail test if command fails or status is not good
   local taskName="$1"
   local targetStatus="$2"
+  
+  if [ $Verbose -ge 1 ]; then
+    echo "look for status: $targetStatus"
+  fi
 
-  crab remake --task ${taskName} --instance=REST_Instance --proxy=$PROXY 2>&1 | tee remakeLog.txt 
-  [ $? -ne 0 ] && exit 1  # if remake fails, abort
-  grep -q Success remakeLog.txt || exit 1  # if log does not contain "Success" string, abort
-  workDir=`grep Success remakeLog.txt | awk '{print $NF}'`
-  crab status -d $workDir --proxy=$PROXY 2>&1 | tee  statusLog.txt
-  [ $? -ne 0 ] && exit 1  # if crab status fails, abort
-
+  # temporarily unset "exit on error" if any so to properly catch exit status and act on it
+  exitStatus=$(
+    set +e
+    crab status --task ${taskName} --instance=REST_Instance --proxy=$PROXY  >  statusLog.txt 2>&1
+    echo $?
+  )
+  if [ $exitStatus -ne 0 ]; then
+    echo "crab status command failed:"
+    cat statusLog.txt
+    echo "====  ABORT"
+    return 1
+  fi
+  workDir=$(grep "CRAB project directory" statusLog.txt | awk '{print $NF}')
+  [ $Verbose -ge 1 ] && grep  "Status on the CRAB server" statusLog.txt  # print relevant line from log
+  statusOnServer=$(grep  "Status on the CRAB server" statusLog.txt | awk '{print $NF}')
+  case $statusOnServer in
+    SUBMITFAILED | SUBMITREFUSED)
+      # fail immediately on failed submission
+      cat statusLog.txt; return 1 ;;  
+    SUBMITTED)
+      [ $Verbose -ge 1 ] && echo "All OK. Go on with test" ;;
+    *)
+      [ $Verbose -ge 1 ] && echo "Need to wait"; return 2 ;;
+  esac
+  
+  # if task was submitted, check status on condor side
+  
   local isSub=0
+  local isRunning=0
   local isDone=0
   local isFailed=0
+  
+  [ $Verbose -ge 1 ] && grep -E "bootstrap|Status on the scheduler" statusLog.txt  # print log relevant lines
+  grep -q "bootstrap" statusLog.txt 2>&1 && isSub=1  # waiting for bootstrap
   grep -q "Status on the scheduler:.*SUBMITTED" statusLog.txt 2>&1 && isSub=1
+  grep -q "Status on the scheduler:.*RUNNING" statusLog.txt 2>&1 && isRunning=1
   grep -q "Status on the scheduler:.*COMPLETED" statusLog.txt 2>&1 && isDone=1
   grep -q "Status on the scheduler:.*FAILED" statusLog.txt 2>&1 && isFailed=1
 
@@ -36,16 +72,16 @@ function checkStatus {
       # no check is needed
       ;;
     SUBMITTED)
-      # any of SUBMITTED or COMPLETED or FAILED are OK
-      [ ${isSub} -eq 0 ] && [ ${isDone} -eq 0 ] && [ ${isFailed} -eq 0 ] && exit 1
+      # any of SUBMITTED or RUNNING or COMPLETED or FAILED are OK
+      [ ${isSub} -eq 0 ] && [ ${isDone} -eq 0 ] && [ ${isRunning} -eq 0 ] && [ ${isFailed} -eq 0 ] && return 1
       ;;
     COMPLETED)
-      [ ${isSub} -eq 1 ] && return 2  # ask for a check later on
-      [ ${isDone} -eq 0 ] && exit 1
+      ( [ ${isSub} -eq 1 ] || [ ${isRunning} -eq 1 ] ) && return 2  # ask for a check later on
+      [ ${isDone} -eq 0 ] && return 1
       ;;
     COMPFAIL)
-      [ ${isSub} -eq 1 ] && return 2  # ask for a check later on
-      [ ${isDone} -eq 0 ] && [ ${isFailed} -eq 0 ] && exit 1
+      ( [ ${isSub} -eq 1 ] || [ ${isRunning} -eq 1 ] ) && return 2  # ask for a check later on
+      [ ${isDone} -eq 0 ] && [ ${isFailed} -eq 0 ] && return 1
   esac
   return 0
 }
@@ -54,28 +90,54 @@ function lookFor {
   # looks for string in file. Fail test if not found
   local string="$1"
   local file="$2"
-  grep -q "${string}" ${file}
-  [ $? -ne 0 ] && return 1
-  return 0
+  [ $Verbose -ge 1 ] && echo "look for string \'$1\' in file $2"
+  found="True"
+  grep -q "${string}" ${file} || found="False"
+  if  [ $found == "True" ]; then
+    [ $Verbose -ge 1 ] && echo "OK"
+    return 0
+  else
+    echo "==> TEST FAILED: string \'${string}\' not found in file ${file}"
+    return 1
+  fi
 }
 
 function lookInTarFor {
   # looks for file in tarball. Fail test if not found
   local file="$1"
   local tarball="$2"
-  tar tf ${tarball} | grep -q ${file}
-  [ $? -ne 0 ] && return 1
-  return 0
+  [ $Verbose -ge 1 ] && echo "look for file \'$1\' in tarball $2"
+  found="True"
+  tar tf ${tarball} | grep -q ${file} || found="False"
+  if  [ $found == "True" ]; then
+    [ $Verbose -ge 1 ] && echo "OK"
+    return 0
+  else
+    echo "==> TEST FAILED: file \'${file}\' not found in tarball ${tarball}"
+    return 1
+  fi
 }
 
 function crabCommand() {
-  # execute crab command and write commandLog.txt.
+  # execute crab command and write commandLog.txt
   # Fails test if command exit code is non 0
   local cmd="$1"
   local params="$2"
-  crab $cmd $params 2>&1 | tee commandLog.txt
-  [ $? -ne 0 ] && exit 1
-  return 0
+  # it is a bit tricky to capture crab command exit status w/o exiting due to
+  # set -eou pipefail because crab get* prints something to stdout in spite of redirection
+  # Temporarily unset set -e if set using trick from ref: https://superuser.com/a/1458830
+  oldopt=$-
+  set +e
+  crab $cmd $params > commandLog.txt 2>&1
+  exitCode=$?
+  set -$oldopt || true  # add true for extra-safety in case the set fails after setting -e (e.g. interactive test)
+  if [ $exitCode -ne 0 ]; then
+    echo "==> TEST FAILED: crab $cmd FAILED"
+    cat commandLog.txt
+    return 1
+  else
+    return 0
+  fi
 }
 """
 
@@ -91,7 +153,7 @@ config = Configuration()
 
 config.section_('General')
 config.General.instance = 'REST_Instance'
-config.General.workArea = 'ROOT_DIR'
+config.General.workArea = os.getenv('WORK_DIR', os.getcwd())
 config.General.requestName = REQUESTNAME
 
 config.section_('JobType')
@@ -155,7 +217,7 @@ commonBashFunctions = commonBashFunctions.replace('REST_Instance', restInstance)
 standardConfig = standardConfig.replace('REST_Instance', restInstance)
 
 def writePset():
-    with open('PSET.py', 'w') as fp:
+    with open('PSET.py', 'w', encoding='utf-8') as fp:
         fp.write(psetFileContent)
     return
 
@@ -168,19 +230,19 @@ def writePset8cores():
             break
     if existingLine:
         pset8c = psetFileContent.replace(existingLine, existingLine+newLine)
-    with open('PSET-8cores.py', 'w') as fp:
+    with open('PSET-8cores.py', 'w', encoding='utf-8') as fp:
         fp.write(pset8c)
     return
 
 def writeScriptExe():
-    with open('SIMPLE-SCRIPT.sh', 'w') as fp:
+    with open('SIMPLE-SCRIPT.sh', 'w', encoding='utf-8') as fp:
         fp.write(simpleScriptExe)
     os.chmod('SIMPLE-SCRIPT.sh', 0o744)  # script needs to be executable
     return
 
 def writeLumiMask():
     lumiMaskForMC = '{"1": [[1,10],[20,25]]}'
-    with open('lumiMask.json', 'w') as fp:
+    with open('lumiMask.json', 'w', encoding='utf-8') as fp:
         fp.write(lumiMaskForMC)
     return
 
@@ -223,19 +285,19 @@ def writeConfigFile(testName=None, listOfDicts=None):
 
     # also set the requestName (do it now to avoid confusing changeInConf)
     conf = conf.replace('REQUESTNAME', '"'+testName+'"')
-    with open(testName + '.py', 'w') as fp:
+    with open(testName + '.py', 'w', encoding='utf-8') as fp:
         fp.write(conf)
     return
 
 def writeValidationScript(testName=None, validationScript=None):
-    with open(testName + '-check.sh', 'w') as fp:
+    with open(testName + '-check.sh', 'w', encoding='utf-8') as fp:
         fp.write(commonBashFunctions)
         fp.write('taskName="$1"\n\n')
         fp.write(validationScript)
     return
 
 def writeTestSubmitScript(testName=None, testSubmitScript=None):
-    with open(testName + '-testSubmit.sh', 'w') as fp:
+    with open(testName + '-testSubmit.sh', 'w', encoding='utf-8') as fp:
         fp.write(commonBashFunctions)
         fp.write('workDir="$1"\n\n')
         fp.write(testSubmitScript)

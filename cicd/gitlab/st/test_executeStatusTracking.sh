@@ -1,5 +1,5 @@
 #! /bin/bash
-# Note: prepare $ROOT_DIR/workdir2 with submitted_tasks_TS before run this script
+# Note: prepare $ROOT_DIR/workdir2 with submitted_tasks_ST before run this script
 set -euo pipefail
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 pushd "${ROOT_DIR}"
@@ -16,7 +16,7 @@ export SCRAM_ARCH=el8_amd64_gcc11
 export Check_Publication_Status=Yes
 export CRABClient_version=prod
 if [[ -n "${MANUAL_TASKNAME:-}" ]]; then
-    echo "${MANUAL_TASKNAME}" > workdir/submitted_tasks_TS
+    echo "${MANUAL_TASKNAME}" > workdir/submitted_tasks_ST
 fi
 bash -x cicd/gitlab/retry.sh bash -x cicd/gitlab/executeStatusTracking.sh
 popd

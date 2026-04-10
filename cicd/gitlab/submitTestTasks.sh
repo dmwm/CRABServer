@@ -1,5 +1,14 @@
 #! /bin/bash
+echo "Starting submitTestTasks.sh"
 set -euo pipefail
+
+echo "Verbose env.var. is set to $Verbose"
+export Verbose
+if [ $Verbose -eq 3 ]
+then
+  echo "enable bash trace"
+  set -x
+fi
 
 # default values
 export Client_Validation_Suite="${Client_Validation_Suite:-}"
@@ -20,9 +29,9 @@ echo "(DEBUG) CI_PIPELINE_ID: ${CI_PIPELINE_ID}"
 
 # always run inside ./workdir
 export ROOT_DIR=$PWD
-export WORK_DIR=$PWD/workdir
-mkdir -p workdir
-pushd "${WORK_DIR}"
+export WORK_DIR=${PWD}/workdir_${CI_PIPELINE_ID}_${CMSSW_release}
+mkdir -p $WORK_DIR
+pushd ${WORK_DIR}
 
 # Get configuration from CMSSW_release
 CONFIG_LINE="$(grep "CMSSW_release=${CMSSW_release};" "${ROOT_DIR}"/test/testingConfigs)"
@@ -50,7 +59,7 @@ if $ERR ; then
     echo -e "Something went wrong during task submission. None of the downstream jobs were triggered."
     exit 1
 else
-    declare -A tests=( ["Task_Submission_Status_Tracking"]=submitted_tasks_TS_${CI_PIPELINE_ID}_${CMSSW_release} ["Client_Validation_Suite"]=submitted_tasks_CV_${CI_PIPELINE_ID}_${CMSSW_release} ["Client_Configuration_Validation"]=submitted_tasks_CCV_${CI_PIPELINE_ID}_${CMSSW_release})
+    declare -A tests=( ["Task_Submission_Status_Tracking"]=submitted_tasks_ST ["Client_Validation_Suite"]=submitted_tasks_CV ["Client_Configuration_Validation"]=submitted_tasks_CCV)
     for test in "${!tests[@]}";
     do
         path="${WORK_DIR}/${tests[$test]}"
