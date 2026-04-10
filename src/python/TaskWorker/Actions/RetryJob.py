@@ -37,17 +37,17 @@ EXIT_RETRY_POLICY = {
     147: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
     60311: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
     151: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
-    8028: {"type": "recoverable", "max_retries": 9, "delay": 900, "msg": "Job failed to open local and fallback files."},
-    8021: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileReadError (May be a site error).", "change_site": True},
-    8020: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileOpenError (Likely a site error).", "change_site": True, "increase_memory": True, "memory_factor": 1.3, "increase_runtime": True, "runtime_factor": 1.3},
-    8022: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FatalRootError."},
-    84: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Some required file not found; check logs for name of missing file."},
-    85: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files."},
-    86: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files."},
-    92: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files."},
-    134: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Abort (ANSI) or IOT trap (4.2 BSD) (most likely user application crashed)."},
-    8001: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Other CMS Exception."},
-    65: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "End of job from user application (CMSSW)."},
+    8028: {"type": "recoverable", "max_retries": 9, "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
+    8021: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileReadError (May be a site error).", "change_site": True, "handler": "handle_file_open_or_root_error"},
+    8020: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileOpenError (Likely a site error).", "change_site": True, "increase_memory": True, "memory_factor": 1.3, "increase_runtime": True, "runtime_factor": 1.3, "handler": "handle_file_open_or_root_error"},
+    8022: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FatalRootError.", "handler": "handle_file_open_or_root_error"},
+    84: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Some required file not found; check logs for name of missing file.", "handler": "handle_file_open_or_root_error"},
+    85: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
+    86: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
+    92: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
+    134: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Abort (ANSI) or IOT trap (4.2 BSD) (most likely user application crashed).", "handler": "handle_sigabrt"},
+    8001: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Other CMS Exception.", "handler": "handle_cvmfs_or_cms_exception"},
+    65: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "End of job from user application (CMSSW).", "handler": "handle_cvmfs_or_cms_exception"},
     "default": {"type": "neutral", "max_retries": 2, "delay": 900, "msg": "Taking default exit code retry policy route."}
 }
 
@@ -188,6 +188,68 @@ class RetryJob():
 
         return effective_max_retries
 
+    def handle_file_open_or_root_error(self, exitCode):
+        """
+        Handle exit codes related to file open/read/root failures (8020, 8021, 8022, 8028, 84, 85, 86, 92).
+        Checks for corrupted input files; if found, creates a fake FJR with code 8022
+        and allows a retry. Otherwise raises RecoverableError with the policy message.
+        """
+        try:
+            corruptedInputFile = self.check_corrupted_file(exitCode)
+        except Exception as e:  # pylint: disable=broad-except
+            self.logger.error(f"check_corrupted_file raised an exception:\n{e}\nIgnore and go on")
+            corruptedInputFile = False
+        if corruptedInputFile:
+            exitMsg = "Fatal Root Error: possible corrupted input file. Reporting and retrying."
+            self.create_fake_fjr(exitMsg, 8022, 8022, fatalError=False)
+        raise RecoverableError(EXIT_RETRY_POLICY[exitCode]["msg"])
+
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def handle_sigabrt(self, exitCode):
+        """
+        Handle exit code 134 (SIGABRT / IOT trap).
+        Checks job stdout for a SIGILL pattern; if found, promotes to a recoverable
+        SIGILL error. Otherwise raises the default RecoverableError.
+        """
+        recoverable_signal = False
+        try:
+            fname = os.path.realpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
+            with open(fname, encoding='utf-8') as fd:
+                for line in fd:
+                    if line.startswith("== CMSSW:  A fatal system signal has occurred: illegal instruction"):
+                        recoverable_signal = True
+                        break
+        except Exception:  # pylint: disable=broad-except
+            msg = "Error analyzing abort signal.\nDetails follow:"
+            self.logger.exception(msg)
+        if recoverable_signal:
+            raise RecoverableError("SIGILL; may indicate a worker node issue.")
+
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def handle_cvmfs_or_cms_exception(self, exitCode):
+        """
+        Handle exit codes 8001 and 65 (CMS exceptions / end-of-job).
+        Scans job stdout for a truncated CVMFS file pattern; if found raises a
+        specific RecoverableError, otherwise raises the default one.
+        """
+        cvmfs_issue = False
+        try:
+            fname = os.path.relpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
+            cvmfs_issue_re = re.compile(r"== CMSSW:  unable to load /cvmfs/.*file too short")
+            with open(fname, encoding='utf-8') as fd:
+                for line in fd:
+                    if cvmfs_issue_re.match(line):
+                        cvmfs_issue = True
+                        break
+        except Exception:  # pylint: disable=broad-except
+            msg = "Error analyzing output for CVMFS issues.\nDetails follow:"
+            self.logger.exception(msg)
+        if cvmfs_issue:
+            raise RecoverableError("CVMFS issue detected.")
+
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def apply_retry_policy(self, exitCode):
         """
@@ -202,6 +264,14 @@ class RetryJob():
                 raise FatalError(f"Retry limit reached for exit {exitCode}: {policy['msg']}")
             self.logger.info(f"Applying retry policy for exit code {exitCode}")
             self.store_retry_actions(policy)
+            # Dispatch to a handler if one is registered for this exit code.
+            handler_name = policy.get("handler")
+            if handler_name:
+                handler = getattr(self, handler_name, None)
+                if handler is None:
+                    self.logger.error(f"Handler '{handler_name}' not found on RetryJob.")
+                else:
+                    handler(exitCode)  
             raise RecoverableError(policy["msg"])
 
         if policy["type"] == "neutral":
@@ -430,58 +500,11 @@ class RetryJob():
             msg = "Job and stageout wrappers finished successfully (exit code %d)." % (exitCode)
             self.logger.info(msg)
             return 0
-        # else:
-        #     raise FatalError("Job wrapper finished with exit code %d.\nExit message:\n  %s" % (exitCode, exitMsg.replace('\n', '\n  ')))
+        else:
+            raise FatalError("Job wrapper finished with exit code %d.\nExit message:\n  %s" % (exitCode, exitMsg.replace('\n', '\n  ')))
 
         msg = "Job or stageout wrapper finished with exit code %d." % (exitCode)
-        self.logger.info(msg)
-
-        # # Wrapper script sometimes returns the posix return code (8 bits).
-        # if exitCode in [8020, 8021, 8022, 8028] or exitCode in [84, 85, 86, 92]:
-        #     try:  # the following is still a bit experimental, make sure it never crashes the PJ
-        #         corruptedInputFile = self.check_corrupted_file(exitCode)
-        #     except Exception as e:  # pylint: disable=broad-except
-        #         msg = f"check_corrupted_file raised an exception:\n{e}\nIgnore and go on"
-        #         self.logger.error(msg)
-        #         corruptedInputFile = False
-        #     if corruptedInputFile:
-        #         exitMsg = "Fatal Root Error maybe a corrupted input file. This error is being reported"
-        #         self.create_fake_fjr(exitMsg, 8022, 8022, fatalError=False)  # retry the job
-        #     raise RecoverableError("Job failed to open local and fallback files.")
-
-        # if exitCode == 134:
-        #     recoverable_signal = False
-        #     try:
-        #         fname = os.path.realpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
-        #         with open(fname, encoding='utf-8') as fd:
-        #             for line in fd:
-        #                 if line.startswith("== CMSSW:  A fatal system signal has occurred: illegal instruction"):
-        #                     recoverable_signal = True
-        #                     break
-        #     except Exception:  # pylint: disable=broad-except
-        #         msg = "Error analyzing abort signal."
-        #         msg += "\nDetails follow:"
-        #         self.logger.exception(msg)
-        #     if recoverable_signal:
-        #         raise RecoverableError("SIGILL; may indicate a worker node issue.")
-
-        # if exitCode == 8001 or exitCode == 65:
-        #     cvmfs_issue = False
-        #     try:
-        #         fname = os.path.relpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
-        #         cvmfs_issue_re = re.compile("== CMSSW:  unable to load /cvmfs/.*file too short")
-        #         with open(fname, encoding='utf-8') as fd:
-        #             for line in fd:
-        #                 if cvmfs_issue_re.match(line):
-        #                     cvmfs_issue = True
-        #                     break
-        #     except Exception:  # pylint: disable=broad-except
-        #         msg = "Error analyzing output for CVMFS issues."
-        #         msg += "\nDetails follow:"
-        #         self.logger.exception(msg)
-        #     if cvmfs_issue:
-        #         raise RecoverableError("CVMFS issue detected.")
-            
+        self.logger.info(msg)           
 
         return 0
 

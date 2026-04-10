@@ -268,11 +268,7 @@ class PreJob:
         maxmemory     = None
         numcores      = None
         priority      = None
-        inkey = str(crab_retry) if crab_retry == 0 else str(crab_retry - 1)
-        while inkey not in self.resubmit_info and int(inkey) > 0:
-            inkey = str(int(inkey) -  1)
-        self.logger.info(f"use_resubmit_info is {use_resubmit_info} and inkey is {inkey}")
-        if not use_resubmit_info:  # means thad we resubmit with new params from crab resubmit
+        if not use_resubmit_info:  # means that we resubmit with new params from crab resubmit
             #if 'MaxWallTimeMins_RAW' in self.task_ad:
             #    if self.task_ad['MaxWallTimeMins_RAW'] != 1315:
             #        maxjobruntime = self.task_ad.lookup('MaxWallTimeMins_RAW')
@@ -295,6 +291,10 @@ class PreJob:
                 priority = 20 #the maximum for splitting jobs
         else:   # means we resubmit with same params as previous try
             ## SB most likely much (all) of this string/int conversions can be simplified
+            inkey = str(crab_retry) if crab_retry == 0 else str(crab_retry - 1)
+            while inkey not in self.resubmit_info and int(inkey) > 0:
+                inkey = str(int(inkey) -  1)
+            self.logger.info(f"use_resubmit_info is {use_resubmit_info} and inkey is {inkey}")
             maxjobruntime = self.resubmit_info[inkey].get('maxjobruntime')
             maxmemory     = self.resubmit_info[inkey].get('maxmemory')
             numcores      = self.resubmit_info[inkey].get('numcores')
@@ -302,21 +302,21 @@ class PreJob:
 
             #ExitCode Dependent change in resubmission parameters for retries
 
-        if self.resubmit_info:
-            retry_data = self.resubmit_info.get(inkey, {})
-            if retry_data.get("increase_memory") and maxmemory:
-                factor = retry_data.get("memory_factor", 1.2)
-                new_memory = int(int(maxmemory) * factor)
-                if hasattr(self, "MAX_MEMORY"):
-                    new_memory = min(new_memory, self.MAX_MEMORY)
-                self.logger.info(f"Increasing memory from {maxmemory} to {new_memory}")
-                maxmemory = new_memory
+            if self.resubmit_info:
+                retry_data = self.resubmit_info.get(inkey, {})
+                if retry_data.get("increase_memory") and maxmemory:
+                    factor = retry_data.get("memory_factor", 1.2)
+                    new_memory = int(int(maxmemory) * factor)
+                    if hasattr(self, "MAX_MEMORY"):
+                        new_memory = min(new_memory, self.MAX_MEMORY)
+                    self.logger.info(f"Increasing memory from {maxmemory} to {new_memory}")
+                    maxmemory = new_memory
 
-            if retry_data.get("increase_runtime") and maxjobruntime:
-                factor = retry_data.get("runtime_factor", 1.2)
-                new_runtime = int(int(maxjobruntime) * factor)
-                self.logger.info(f"Increasing walltime from {maxjobruntime} to {new_runtime}")
-                maxjobruntime = new_runtime
+                if retry_data.get("increase_runtime") and maxjobruntime:
+                    factor = retry_data.get("runtime_factor", 1.2)
+                    new_runtime = int(int(maxjobruntime) * factor)
+                    self.logger.info(f"Increasing walltime from {maxjobruntime} to {new_runtime}")
+                    maxjobruntime = new_runtime
 
         ## Save the (new) values of the resubmission parameters in self.resubmit_info
         ## for the current job retry number.
