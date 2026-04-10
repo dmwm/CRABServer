@@ -10,9 +10,11 @@ CI_COMMIT_AUTHOR="${CI_COMMIT_AUTHOR:=crab-gitlab-ci}"
 
 # Setup SSH deploy key
 mkdir -p ~/.ssh
-echo "${UPSTREAM_IAC_REPO_DEPLOY_PRIVATE_PKI_BASE64}" | base64 -d | tr -d '\r' > ~/.ssh/id_ed25519
-chmod 600 ~/.ssh/id_ed25519
+KEY_PATH="$HOME/.ssh/crab-gitlab-ci.deploy"
+echo "${UPSTREAM_IAC_REPO_DEPLOY_PRIVATE_PKI_BASE64}" | base64 -d | tr -d '\r' > "$KEY_PATH"
+chmod 600 "$KEY_PATH"
 ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+export GIT_SSH_COMMAND="ssh -i $KEY_PATH -o IdentitiesOnly=yes"
 
 # Get latest SHA
 LATEST_COMMIT_SHA=$(git ls-remote \
@@ -20,7 +22,7 @@ LATEST_COMMIT_SHA=$(git ls-remote \
   "$UPSTREAM_IAC_BRANCH" | awk '{print $1}')
 
 WORKDIR="$(mktemp -d)"
-trap 'rm -rf "$WORKDIR" ~/.ssh/id_ed25519' EXIT     # cleanup on exit
+trap 'rm -rf "$WORKDIR" "$KEY_PATH"' EXIT     # cleanup on exit
 
 git clone --branch ${UPSTREAM_IAC_BRANCH} \
   "git@github.com:${UPSTREAM_IAC_REPO}" \
