@@ -68,6 +68,9 @@ class StageoutCheck(TaskAction):
         Main execute
         """
         self.task = kw['task']
+        asoSite = self.task['tm_asyncdest']
+        asoLfn = self.task['tm_output_lfn']
+
         # Do not check it for HC
         # ActivitiesToRunEverywhere is used mainly for HC and there is no need to check for it.
         if hasattr(self.config.TaskWorker, 'ActivitiesToRunEverywhere') and \
@@ -96,16 +99,30 @@ class StageoutCheck(TaskAction):
             self.logger.info("StageoutCheck disabled in this TaskWorker configuration. Skipping.")
             return
 
+        # Some site may be requestion their local users to use Rucio
+        sitesForcingRucio = getattr(self.config.TaskWorker, 'rucioASOSites', {})
+        if asoSite in sitesForcingRucio and sitesForcingRucio[asoSite]['forceRucio'] :
+            if not asoLfn.startswith('/store/user/rucio') and not  asoLfn.startswith('/store/group/rucio') :
+                msg = f"You are using {asoSite} as output destination"
+                msg += "\nbut that site only accepts output to be sent via Rucio"
+                msg += "\nYou must change your crab configuration python file to make sure that"
+                msg += "\nconfig.Data.outLFNDirBase starts with /store/user/rucio/ or /store/group/rucio"
+                if sitesForcingRucio[asoSite]['ASO_RSE'] != asoSite:
+                    msg += "\nAnd change destination name to:"
+                    msg += f"\nconfig.Site.storageSite = '{sitesForcingRucio[asoSite]['ASO_RSE']}'"
+                self.logger.warning(f"submission refused because site {asoSite} requires Rucio for ASO")
+                raise SubmissionRefusedException(msg)
+
         # OK, we are interested in telling if output can be actually transferred to user destination
         # if user wants to user Rucio, we can only check quota, since transfer will be done
         # by Rucio robot without using user credentials
-        if self.task['tm_output_lfn'].startswith('/store/user/rucio') or \
-           self.task['tm_output_lfn'].startswith('/store/group/rucio'):
-            rucioAccount = getRucioAccountFromLFN(self.task['tm_output_lfn'])
+        if asoLfn.startswith('/store/user/rucio') or \
+           asoLfn.startswith('/store/group/rucio'):
+            rucioAccount = getRucioAccountFromLFN(asoLfn)
             self.logger.info("Checking Rucio quota from account %s.", rucioAccount)
-            quotaCheck = isEnoughRucioQuota(self.rucioClient, self.task['tm_asyncdest'], rucioAccount)
+            quotaCheck = isEnoughRucioQuota(self.rucioClient, asoSite, rucioAccount)
             if not quotaCheck['isEnough']:
-                msg = f"Not enough Rucio quota at {self.task['tm_asyncdest']}:{self.task['tm_output_lfn']}."\
+                msg = f"Not enough Rucio quota at {asoSite}:{asoLfn}."\
                       f" Remain quota: {quotaCheck['free']} GB."
                 raise SubmissionRefusedException(msg)
             self.logger.info(" Remain quota: %s GB.", quotaCheck['free'])
@@ -120,14 +137,14 @@ class StageoutCheck(TaskAction):
             if not cpCmd:
                 self.logger.info("Can not check write permissions. No GFAL2 or LCG commands installed. Continuing")
                 return
-            self.logger.info("Will check stageout at %s", self.task['tm_asyncdest'])
+            self.logger.info("Will check stageout at %s", asoSite)
             filename = re.sub("[:-_]", "", self.task['tm_taskname']) + '_crab3check.tmp'
             try:
-                lfn = os.path.join(self.task['tm_output_lfn'], filename)
+                lfn = os.path.join(asoLfn, filename)
                 # when checking the stageout, we are interested if we can use FTS for ASO.
                 # therefore, we are interested in 'third_party_copy_write' only.
                 # we should not get a PFN for 'write', which should be used for plain gfal.
-                pfn = getWritePFN(self.rucioClient, siteName=self.task['tm_asyncdest'], lfn=lfn, operations=['third_party_copy_write'], logger=self.logger)
+                pfn = getWritePFN(self.rucioClient, siteName=asoSite, lfn=lfn, operations=['third_party_copy_write'], logger=self.logger)
                 cpCmd += append + os.path.abspath(filename) + " " + pfn
                 rmCmd += " " + pfn
                 createDummyFile(filename, self.logger)
