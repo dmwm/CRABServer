@@ -95,7 +95,7 @@ class StageoutCheck(TaskAction):
         self.proxy = self.task['user_proxy']
 
         # In test machines this check is often only annoying
-        if hasattr(self.config.TaskWorker, 'checkStageout') and not self.config.TaskWorker.checkStageout:
+        if not getattr(self.config.TaskWorker, 'checkStageout', True):
             self.logger.info("StageoutCheck disabled in this TaskWorker configuration. Skipping.")
             return
 
