@@ -39,7 +39,7 @@ EXIT_RETRY_POLICY = {
     151: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
     8028: {"type": "recoverable", "max_retries": 9, "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
     8021: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileReadError (May be a site error).", "change_site": True, "handler": "handle_file_open_or_root_error"},
-    8020: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileOpenError (Likely a site error).", "change_site": True, "increase_memory": True, "memory_factor": 1.3, "increase_runtime": True, "runtime_factor": 1.3, "handler": "handle_file_open_or_root_error"},
+    8020: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileOpenError (Likely a site error).", "change_site": True, "handler": "handle_file_open_or_root_error"},
     8022: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FatalRootError.", "handler": "handle_file_open_or_root_error"},
     84: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Some required file not found; check logs for name of missing file.", "handler": "handle_file_open_or_root_error"},
     85: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},

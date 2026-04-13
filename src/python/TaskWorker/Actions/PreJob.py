@@ -13,7 +13,7 @@ import errno
 import logging
 from ast import literal_eval
 
-from ServerUtilities import getWebdirForDb, insertJobIdSid, pythonListToClassAdExprTree
+from ServerUtilities import getWebdirForDb, insertJobIdSid, pythonListToClassAdExprTree, MAX_MEMORY_AUTOMATIC_RESUBMIT, MAX_JOB_RUNTIME_AUTOMATIC_RESUBMIT
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
 import htcondor2 as htcondor
@@ -300,21 +300,21 @@ class PreJob:
             numcores      = self.resubmit_info[inkey].get('numcores')
             priority      = self.resubmit_info[inkey].get('priority')
 
-            #ExitCode Dependent change in resubmission parameters for retries
+            #ExitCode Dependent automatic change in resubmission parameters
 
             if self.resubmit_info:
                 retry_data = self.resubmit_info.get(inkey, {})
                 if retry_data.get("increase_memory") and maxmemory:
                     factor = retry_data.get("memory_factor", 1.2)
                     new_memory = int(int(maxmemory) * factor)
-                    if hasattr(self, "MAX_MEMORY"):
-                        new_memory = min(new_memory, self.MAX_MEMORY)
+                    new_memory = min(new_memory, MAX_MEMORY_AUTOMATIC_RESUBMIT)
                     self.logger.info(f"Increasing memory from {maxmemory} to {new_memory}")
                     maxmemory = new_memory
 
                 if retry_data.get("increase_runtime") and maxjobruntime:
                     factor = retry_data.get("runtime_factor", 1.2)
                     new_runtime = int(int(maxjobruntime) * factor)
+                    new_runtime = min(new_runtime, MAX_JOB_RUNTIME_AUTOMATIC_RESUBMIT)
                     self.logger.info(f"Increasing walltime from {maxjobruntime} to {new_runtime}")
                     maxjobruntime = new_runtime
 
