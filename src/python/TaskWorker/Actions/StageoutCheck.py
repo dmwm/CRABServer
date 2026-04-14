@@ -110,6 +110,7 @@ class StageoutCheck(TaskAction):
                 if sitesForcingRucio[asoSite]['ASO_RSE'] != asoSite:
                     msg += "\nAnd change destination name to:"
                     msg += f"\nconfig.Site.storageSite = '{sitesForcingRucio[asoSite]['ASO_RSE']}'"
+                msg += "\nMore info in https://twiki.cern.ch/twiki/bin/view/CMSPublic/CrabASOwithRucio"
                 self.logger.warning(f"submission refused because site {asoSite} requires Rucio for ASO")
                 raise SubmissionRefusedException(msg)
 
