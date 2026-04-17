@@ -20,12 +20,13 @@ JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERRO
 # ----------------------------------------------------------------------
 # Exit-code dependent retry policy
 # ----------------------------------------------------------------------
+# ToDo: Reduce Redundance across short and long exit codes
 
 EXIT_RETRY_POLICY = {
     1: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to bootstrap CMSSW; likely a worker node issue."},
     50513: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job did not find functioning CMSSW on worker node."},
     81: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job did not find functioning CMSSW on worker node."},
-    50115: {"type": "recoverable", "max_retries": 9, "delay": 900, "msg": "Job did not produce a FJR; will retry.", "increase_memory": True, "memory_factor": 1.3},
+    50115: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job did not produce a FJR; will retry.", "increase_memory": True, "memory_factor": 1.3},
     195: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job did not produce a FJR; will retry.", "increase_memory": True, "memory_factor": 1.3},
     137: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "SIGKILL; likely an unrelated batch system kill."},
     10034: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Required application version not found at the site."},
@@ -37,9 +38,9 @@ EXIT_RETRY_POLICY = {
     147: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
     60311: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
     151: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
-    8028: {"type": "recoverable", "max_retries": 9, "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
+    8028: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
     8021: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileReadError (May be a site error).", "change_site": True, "handler": "handle_file_open_or_root_error"},
-    8020: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileOpenError (Likely a site error).", "change_site": True, "handler": "handle_file_open_or_root_error"},
+    8020: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileOpenError (Likely a site error).", "change_site": True, "handler": "handle_file_open_or_root_error", "increase_runtime": True, "runtime_factor": 1.3, "increase_memory": True, "memory_factor": 1.3},
     8022: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FatalRootError.", "handler": "handle_file_open_or_root_error"},
     84: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Some required file not found; check logs for name of missing file.", "handler": "handle_file_open_or_root_error"},
     85: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},

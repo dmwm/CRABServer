@@ -86,7 +86,7 @@ class DagmanResubmitter(TaskAction):
                 # is saving the values of the parameters for each job retry in text files (the
                 # files are in the directory resubmit_info in the schedd).
                 # We use classAds here as way to pass informations to PreJobs.
-                # Value in schedd.exit(const, ad, value) can be string or ExprTree
+                # Value in schedd.edit(const, ad, value) can be string or ExprTree
                 # https://htcondor.readthedocs.io/en/latest/apis/python-bindings/api/version2/htcondor2/schedd.html#htcondor2.Schedd.edit
                 # We need ExprTree when the ad correspond to a python list
                 for adparam, taskparam in params.items():

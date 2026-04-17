@@ -61,6 +61,7 @@ def addJobSubmitInfoToDagJobJDL(dagJdl, jobSubmit):
         'My.MaxWallTimeMinsRun',
         'My.MaxWallTimeMinsProbe',
         'My.MaxWallTimeMinsTail',
+        'My.CRAB_ResubmitCounter',
         # these are used in PostJob only
         'My.CRAB_UserRole',
         'My.CRAB_UserGroup',
@@ -87,7 +88,6 @@ def addJobSubmitInfoToDagJobJDL(dagJdl, jobSubmit):
         'My.CMS_Type',
         'My.CMS_WMTool',
         'My.CMS_TaskType',
-        'My.CRAB_ResubmitCounter',
     ]
 
     for adName in adsToPort:

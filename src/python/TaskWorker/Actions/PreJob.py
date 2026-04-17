@@ -306,22 +306,23 @@ class PreJob:
                 retry_data = self.resubmit_info.get(inkey, {})
                 if retry_data.get("increase_memory") and maxmemory:
                     factor = retry_data.get("memory_factor", 1.2)
-                    new_memory = int(int(maxmemory) * factor)
+                    new_memory = int(maxmemory * factor)
                     new_memory = min(new_memory, MAX_MEMORY_AUTOMATIC_RESUBMIT)
                     self.logger.info(f"Increasing memory from {maxmemory} to {new_memory}")
                     maxmemory = new_memory
 
                 if retry_data.get("increase_runtime") and maxjobruntime:
                     factor = retry_data.get("runtime_factor", 1.2)
-                    new_runtime = int(int(maxjobruntime) * factor)
+                    new_runtime = int(maxjobruntime * factor)
                     new_runtime = min(new_runtime, MAX_JOB_RUNTIME_AUTOMATIC_RESUBMIT)
                     self.logger.info(f"Increasing walltime from {maxjobruntime} to {new_runtime}")
                     maxjobruntime = new_runtime
 
+        ## get resubmission counter
+        resubmit_counter = self.task_ad.get("CRAB_ResubmitCounter", 0)
+
         ## Save the (new) values of the resubmission parameters in self.resubmit_info
         ## for the current job retry number.
-        #get resubmission counter
-        resubmit_counter = int(self.task_ad.get("CRAB_ResubmitCounter", 0))
         outkey = str(crab_retry)
         if outkey not in self.resubmit_info:
             self.resubmit_info[outkey] = {}
@@ -442,7 +443,7 @@ class PreJob:
         previous_site = retry_data.get("previous_site")
         if retry_data.get("change_site") and previous_site:
             self.logger.info(f"Last Exit Code indicated that a change in site might help. inkey was {inkey}")
-            if previous_site in availableSet:
+            if previous_site in availableSet and len(availableSet) > 1:
                 self.logger.info(f"Removing previous site {previous_site} from candidate sites")
                 availableSet.discard(previous_site)
         else:
@@ -497,6 +498,11 @@ class PreJob:
         currentTime = time.time()
 
         # Check retry delay from resubmit_info
+        # Inside SPOOL_DIR we have resubmit_info folder with text files job.{self.job_id}.txt for each job id
+        # Each file is a dictionary of the format example {0:{'maxmemory':2000, ...}, 1:{}, 2:{}, ...}
+        # where 0,1,2,... are crab_retry numbers. A lot of vital info like site_whitelist, retry_delay_until,
+        # resubmit_counter, use_resubmit_info, etc is stored and read from this file for each retry across resubmissions.
+        # ToDo: Convert this file to json format
         retry_info_file = f"resubmit_info/job.{self.job_id}.txt"
         if os.path.exists(retry_info_file):
             try:
