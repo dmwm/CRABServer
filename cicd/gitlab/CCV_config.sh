@@ -51,7 +51,7 @@ scramprefix=el8
 ERR=false;
 /cvmfs/cms.cern.ch/common/cmssw-${scramprefix} -- "${ROOT_DIR}/cicd/gitlab/clientConfigurationValidation.sh"
 CCV_EC=$?
-echo "clientConfigurationValidation.sh script ended wih exit code $CCV_EC"
+echo "clientConfigurationValidation.sh script ended with exit code $CCV_EC"
 ERR=$([[ $CCV_EC -eq 0 || $CCV_EC -eq 2 ]] && echo "false" || echo "true") #ERR is true if return is other than 0 or 2
 
 if [ "$ERR" == true ]; then

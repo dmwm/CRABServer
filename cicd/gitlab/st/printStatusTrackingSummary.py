@@ -6,7 +6,7 @@ import json
 with open('result.json', 'r', encoding='utf-8') as f:
     summary = json.load(f)
 print("============ TEST SUMMARY ========")
-legend = "Jobs: OK=Success, R=Running, X=Trasferring, F=Failed\n"
+legend = "Jobs: OK=Success, R=Running, X=Transfering, F=Failed\n"
 legend += "Publications: F=Failed, P=Pending (ToBeDone), D=in DBS"
 print(f"Legend:\n{legend}")
 
@@ -17,7 +17,7 @@ for task in summary:
     name = '_'.join(task['TN'].split('crab_')[1].split('_')[:-2])
     result = task['testResult']
     jobs = task['jobsPerStatus']
-    jOK = jobs.get('finished',0)
+    jOK = jobs.get('finished', 0)
     jR = jobs.get('running', 0)
     jT = jobs.get('transferring', 0)
     jF = jobs.get('failed', 0)
