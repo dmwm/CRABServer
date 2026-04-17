@@ -7,7 +7,7 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 from rucio.client import Client as NativeClient
 from rucio.common.exception import RSENotFound, RuleNotFound, RucioException
 
-RETRIABLE_RUCIO_HTTP_STATUSES = [403, 429, 500, 502, 503]
+RETRIABLE_RUCIO_HTTP_STATUSES = [503]
 
 def _is_rucio_retriable_http_error(exc):
     """True if this RucioException wraps a transient HTTP error we should retry."""
