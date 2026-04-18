@@ -9,6 +9,7 @@ import json
 import traceback
 import argparse
 import pprint
+import random
 
 from WMCore.Configuration import loadConfigurationFile
 
@@ -305,6 +306,7 @@ def publishInDBS3(config, taskname, verbose, console):  # pylint: disable=too-ma
         blockDict['files'] = block['files']
         lfnsInBlock = [f['source_lfn'] for f in blockDict['files']]
         result = publishOneBlockInDBS(blockDict=blockDict, DBSConfigs=DBSConfigs, logger=logger)
+        time.sleep(random.uniform(0.2, 0.5)) # wait a random time to avoid overwhelming the DBS server
         if result['status'] == 'OK':
             logger.info('Publish OK   for Block: %s', blockDict['block_name'])
             publishedBlocks += 1
