@@ -319,7 +319,7 @@ class PreJob:
                     maxjobruntime = new_runtime
 
         ## get resubmission counter
-        resubmit_counter = self.task_ad.get("CRAB_ResubmitCounter", 0)
+        resubmit_counter = int(self.task_ad.get("CRAB_ResubmitCounter", 0))
 
         ## Save the (new) values of the resubmission parameters in self.resubmit_info
         ## for the current job retry number.
