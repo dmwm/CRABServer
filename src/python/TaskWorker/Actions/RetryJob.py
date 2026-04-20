@@ -203,6 +203,7 @@ class RetryJob():
         if corruptedInputFile:
             exitMsg = "Fatal Root Error: possible corrupted input file. Reporting and retrying."
             self.create_fake_fjr(exitMsg, 8022, 8022, fatalError=False)
+        self.logger.info(f"Handler function ran successfully for exit Code {exitCode}")
         raise RecoverableError(EXIT_RETRY_POLICY[exitCode]["msg"])
 
     # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -224,6 +225,7 @@ class RetryJob():
         except Exception:  # pylint: disable=broad-except
             msg = "Error analyzing abort signal.\nDetails follow:"
             self.logger.exception(msg)
+        self.logger.info(f"Handler function ran successfully for exit Code {exitCode}")
         if recoverable_signal:
             raise RecoverableError("SIGILL; may indicate a worker node issue.")
 
@@ -247,6 +249,7 @@ class RetryJob():
         except Exception:  # pylint: disable=broad-except
             msg = "Error analyzing output for CVMFS issues.\nDetails follow:"
             self.logger.exception(msg)
+        self.logger.info(f"Handler function ran successfully for exit Code {exitCode}")
         if cvmfs_issue:
             raise RecoverableError("CVMFS issue detected.")
 
