@@ -10,6 +10,7 @@ import json
 import traceback
 import argparse
 import pprint
+import random
 
 from WMCore.Configuration import loadConfigurationFile
 
@@ -320,6 +321,7 @@ def publishInDBS3(config, taskname, verbose, console):
             logger.error("FAILING BLOCK DUE TO %s SAVED AS %s", str(ex), fname)
         finally:
             elapsed = int(time.time() - t1)
+            time.sleep(random.uniform(0.2, 0.5)) # wait a random time to avoid overwhelming the DBS server
             msg = f"PUBSTAT: Nfiles={len(dbsFiles):{4}}, filestructSize={dbsFilesSize:{6}}"
             msg += f", lumis={nLumis:{7}}, iter={nIter:{2}}"
             msg += f", blockSize={blockSize:{6}}, time={elapsed:{3}}"
