@@ -20,7 +20,7 @@ RUN dnf -y update && \
     dnf -y install --skip-broken curl libcurl && \
     dnf -y install \
       # basic OS packages \
-      sudo vim less procps \
+      sudo vim less procps lsof strace \
       tini git \
       fd-find ripgrep bash-completion \
       wget unzip \
