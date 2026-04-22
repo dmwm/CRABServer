@@ -12,9 +12,9 @@ import json
 import errno
 import logging
 from ast import literal_eval
-from RetryJob import EXIT_RETRY_POLICY
+
 from ServerUtilities import getWebdirForDb, insertJobIdSid, pythonListToClassAdExprTree, MAX_MEMORY_AUTOMATIC_RESUBMIT, MAX_JOB_RUNTIME_AUTOMATIC_RESUBMIT
-from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
+from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES, EXIT_RETRY_POLICY
 
 import htcondor2 as htcondor
 import classad2 as classad
