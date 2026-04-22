@@ -158,7 +158,7 @@ class RetryJob():
         retry_info[key]["change_site"] = policy.get("change_site", False)
         retry_info[key]["memory_factor"] = policy.get("memory_factor", 1.0)
         retry_info[key]["runtime_factor"] = policy.get("runtime_factor", 1.0)
-        retry_info[key]["previous_site"] = getattr(self, "site", None)
+        retry_info[key]["site"] = getattr(self, "site", None)
 
         with open(retry_info_file + ".tmp", "w", encoding="utf-8") as fd:
             fd.write(str(retry_info))

@@ -335,9 +335,9 @@ class PreJob:
                     maxjobruntime = new_runtime
 
         ## get resubmission counter
-        if inkey == "0":
+        if crab_retry == 0:
             resubmit_counter = 0
-            self.logger.info("inkey is 0. resubmit_counter is set to 0.")
+            self.logger.info("crab_retry is 0. resubmit_counter is set to 0.")
         else:
             lastExitCode = self.resubmit_info[inkey].get('exitCode')
             self.logger.info(f"Last Exit Code was {lastExitCode}")
@@ -466,7 +466,7 @@ class PreJob:
             
         # ExitCode Dependent discard of previous_site
         retry_data = self.resubmit_info.get(inkey, {})
-        previous_site = retry_data.get("previous_site")
+        previous_site = retry_data.get("site")
         if retry_data.get("change_site") and previous_site:
             self.logger.info(f"Last Exit Code indicated that a change in site might help. inkey was {inkey}")
             if previous_site in availableSet and len(availableSet) > 1:
