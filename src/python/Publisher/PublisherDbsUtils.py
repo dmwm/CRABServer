@@ -8,7 +8,6 @@ import os
 import logging
 import json
 import time
-import random
 from datetime import datetime
 
 from dbs.apis.dbsClient import DbsApi
@@ -134,7 +133,6 @@ def findParentBlocks(listOfFileDicts=None, DBSApis=None, logger=None, verbose=No
                     blocksDict = DBSApis['destRead'].listBlocks(logical_file_name=parentFile)
                 except Exception:
                     file['parents'].remove(parentFile)
-                    time.sleep(random.uniform(0.1, 0.3)) # wait a random time to avoid overwhelming the DBS server
                     continue
                 if not blocksDict:
                     # No, this parent file is not in the destination DBS instance.
@@ -160,7 +158,6 @@ def findParentBlocks(listOfFileDicts=None, DBSApis=None, logger=None, verbose=No
                 # Put it in the set of parent files for which migration should be skipped.
                 if not blocksDict:
                     parentsToSkip.add(parentFile)
-                time.sleep(random.uniform(0.1, 0.3)) # wait a random time to avoid overwhelming the DBS server
             # If this parent file should not be migrated because it is not known to DBS,
             # we remove it from the list of parents in the file-to-publish info dictionary
             # (so that when publishing, this "parent" file will not appear as a parent).
@@ -315,7 +312,6 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, blocks,  # 
             migrationsInProgress.append(block)
         else:
             numFailedSubmissions += 1
-        time.sleep(random.uniform(0.2, 0.5)) # wait a random time to avoid overwhelming the DBS server
 
     numMigrationsInProgress = len(migrationsInProgress)
     msg = f"{numMigrationsInProgress} block migration requests successfully submitted."
@@ -360,7 +356,6 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, blocks,  # 
                 numFailedMigrations += 1
             if inProgress:
                 pass  # will check again later
-            time.sleep(random.uniform(0.2, 0.5))
         numMigrationsInProgress = len(migrationsInProgress)  # update counter at the end of loop
         # Stop waiting if there are no more migrations in progress.
         if numMigrationsInProgress == 0:
