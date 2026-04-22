@@ -96,11 +96,6 @@ class DagmanResubmitter(TaskAction):
                         else:
                             newAdValue = str(task['resubmit_'+taskparam])
                         schedd.edit(rootConst, adparam, newAdValue)
-                dagAds = schedd.query(rootConst, ['CRAB_ResubmitCounter'])
-                current = 0
-                if dagAds and isinstance(dagAds[0].get('CRAB_ResubmitCounter'), int):
-                    current = dagAds[0]['CRAB_ResubmitCounter']
-                schedd.edit(rootConst, "CRAB_ResubmitCounter", str(current + 1))
                 # finally restart the dagman with the 3 lines below
                 schedd.act(htcondor.JobAction.Hold, rootConst)
                 schedd.edit(rootConst, "HoldKillSig", 'SIGUSR1')
