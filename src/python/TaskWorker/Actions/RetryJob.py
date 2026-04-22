@@ -135,7 +135,7 @@ class RetryJob():
 
     # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def store_retry_actions(self, policy):
+    def store_retry_actions(self, policy, exitCode):
         retry_info_file = f"resubmit_info/job.{self.job_id}.txt"
         retry_info = {}
 
@@ -152,7 +152,7 @@ class RetryJob():
 
         delay = policy.get("delay", 900)
         retry_info[key]["retry_delay_until"] = time.time() + delay
-
+        retry_info[key]["exitCode"] = exitCode
         retry_info[key]["increase_memory"] = policy.get("increase_memory", False)
         retry_info[key]["increase_runtime"] = policy.get("increase_runtime", False)
         retry_info[key]["change_site"] = policy.get("change_site", False)
@@ -267,7 +267,7 @@ class RetryJob():
             if self.crab_retry >= effective_max_retries:
                 raise FatalError(f"Retry limit reached for exit {exitCode}: {policy['msg']}")
             self.logger.info(f"Applying retry policy for exit code {exitCode}")
-            self.store_retry_actions(policy)
+            self.store_retry_actions(policy, exitCode)
             # Dispatch to a handler if one is registered for this exit code.
             handler_name = policy.get("handler")
             if handler_name:

@@ -12,7 +12,7 @@ import json
 import errno
 import logging
 from ast import literal_eval
-
+from RetryJob import EXIT_RETRY_POLICY
 from ServerUtilities import getWebdirForDb, insertJobIdSid, pythonListToClassAdExprTree, MAX_MEMORY_AUTOMATIC_RESUBMIT, MAX_JOB_RUNTIME_AUTOMATIC_RESUBMIT
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
@@ -182,6 +182,22 @@ class PreJob:
             with open(file_name, 'r', encoding='utf-8') as fd:
                 self.resubmit_info = literal_eval(fd.read())
 
+    def get_resubmit_counter(self, exit_code, crab_retry):
+        """
+        Calculate the resubmit counter based on the exit code's max_retries
+        and the current crab_retry value.
+
+        Formula: resubmit_counter = crab_retry // (max_retries + 1)
+
+        Examples:
+        max_retries=2: [0,2] -> 0, [3,5] -> 1, [6,8] -> 2, ...
+        max_retries=9: [0,9] -> 0, [10,19] -> 1, [20,29] -> 2, ...
+        """
+        policy = EXIT_RETRY_POLICY.get(exit_code, EXIT_RETRY_POLICY["default"])
+        max_retries = policy["max_retries"]
+        resubmit_counter = crab_retry // (max_retries + 1)
+        self.logger.info(f"Resubmit Counter was calculated to be {resubmit_counter}")
+        return resubmit_counter
 
     def save_resubmit_info(self):
         """
@@ -268,6 +284,9 @@ class PreJob:
         maxmemory     = None
         numcores      = None
         priority      = None
+        inkey = str(crab_retry) if crab_retry == 0 else str(crab_retry - 1)
+        while inkey not in self.resubmit_info and int(inkey) > 0:
+            inkey = str(int(inkey) -  1)
         if not use_resubmit_info:  # means that we resubmit with new params from crab resubmit
             #if 'MaxWallTimeMins_RAW' in self.task_ad:
             #    if self.task_ad['MaxWallTimeMins_RAW'] != 1315:
@@ -291,9 +310,6 @@ class PreJob:
                 priority = 20 #the maximum for splitting jobs
         else:   # means we resubmit with same params as previous try
             ## SB most likely much (all) of this string/int conversions can be simplified
-            inkey = str(crab_retry) if crab_retry == 0 else str(crab_retry - 1)
-            while inkey not in self.resubmit_info and int(inkey) > 0:
-                inkey = str(int(inkey) -  1)
             self.logger.info(f"use_resubmit_info is {use_resubmit_info} and inkey is {inkey}")
             maxjobruntime = self.resubmit_info[inkey].get('maxjobruntime')
             maxmemory     = self.resubmit_info[inkey].get('maxmemory')
@@ -319,7 +335,17 @@ class PreJob:
                     maxjobruntime = new_runtime
 
         ## get resubmission counter
-        resubmit_counter = int(self.task_ad.get("CRAB_ResubmitCounter", 0))
+        if inkey == "0":
+            resubmit_counter = 0
+            self.logger.info("inkey is 0. resubmit_counter is set to 0.")
+        else:
+            lastExitCode = self.resubmit_info[inkey].get('exitCode')
+            self.logger.info(f"Last Exit Code was {lastExitCode}")
+            try:
+                resubmit_counter = self.get_resubmit_counter(lastExitCode, crab_retry)
+            except Exception:
+                self.logger.info("Exception occured while trying to get resubmit counter. Setting to 0")
+                resubmit_counter = 0
 
         ## Save the (new) values of the resubmission parameters in self.resubmit_info
         ## for the current job retry number.
