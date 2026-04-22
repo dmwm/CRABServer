@@ -261,13 +261,12 @@ class RetryJob():
         Raises FatalError if retry limit exceeded.
         """
         policy = EXIT_RETRY_POLICY.get(exitCode, EXIT_RETRY_POLICY["default"])
-
+        self.logger.info(f"Applying retry policy for exit code {exitCode}")
+        self.store_retry_actions(policy, exitCode)
         if policy["type"] == "recoverable":
             effective_max_retries = self.calculate_effective_max_retries(policy)
             if self.crab_retry >= effective_max_retries:
                 raise FatalError(f"Retry limit reached for exit {exitCode}: {policy['msg']}")
-            self.logger.info(f"Applying retry policy for exit code {exitCode}")
-            self.store_retry_actions(policy, exitCode)
             # Dispatch to a handler if one is registered for this exit code.
             handler_name = policy.get("handler")
             if handler_name:
