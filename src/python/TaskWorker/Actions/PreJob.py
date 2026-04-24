@@ -14,7 +14,7 @@ import logging
 from ast import literal_eval
 
 from ServerUtilities import getWebdirForDb, insertJobIdSid, pythonListToClassAdExprTree, MAX_MEMORY_AUTOMATIC_RESUBMIT, MAX_JOB_RUNTIME_AUTOMATIC_RESUBMIT
-from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES, EXIT_RETRY_POLICY
+from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
 import htcondor2 as htcondor
 import classad2 as classad
