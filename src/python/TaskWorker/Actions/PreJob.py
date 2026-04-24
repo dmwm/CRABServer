@@ -184,19 +184,23 @@ class PreJob:
 
     def get_resubmit_counter(self, exit_code, crab_retry):
         """
-        Calculate the resubmit counter based on the exit code's max_retries
-        and the current crab_retry value.
-
-        Formula: resubmit_counter = crab_retry // (max_retries + 1)
-
-        Examples:
-        max_retries=2: [0,2] -> 0, [3,5] -> 1, [6,8] -> 2, ...
-        max_retries=9: [0,9] -> 0, [10,19] -> 1, [20,29] -> 2, ...
+        Read the resubmit_counter persisted by RetryJob.store_retry_actions().
+        RetryJob is the source of truth: it tracks retries-consumed-per-exit-code
+        and resets the count when the exit code changes, so the counter correctly
+        reflects only retries under the current exit code and is not contaminated
+        by previous exit codes with different max_retries values.
+        Falls back to 0 if no prior RetryJob data exists.
         """
-        policy = EXIT_RETRY_POLICY.get(exit_code, EXIT_RETRY_POLICY["default"])
-        max_retries = policy["max_retries"]
-        resubmit_counter = crab_retry // (max_retries + 1)
-        self.logger.info(f"Resubmit Counter was calculated to be {resubmit_counter}")
+        # inkey resolution mirrors the existing pattern in alter_submit
+        inkey = "0" if crab_retry == 0 else str(crab_retry - 1)
+        while inkey not in self.resubmit_info and int(inkey) > 0:
+            inkey = str(int(inkey) - 1)
+
+        resubmit_counter = self.resubmit_info.get(inkey, {}).get("resubmit_counter", 0)
+        self.logger.info(
+            f"Read resubmit_counter={resubmit_counter} from resubmit_info[{inkey}] "
+            f"(crab_retry={crab_retry}, exit_code={exit_code})"
+        )
         return resubmit_counter
 
     def save_resubmit_info(self):
@@ -284,7 +288,7 @@ class PreJob:
         maxmemory     = None
         numcores      = None
         priority      = None
-        inkey = str(crab_retry) if crab_retry == 0 else str(crab_retry - 1)
+        inkey = "0" if crab_retry == 0 else str(crab_retry - 1)
         while inkey not in self.resubmit_info and int(inkey) > 0:
             inkey = str(int(inkey) -  1)
         if not use_resubmit_info:  # means that we resubmit with new params from crab resubmit

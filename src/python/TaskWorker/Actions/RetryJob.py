@@ -143,12 +143,40 @@ class RetryJob():
             try:
                 with open(retry_info_file, "r", encoding="utf-8") as fd:
                     retry_info = literal_eval(fd.read())
-            except Exception:
+            except FileNotFoundError:
                 retry_info = {}
 
         key = str(self.crab_retry)
         if key not in retry_info:
             retry_info[key] = {}
+
+        # --- compute retries_consumed_for_ec ---
+        # Find the most recent previous entry (walk backwards if needed)
+        prev_consumed = 0
+        prev_ec = None
+        if self.crab_retry > 0:
+            prev_key = str(self.crab_retry - 1)
+            while prev_key not in retry_info and int(prev_key) > 0:
+                prev_key = str(int(prev_key) - 1)
+            prev_entry = retry_info.get(prev_key, {})
+            prev_ec = prev_entry.get("exitCode")
+            prev_consumed = prev_entry.get("retries_consumed_for_ec", 0)
+
+        if prev_ec is not None and prev_ec != exitCode:
+            # Exit code changed: start a fresh count for this new code
+            retries_consumed_for_ec = 0
+            self.logger.info(
+                f"Exit code changed from {prev_ec} to {exitCode} at retry {self.crab_retry}. "
+                f"Resetting retries_consumed_for_ec to 0."
+            )
+        else:
+            retries_consumed_for_ec = prev_consumed + 1
+
+        # Compute resubmit_counter: how many full cycles of (max_retries+1) have elapsed
+        # for THIS exit code.
+        max_retries = policy["max_retries"]
+        resubmit_counter = retries_consumed_for_ec // (max_retries + 1)
+        # --- end ---
 
         delay = policy.get("delay", 900)
         retry_info[key]["retry_delay_until"] = time.time() + delay
@@ -159,6 +187,8 @@ class RetryJob():
         retry_info[key]["memory_factor"] = policy.get("memory_factor", 1.0)
         retry_info[key]["runtime_factor"] = policy.get("runtime_factor", 1.0)
         retry_info[key]["site"] = getattr(self, "site", None)
+        retry_info[key]["retries_consumed_for_ec"] = retries_consumed_for_ec
+        retry_info[key]["resubmit_counter"] = resubmit_counter
 
         with open(retry_info_file + ".tmp", "w", encoding="utf-8") as fd:
             fd.write(str(retry_info))
@@ -174,7 +204,7 @@ class RetryJob():
             try:
                 with open(retry_info_file, "r", encoding="utf-8") as fd:
                     retry_info = literal_eval(fd.read())
-            except Exception:
+            except FileNotFoundError:
                 retry_info = {}
 
         key = str(self.crab_retry)
@@ -182,18 +212,20 @@ class RetryJob():
             retry_info[key] = {}
 
         entry = retry_info.get(key, {})
+        # resubmit_counter was written by store_retry_actions() just before this call
         resubmit_counter = entry.get("resubmit_counter", 0)
+        retries_consumed = entry.get("retries_consumed_for_ec", 0)
         base_max = policy["max_retries"]
         effective_max_retries = (base_max + 1)*(resubmit_counter + 1) - 1
-        self.logger.info(f"Resubmit counter = {resubmit_counter}, effective max retries = {effective_max_retries}")
+        self.logger.info(f"EC retries consumed: {retries_consumed}, resubmit_counter: {resubmit_counter}, effective_max_retries: {effective_max_retries}")
 
         return effective_max_retries
 
     def handle_file_open_or_root_error(self, exitCode):
         """
         Handle exit codes related to file open/read/root failures (8020, 8021, 8022, 8028, 84, 85, 86, 92).
-        Checks for corrupted input files; if found, creates a fake FJR with code 8022
-        and allows a retry. Otherwise raises RecoverableError with the policy message.
+        Checks for corrupted input files; if found, creates a fake FJR with code 8022. 
+        Raises RecoverableError with the policy message.
         """
         try:
             corruptedInputFile = self.check_corrupted_file(exitCode)
