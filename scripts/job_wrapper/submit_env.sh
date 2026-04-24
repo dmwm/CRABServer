@@ -102,7 +102,7 @@ setup_python_comp() {
         prefix="$CVMFS"/COMP/"$WMA_SCRAM_ARCH"/external/python3
     else
         echo "Failed to find a COMP python3 installation in the worker node setup." >&2
-        echo "  Without a known python3, there is nothing else we can do with this job. Quiting!" >&2
+        echo "  Without a known python3, there is nothing else we can do with this job. Quitting!" >&2
         exit 11004
     fi
     compPythonPath=`echo $prefix | sed 's|/python3||'`

@@ -19,8 +19,8 @@ class MakeFakeFileSet(TaskAction):
     def getListOfFilteredSites(self, sites):
         """ Get the list of sites to use for PrivateMC workflows.
             For the moment we are filtering out T1_ since they are precious resources
-            and don't want to overtake production (WMAgent) jobs there. In the
-            future we would like to take this list from the SSB.
+            and we CRAB only gets a limites share of CPU there which we
+            prefer to reserve to processing local data. MC can run anywhere.
         """
         filteredSites = [site for site in sites if not site.startswith("T1_")]
         return filteredSites
