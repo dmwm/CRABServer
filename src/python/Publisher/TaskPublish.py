@@ -259,7 +259,7 @@ def publishInDBS3(config, taskname, verbose, console):
 
     # make sure that a block never has too many lumis, see
     # https://github.com/dmwm/CRABServer/issues/6670#issuecomment-965837566
-    maxLumisPerBlock = 1.e6  # 1 Million
+    maxLumisPerBlock = 1.e5  # 100 K
     nBlocks = float(len(dbsFiles)) / float(max_files_per_block)
     if nLumis > maxLumisPerBlock * nBlocks:
         logger.info('Trying to publish %d lumis in %d blocks', nLumis, nBlocks)
