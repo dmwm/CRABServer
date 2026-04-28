@@ -38,6 +38,7 @@ class PreJob:
         self.resubmit_info = {}
         self.prejob_exit_code = None
         self.logger = logging.getLogger()
+        self.max_retries = 9
 
 
     def calculate_crab_retry(self):
@@ -182,27 +183,6 @@ class PreJob:
             with open(file_name, 'r', encoding='utf-8') as fd:
                 self.resubmit_info = literal_eval(fd.read())
 
-    def get_resubmit_counter(self, exit_code, crab_retry):
-        """
-        Read the resubmit_counter persisted by RetryJob.store_retry_actions().
-        RetryJob is the source of truth: it tracks retries-consumed-per-exit-code
-        and resets the count when the exit code changes, so the counter correctly
-        reflects only retries under the current exit code and is not contaminated
-        by previous exit codes with different max_retries values.
-        Falls back to 0 if no prior RetryJob data exists.
-        """
-        # inkey resolution mirrors the existing pattern in alter_submit
-        inkey = "0" if crab_retry == 0 else str(crab_retry - 1)
-        while inkey not in self.resubmit_info and int(inkey) > 0:
-            inkey = str(int(inkey) - 1)
-
-        resubmit_counter = self.resubmit_info.get(inkey, {}).get("resubmit_counter", 0)
-        self.logger.info(
-            f"Read resubmit_counter={resubmit_counter} from resubmit_info[{inkey}] "
-            f"(crab_retry={crab_retry}, exit_code={exit_code})"
-        )
-        return resubmit_counter
-
     def save_resubmit_info(self):
         """
         Need a doc string here.
@@ -270,6 +250,7 @@ class PreJob:
         ## TaskWorker than modify the dagman job classAds !
         CRAB_ResubmitList_in_taskad = 'CRAB_ResubmitList' in self.task_ad
         use_resubmit_info = False
+        increase_resubmission_counter = False
         resubmit_jobids = []
         if 'CRAB_ResubmitList' in self.task_ad:
             # SB this map is most likley useless, keep it in "Works/Don't Touch" spirit
@@ -278,6 +259,10 @@ class PreJob:
                 resubmit_jobids = set(resubmit_jobids)
                 if resubmit_jobids and self.job_id not in resubmit_jobids:
                     use_resubmit_info = True
+                base_max = self.max_retries
+                if self.job_id in resubmit_jobids and self.crab_retry % (base_max + 1) == base_max:
+                    increase_resubmission_counter = True
+                    self.logger.info(f"increase resubmission counter was set to True as {self.job_id} was in {resubmit_jobids}")
             except TypeError:
                 resubmit_jobids = True
         ## If there is no resubmit_info, we can of course not use it.
@@ -288,6 +273,7 @@ class PreJob:
         maxmemory     = None
         numcores      = None
         priority      = None
+        # read information about last retry (if any)
         inkey = "0" if crab_retry == 0 else str(crab_retry - 1)
         while inkey not in self.resubmit_info and int(inkey) > 0:
             inkey = str(int(inkey) -  1)
@@ -343,10 +329,15 @@ class PreJob:
             resubmit_counter = 0
             self.logger.info("crab_retry is 0. resubmit_counter is set to 0.")
         else:
-            lastExitCode = self.resubmit_info[inkey].get('exitCode')
-            self.logger.info(f"Last Exit Code was {lastExitCode}")
+            lastResubmitCounter = self.resubmit_info[inkey].get('resubmit_counter')
+            self.logger.info(f"Last Resubmit Counter was {lastResubmitCounter}")
             try:
-                resubmit_counter = self.get_resubmit_counter(lastExitCode, crab_retry)
+                if increase_resubmission_counter:
+                    resubmit_counter = lastResubmitCounter + 1
+                    self.logger.info(f"New Resubmit Counter was increased from {lastResubmitCounter} to {resubmit_counter}")
+                else:
+                    resubmit_counter = lastResubmitCounter
+                    self.logger.info(f"Last resubmission counter same as new {resubmit_counter}")
             except Exception:
                 self.logger.info("Exception occured while trying to get resubmit counter. Setting to 0")
                 resubmit_counter = 0

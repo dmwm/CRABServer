@@ -23,33 +23,33 @@ JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERRO
 # ToDo: Reduce Redundance across short and long exit codes
 
 EXIT_RETRY_POLICY = {
-    1: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to bootstrap CMSSW; likely a worker node issue."},
-    50513: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job did not find functioning CMSSW on worker node."},
-    81: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job did not find functioning CMSSW on worker node."},
-    50115: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job did not produce a FJR; will retry.", "increase_memory": True, "memory_factor": 1.3},
-    195: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job did not produce a FJR; will retry.", "increase_memory": True, "memory_factor": 1.3},
-    137: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "SIGKILL; likely an unrelated batch system kill."},
-    10034: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Required application version not found at the site."},
-    50: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Required application version not found at the site."},
-    10040: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Site Error: failed to generate cmsRun cfg file at runtime."},
-    60403: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Timeout during attempted file stageout.", "increase_runtime": True, "runtime_factor": 1.3},
-    243: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Timeout during attempted file stageout.", "increase_runtime": True, "runtime_factor": 1.3},
-    60307: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
-    147: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
-    60311: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
-    151: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Error during attempted file stageout."},
-    8028: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
-    8021: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileReadError (May be a site error).", "change_site": True, "handler": "handle_file_open_or_root_error"},
-    8020: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FileOpenError (Likely a site error).", "change_site": True, "handler": "handle_file_open_or_root_error"},
-    8022: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "FatalRootError.", "handler": "handle_file_open_or_root_error"},
-    84: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Some required file not found; check logs for name of missing file.", "handler": "handle_file_open_or_root_error"},
-    85: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
-    86: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
-    92: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
-    134: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Abort (ANSI) or IOT trap (4.2 BSD) (most likely user application crashed).", "handler": "handle_sigabrt"},
-    8001: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "Other CMS Exception.", "handler": "handle_cvmfs_or_cms_exception"},
-    65: {"type": "recoverable", "max_retries": 2, "delay": 900, "msg": "End of job from user application (CMSSW).", "handler": "handle_cvmfs_or_cms_exception"},
-    "default": {"type": "neutral", "max_retries": 2, "delay": 900, "msg": "Taking default exit code retry policy route."}
+    1: {"type": "recoverable", "delay": 900, "msg": "Job failed to bootstrap CMSSW; likely a worker node issue."},
+    50513: {"type": "recoverable", "delay": 900, "msg": "Job did not find functioning CMSSW on worker node."},
+    81: {"type": "recoverable", "delay": 900, "msg": "Job did not find functioning CMSSW on worker node."},
+    50115: {"type": "recoverable", "delay": 900, "msg": "Job did not produce a FJR; will retry.", "increase_memory": True, "memory_factor": 1.3},
+    195: {"type": "recoverable", "delay": 900, "msg": "Job did not produce a FJR; will retry.", "increase_memory": True, "memory_factor": 1.3},
+    137: {"type": "recoverable", "delay": 900, "msg": "SIGKILL; likely an unrelated batch system kill."},
+    10034: {"type": "recoverable", "delay": 900, "msg": "Required application version not found at the site."},
+    50: {"type": "recoverable", "delay": 900, "msg": "Required application version not found at the site."},
+    10040: {"type": "recoverable", "delay": 900, "msg": "Site Error: failed to generate cmsRun cfg file at runtime."},
+    60403: {"type": "recoverable", "delay": 900, "msg": "Timeout during attempted file stageout.", "increase_runtime": True, "runtime_factor": 1.3},
+    243: {"type": "recoverable", "delay": 900, "msg": "Timeout during attempted file stageout.", "increase_runtime": True, "runtime_factor": 1.3},
+    60307: {"type": "recoverable", "delay": 900, "msg": "Error during attempted file stageout."},
+    147: {"type": "recoverable", "delay": 900, "msg": "Error during attempted file stageout."},
+    60311: {"type": "recoverable", "delay": 900, "msg": "Error during attempted file stageout."},
+    151: {"type": "recoverable", "delay": 900, "msg": "Error during attempted file stageout."},
+    8028: {"type": "recoverable", "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
+    8021: {"type": "recoverable", "delay": 900, "msg": "FileReadError (May be a site error).", "change_site": True, "handler": "handle_file_open_or_root_error"},
+    8020: {"type": "recoverable", "delay": 900, "msg": "FileOpenError (Likely a site error).", "change_site": True, "handler": "handle_file_open_or_root_error"},
+    8022: {"type": "recoverable", "delay": 900, "msg": "FatalRootError.", "handler": "handle_file_open_or_root_error"},
+    84: {"type": "recoverable", "delay": 900, "msg": "Some required file not found; check logs for name of missing file.", "handler": "handle_file_open_or_root_error"},
+    85: {"type": "recoverable", "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
+    86: {"type": "recoverable", "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
+    92: {"type": "recoverable", "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
+    134: {"type": "recoverable", "delay": 900, "msg": "Abort (ANSI) or IOT trap (4.2 BSD) (most likely user application crashed).", "handler": "handle_sigabrt"},
+    8001: {"type": "recoverable", "delay": 900, "msg": "Other CMS Exception.", "handler": "handle_cvmfs_or_cms_exception"},
+    65: {"type": "recoverable", "delay": 900, "msg": "End of job from user application (CMSSW).", "handler": "handle_cvmfs_or_cms_exception"},
+    "default": {"type": "neutral", "delay": 900, "msg": "Taking default exit code retry policy route."}
 }
 
 # strings in fatal root exception text which indicate code problem, not corrupted file
@@ -97,6 +97,7 @@ class RetryJob():
         self.report = {}
         self.validreport = True
         self.integrated_job_time = 0
+        self.max_retries = 9
 
         self.MAX_DISK_SPACE = MAX_DISK_SPACE
         self.MAX_WALLTIME = MAX_WALLTIME
@@ -150,33 +151,8 @@ class RetryJob():
         if key not in retry_info:
             retry_info[key] = {}
 
-        # --- compute retries_consumed_for_ec ---
-        # Find the most recent previous entry (walk backwards if needed)
-        prev_consumed = 0
-        prev_ec = None
-        if self.crab_retry > 0:
-            prev_key = str(self.crab_retry - 1)
-            while prev_key not in retry_info and int(prev_key) > 0:
-                prev_key = str(int(prev_key) - 1)
-            prev_entry = retry_info.get(prev_key, {})
-            prev_ec = prev_entry.get("exitCode")
-            prev_consumed = prev_entry.get("retries_consumed_for_ec", 0)
-
-        if prev_ec is not None and prev_ec != exitCode:
-            # Exit code changed: start a fresh count for this new code
-            retries_consumed_for_ec = 0
-            self.logger.info(
-                f"Exit code changed from {prev_ec} to {exitCode} at retry {self.crab_retry}. "
-                f"Resetting retries_consumed_for_ec to 0."
-            )
-        else:
-            retries_consumed_for_ec = prev_consumed + 1
-
-        # Compute resubmit_counter: how many full cycles of (max_retries+1) have elapsed
-        # for THIS exit code.
-        max_retries = policy["max_retries"]
-        resubmit_counter = retries_consumed_for_ec // (max_retries + 1)
-        # --- end ---
+        # max_retries = self.max_retries
+        # resubmit_counter = self.crab_retry // (max_retries + 1)
 
         delay = policy.get("delay", 900)
         retry_info[key]["retry_delay_until"] = time.time() + delay
@@ -187,8 +163,7 @@ class RetryJob():
         retry_info[key]["memory_factor"] = policy.get("memory_factor", 1.0)
         retry_info[key]["runtime_factor"] = policy.get("runtime_factor", 1.0)
         retry_info[key]["site"] = getattr(self, "site", None)
-        retry_info[key]["retries_consumed_for_ec"] = retries_consumed_for_ec
-        retry_info[key]["resubmit_counter"] = resubmit_counter
+        # retry_info[key]["resubmit_counter"] = resubmit_counter
 
         with open(retry_info_file + ".tmp", "w", encoding="utf-8") as fd:
             fd.write(str(retry_info))
@@ -196,7 +171,7 @@ class RetryJob():
 
     # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def calculate_effective_max_retries(self, policy):
+    def calculate_effective_max_retries(self):
         retry_info_file = f"resubmit_info/job.{self.job_id}.txt"
         retry_info = {}
 
@@ -212,12 +187,10 @@ class RetryJob():
             retry_info[key] = {}
 
         entry = retry_info.get(key, {})
-        # resubmit_counter was written by store_retry_actions() just before this call
         resubmit_counter = entry.get("resubmit_counter", 0)
-        retries_consumed = entry.get("retries_consumed_for_ec", 0)
-        base_max = policy["max_retries"]
+        base_max = self.max_retries
         effective_max_retries = (base_max + 1)*(resubmit_counter + 1) - 1
-        self.logger.info(f"EC retries consumed: {retries_consumed}, resubmit_counter: {resubmit_counter}, effective_max_retries: {effective_max_retries}")
+        self.logger.info(f"resubmit_counter: {resubmit_counter}, effective_max_retries: {effective_max_retries}")
 
         return effective_max_retries
 
@@ -296,7 +269,7 @@ class RetryJob():
         self.logger.info(f"Applying retry policy for exit code {exitCode}")
         self.store_retry_actions(policy, exitCode)
         if policy["type"] == "recoverable":
-            effective_max_retries = self.calculate_effective_max_retries(policy)
+            effective_max_retries = self.calculate_effective_max_retries()
             if self.crab_retry >= effective_max_retries:
                 raise FatalError(f"Retry limit reached for exit {exitCode}: {policy['msg']}")
             # Dispatch to a handler if one is registered for this exit code.
