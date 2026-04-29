@@ -257,14 +257,16 @@ class PreJob:
             resubmit_jobids = map(str, self.task_ad['CRAB_ResubmitList'])
             try:
                 resubmit_jobids = set(resubmit_jobids)
+                self.logger.info(f"resubmit_jobids is {resubmit_jobids} and job id is {self.job_id}")
                 if resubmit_jobids and self.job_id not in resubmit_jobids:
                     use_resubmit_info = True
                 base_max = self.max_retries
-                if self.job_id in resubmit_jobids and crab_retry % (base_max + 1) == base_max:
+                if crab_retry % (base_max + 1) == 0 and crab_retry != 0:
                     increase_resubmission_counter = True
                     self.logger.info(f"increase resubmission counter was set to True as {self.job_id} was in {resubmit_jobids}")
             except TypeError:
                 resubmit_jobids = True
+                self.logger.info(f"resubmit_jobids is {resubmit_jobids} and job id is {self.job_id}")
         ## If there is no resubmit_info, we can of course not use it.
         if not self.resubmit_info:
             use_resubmit_info = False
