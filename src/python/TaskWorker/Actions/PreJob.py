@@ -38,7 +38,7 @@ class PreJob:
         self.resubmit_info = {}
         self.prejob_exit_code = None
         self.logger = logging.getLogger()
-        self.max_retries = 9
+        self.max_retries = 2
 
 
     def calculate_crab_retry(self):

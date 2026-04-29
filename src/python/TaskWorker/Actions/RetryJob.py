@@ -97,7 +97,7 @@ class RetryJob():
         self.report = {}
         self.validreport = True
         self.integrated_job_time = 0
-        self.max_retries = 9
+        self.max_retries = 2
 
         self.MAX_DISK_SPACE = MAX_DISK_SPACE
         self.MAX_WALLTIME = MAX_WALLTIME
