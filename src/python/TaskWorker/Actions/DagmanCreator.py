@@ -347,7 +347,6 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_PublishDBSURL'] = classad.quote(task['tm_publish_dbs_url'])
         jobSubmit['My.CRAB_ISB'] = classad.quote(task['tm_cache_url'])
 
-
         # note about Lists
         # in the JDL everything is a string, we can't use the simple classAd[name]=somelist
         # but need the ExprTree format (what classAd.lookup() would return)
@@ -885,7 +884,7 @@ class DagmanCreator(TaskAction):
 
         ## In the future this parameter may be set by the user in the CRAB configuration
         ## file and we would take it from the Task DB.
-        self.task['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 2)
+        self.task['numautomjobretries'] = getattr(self.config.TaskWorker, 'numAutomJobRetries', 100)
 
         runtime = self.task['tm_split_args'].get('minutes_per_job', -1)
 

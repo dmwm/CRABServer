@@ -5,7 +5,9 @@ import json
 import shutil
 import subprocess
 import socket
+import time
 from collections import namedtuple
+from ast import literal_eval
 
 from ServerUtilities import executeCommand, getLock
 from ServerUtilities import MAX_DISK_SPACE, MAX_WALLTIME, MAX_MEMORY
@@ -14,6 +16,41 @@ import classad2 as classad
 
 
 JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERROR')(0, 1, 2)
+
+# ----------------------------------------------------------------------
+# Exit-code dependent retry policy
+# ----------------------------------------------------------------------
+# ToDo: Reduce Redundance across short and long exit codes
+
+EXIT_RETRY_POLICY = {
+    1: {"type": "recoverable", "delay": 900, "msg": "Job failed to bootstrap CMSSW; likely a worker node issue."},
+    50513: {"type": "recoverable", "delay": 900, "msg": "Job did not find functioning CMSSW on worker node."},
+    81: {"type": "recoverable", "delay": 900, "msg": "Job did not find functioning CMSSW on worker node."},
+    50115: {"type": "recoverable", "delay": 900, "msg": "Job did not produce a FJR; will retry.", "increase_memory": True, "memory_factor": 1.3},
+    195: {"type": "recoverable", "delay": 900, "msg": "Job did not produce a FJR; will retry.", "increase_memory": True, "memory_factor": 1.3},
+    137: {"type": "recoverable", "delay": 900, "msg": "SIGKILL; likely an unrelated batch system kill."},
+    10034: {"type": "recoverable", "delay": 900, "msg": "Required application version not found at the site."},
+    50: {"type": "recoverable", "delay": 900, "msg": "Required application version not found at the site."},
+    10040: {"type": "recoverable", "delay": 900, "msg": "Site Error: failed to generate cmsRun cfg file at runtime."},
+    60403: {"type": "recoverable", "delay": 900, "msg": "Timeout during attempted file stageout.", "increase_runtime": True, "runtime_factor": 1.3},
+    243: {"type": "recoverable", "delay": 900, "msg": "Timeout during attempted file stageout.", "increase_runtime": True, "runtime_factor": 1.3},
+    60307: {"type": "recoverable", "delay": 900, "msg": "Error during attempted file stageout."},
+    147: {"type": "recoverable", "delay": 900, "msg": "Error during attempted file stageout."},
+    60311: {"type": "recoverable", "delay": 900, "msg": "Error during attempted file stageout."},
+    151: {"type": "recoverable", "delay": 900, "msg": "Error during attempted file stageout."},
+    8028: {"type": "recoverable", "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
+    8021: {"type": "recoverable", "delay": 900, "msg": "FileReadError (May be a site error).", "change_site": True, "handler": "handle_file_open_or_root_error"},
+    8020: {"type": "recoverable", "delay": 900, "msg": "FileOpenError (Likely a site error).", "change_site": True, "handler": "handle_file_open_or_root_error"},
+    8022: {"type": "recoverable", "delay": 900, "msg": "FatalRootError.", "handler": "handle_file_open_or_root_error"},
+    84: {"type": "recoverable", "delay": 900, "msg": "Some required file not found; check logs for name of missing file.", "handler": "handle_file_open_or_root_error"},
+    85: {"type": "recoverable", "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
+    86: {"type": "recoverable", "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
+    92: {"type": "recoverable", "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
+    134: {"type": "recoverable", "delay": 900, "msg": "Abort (ANSI) or IOT trap (4.2 BSD) (most likely user application crashed).", "handler": "handle_sigabrt"},
+    8001: {"type": "recoverable", "delay": 900, "msg": "Other CMS Exception.", "handler": "handle_cvmfs_or_cms_exception"},
+    65: {"type": "recoverable", "delay": 900, "msg": "End of job from user application (CMSSW).", "handler": "handle_cvmfs_or_cms_exception"},
+    "default": {"type": "neutral", "delay": 900, "msg": "Taking default exit code retry policy route."}
+}
 
 # strings in fatal root exception text which indicate code problem, not corrupted file
 # a small "knowledge data base"
@@ -60,6 +97,7 @@ class RetryJob():
         self.report = {}
         self.validreport = True
         self.integrated_job_time = 0
+        self.max_retries = 2
 
         self.MAX_DISK_SPACE = MAX_DISK_SPACE
         self.MAX_WALLTIME = MAX_WALLTIME
@@ -96,6 +134,157 @@ class RetryJob():
                 self.ads.append(ad)
         self.ad = self.ads[-1]
 
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def store_retry_actions(self, policy, exitCode):
+        retry_info_file = f"resubmit_info/job.{self.job_id}.txt"
+        retry_info = {}
+
+        if os.path.exists(retry_info_file):
+            try:
+                with open(retry_info_file, "r", encoding="utf-8") as fd:
+                    retry_info = literal_eval(fd.read())
+            except FileNotFoundError:
+                retry_info = {}
+
+        key = str(self.crab_retry)
+        if key not in retry_info:
+            retry_info[key] = {}
+
+        # max_retries = self.max_retries
+        # resubmit_counter = self.crab_retry // (max_retries + 1)
+
+        delay = policy.get("delay", 900)
+        retry_info[key]["retry_delay_until"] = time.time() + delay
+        retry_info[key]["exitCode"] = exitCode
+        retry_info[key]["increase_memory"] = policy.get("increase_memory", False)
+        retry_info[key]["increase_runtime"] = policy.get("increase_runtime", False)
+        retry_info[key]["change_site"] = policy.get("change_site", False)
+        retry_info[key]["memory_factor"] = policy.get("memory_factor", 1.0)
+        retry_info[key]["runtime_factor"] = policy.get("runtime_factor", 1.0)
+        retry_info[key]["site"] = getattr(self, "site", None)
+        # retry_info[key]["resubmit_counter"] = resubmit_counter
+
+        with open(retry_info_file + ".tmp", "w", encoding="utf-8") as fd:
+            fd.write(str(retry_info))
+        os.rename(retry_info_file + ".tmp", retry_info_file)
+
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def calculate_effective_max_retries(self):
+        retry_info_file = f"resubmit_info/job.{self.job_id}.txt"
+        retry_info = {}
+
+        if os.path.exists(retry_info_file):
+            try:
+                with open(retry_info_file, "r", encoding="utf-8") as fd:
+                    retry_info = literal_eval(fd.read())
+            except FileNotFoundError:
+                retry_info = {}
+
+        key = str(self.crab_retry)
+        if key not in retry_info:
+            retry_info[key] = {}
+
+        entry = retry_info.get(key, {})
+        resubmit_counter = entry.get("resubmit_counter", 0)
+        base_max = self.max_retries
+        effective_max_retries = (base_max + 1)*(resubmit_counter + 1) - 1
+        self.logger.info(f"resubmit_counter: {resubmit_counter}, effective_max_retries: {effective_max_retries}")
+
+        return effective_max_retries
+
+    def handle_file_open_or_root_error(self, exitCode):
+        """
+        Handle exit codes related to file open/read/root failures (8020, 8021, 8022, 8028, 84, 85, 86, 92).
+        Checks for corrupted input files; if found, creates a fake FJR with code 8022. 
+        Raises RecoverableError with the policy message.
+        """
+        try:
+            corruptedInputFile = self.check_corrupted_file(exitCode)
+        except Exception as e:  # pylint: disable=broad-except
+            self.logger.error(f"check_corrupted_file raised an exception:\n{e}\nIgnore and go on")
+            corruptedInputFile = False
+        if corruptedInputFile:
+            exitMsg = "Fatal Root Error: possible corrupted input file. Reporting and retrying."
+            self.create_fake_fjr(exitMsg, 8022, 8022, fatalError=False)
+        self.logger.info(f"Handler function ran successfully for exit Code {exitCode}")
+        raise RecoverableError(EXIT_RETRY_POLICY[exitCode]["msg"])
+
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def handle_sigabrt(self, exitCode):
+        """
+        Handle exit code 134 (SIGABRT / IOT trap).
+        Checks job stdout for a SIGILL pattern; if found, promotes to a recoverable
+        SIGILL error. Otherwise raises the default RecoverableError.
+        """
+        recoverable_signal = False
+        try:
+            fname = os.path.realpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
+            with open(fname, encoding='utf-8') as fd:
+                for line in fd:
+                    if line.startswith("== CMSSW:  A fatal system signal has occurred: illegal instruction"):
+                        recoverable_signal = True
+                        break
+        except Exception:  # pylint: disable=broad-except
+            msg = "Error analyzing abort signal.\nDetails follow:"
+            self.logger.exception(msg)
+        self.logger.info(f"Handler function ran successfully for exit Code {exitCode}")
+        if recoverable_signal:
+            raise RecoverableError("SIGILL; may indicate a worker node issue.")
+
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def handle_cvmfs_or_cms_exception(self, exitCode):
+        """
+        Handle exit codes 8001 and 65 (CMS exceptions / end-of-job).
+        Scans job stdout for a truncated CVMFS file pattern; if found raises a
+        specific RecoverableError, otherwise raises the default one.
+        """
+        cvmfs_issue = False
+        try:
+            fname = os.path.relpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
+            cvmfs_issue_re = re.compile(r"== CMSSW:  unable to load /cvmfs/.*file too short")
+            with open(fname, encoding='utf-8') as fd:
+                for line in fd:
+                    if cvmfs_issue_re.match(line):
+                        cvmfs_issue = True
+                        break
+        except Exception:  # pylint: disable=broad-except
+            msg = "Error analyzing output for CVMFS issues.\nDetails follow:"
+            self.logger.exception(msg)
+        self.logger.info(f"Handler function ran successfully for exit Code {exitCode}")
+        if cvmfs_issue:
+            raise RecoverableError("CVMFS issue detected.")
+
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def apply_retry_policy(self, exitCode):
+        """
+        Enforce exit-code dependent retry limits and delay.
+        Raises FatalError if retry limit exceeded.
+        """
+        policy = EXIT_RETRY_POLICY.get(exitCode, EXIT_RETRY_POLICY["default"])
+        self.logger.info(f"Applying retry policy for exit code {exitCode}")
+        self.store_retry_actions(policy, exitCode)
+        if policy["type"] == "recoverable":
+            effective_max_retries = self.calculate_effective_max_retries()
+            if self.crab_retry >= effective_max_retries:
+                raise FatalError(f"Retry limit reached for exit {exitCode}: {policy['msg']}")
+            # Dispatch to a handler if one is registered for this exit code.
+            handler_name = policy.get("handler")
+            if handler_name:
+                handler = getattr(self, handler_name, None)
+                if handler is None:
+                    self.logger.error(f"Handler '{handler_name}' not found on RetryJob.")
+                else:
+                    handler(exitCode)  
+            raise RecoverableError(policy["msg"])
+
+        if policy["type"] == "neutral":
+            return
+            
     # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def get_job_ad_from_file(self):
@@ -307,6 +496,8 @@ class RetryJob():
             return 1
         try:
             exitCode = int(self.report['exitCode'])
+            # Apply retry policy
+            self.apply_retry_policy(exitCode)
         except ValueError:
             msg = "Unable to extract job's wrapper exit code from job report."
             self.logger.warning(msg)
@@ -317,92 +508,11 @@ class RetryJob():
             msg = "Job and stageout wrappers finished successfully (exit code %d)." % (exitCode)
             self.logger.info(msg)
             return 0
+        else:
+            raise FatalError("Job wrapper finished with exit code %d.\nExit message:\n  %s" % (exitCode, exitMsg.replace('\n', '\n  ')))
 
         msg = "Job or stageout wrapper finished with exit code %d." % (exitCode)
-        msg += " Trying to determine the meaning of the exit code and if it is a recoverable or fatal error."
-        self.logger.info(msg)
-
-        # Wrapper script sometimes returns the posix return code (8 bits).
-        if exitCode in [8020, 8021, 8022, 8028] or exitCode in [84, 85, 86, 92]:
-            try:  # the following is still a bit experimental, make sure it never crashes the PJ
-                corruptedInputFile = self.check_corrupted_file(exitCode)
-            except Exception as e:  # pylint: disable=broad-except
-                msg = f"check_corrupted_file raised an exception:\n{e}\nIgnore and go on"
-                self.logger.error(msg)
-                corruptedInputFile = False
-            if corruptedInputFile:
-                exitMsg = "Fatal Root Error maybe a corrupted input file. This error is being reported"
-                self.create_fake_fjr(exitMsg, 8022, 8022, fatalError=False)  # retry the job
-            raise RecoverableError("Job failed to open local and fallback files.")
-
-        if exitCode == 1:
-            raise RecoverableError("Job failed to bootstrap CMSSW; likely a worker node issue.")
-
-        if exitCode == 50513 or exitCode == 81:
-            raise RecoverableError("Job did not find functioning CMSSW on worker node.")
-
-        # This is a difficult one -- right now CMSRunAnalysis.py will turn things like
-        # segfaults into an invalid FJR.  Will revisit this decision later.
-        if exitCode == 50115 or exitCode == 195:
-            raise RecoverableError("Job did not produce a FJR; will retry.")
-
-        if exitCode == 134:
-            recoverable_signal = False
-            try:
-                fname = os.path.realpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
-                with open(fname, encoding='utf-8') as fd:
-                    for line in fd:
-                        if line.startswith("== CMSSW:  A fatal system signal has occurred: illegal instruction"):
-                            recoverable_signal = True
-                            break
-            except Exception:  # pylint: disable=broad-except
-                msg = "Error analyzing abort signal."
-                msg += "\nDetails follow:"
-                self.logger.exception(msg)
-            if recoverable_signal:
-                raise RecoverableError("SIGILL; may indicate a worker node issue.")
-
-        if exitCode == 8001 or exitCode == 65:
-            cvmfs_issue = False
-            try:
-                fname = os.path.relpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
-                cvmfs_issue_re = re.compile("== CMSSW:  unable to load /cvmfs/.*file too short")
-                with open(fname, encoding='utf-8') as fd:
-                    for line in fd:
-                        if cvmfs_issue_re.match(line):
-                            cvmfs_issue = True
-                            break
-            except Exception:  # pylint: disable=broad-except
-                msg = "Error analyzing output for CVMFS issues."
-                msg += "\nDetails follow:"
-                self.logger.exception(msg)
-            if cvmfs_issue:
-                raise RecoverableError("CVMFS issue detected.")
-
-        # Another difficult case -- so far, SIGKILL has mostly been observed at T2_CH_CERN, and it has nothing to do
-        # with an issue of the job itself. Typically, this isn't the user code's fault
-        # it was often a site or pilot misconfiguration that led to the pilot exhausting its allocated runtime.
-        # We should revisit this issue if we see SIGKILL happening for other cases that are the users' fault.
-        if exitCode == 137:
-            raise RecoverableError("SIGKILL; likely an unrelated batch system kill.")
-
-        if exitCode == 10034 or exitCode == 50:
-            raise RecoverableError("Required application version not found at the site.")
-
-        if exitCode == 10040:
-            raise RecoverableError("Site Error: failed to generate cmsRun cfg file at runtime.")
-
-        if exitCode == 60403 or exitCode == 243:
-            raise RecoverableError("Timeout during attempted file stageout.")
-
-        if exitCode == 60307 or exitCode == 147:
-            raise RecoverableError("Error during attempted file stageout.")
-
-        if exitCode == 60311 or exitCode == 151:
-            raise RecoverableError("Error during attempted file stageout.")
-
-        if exitCode:
-            raise FatalError("Job wrapper finished with exit code %d.\nExit message:\n  %s" % (exitCode, exitMsg.replace('\n', '\n  ')))
+        self.logger.info(msg)           
 
         return 0
 
