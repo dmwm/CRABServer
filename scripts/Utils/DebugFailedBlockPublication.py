@@ -18,7 +18,7 @@ def main():
     fileName = args.file
     #fileName = 'failed-block-at-1611258668.34.txt' # just an example
 
-    failedBlocksDir = '/data/srv/Publisher_files/FailedBlocks/'
+    failedBlocksDir = '/data/srv/Publisher/PublisherFiles/FailedBlocks/'
     filePath = failedBlocksDir + fileName
     if not os.path.isfile(filePath):
         print("File %s not found in %s" % (fileName, failedBlocksDir))
