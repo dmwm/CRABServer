@@ -167,6 +167,10 @@ def publishInDBS3(config, taskname, verbose, console):  # pylint: disable=too-ma
                     log['taskFilesDir'], 'FailedBlocks', f"failed-block-at-{time.time()}.txt")
                 with open(failedBlockDumpFile, 'w', encoding='utf8') as fd:
                     fd.write(pprint.pformat(blockDump))
+                failedBlockDumpFile = failedBlockDumpFile.replace('txt','json')
+                with open(failedBlockDumpFile, 'w', encoding='utf8') as fd:
+                    json.dump(blockDump, fd)
+                dumpList.append(fname)
                 logger.error("FAILING BLOCK DUE TO %s SAVED AS %s", str(ex), failedBlockDumpFile)
                 failureReason = 'failedToInsertInDBS'
             finally:

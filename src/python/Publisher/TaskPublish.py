@@ -316,6 +316,10 @@ def publishInDBS3(config, taskname, verbose, console):
             with open(fname, 'w', encoding='utf8') as fd:
                 fd.write(pprint.pformat(blockDump))
             dumpList.append(fname)
+            fname = fname.replace('txt','json')
+            with open(fname, 'w', encoding='utf8') as fd:
+                json.dump(blockDump, fd)
+            dumpList.append(fname)
             failedBlocks += 1
             logger.error("FAILING BLOCK DUE TO %s SAVED AS %s", str(ex), fname)
         finally:
