@@ -26,7 +26,7 @@ def main():
         os.environ['X509_USER_KEY'] = '/data/certs/robotkey.pem'
 
     migUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSMigrate'
-    apiMig = DbsApi(url=migUrl, debug=True)
+    apiMig = DbsApi(url=migUrl, debug=True, useGzip=True)
 
     status = apiMig.statusMigration(migration_rqst_id=migrationId)
     if not status:
