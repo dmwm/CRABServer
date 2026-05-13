@@ -90,7 +90,7 @@ def main():
         os.environ['X509_USER_KEY'] = '/data/certs/robotkey.pem'
 
     migUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSMigrate'
-    apiMig = DbsApi(url=migUrl, debug=False)
+    apiMig = DbsApi(url=migUrl, debug=False, useGzip=True)
 
     failedMigrations = readAndParse(logFile, apiMig)
 
