@@ -8,14 +8,41 @@ import os
 import logging
 import json
 import time
+from random import uniform
 from datetime import datetime
 
-from dbs.apis.dbsClient import DbsApi
+from dbs.apis.dbsClient import DbsApi as DbsApiBase
 from dbs.exceptions.dbsClientException import dbsClientException
 from RestClient.ErrorHandling.RestClientExceptions import HTTPError
 
 from TaskWorker.WorkerExceptions import CannotMigrateException
 
+MAX_RETRY_ATTEMPTS = 3
+MIN_RETRY_DELAY = 10
+MAX_RETRY_DELAY = 3 * 60 # 3 minutes
+
+logger = logging.getLogger(__name__)
+
+class DbsApi(DbsApiBase):
+
+    def insertBulkBlock(self, block_dump):
+        retry_count = 0
+        last_ex = None
+        while retry_count < MAX_RETRY_ATTEMPTS:
+            try:
+                return super().insertBulkBlock(block_dump)
+            except HTTPError as ex:
+                last_ex = ex
+                body = json.loads(ex.body)
+                reason = body[0]['error']['reason']
+                if ex.code == 400 and 'ORA-00001' in reason:
+                    block_name = block_dump['block']['block_name']
+                    logger.info(f"Retry {retry_count+1} of {MAX_RETRY_ATTEMPTS} for inserting bulk block {block_name}")
+                    time.sleep(uniform(MIN_RETRY_DELAY, MAX_RETRY_DELAY))
+                    retry_count += 1
+                    continue
+                raise
+        raise Exception(f"Error inserting bulk block: {last_ex} after {MAX_RETRY_ATTEMPTS} attempts") from last_ex
 
 def format_file_3(file_):
     """
