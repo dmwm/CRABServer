@@ -8,6 +8,7 @@ import os
 import logging
 import json
 import time
+from random import uniform
 from datetime import datetime
 
 from dbs.apis.dbsClient import DbsApi as DbsApiBase
@@ -17,7 +18,8 @@ from RestClient.ErrorHandling.RestClientExceptions import HTTPError
 from TaskWorker.WorkerExceptions import CannotMigrateException
 
 MAX_RETRY_ATTEMPTS = 3
-RETRY_DELAY = 1
+MIN_RETRY_DELAY = 10
+MAX_RETRY_DELAY = 3 * 60 # 3 minutes
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +38,7 @@ class DbsApi(DbsApiBase):
                 if ex.code == 400 and 'ORA-00001' in reason:
                     block_name = block_dump['block']['block_name']
                     logger.info(f"Retry {retry_count+1} of {MAX_RETRY_ATTEMPTS} for inserting bulk block {block_name}")
-                    time.sleep(RETRY_DELAY)
+                    time.sleep(uniform(MIN_RETRY_DELAY, MAX_RETRY_DELAY))
                     retry_count += 1
                     continue
                 raise
