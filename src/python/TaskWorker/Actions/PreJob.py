@@ -13,7 +13,7 @@ import errno
 import logging
 from ast import literal_eval
 
-from ServerUtilities import getWebdirForDb, insertJobIdSid, pythonListToClassAdExprTree
+from ServerUtilities import getWebdirForDb, insertJobIdSid, pythonListToClassAdExprTree, getLock
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
 import htcondor2 as htcondor
@@ -38,6 +38,7 @@ class PreJob:
         self.resubmit_info = {}
         self.prejob_exit_code = None
         self.logger = logging.getLogger()
+        self.rrn           = None
 
 
     def calculate_crab_retry(self):
@@ -182,6 +183,31 @@ class PreJob:
             with open(file_name, 'r', encoding='utf-8') as fd:
                 self.resubmit_info = literal_eval(fd.read())
 
+    def get_rrn(self):
+        rrn_file = os.path.join("rrn_info", f"job.{self.job_id}.txt")
+        lock_file = rrn_file + ".lock"
+
+        with getLock(lock_file):
+            data = {}
+            if os.path.exists(rrn_file):
+                try:
+                    with open(rrn_file, 'r', encoding='utf-8') as fd:
+                        data = json.load(fd)
+                except Exception:
+                    self.logger.warning("Could not read %s, starting fresh", rrn_file)
+                    data = {}
+
+            rrn = data.get('rrn', 0)
+            rrn += 1
+            data['rrn'] = rrn
+            # Preserve epoch field if present; PreJob does not modify it
+            tmp = rrn_file + ".tmp"
+            with open(tmp, 'w', encoding='utf-8') as fd:
+                json.dump(data, fd)
+            os.rename(tmp, rrn_file)
+
+        self.logger.info("RRN for job %s incremented to %d", self.job_id, rrn)
+        return rrn
 
     def save_resubmit_info(self):
         """
@@ -521,7 +547,9 @@ class PreJob:
 
         ## Load the task ad.
         self.get_task_ad()
-
+        # increment and record RRN for this submission
+        self.rrn = self.get_rrn()
+        self.logger.info("RRN=%d", self.rrn)
         try:
             with open('webdir', 'r', encoding='utf-8') as fd:
                 self.userWebDirPrx = fd.read()

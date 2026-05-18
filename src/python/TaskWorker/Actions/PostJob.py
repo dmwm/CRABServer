@@ -1796,7 +1796,7 @@ class PostJob():
                 self.logger.info("====== Finished to analyze job exit status.")
                 res = JOB_RETURN_CODES.FATAL_ERROR, ""
             elif self.retryjob_retval == JOB_RETURN_CODES.RECOVERABLE_ERROR:
-                if self.dag_retry >= self.max_retries:
+                if self.get_rrn() >= self.max_retries:
                     msg = "The retry handler indicated this was a recoverable error,"
                     msg += " but the maximum number of retries was already hit."
                     msg += " DAGMan will not retry."
@@ -1823,7 +1823,7 @@ class PostJob():
                 res = JOB_RETURN_CODES.FATAL_ERROR, "" #MarcoM: this should never happen
         # This is for the case in which we don't run the retry-job.
         elif self.job_return_code != JOB_RETURN_CODES.OK:
-            if self.dag_retry >= self.max_retries:
+            if self.get_rrn() >= self.max_retries:
                 msg = "The maximum allowed number of retries was hit and the job failed."
                 msg += " Setting this node (job) to permanent failure."
                 self.logger.info(msg)
@@ -3013,7 +3013,7 @@ class PostJob():
         number of job retries was hit. If it was, the post-job should return with the
         fatal error exit code. Otherwise with the recoverable error exit code.
         """
-        if self.dag_retry >= self.max_retries:
+        if self.get_rrn() >= self.max_retries:
             msg = "Job could be retried, but the maximum allowed number of retries was hit."
             msg += " Setting this node (job) to permanent failure. DAGMan will NOT retry."
             self.logger.info(msg)
@@ -3026,6 +3026,25 @@ class PostJob():
         self.set_state_ClassAds('COOLOFF', exitCode=exitCode)
 
         return JOB_RETURN_CODES.RECOVERABLE_ERROR
+
+    # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def get_rrn(self):
+        """
+        Read the current RRN for this job from rrn_info/job.<job_id>.txt.
+        Returns 0 if the file doesn't exist yet (first submission).
+        """
+        rrn_file = os.path.join("rrn_info", f"job.{self.job_id}.txt")
+        if not os.path.exists(rrn_file):
+            self.logger.warning("RRN file %s not found, assuming RRN=0", rrn_file)
+            return 0
+        try:
+            with open(rrn_file, 'r', encoding='utf-8') as fd:
+                data = json.load(fd)
+            return int(data.get('rrn', 0))
+        except Exception:
+            self.logger.exception("Failed to read RRN file %s, assuming RRN=0", rrn_file)
+            return 0
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
