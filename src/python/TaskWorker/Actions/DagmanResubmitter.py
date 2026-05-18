@@ -1,7 +1,7 @@
 """ Resubmit failed jobs in tasks """
 
 import os
-
+import json
 from http.client import HTTPException
 from urllib.parse import urlencode
 
