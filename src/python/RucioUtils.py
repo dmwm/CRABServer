@@ -7,7 +7,14 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 from rucio.client import Client as NativeClient
 from rucio.common.exception import RSENotFound, RuleNotFound, RucioException
 
-def withExponentialBackOffRetry(retryAttempts=5, fatalExceptions=(), retryExceptions=(Exception,)):
+RETRIABLE_RUCIO_HTTP_STATUSES = [503]
+
+def _is_rucio_retriable_http_error(exc):
+    """True if this RucioException wraps a transient HTTP error we should retry."""
+    msg = str(exc).lower()
+    return any(f"http status code: {code}" in msg for code in RETRIABLE_RUCIO_HTTP_STATUSES)
+
+def withExponentialBackOffRetry(retryAttempts=5, fatalExceptions=(), retryExceptions=(Exception,), retryPredicate=None):
     """
     Generic Exponential Back-off Retry
     - retryAttempts: The number of retry attempts to perform before giving up.
@@ -17,6 +24,8 @@ def withExponentialBackOffRetry(retryAttempts=5, fatalExceptions=(), retryExcept
             9/10 attempts -- Long-running or critical operations such as job submission, task management, and tape recall (≈ 17/34 minutes tolerance).
     - fatalExceptions: A tuple of exception types that should not be retried, raise immediately.
     - retryExceptions: A tuple of exception types that are eligible for retry. Otherwise will be raise right away as well. (But our default is built-in Exception, so all exception will be catch and retry anyhow.
+    - retryPredicate: Optional callable(exception) -> bool. When a fatalException is caught,
+        if retryPredicate returns True, it is retried instead of raised. Extra sleep tolerance is applied.
     """
     fatalExceptions = tuple(fatalExceptions)
     retryExceptions = tuple(retryExceptions)
@@ -38,7 +47,18 @@ def withExponentialBackOffRetry(retryAttempts=5, fatalExceptions=(), retryExcept
                 try:
                     return func(*args, **kwargs)
                 except fatalExceptions as e:
-                    # Fatal Exception will not be retry, raise immediately.
+                    if retryPredicate and retryPredicate(e):
+                        if attempt > retryAttempts:
+                            logger.error(f"Operation '{name}' failed after {attempt} retries (retryPredicate matched): {e}")
+                            raise
+                        sleepTime = 20 + (2 ** attempt)
+                        logger.warning(
+                            f"Retriable exception in '{name}' (attempt {attempt+1}/{retryAttempts}): "
+                            f"{e}, waiting for {sleepTime} seconds..."
+                        )
+                        time.sleep(sleepTime)
+                        attempt += 1
+                        continue
                     logger.exception(f"Fatal exception in '{name}' : {e}")
                     logger.exception(f"Type of Exception: {type(e)}")
                     logger.exception(f"repr(): {repr(e)}")
@@ -67,7 +87,7 @@ class Client:
         if not callable(attr):
             return attr
 
-        @withExponentialBackOffRetry(retryAttempts=8, fatalExceptions=(RucioException,))
+        @withExponentialBackOffRetry(retryAttempts=10, fatalExceptions=(RucioException,), retryPredicate=_is_rucio_retriable_http_error)
         @wraps(attr)
         def call(*args, **kwargs):
             return attr(*args, **kwargs)
@@ -173,7 +193,7 @@ def getWritePFN(rucioClient=None, siteName='', lfn='',  # pylint: disable=danger
 
     return pfn
 
-@withExponentialBackOffRetry(retryAttempts=8, fatalExceptions=(RucioException,))
+@withExponentialBackOffRetry(retryAttempts=10, fatalExceptions=(RucioException,))
 def getRuleQuota(rucioClient=None, ruleId=None):
     """ return quota needed by this rule in Bytes """
     size = 0
@@ -185,7 +205,7 @@ def getRuleQuota(rucioClient=None, ruleId=None):
     size = sum(file['bytes'] for file in files)
     return size
 
-@withExponentialBackOffRetry(retryAttempts=8, fatalExceptions=(RucioException,))
+@withExponentialBackOffRetry(retryAttempts=10, fatalExceptions=(RucioException,))
 def getRucioUsage(rucioClient=None, account=None, activity =None):
     """ size of Rucio usage for this account (if provided) or by activity """
     if activity is None:
