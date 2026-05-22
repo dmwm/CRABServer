@@ -262,6 +262,7 @@ class PreJob:
         msg = "Setting CRAB_Retry = %s" % (crab_retry)
         self.logger.info(msg)
         newJobSubmit['My.CRAB_Retry'] = str(crab_retry)
+        newJobSubmit['My.CRAB_RRN'] = str(self.rrn)
         ## Add job and postjob log URLs
         job_retry = "%s.%s" % (self.job_id, crab_retry)
         newJobSubmit['My.CRAB_JobLogURL'] = classad.quote(os.path.join(self.userWebDirPrx, "job_out."+job_retry+".txt"))
