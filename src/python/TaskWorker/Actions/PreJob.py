@@ -39,6 +39,7 @@ class PreJob:
         self.prejob_exit_code = None
         self.logger = logging.getLogger()
         self.rrn           = None
+        self.reuse_rrn     = False
 
 
     def calculate_crab_retry(self):
@@ -101,6 +102,9 @@ class PreJob:
                 retmsg += "\n\tIt seems the job has already been submitted."
                 retmsg += "\n\tSetting the pre-job exit code to 1."
                 self.prejob_exit_code = 1
+            else:
+                retmsg += "\n\tPre-job was interrupted before job completed. pre=%d > post=%d, no job_out. Reusing existing RRN." % (retry_info['pre'], retry_info['post'])
+                self.reuse_rrn = True
         ## ... or not.
         else:
             ## If the job_out doesn't exist, then this is certainly (ok, 99.99% certainly)
@@ -196,7 +200,13 @@ class PreJob:
                 except Exception:
                     self.logger.warning("Could not read %s, starting fresh", rrn_file)
                     data = {}
-
+            if self.reuse_rrn:
+                rrn = data.get('rrn', 0)
+                self.logger.info(
+                    "RRN for job %s reused as %d (interrupted pre-job, not re-incrementing)",
+                    self.job_id, rrn
+                )
+                return rrn
             rrn = data.get('rrn', 0)
             rrn += 1
             data['rrn'] = rrn
