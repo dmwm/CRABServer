@@ -1,5 +1,7 @@
 # **NEW** learn CRABServer via [DeepWiki](https://deepwiki.com/dmwm/CRABServer)
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/dmwm/crabserver)
+
 ### CRAB CI/CD flow with [Jenkins](https://cmssdt.cern.ch/dmwm-jenkins/)
 ##### 1. Building RPMs
 * Each release created in CRABServer repository triggers [Jenkins job](https://cmssdt.cern.ch/dmwm-jenkins/job/CRABServer_BuildOnRelease) that builds RPMs for crabserver and crabtaskworker. 
