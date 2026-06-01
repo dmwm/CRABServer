@@ -216,7 +216,7 @@ def resetRRN():
             os.rename(tmp, fpath)
             printLog(f"Reset RRN for {fpath}, last_reset_epoch set to {current_epoch}")
 
-        except Exception as ex:
+        except Exception as ex: # pylint: disable=broad-exception-caught
             printLog(f"WARNING: failed to reset RRN for {fpath}: {ex}")
 
 def writeResubmitRecord(ad):
@@ -231,13 +231,13 @@ def writeResubmitRecord(ad):
 
     try:
         record = json.loads(str(ad['CRAB_ResubmitRecord']))
-    except Exception as ex:
+    except Exception as ex: # pylint: disable=broad-exception-caught
         printLog(f"Failed to parse CRAB_ResubmitRecord: {ex}, skipping")
         return
 
     epoch = record.get('epoch', 0)
-    job_ids = record.get('job_ids')  # list of strings or None
-
+    job_ids = record.get('job_ids')
+    printLog(f"epoch={epoch}, job_ids={job_ids}")
     os.makedirs("rrn_info", exist_ok=True)
     record_path = os.path.join("rrn_info", "resubmit_record.json")
 
@@ -249,7 +249,7 @@ def writeResubmitRecord(ad):
             if existing.get('epoch') == epoch:
                 printLog(f"resubmit_record.json already at epoch {epoch}, skipping")
                 return
-        except Exception as ex:
+        except Exception as ex: # pylint: disable=broad-exception-caught
             printLog(f"Could not read existing resubmit_record.json: {ex}, overwriting")
 
     tmp = record_path + ".tmp"

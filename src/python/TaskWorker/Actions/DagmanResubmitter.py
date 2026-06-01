@@ -103,7 +103,7 @@ class DagmanResubmitter(TaskAction):
                     ads = schedd.query(rootConst, projection=["CRAB_ResubmitEpoch"])
                     if ads and "CRAB_ResubmitEpoch" in ads[0]:
                         currentEpoch = int(ads[0]["CRAB_ResubmitEpoch"])
-                except Exception as ex:
+                except Exception as ex: # pylint: disable=broad-exception-caught
                     self.logger.warning("Could not read CRAB_ResubmitEpoch, defaulting to 0: %s", ex)
 
                 newEpoch = currentEpoch + 1
