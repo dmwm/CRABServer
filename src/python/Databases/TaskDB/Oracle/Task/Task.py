@@ -26,8 +26,6 @@ class Task(object):
 
     #INSERTED BY ERIC SUMMER STUDENT
     ALLUSER_sql = "SELECT DISTINCT(tm_username) FROM tasks"
-    #TODO: remove some of the following unused queries
-    TASKSUMMARY_sql = "select tm_username, tm_task_status, count(*) from tasks group by tm_username, tm_task_status order by tm_username"
     #get taskname by user and status
     GetByUserAndStatus_sql = "select tm_taskname from tasks where tm_username=:username and tm_task_status=:status"
     #quick search
