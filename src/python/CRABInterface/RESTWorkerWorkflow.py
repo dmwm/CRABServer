@@ -53,6 +53,7 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
             validate_str("getstatus", param, safe, RX_STATUS, optional=True)
             validate_num("limit", param, safe, optional=True)
+            validate_num("months", param, safe, optional=True)
             # possible combinations to check
             # 1) workername + getstatus + limit
             # 2) subresource + subjobdef + subuser
@@ -83,12 +84,13 @@ class RESTWorkerWorkflow(RESTEntity):
         return []
 
     @restcall
-    def get(self, workername, getstatus, limit):
+    def get(self, workername, getstatus, limit, months=1):
         """ Retrieve all columns for a specified task or
             tasks which are in a particular status with
             particular conditions """
 
-        binds = {"limit": limit, "tw_name": workername, "get_status": getstatus}
+        months = 1 if months is None else int(months)
+        binds = {"limit": limit, "tw_name": workername, "get_status": getstatus, "months": months} 
         rows = self.api.query(None, None, self.Task.GetReadyTasks_sql, **binds)
         for row in rows:
             # get index of tm_user_config to load data from clob and load json string
