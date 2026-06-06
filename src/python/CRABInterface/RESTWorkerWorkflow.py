@@ -89,6 +89,7 @@ class RESTWorkerWorkflow(RESTEntity):
             tasks which are in a particular status with
             particular conditions """
 
+        months = 1 if months is None else int(months)
         binds = {"limit": limit, "tw_name": workername, "get_status": getstatus, "months": months} 
         rows = self.api.query(None, None, self.Task.GetReadyTasks_sql, **binds)
         for row in rows:
