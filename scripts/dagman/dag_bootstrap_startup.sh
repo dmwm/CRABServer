@@ -43,6 +43,7 @@ mkdir -p retry_info
 mkdir -p resubmit_info
 mkdir -p defer_info
 mkdir -p transfer_info
+mkdir -p rrn_info # stores RRN counter per job
 
 #Test if bearer token is available and "notify it"
 condor_store_cred query-oauth > TOKEN 2>&1

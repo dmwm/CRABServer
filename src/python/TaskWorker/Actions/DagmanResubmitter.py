@@ -1,7 +1,7 @@
 """ Resubmit failed jobs in tasks """
 
 import os
-
+import json
 from http.client import HTTPException
 from urllib.parse import urlencode
 
@@ -86,7 +86,7 @@ class DagmanResubmitter(TaskAction):
                 # is saving the values of the parameters for each job retry in text files (the
                 # files are in the directory resubmit_info in the schedd).
                 # We use classAds here as way to pass informations to PreJobs.
-                # Value in schedd.exit(const, ad, value) can be string or ExprTree
+                # Value in schedd.edit(const, ad, value) can be string or ExprTree
                 # https://htcondor.readthedocs.io/en/latest/apis/python-bindings/api/version2/htcondor2/schedd.html#htcondor2.Schedd.edit
                 # We need ExprTree when the ad correspond to a python list
                 for adparam, taskparam in params.items():
@@ -96,6 +96,34 @@ class DagmanResubmitter(TaskAction):
                         else:
                             newAdValue = str(task['resubmit_'+taskparam])
                         schedd.edit(rootConst, adparam, newAdValue)
+                
+                # Read current epoch
+                currentEpoch = 0
+                try:
+                    ads = schedd.query(rootConst, projection=["CRAB_ResubmitEpoch"])
+                    if ads and "CRAB_ResubmitEpoch" in ads[0]:
+                        currentEpoch = int(ads[0]["CRAB_ResubmitEpoch"])
+                except Exception as ex: # pylint: disable=broad-exception-caught
+                    self.logger.warning("Could not read CRAB_ResubmitEpoch, defaulting to 0: %s", ex)
+
+                newEpoch = currentEpoch + 1
+
+                # Build the record as a JSON string stored in a single classAd.
+                # This is written atomically in one schedd.edit call, so AdjustSites
+                # always sees a consistent (epoch, job_ids) pair — never a stale
+                # job_ids list paired with a new epoch.
+                resubmitRecord = json.dumps({
+                    'epoch': newEpoch,
+                    'job_ids': task['resubmit_jobids']  # the actual list for this resubmit
+                })
+
+                self.logger.info(
+                    "Setting CRAB_ResubmitRecord=%s for workflow %s", resubmitRecord, workflow
+                )
+                # Write epoch separately too so DagmanResubmitter can read it back next time
+                schedd.edit(rootConst, "CRAB_ResubmitEpoch", str(newEpoch))
+                # Write the full record atomically
+                schedd.edit(rootConst, "CRAB_ResubmitRecord", classad.quote(resubmitRecord))
                 # finally restart the dagman with the 3 lines below
                 schedd.act(htcondor.JobAction.Hold, rootConst)
                 schedd.edit(rootConst, "HoldKillSig", 'SIGUSR1')
