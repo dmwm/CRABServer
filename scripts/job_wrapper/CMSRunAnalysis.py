@@ -730,6 +730,9 @@ if __name__ == "__main__":
                         + f" {scriptArguments}")
         command += " > cmsRun-stdout.log.tmp 2>&1"
         print(f"==== Will execute {command}")
+        # Enable verbose xrootd logging for the cmsRun subprocess
+        os.environ['XRD_LOGLEVEL'] = 'Debug'
+        print("XRD_LOGLEVEL set to Debug for xrootd verbose logging")
         applicationExitCode = executeUserApplication(cmd=command, scramTool=scram, cleanEnv=False)
         if applicationExitCode:
             print(f"==== Execution FAILED at {UTCNow()} ====")
