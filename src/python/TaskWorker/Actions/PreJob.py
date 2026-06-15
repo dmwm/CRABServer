@@ -13,7 +13,7 @@ import errno
 import logging
 from ast import literal_eval
 
-from ServerUtilities import getWebdirForDb, insertJobIdSid, pythonListToClassAdExprTree
+from ServerUtilities import getWebdirForDb, insertJobIdSid, pythonListToClassAdExprTree, getLock, MAX_MEMORY_AUTOMATIC_RESUBMIT, MAX_JOB_RUNTIME_AUTOMATIC_RESUBMIT
 from TaskWorker.Actions.RetryJob import JOB_RETURN_CODES
 
 import htcondor2 as htcondor
@@ -38,6 +38,8 @@ class PreJob:
         self.resubmit_info = {}
         self.prejob_exit_code = None
         self.logger = logging.getLogger()
+        self.rrn           = None
+        self.reuse_rrn     = False
 
 
     def calculate_crab_retry(self):
@@ -100,6 +102,9 @@ class PreJob:
                 retmsg += "\n\tIt seems the job has already been submitted."
                 retmsg += "\n\tSetting the pre-job exit code to 1."
                 self.prejob_exit_code = 1
+            else:
+                retmsg += "\n\tPre-job was interrupted before job completed. pre=%d > post=%d, no job_out. Reusing existing RRN." % (retry_info['pre'], retry_info['post'])
+                self.reuse_rrn = True
         ## ... or not.
         else:
             ## If the job_out doesn't exist, then this is certainly (ok, 99.99% certainly)
@@ -182,6 +187,37 @@ class PreJob:
             with open(file_name, 'r', encoding='utf-8') as fd:
                 self.resubmit_info = literal_eval(fd.read())
 
+    def get_rrn(self):
+        rrn_file = os.path.join("rrn_info", f"job.{self.job_id}.txt")
+        lock_file = rrn_file + ".lock"
+
+        with getLock(lock_file):
+            data = {}
+            if os.path.exists(rrn_file):
+                try:
+                    with open(rrn_file, 'r', encoding='utf-8') as fd:
+                        data = json.load(fd)
+                except Exception:
+                    self.logger.warning("Could not read %s, starting fresh", rrn_file)
+                    data = {}
+            if self.reuse_rrn:
+                rrn = data.get('rrn', 0)
+                self.logger.info(
+                    "RRN for job %s reused as %d (interrupted pre-job, not re-incrementing)",
+                    self.job_id, rrn
+                )
+                return rrn
+            rrn = data.get('rrn', 0)
+            rrn += 1
+            data['rrn'] = rrn
+            # Preserve epoch field if present; PreJob does not modify it
+            tmp = rrn_file + ".tmp"
+            with open(tmp, 'w', encoding='utf-8') as fd:
+                json.dump(data, fd)
+            os.rename(tmp, rrn_file)
+
+        self.logger.info("RRN for job %s incremented to %d", self.job_id, rrn)
+        return rrn
 
     def save_resubmit_info(self):
         """
@@ -236,6 +272,7 @@ class PreJob:
         msg = "Setting CRAB_Retry = %s" % (crab_retry)
         self.logger.info(msg)
         newJobSubmit['My.CRAB_Retry'] = str(crab_retry)
+        newJobSubmit['My.CRAB_RRN'] = str(self.rrn)
         ## Add job and postjob log URLs
         job_retry = "%s.%s" % (self.job_id, crab_retry)
         newJobSubmit['My.CRAB_JobLogURL'] = classad.quote(os.path.join(self.userWebDirPrx, "job_out."+job_retry+".txt"))
@@ -298,6 +335,24 @@ class PreJob:
             maxmemory     = self.resubmit_info[inkey].get('maxmemory')
             numcores      = self.resubmit_info[inkey].get('numcores')
             priority      = self.resubmit_info[inkey].get('priority')
+
+            #ExitCode Dependent automatic change in resubmission parameters
+            if self.resubmit_info:
+                retry_data = self.resubmit_info.get(inkey, {})
+                if retry_data.get("increase_memory") and maxmemory:
+                    factor = retry_data.get("memory_factor", 1.2)
+                    new_memory = int(maxmemory * factor)
+                    new_memory = min(new_memory, MAX_MEMORY_AUTOMATIC_RESUBMIT)
+                    self.logger.info(f"Increasing memory from {maxmemory} to {new_memory}")
+                    maxmemory = new_memory
+
+                if retry_data.get("increase_runtime") and maxjobruntime:
+                    factor = retry_data.get("runtime_factor", 1.2)
+                    new_runtime = int(maxjobruntime * factor)
+                    new_runtime = min(new_runtime, MAX_JOB_RUNTIME_AUTOMATIC_RESUBMIT)
+                    self.logger.info(f"Increasing walltime from {maxjobruntime} to {new_runtime}")
+                    maxjobruntime = new_runtime
+
         ## Save the (new) values of the resubmission parameters in self.resubmit_info
         ## for the current job retry number.
         outkey = str(crab_retry)
@@ -373,6 +428,9 @@ class PreJob:
         siteWhiteList = []
         siteBlackSet = set()
         siteWhiteSet = set()
+        inkey = str(crab_retry) if crab_retry == 0 else str(crab_retry - 1)
+        while inkey not in self.resubmit_info and int(inkey) > 0:
+            inkey = str(int(inkey) -  1)
         if not use_resubmit_info:
             if 'CRAB_SiteBlacklist' in self.task_ad:
                 if self.task_ad['CRAB_SiteBlacklist']:  # skip ad=''
@@ -383,9 +441,6 @@ class PreJob:
                     siteWhiteList = self.task_ad['CRAB_SiteWhitelist']
                     siteWhiteSet = set(siteWhiteList)
         else:
-            inkey = str(crab_retry) if crab_retry == 0 else str(crab_retry - 1)
-            while inkey not in self.resubmit_info and int(inkey) > 0:
-                inkey = str(int(inkey) -  1)
             siteBlackSet = set(self.resubmit_info[inkey].get('site_blacklist', []))
             siteWhiteSet = set(self.resubmit_info[inkey].get('site_whitelist', []))
         ## Save the current site black- and whitelists in self.resubmit_info for the
@@ -414,6 +469,18 @@ class PreJob:
             self.logger.error("Can not submit since DESIRED_Sites list is empty")
             self.prejob_exit_code = 1
             sys.exit(self.prejob_exit_code)
+
+        # ExitCode Dependent discard of previous_site
+        retry_data = self.resubmit_info.get(inkey, {})
+        previous_site = retry_data.get("site")
+        if retry_data.get("change_site") and previous_site:
+            self.logger.info(f"Last Exit Code indicated that a change in site might help. inkey was {inkey}")
+            if previous_site in availableSet and len(availableSet) > 1:
+                self.logger.info(f"Removing previous site {previous_site} from candidate sites")
+                availableSet.discard(previous_site)
+        else:
+            self.logger.info(f"No need to discard last site. inkey was {inkey}")
+
         ## Make sure that attributest which will be used in MatchMaking are SORTED lists
         available = list(availableSet)
         available.sort()
@@ -456,19 +523,42 @@ class PreJob:
             slow release of jobs in a task.
             The function return True if CRAB_JobReleaseTimeout is defined and not 0, and if the submit
             time of the task plus the defer time is greater than the current time.
+            Additionally retry policy delay
         """
         deferTime = int(self.task_ad.get("CRAB_JobReleaseTimeout", 0))
+
+        currentTime = time.time()
+
+        # Check retry delay from resubmit_info
+        # Inside SPOOL_DIR we have resubmit_info folder with text files job.{self.job_id}.txt for each job id
+        # Each file is a dictionary of the format example {0:{'maxmemory':2000, ...}, 1:{}, 2:{}, ...}
+        # where 0,1,2,... are crab_retry numbers. A lot of vital info like site_whitelist, retry_delay_until,
+        # use_resubmit_info, etc is stored and read from this file for each retry across resubmissions.
+        # ToDo: Convert this file to json format
+        retry_info_file = f"resubmit_info/job.{self.job_id}.txt"
+        if os.path.exists(retry_info_file):
+            try:
+                with open(retry_info_file, "r", encoding="utf-8") as fd:
+                    retry_info = literal_eval(fd.read())
+                key = str(self.dag_retry)
+                if key in retry_info:
+                    retry_delay_until = retry_info[key].get("retry_delay_until")
+                    if retry_delay_until and currentTime < retry_delay_until:
+                        wait = int(retry_delay_until - currentTime)
+                        self.logger.info(f"Retry delay not elapsed yet. Deferring for {wait} seconds.")
+                        return True
+            except Exception:
+                self.logger.exception("Error checking retry delay in resubmit_info")
         if deferTime:
             self.logger.info('Release timeout specified in extraJDL:')
             totalDefer = deferTime * int(self.job_id)
             submitTime = int(self.task_ad["CRAB_TaskSubmitTime"])
-            currentTime = time.time()
             if currentTime < (submitTime + totalDefer):
                 msg = f"  Defer time of this job ({totalDefer} seconds since initial task submission)"
                 msg += f" not elapsed yet, deferring for {totalDefer} seconds"
                 self.logger.info(msg)
                 return True
-            self.logger.info('  Continuing normally since current time is greater than requested starttime of the job')
+            self.logger.info('Continuing normally since current time is greater than requested starttime of the job')
         return False
 
     def execute(self, *args):
@@ -521,7 +611,9 @@ class PreJob:
 
         ## Load the task ad.
         self.get_task_ad()
-
+        # increment and record RRN for this submission
+        self.rrn = self.get_rrn()
+        self.logger.info("RRN=%d", self.rrn)
         try:
             with open('webdir', 'r', encoding='utf-8') as fd:
                 self.userWebDirPrx = fd.read()

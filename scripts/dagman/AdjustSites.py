@@ -27,6 +27,7 @@ from urllib.parse import urlencode
 import traceback
 from datetime import datetime
 from http.client import HTTPException
+import json
 
 from RESTInteractions import CRABRest
 from ServerUtilities import getProxiedWebDir, getColumn, downloadFromS3
@@ -169,6 +170,93 @@ def getGlob(ad, normal, automatic):
         return glob.glob(automatic)
     return [normal]
 
+def resetRRN():
+    """
+    Reset RRN counters for jobs listed in rrn_info/resubmit_record.json.
+    Idempotent: uses per-job last_reset_epoch to skip already-processed jobs,
+    so DAGMan restarts running AdjustSites again are safe.
+    """
+    record_path = os.path.join("rrn_info", "resubmit_record.json")
+    if not os.path.exists(record_path):
+        printLog("No resubmit_record.json found, skipping RRN reset")
+        return
+
+    with open(record_path, 'r', encoding='utf-8') as fd:
+        record = json.load(fd)
+
+    current_epoch = record.get('epoch', 0)
+    job_ids = record.get('job_ids')       # None means resubmit all
+    resubmit_all = (job_ids is None)
+
+    if resubmit_all:
+        targets = glob.glob(os.path.join("rrn_info", "job.*.txt"))
+    else:
+        targets = [os.path.join("rrn_info", f"job.{jid}.txt") for jid in job_ids]
+
+    printLog(f"resetRRN: epoch={current_epoch}, targets={'ALL' if resubmit_all else job_ids}")
+
+    for fpath in targets:
+        try:
+            data = {}
+            if os.path.exists(fpath):
+                with open(fpath, 'r', encoding='utf-8') as fd:
+                    data = json.load(fd)
+
+            last_reset_epoch = data.get('last_reset_epoch', 0)
+            if last_reset_epoch >= current_epoch:
+                printLog(f"Skipping {fpath}: last_reset_epoch={last_reset_epoch} "
+                         f">= current_epoch={current_epoch}")
+                continue
+
+            data['rrn'] = 0
+            data['last_reset_epoch'] = current_epoch
+            tmp = fpath + ".tmp"
+            with open(tmp, 'w', encoding='utf-8') as fd:
+                json.dump(data, fd)
+            os.rename(tmp, fpath)
+            printLog(f"Reset RRN for {fpath}, last_reset_epoch set to {current_epoch}")
+
+        except Exception as ex: # pylint: disable=broad-exception-caught
+            printLog(f"WARNING: failed to reset RRN for {fpath}: {ex}")
+
+def writeResubmitRecord(ad):
+    """
+    Write rrn_info/resubmit_record.json from the CRAB_ResubmitRecord classAd.
+    This classAd is written atomically by DagmanResubmitter as a JSON string
+    containing both epoch and job_ids, so we never see a mismatched pair.
+    """
+    if 'CRAB_ResubmitRecord' not in ad: # this is first crab resubmit for this task
+        printLog("CRAB_ResubmitRecord not in classAd, skipping resubmit record write")
+        return
+
+    try:
+        record = json.loads(str(ad['CRAB_ResubmitRecord']))
+    except Exception as ex: # pylint: disable=broad-exception-caught
+        printLog(f"Failed to parse CRAB_ResubmitRecord: {ex}, skipping")
+        return
+
+    epoch = record.get('epoch', 0)
+    job_ids = record.get('job_ids')
+    printLog(f"epoch={epoch}, job_ids={job_ids}")
+    os.makedirs("rrn_info", exist_ok=True)
+    record_path = os.path.join("rrn_info", "resubmit_record.json")
+
+    # Idempotency: if we already wrote this epoch, skip
+    if os.path.exists(record_path):
+        try:
+            with open(record_path, 'r', encoding='utf-8') as fd:
+                existing = json.load(fd)
+            if existing.get('epoch') == epoch:
+                printLog(f"resubmit_record.json already at epoch {epoch}, skipping")
+                return
+        except Exception as ex: # pylint: disable=broad-exception-caught
+            printLog(f"Could not read existing resubmit_record.json: {ex}, overwriting")
+
+    tmp = record_path + ".tmp"
+    with open(tmp, 'w', encoding='utf-8') as fd:
+        json.dump(record, fd)
+    os.rename(tmp, record_path)
+    printLog(f"Written resubmit_record.json: {record}")
 
 def adjustMaxRetries(adjustJobIds, ad):
     """
@@ -588,6 +676,9 @@ def main():
         ## job is in failed status or not just from the RunJobs.dag file, while job ids
         ## in adjustedJobIds correspond only to failed jobs.
         adjustMaxRetries(adjustedJobIds, ad)
+
+    writeResubmitRecord(ad)
+    resetRRN()
 
     if resubmitJobIds and ad.get('CRAB_SplitAlgo') == 'Automatic':
         printLog("Releasing processing and tail DAGs")

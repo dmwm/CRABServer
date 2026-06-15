@@ -1660,8 +1660,8 @@ class PostJob():
             # DAGMan will resubmit the job unless the maximum allowed number of retries has
             # been reached already (DAGMan compares the DAGMan retry count against the
             # maximum allowed number of retries).
-            msg = "This is job retry number %d." % (self.dag_retry)
-            msg += " The maximum allowed number of retries is %d." % (self.max_retries)
+            msg = "This is job retry number %d." % (self.get_rrn())
+            msg += " The maximum allowed number of retries is %d." % (self.get_max_retry())
             self.logger.info(msg)
             # Print a message about the DAG cluster ID of the job, which can be -1 when the
             # job has not been executed. The later can happen when a DAG node is restarted
@@ -1796,7 +1796,7 @@ class PostJob():
                 self.logger.info("====== Finished to analyze job exit status.")
                 res = JOB_RETURN_CODES.FATAL_ERROR, ""
             elif self.retryjob_retval == JOB_RETURN_CODES.RECOVERABLE_ERROR:
-                if self.dag_retry >= self.max_retries:
+                if self.get_rrn() >= self.get_max_retry():
                     msg = "The retry handler indicated this was a recoverable error,"
                     msg += " but the maximum number of retries was already hit."
                     msg += " DAGMan will not retry."
@@ -1823,7 +1823,7 @@ class PostJob():
                 res = JOB_RETURN_CODES.FATAL_ERROR, "" #MarcoM: this should never happen
         # This is for the case in which we don't run the retry-job.
         elif self.job_return_code != JOB_RETURN_CODES.OK:
-            if self.dag_retry >= self.max_retries:
+            if self.get_rrn() >= self.get_max_retry():
                 msg = "The maximum allowed number of retries was hit and the job failed."
                 msg += " Setting this node (job) to permanent failure."
                 self.logger.info(msg)
@@ -3013,7 +3013,7 @@ class PostJob():
         number of job retries was hit. If it was, the post-job should return with the
         fatal error exit code. Otherwise with the recoverable error exit code.
         """
-        if self.dag_retry >= self.max_retries:
+        if self.get_rrn() >= self.get_max_retry():
             msg = "Job could be retried, but the maximum allowed number of retries was hit."
             msg += " Setting this node (job) to permanent failure. DAGMan will NOT retry."
             self.logger.info(msg)
@@ -3026,6 +3026,44 @@ class PostJob():
         self.set_state_ClassAds('COOLOFF', exitCode=exitCode)
 
         return JOB_RETURN_CODES.RECOVERABLE_ERROR
+
+    # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def get_rrn(self):
+        """
+        Read RRN from the individual job's classAd where PreJob stamped it after crab resubmit.
+        This is completely independent of dag_retry, crab_retry, and max_retries.
+        Falls back to rrn_info file if classAd not available (happens in all the 
+        retries of first submission, when user has not done crab resubmit).
+        """
+        # Primary: read from job classAd stamped by PreJob.alter_submit()
+        if self.job_ad and 'CRAB_RRN' in self.job_ad:
+            rrn = int(self.job_ad['CRAB_RRN'])
+            self.logger.info("Read CRAB_RRN=%d from job classAd", rrn)
+            return rrn
+
+        # Fallback: read from file directly (classAd unavailable)
+        # This fallback happens on the first run before CRAB resubmit
+        self.logger.warning(
+            "CRAB_RRN not in job classAd, falling back to rrn_info file"
+        )
+        rrn_file = os.path.join("rrn_info", f"job.{self.job_id}.txt")
+        if not os.path.exists(rrn_file):
+            self.logger.warning("rrn_info file %s not found, assuming RRN=0", rrn_file)
+            return 0
+        try:
+            with open(rrn_file, 'r', encoding='utf-8') as fd:
+                data = json.load(fd)
+            return int(data.get('rrn', 0))
+        except Exception:
+            self.logger.exception("Failed to read %s, assuming RRN=0", rrn_file)
+            return 0
+
+    def get_max_retry(self):
+        """
+        Return the configured maxRetry from the job ad.
+        """
+        return int(self.job_ad.get('CRAB_NumAutomJobRetries', 5))
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
