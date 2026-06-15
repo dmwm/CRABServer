@@ -3063,7 +3063,7 @@ class PostJob():
         """
         Return the configured maxRetry from the job ad.
         """
-        return int(self.job_ad.get('CRAB_NumAutomJobRetries', 5))
+        return int(self.job_ad.get('CRAB_NumAutomJobRetries', 3))
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
