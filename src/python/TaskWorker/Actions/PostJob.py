@@ -3031,10 +3031,10 @@ class PostJob():
 
     def get_rrn(self):
         """
-        Read RRN from the individual job's classAd where PreJob stamped it.
+        Read RRN from the individual job's classAd where PreJob stamped it after crab resubmit.
         This is completely independent of dag_retry, crab_retry, and max_retries.
-        Falls back to rrn_info file if classAd not available (e.g. job never ran
-        because PreJob itself failed).
+        Falls back to rrn_info file if classAd not available (happens in all the 
+        retries of first submission, when user has not done crab resubmit).
         """
         # Primary: read from job classAd stamped by PreJob.alter_submit()
         if self.job_ad and 'CRAB_RRN' in self.job_ad:
@@ -3042,7 +3042,8 @@ class PostJob():
             self.logger.info("Read CRAB_RRN=%d from job classAd", rrn)
             return rrn
 
-        # Fallback: read from file directly (job never ran, classAd unavailable)
+        # Fallback: read from file directly (classAd unavailable)
+        # This fallback happens on the first run before CRAB resubmit
         self.logger.warning(
             "CRAB_RRN not in job classAd, falling back to rrn_info file"
         )

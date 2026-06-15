@@ -225,7 +225,7 @@ def writeResubmitRecord(ad):
     This classAd is written atomically by DagmanResubmitter as a JSON string
     containing both epoch and job_ids, so we never see a mismatched pair.
     """
-    if 'CRAB_ResubmitRecord' not in ad:
+    if 'CRAB_ResubmitRecord' not in ad: # this is first crab resubmit for this task
         printLog("CRAB_ResubmitRecord not in classAd, skipping resubmit record write")
         return
 
