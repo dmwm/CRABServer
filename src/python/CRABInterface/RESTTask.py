@@ -67,12 +67,6 @@ class RESTTask(RESTEntity):
         rows = self.api.query(None, None, self.Task.IDAll_sql, taskname=kwargs['workflow'])
         return rows
 
-	#INSERTED BY ERIC SUMMER STUDENT
-    def summary(self, **kwargs):
-        """ Retrieves the data for list all users"""
-        rows = self.api.query(None, None, self.Task.TASKSUMMARY_sql)
-        return rows
-
     # short status summary for the UI MAIN tab
     def status(self, **kwargs):
         """
@@ -315,8 +309,7 @@ class RESTTask(RESTEntity):
         workflow = kwargs['workflow']
         authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
 
-#        rows = self.api.query(None, None, "SELECT tm_task_warnings FROM tasks WHERE tm_taskname = :workflow", workflow=workflow)#self.Task.TASKSUMMARY_sql)
-        rows = self.api.query(None, None, self.Task.ID_sql, taskname=workflow)#self.Task.TASKSUMMARY_sql)
+        rows = self.api.query(None, None, self.Task.ID_sql, taskname=workflow)
         rows = list(rows) #from generator to list
         if len(rows)==0:
             raise InvalidParameter("Task %s not found in the task database" % workflow)
@@ -347,8 +340,7 @@ class RESTTask(RESTEntity):
         workflow = kwargs['workflow']
         authz_owner_match(self.api, [workflow], self.Task) #check that I am modifying my own workflow
 
-#        rows = self.api.query(None, None, "SELECT tm_task_warnings FROM tasks WHERE tm_taskname = :workflow", workflow=workflow)#self.Task.TASKSUMMARY_sql)
-        rows = self.api.query(None, None, self.Task.ID_sql, taskname=workflow)#self.Task.TASKSUMMARY_sql)
+        rows = self.api.query(None, None, self.Task.ID_sql, taskname=workflow)
         rows = list(rows) #from generator to list
         if len(rows)==0:
             raise InvalidParameter("Task %s not found in the task database" % workflow)

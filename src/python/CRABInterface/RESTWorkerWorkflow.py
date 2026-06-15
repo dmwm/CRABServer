@@ -4,14 +4,13 @@
 from builtins import str
 from Utils.Utilities import decodeBytesToUnicode
 from WMCore.REST.Server import RESTEntity, restcall
-from WMCore.REST.Validation import validate_str, validate_strlist, validate_num
+from WMCore.REST.Validation import validate_str, validate_num
 from WMCore.REST.Error import InvalidParameter
 
 from ServerUtilities import getEpochFromDBTime
 from CRABInterface.Utilities import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid
-from CRABInterface.Regexps import (RX_MANYLINES_SHORT, RX_TASKNAME, RX_WORKER_NAME, RX_STATUS, RX_SUBPOSTWORKER,
-                                  RX_JOBID)
+from CRABInterface.Regexps import (RX_MANYLINES_SHORT, RX_TASKNAME, RX_WORKER_NAME, RX_STATUS, RX_SUBPOSTWORKER)
 
 # external dependecies here
 from ast import literal_eval
@@ -37,7 +36,6 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_str("command", param, safe, RX_STATUS, optional=True)
             validate_str("getstatus", param, safe, RX_STATUS, optional=True)
             validate_str("failure", param, safe, RX_MANYLINES_SHORT, optional=True)
-            validate_strlist("resubmittedjobs", param, safe, RX_JOBID)
             validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
             validate_str("subresource", param, safe, RX_SUBPOSTWORKER, optional=True)
             validate_num("limit", param, safe, optional=True)
@@ -53,13 +51,14 @@ class RESTWorkerWorkflow(RESTEntity):
             validate_str("workername", param, safe, RX_WORKER_NAME, optional=True)
             validate_str("getstatus", param, safe, RX_STATUS, optional=True)
             validate_num("limit", param, safe, optional=True)
+            validate_num("months", param, safe, optional=True)
             # possible combinations to check
             # 1) workername + getstatus + limit
             # 2) subresource + subjobdef + subuser
 
 
     @restcall
-    def post(self, workflow, status, command, subresource, failure, resubmittedjobs, getstatus, workername, limit, clusterid):
+    def post(self, workflow, status, command, subresource, failure, getstatus, workername, limit, clusterid):
         """ Updates task information """
         methodmap = {"state": {"args": (self.Task.SetStatusTask_sql,), "method": self.api.modify, "kwargs": {"status": [status],
                      "command": [command], "taskname": [workflow]}},
@@ -83,12 +82,13 @@ class RESTWorkerWorkflow(RESTEntity):
         return []
 
     @restcall
-    def get(self, workername, getstatus, limit):
+    def get(self, workername, getstatus, limit, months=1):
         """ Retrieve all columns for a specified task or
             tasks which are in a particular status with
             particular conditions """
 
-        binds = {"limit": limit, "tw_name": workername, "get_status": getstatus}
+        months = 1 if months is None else int(months)
+        binds = {"limit": limit, "tw_name": workername, "get_status": getstatus, "months": months}
         rows = self.api.query(None, None, self.Task.GetReadyTasks_sql, **binds)
         for row in rows:
             # get index of tm_user_config to load data from clob and load json string

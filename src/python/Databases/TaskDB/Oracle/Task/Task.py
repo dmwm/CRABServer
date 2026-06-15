@@ -26,8 +26,6 @@ class Task(object):
 
     #INSERTED BY ERIC SUMMER STUDENT
     ALLUSER_sql = "SELECT DISTINCT(tm_username) FROM tasks"
-    #TODO: remove some of the following unused queries
-    TASKSUMMARY_sql = "select tm_username, tm_task_status, count(*) from tasks group by tm_username, tm_task_status order by tm_username"
     #get taskname by user and status
     GetByUserAndStatus_sql = "select tm_taskname from tasks where tm_username=:username and tm_task_status=:status"
     #quick search
@@ -97,7 +95,7 @@ class Task(object):
                        tm_user_files, tm_transfer_outputs, tm_output_lfn, tm_ignore_locality, tm_fail_limit, tm_one_event_mode, \
                        tm_publish_groupname, tm_nonvalid_input_dataset, tm_secondary_input_dataset, tm_primary_dataset, \
                        tm_submitter_ip_addr, tm_ignore_global_blacklist, tm_user_config \
-                       FROM tasks WHERE tm_task_status = :get_status AND ROWNUM <= :limit AND tw_name LIKE :tw_name
+                       FROM tasks WHERE tm_task_status = :get_status AND ROWNUM <= :limit AND tw_name LIKE :tw_name and tm_start_time > ADD_MONTHS(SYSDATE, -:months) \
                        ORDER BY tm_start_time ASC"""
 
     #GetUserFromID
