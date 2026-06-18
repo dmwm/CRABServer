@@ -39,10 +39,10 @@ def main():
     phy3Url = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSReader'
     #globUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/global/DBSReader'
     destUrl = 'https://cmsweb-prod.cern.ch/dbs/prod/phys03/DBSWriter'
-    #apiG = DbsApi(url=globUrl, debug=True, useGzip=True)
-    apiP3 = DbsApi(url=phy3Url, debug=True, useGzip=True)
-    #apiMig = DbsApi(url=migUrl, debug=True, useGzip=True)
-    apiDest = DbsApi(url=destUrl, debug=True, useGzip=True)
+    #apiG = DbsApi(url=globUrl, debug=True)
+    apiP3 = DbsApi(url=phy3Url, debug=True)
+    #apiMig = DbsApi(url=migUrl, debug=True)
+    apiDest = DbsApi(url=destUrl, debug=True)
 
     with open(filePath, 'r', encoding='utf8') as fp:
         blockData = fp.read()
