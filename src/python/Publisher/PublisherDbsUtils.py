@@ -75,9 +75,9 @@ def setupDbsAPIs(sourceURL=None, publishURL=None, DBSHost=None, logger=None):
 
     # create DBS API objects
     logger.info("DBS Source API URL: %s", sourceURL)
-    sourceApi = DbsApi(url=sourceURL, debug=False, useGzip=True)
+    sourceApi = DbsApi(url=sourceURL, debug=False)
     logger.info("DBS Global API URL: %s", globalURL)
-    globalApi = DbsApi(url=globalURL, debug=False, useGzip=True)
+    globalApi = DbsApi(url=globalURL, debug=False)
 
     if publishURL.endswith('/DBSWriter'):
         publish_read_url = publishURL[:-len('/DBSWriter')] + '/DBSReader'
@@ -91,7 +91,7 @@ def setupDbsAPIs(sourceURL=None, publishURL=None, DBSHost=None, logger=None):
     logger.info("DBS Destination read API URL: %s", publish_read_url)
     destReadApi = DbsApi(url=publish_read_url, debug=False, useGzip=True)
     logger.info("DBS Migration API URL: %s", publish_migrate_url)
-    migrateApi = DbsApi(url=publish_migrate_url, debug=False, useGzip=True)
+    migrateApi = DbsApi(url=publish_migrate_url, debug=False)
     DBSApis['source'] = sourceApi
     DBSApis['destRead'] = destReadApi
     DBSApis['destWrite'] = destApi
