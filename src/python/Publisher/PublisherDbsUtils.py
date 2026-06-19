@@ -23,7 +23,8 @@ def format_file_3(file_):
     """
     nf = {'logical_file_name': file_['lfn'],
           'file_type': 'EDM',
-          'check_sum': str(file_['cksum']),  # historically CRAB FILEMTETADATADB has the wrong type (int)
+          # historically CRAB FILEMTETADATADB has the wrong type (int)
+          'check_sum': str(file_['cksum']),
           'event_count': file_['inevents'],
           'file_size': file_['filesize'],
           'adler32': file_['adler32'],
@@ -32,7 +33,8 @@ def format_file_3(file_):
     file_lumi_list = []
     for run, lumis in file_['runlumi'].items():
         for lumi in lumis:
-            file_lumi_list.append({'lumi_section_num': int(lumi), 'run_num': int(run)})
+            file_lumi_list.append(
+                {'lumi_section_num': int(lumi), 'run_num': int(run)})
     nf['file_lumi_list'] = file_lumi_list
     return nf
 
@@ -67,7 +69,8 @@ def setupDbsAPIs(sourceURL=None, publishURL=None, DBSHost=None, logger=None):
         globalURL = globalURL.replace('cmsweb.cern.ch', DBSHost)
         publishURL = publishURL.replace('cmsweb.cern.ch', DBSHost)
 
-    # special case for testing, read from "standard" place and publish in int/phys03
+    # special case for testing, read from "standard" place and publish in
+    # int/phys03
     if DBSHost == 'cmsweb-testbed.cern.ch':
         sourceURL = sourceURL.replace(DBSHost, 'cmsweb.cern.ch')
         globalURL = globalURL.replace(DBSHost, 'cmsweb.cern.ch')
@@ -101,7 +104,8 @@ def setupDbsAPIs(sourceURL=None, publishURL=None, DBSHost=None, logger=None):
     return DBSApis
 
 
-def findParentBlocks(listOfFileDicts=None, DBSApis=None, logger=None, verbose=None):
+def findParentBlocks(listOfFileDicts=None, DBSApis=None,
+                     logger=None, verbose=None):
     """ find parent blocks for a list of files"""
 
     # Set of all the parent files from all the files requested to be published.
@@ -128,34 +132,42 @@ def findParentBlocks(listOfFileDicts=None, DBSApis=None, logger=None, verbose=No
                 parentFiles.add(parentFile)
                 # Is this parent file already in the destination DBS instance?
                 # (If yes, then we don't have to migrate this block.)
-                # some parent files are illegal DBS names (GH issue #6771), skip them
+                # some parent files are illegal DBS names (GH issue #6771),
+                # skip them
                 try:
-                    blocksDict = DBSApis['destRead'].listBlocks(logical_file_name=parentFile)
+                    blocksDict = DBSApis['destRead'].listBlocks(
+                        logical_file_name=parentFile)
                 except Exception:
                     file['parents'].remove(parentFile)
                     continue
                 if not blocksDict:
                     # No, this parent file is not in the destination DBS instance.
-                    # Maybe it is in the same DBS instance as the input dataset?
-                    blocksDict = DBSApis['source'].listBlocks(logical_file_name=parentFile)
+                    # Maybe it is in the same DBS instance as the input
+                    # dataset?
+                    blocksDict = DBSApis['source'].listBlocks(
+                        logical_file_name=parentFile)
                     if blocksDict:
                         # Yes, this parent file is in the same DBS instance as the input dataset.
                         # Add the corresponding block to the set of blocks from the source DBS
-                        # instance that have to be migrated to the destination DBS.
+                        # instance that have to be migrated to the destination
+                        # DBS.
                         localParentBlocks.add(blocksDict[0]['block_name'])
                     else:
                         # No, this parent file is not in the same DBS instance as input dataset.
                         # Maybe it is in global DBS instance?
-                        blocksDict = DBSApis['global'].listBlocks(logical_file_name=parentFile)
+                        blocksDict = DBSApis['global'].listBlocks(
+                            logical_file_name=parentFile)
                         if blocksDict:
                             # Yes, this parent file is in global DBS instance.
                             # Add the corresponding block to the set of blocks from global DBS
-                            # instance that have to be migrated to the destination DBS.
+                            # instance that have to be migrated to the
+                            # destination DBS.
                             globalParentBlocks.add(blocksDict[0]['block_name'])
                 # If this parent file is not in the destination DBS instance, is not
                 # the source DBS instance, and is not in global DBS instance, then it
                 # means it is not known to DBS and therefore we can not migrate it.
-                # Put it in the set of parent files for which migration should be skipped.
+                # Put it in the set of parent files for which migration should
+                # be skipped.
                 if not blocksDict:
                     parentsToSkip.add(parentFile)
             # If this parent file should not be migrated because it is not known to DBS,
@@ -187,10 +199,12 @@ def prepareDbsPublishingConfigs(blockDict=None, aFile=None, inputDataset=None, o
 
     noInput = len(inputDataset.split("/")) <= 3
     if not noInput:
-        existing_datasets = DBSApis['source'].listDatasets(dataset=inputDataset, detail=True, dataset_access_type='*')
+        existing_datasets = DBSApis['source'].listDatasets(
+            dataset=inputDataset, detail=True, dataset_access_type='*')
         primary_ds_type = existing_datasets[0]['primary_ds_type']
         acquisitionEra = existing_datasets[0]['acquisition_era_name']
-        existing_output = DBSApis['destRead'].listOutputConfigs(dataset=inputDataset)
+        existing_output = DBSApis['destRead'].listOutputConfigs(
+            dataset=inputDataset)
         if not existing_output:
             msg = f"Unable to list output config for input dataset {inputDataset}"
             logger.error(msg)
@@ -211,11 +225,17 @@ def prepareDbsPublishingConfigs(blockDict=None, aFile=None, inputDataset=None, o
         acquisitionEra = 'CRAB'
 
     _, primName, procName, tier = outputDataset.split('/')
-    primds_config = {'primary_ds_name': primName, 'primary_ds_type': primary_ds_type}
+    primds_config = {
+        'primary_ds_name': primName,
+        'primary_ds_type': primary_ds_type}
 
-    acquisition_era_config = {'acquisition_era_name': acquisitionEra, 'start_date': 0}
+    acquisition_era_config = {
+        'acquisition_era_name': acquisitionEra,
+        'start_date': 0}
 
-    processing_era_config = {'processing_version': 1, 'description': 'CRAB3_processing_era'}
+    processing_era_config = {
+        'processing_version': 1,
+        'description': 'CRAB3_processing_era'}
 
     output_config = {'release_version': releaseVersion,
                      'pset_hash': psetHash,
@@ -269,9 +289,10 @@ def createBulkBlock(output_config, processing_era_config, primds_config,
         'acquisition_era': acquisition_era_config,
         'block': block_config,
         'file_parent_list': file_parent_list,
-        }
+    }
     blockDump['block']['file_count'] = len(files)
-    blockDump['block']['block_size'] = sum([int(file_['file_size']) for file_ in files])
+    blockDump['block']['block_size'] = sum(
+        [int(file_['file_size']) for file_ in files])
     return blockDump
 
 
@@ -288,7 +309,8 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, blocks,  # 
         blocksToMigrate = set(blocks)
         datasetToMigrate = list(blocks)[0].split('#')[0]
     else:
-        # migration of a full dataset is better accomplished with a separate method
+        # migration of a full dataset is better accomplished with a separate
+        # method
         raise NotImplementedError
 
     numBlocksToMigrate = len(blocksToMigrate)
@@ -339,9 +361,11 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, blocks,  # 
         # Check the migration status of each block migration request.
         # If a block migration has succeeded or terminally failes, remove the
         # migration request id from the list of migration requests in progress.
-        for block in migrationsInProgress.copy():  # make a copy to allow manipulating original list
+        for block in migrationsInProgress.copy(
+        ):  # make a copy to allow manipulating original list
             try:
-                inProgress, atDestination, failed = checkBlockMigration(taskname, migrateApi, block, migLogDir)
+                inProgress, atDestination, failed = checkBlockMigration(
+                    taskname, migrateApi, block, migLogDir)
             except Exception as ex:
                 msg = f"Could not get migration status for {block}:\n{ex}"
                 logger.error(msg)
@@ -356,7 +380,8 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, blocks,  # 
                 numFailedMigrations += 1
             if inProgress:
                 pass  # will check again later
-        numMigrationsInProgress = len(migrationsInProgress)  # update counter at the end of loop
+        # update counter at the end of loop
+        numMigrationsInProgress = len(migrationsInProgress)
         # Stop waiting if there are no more migrations in progress.
         if numMigrationsInProgress == 0:
             break
@@ -383,8 +408,10 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, blocks,  # 
     time.sleep(5.0)
     migratedDataset = None
     try:
-        migratedDataset = destReadApi.listDatasets(dataset=datasetToMigrate, detail=True, dataset_access_type='*')
-        if not migratedDataset or migratedDataset[0].get('dataset', None) != datasetToMigrate:
+        migratedDataset = destReadApi.listDatasets(
+            dataset=datasetToMigrate, detail=True, dataset_access_type='*')
+        if not migratedDataset or migratedDataset[0].get(
+                'dataset', None) != datasetToMigrate:
             return 4, f"Migration of {datasetToMigrate} in some inconsistent status."
     except Exception as ex:
         logger.exception("Migration check failed.")
@@ -415,14 +442,19 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
         # N.B. a migration request is supposed never to fail. Only failure to contact server should
         # result in HTTP or curl error/exceptions. Otherwise server will always return a list of dicionaries.
         # But there are cases where server replies with HTTP code other than 200 (e.g. 400 if migration
-        # request is invalid), in those cases client raises exception which should be handled with proper care
+        # request is invalid), in those cases client raises exception which
+        # should be handled with proper care
     except dbsClientException as dbsEx:
-        logger.error("HTTP call to server %s failed: %s", migrateApi.url, dbsEx)
+        logger.error(
+            "HTTP call to server %s failed: %s",
+            migrateApi.url,
+            dbsEx)
         return False
     except HTTPError as httpErr:
         # this is a structured message from migrate server as per
         #  https://github.com/dmwm/dbs2go/blob/master/docs/DBSServer.md#dbs-errors
-        # http call went through, simply server returned an HTTP code other than 200
+        # http call went through, simply server returned an HTTP code other
+        # than 200
         code = httpErr.code
         body = json.loads(httpErr.body)
         reason = body[0]['error']['reason']
@@ -453,7 +485,8 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
                 logger.info(msg)
                 return True
             # Otherwise we assume that it is a no-go and so getout via an exception
-            # beware "not allowed for migration" error in message which is persistent
+            # beware "not allowed for migration" error in message which is
+            # persistent
             if 'not allowed for migration' in message:
                 msg = message
                 if 'has status PRODUCTION' in reason:
@@ -465,7 +498,9 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
             # and go on with status checking via checkBlockMigration where various status codes
             # are properly handled
             logger.error("HTTP error %d", code)
-            logger.error("A new migration request could not be submitted. Reason: %s", reason)
+            logger.error(
+                "A new migration request could not be submitted. Reason: %s",
+                reason)
             msg += 'Reason unclear. Assume that it will work and go on with status checking'
             logger.error(msg)
             return True
@@ -479,8 +514,11 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
         msg += f"\nDBS3 exception: {ex}"
         logger.error(msg)
         return False
-    # if HTTP call succeeded a migration request was sent for this block and all its ancestors
-    logger.info('Migration request submitted. %d blocks will be migrated', len(result))
+    # if HTTP call succeeded a migration request was sent for this block and
+    # all its ancestors
+    logger.info(
+        'Migration request submitted. %d blocks will be migrated',
+        len(result))
     return True
 
 
@@ -531,17 +569,23 @@ def checkBlockMigration(taskname, migrateApi, block, migLogDir):
     if beingRetried:  # sanity check
         nRetries = result[0]['retry_count']
         if nRetries > 10:
-            logger.error("too many (%d) retries. Treat as terminally failed", nRetries)
+            logger.error(
+                "too many (%d) retries. Treat as terminally failed",
+                nRetries)
             failed = True
             return inProgress, atDestination, failed
     if failed:
         logger.error("migration terminally failed for %s\n", block)
         logger.error("migration status details:\n%s", result)
-        failedMigrationsLog = os.path.join(migLogDir, 'TerminallyFailedLog.txt')
-        logger.debug("Migration terminally failed, log to %s", failedMigrationsLog)
+        failedMigrationsLog = os.path.join(
+            migLogDir, 'TerminallyFailedLog.txt')
+        logger.debug(
+            "Migration terminally failed, log to %s",
+            failedMigrationsLog)
         creationDate = result[0]['creation_date']
         # convert to human format
-        migCreation = datetime.fromtimestamp(creationDate).strftime('%Y-%m-%d,%H:%M:%S')
+        migCreation = datetime.fromtimestamp(
+            creationDate).strftime('%Y-%m-%d,%H:%M:%S')
         # FiledMigFile format is CSV: reqid,creationDate, block, taskname
         with open(failedMigrationsLog, 'a', encoding='utf8') as fp:
             line = f"{reqid},{migCreation},{block},{taskname}\n"
