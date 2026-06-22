@@ -39,7 +39,7 @@ echo "======== Current environment dump STARTING ========"
 for i in `env`; do
   echo "== ENV: $i"
 done
-echo "======== Current environment dump FINISHING ========"
+echo "======== Current environment dump COMPLETED ========"
 
 echo "======== Tarball initialization STARTING at $(TZ=GMT date) ========"
 set -x
@@ -56,13 +56,13 @@ else
 fi
 export PYTHONPATH=`pwd`/WMCore.zip:$PYTHONPATH
 set +x
-echo "======== Tarball initialization FINISHING at $(TZ=GMT date) ========"
+echo "======== Tarball initialization COMPLETED at $(TZ=GMT date) ========"
 echo "==== Local directory contents dump STARTING ===="
 echo "PWD: `pwd`"
 for i in `ls`; do
   echo "== DIR: $i"
 done
-echo "==== Local directory contents dump FINISHING ===="
+echo "==== Local directory contents dump COMPLETED ===="
 
 echo "======== CMSRunAnalysis.py STARTING at $(TZ=GMT date) ========"
 echo "Now running the CMSRunAnalysis.py job in `pwd`..."
@@ -71,7 +71,10 @@ $pythonCommand CMSRunAnalysis.py "$@"
 jobrc=$?
 set +x
 echo "== The job had an exit code of $jobrc "
-echo "======== CMSRunAnalysis.py FINISHING at $(TZ=GMT date) ========"
+echo "======== CMSRunAnalysis.py COMPLETED at $(TZ=GMT date) ========"
+
+echo "======== Remove core dumps, if any ======="
+ls -l core.* 2>/dev/null && rm -v core.*
 
 if [[ $jobrc == 68 ]]
 then
