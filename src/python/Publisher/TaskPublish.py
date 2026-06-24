@@ -17,7 +17,7 @@ from TaskWorker.WorkerExceptions import CannotMigrateException
 from TaskWorker.WorkerUtilities import getCrabserver
 
 from Publisher.PublisherUtils import setupLogging, prepareDummySummary, saveSummaryJson, \
-    markGood, markFailed, getDBSInputInformation
+    markGood, markFailed, getDBSInputInformation, FailedMigrationAccounter
 
 from Publisher.PublisherDbsUtils import format_file_3, setupDbsAPIs, findParentBlocks, \
     createBulkBlock, migrateByBlockDBS3, prepareDbsPublishingConfigs
@@ -95,6 +95,10 @@ def publishInDBS3(config, taskname, verbose, console):
     destApi = DBSApis['destWrite']
     destReadApi = DBSApis['destRead']
     migrateApi = DBSApis['migrate']
+
+    # instantiate an accounter for failed migrations
+    migrationAccounter = FailedMigrationAccounter(directory=migrationLogDir, logger=logger)
+
 
     logger.info("inputDataset: %s", inputDataset)
 
@@ -197,6 +201,7 @@ def publishInDBS3(config, taskname, verbose, console):
             try:
                 statusCode, failureMsg = migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi,
                                                             localParentBlocks, migrationLogDir,
+                                                            migrationAccounter,
                                                             logger=logger, verbose=verbose)
             except CannotMigrateException as ex:
                 # there is nothing we can do in this case
@@ -231,6 +236,7 @@ def publishInDBS3(config, taskname, verbose, console):
             try:
                 statusCode, failureMsg = migrateByBlockDBS3(taskname, migrateApi, destReadApi, globalApi,
                                                             globalParentBlocks, migrationLogDir,
+                                                            migrationAccounter,
                                                             logger=logger, verbose=verbose)
             except Exception as ex:
                 logger.exception('Exception raised inside migrateByBlockDBS3\n%s', ex)
