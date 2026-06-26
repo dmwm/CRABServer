@@ -16,7 +16,7 @@ from TaskWorker.WorkerExceptions import CannotMigrateException
 from TaskWorker.WorkerUtilities import getCrabserver
 
 from Publisher.PublisherUtils import setupLogging, prepareDummySummary, saveSummaryJson, \
-    markGood, markFailed, getDBSInputInformation
+    markGood, markFailed, getDBSInputInformation, FailedMigrationAccounter
 
 from Publisher.PublisherDbsUtils import format_file_3, setupDbsAPIs, findParentBlocks, \
     prepareDbsPublishingConfigs, createBulkBlock, migrateByBlockDBS3
@@ -90,8 +90,8 @@ def publishInDBS3(config, taskname, verbose, console):  # pylint: disable=too-ma
                     statusCode, failureMsg = migrateByBlockDBS3(
                         taskname,
                         DBSApis['migrate'], DBSApis['destRead'], DBSApis['source'],
-                        localParentBlocks,
-                        log['migrationLogDir'], logger=logger, verbose=verbose)
+                        localParentBlocks, log['migrationLogDir'],
+                        migrationAccounter, logger=logger, verbose=verbose)
                 except CannotMigrateException as ex:
                     # there is nothing we can do in this case
                     failureMsg = 'Cannot migrate. ' + str(ex)
@@ -116,8 +116,8 @@ def publishInDBS3(config, taskname, verbose, console):  # pylint: disable=too-ma
                     statusCode, failureMsg = migrateByBlockDBS3(
                         taskname,
                         DBSApis['migrate'], DBSApis['destRead'], DBSApis['global'],
-                        globalParentBlocks,
-                        log['migrationLogDir'], logger=logger, verbose=verbose)
+                        globalParentBlocks, log['migrationLogDir'],
+                        migrationAccounter, logger=logger, verbose=verbose)
                 except Exception as ex:
                     logger.exception('Exception raised inside migrateByBlockDBS3\n%s', ex)
                     statusCode = 1
@@ -234,6 +234,9 @@ def publishInDBS3(config, taskname, verbose, console):  # pylint: disable=too-ma
         nothingToDo['reason'] = 'Error contacting DBS'
         summaryFileName = saveSummaryJson(nothingToDo, log['logdir'])
         return summaryFileName
+
+    # instantiate an accounter for failed migrations
+    migrationAccounter = FailedMigrationAccounter(directory=log['migrationLogDir'], logger=logger)
 
     # pick a few params which are common to all blocks and files to be published
     aBlock = blocksToPublish[0]
