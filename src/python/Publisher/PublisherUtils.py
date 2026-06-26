@@ -5,6 +5,9 @@ mostly things which communicate with DBS or CRAB REST
 
 
 import os
+import subprocess
+from tempfile import mkstemp
+
 import sys
 import time
 import logging
@@ -324,3 +327,75 @@ def getDBSInputInformation(taskname=None, crabServer=None):
     if not sourceURL.endswith("/DBSReader") and not sourceURL.endswith("/DBSReader/"):
         sourceURL += "/DBSReader"
     return (inputDataset, sourceURL, publishURL)
+
+#
+# A few methods to keep track of failed migrations
+#
+class FailedMigrationAccounter():
+    """
+    an accounter object to track failed migrations
+    initial implementation: a CSV file, may want to move to SQLite
+    CSV format: blockname, numFailures, timeOfFirstFail, timeOfLastFail
+                  times in seconds from epoch
+    """
+    def __init__(self, directory=None, logger=None):
+        self.logger = logger
+        self.dir = directory  # the directory where the account file is located
+        self.accountFile = os.path.join(os.path.abspath(self.dir), "failedMigrationAccount.txt")
+
+    def checkForDoomedBlocks(self, blocks=None):
+        """
+        check whether some blocks can not be migrated because they were already
+        tried too many times over too long a time
+        input:
+             blocks (list of strings) : a list of block names to test
+        returns:
+             badBlocks (list of strings) : a list of block names which have no hope to migrate
+        """
+
+        badBlocks = []
+        for block in blocks:
+            ret = subprocess.run(f"grep {block} {self.accountFile}", capture_output=True, shell=True, check=False)
+            if not ret.returncode == 0:
+                continue
+            info = ret.stdout.decode("utf-8").split(',')
+            nFail = int(info[1])
+            firstFail = int(info[2])
+            lastFail = int(info[3])
+            if nFail > 10 and ((lastFail - firstFail)/86400) > 2:
+                # more than 10 failures over at least 2 days
+                badBlocks.append(block)
+        return badBlocks
+
+    def addOrUpdateFailedMigration(self, block=None):
+        """
+        logs a terminally failed migration for the given block
+         - adds a record for this block to be list if first time
+         - increse failure count if not first time
+         - logs time of initial attempt and of last one
+         input:
+              block (string) : a DBS block name
+        returns:
+              None
+              raises if log can not be updated
+        """
+        if not block:
+            return
+        now = int(time.time())  # round to seconds
+        ret = subprocess.run(f"grep {block} {self.accountFile}", shell=True, capture_output=True, check=False)
+        if not ret.returncode == 0:
+            # new block, just add
+            info = f"{block},1,{now},{now}"
+            subprocess.run(f"echo '{info}' >> {self.accountFile}", shell=True, check=True)
+        else:
+            # block already failed
+            info = ret.stdout.decode("utf-8").split(',')
+            nFail = int(info[1])  # from string to int
+            info[1] = str(nFail + 1)  # increment failure counter and convert to string again
+            info[3] = str(now)  # update time
+            info = ','.join(info)  # convert back to CSV format
+            # editing a possibly long file is a pain, just filter out old record and add new one at the end
+            tmpFile = mkstemp()[1]
+            subprocess.run(f"cat {self.accountFile} | grep -v {block} > {tmpFile};\
+                echo '{info}' >> {tmpFile}", shell=True, check=True)
+            subprocess.run(f"mv {tmpFile} {self.accountFile}", shell=True, check=True)

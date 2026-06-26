@@ -21,13 +21,20 @@ MAX_RETRY_ATTEMPTS = 3
 MIN_RETRY_DELAY = 10
 MAX_RETRY_DELAY = 3 * 60 # 3 minutes
 
-logger = logging.getLogger(__name__)
-
-class DbsApi(DbsApiBase):
+class DbsApi(DbsApiBase):  # pylint: disable=too-few-public-methods
+    """
+    a wrapper around DBSCLient own DbsApi
+    """
 
     def insertBulkBlock(self, block_dump):
+        """
+        wraps same class in super with retries so that we
+        can retry block insertion to avoid deal with concurrent
+        inserts into same dataset by multiple tasks
+        """
         retry_count = 0
         last_ex = None
+        logger = logging.getLogger(__name__)
         while retry_count < MAX_RETRY_ATTEMPTS:
             try:
                 return super().insertBulkBlock(block_dump)
@@ -41,8 +48,9 @@ class DbsApi(DbsApiBase):
                     time.sleep(uniform(MIN_RETRY_DELAY, MAX_RETRY_DELAY))
                     retry_count += 1
                     continue
-                raise
-        raise Exception(f"Error inserting bulk block: {last_ex} after {MAX_RETRY_ATTEMPTS} attempts") from last_ex
+                raise  # pylint: disable=broad-exception-raised
+        msg = f"Error inserting bulk block: {last_ex} after {MAX_RETRY_ATTEMPTS} attempts"
+        raise Exception(msg) from last_ex  # pylint: disable=broad-exception-raised
 
 def format_file_3(file_):
     """
@@ -76,6 +84,7 @@ def setupDbsAPIs(sourceURL=None, publishURL=None, DBSHost=None, logger=None):
     to keep the existing generality. We could e.d. use dbs/int or dbs/dev for testing
     tm_dbs_url usually is either prod/global or prod/phys03.
     returns DBSApis : a dictionary with the DBS API's needed to publish
+                      and also an accounter object to track failed migrations
     with keys: source, destRead, destWrite, global, migrate
 
     """
@@ -119,7 +128,7 @@ def setupDbsAPIs(sourceURL=None, publishURL=None, DBSHost=None, logger=None):
     logger.info("DBS Destination API URL: %s", publishURL)
     destApi = DbsApi(url=publishURL, debug=False, useGzip=True)
     logger.info("DBS Destination read API URL: %s", publish_read_url)
-    destReadApi = DbsApi(url=publish_read_url, debug=False, useGzip=True)
+    destReadApi = DbsApi(url=publish_read_url, debug=False)
     logger.info("DBS Migration API URL: %s", publish_migrate_url)
     migrateApi = DbsApi(url=publish_migrate_url, debug=False)
     DBSApis['source'] = sourceApi
@@ -127,6 +136,7 @@ def setupDbsAPIs(sourceURL=None, publishURL=None, DBSHost=None, logger=None):
     DBSApis['destWrite'] = destApi
     DBSApis['global'] = globalApi
     DBSApis['migrate'] = migrateApi
+
 
     return DBSApis
 
@@ -324,7 +334,7 @@ def createBulkBlock(output_config, processing_era_config, primds_config,
 
 
 def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, blocks,  # pylint: disable=too-many-arguments
-                       migLogDir, logger=None, verbose=False):
+                       migLogDir, migrationAccounter,logger=None, verbose=False):
     """
     Submit one migration request for each block that needs to be migrated.
     If blocks argument is not specified, migrate the whole dataset.
@@ -333,6 +343,7 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, blocks,  # 
     """
 
     if blocks:
+        # SB: why do we use a set here ??? Afraid of duplicates in the list ?
         blocksToMigrate = set(blocks)
         datasetToMigrate = list(blocks)[0].split('#')[0]
     else:
@@ -350,13 +361,17 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, blocks,  # 
     if verbose:
         msg = f"List of blocks to migrate:\n{', '.join(blocksToMigrate)}."
         logger.debug(msg)
+    # make sure that we have not ruled those migrations as impossible
+    badBlocks = migrationAccounter.checkForDoomedBlocks(list(blocksToMigrate))
+    if badBlocks:
+        raise CannotMigrateException(f"Some blocks have persistently failed migration:\n{badBlocks}")
     msg = f"Submitting {numBlocksToMigrate} block migration requests to DBS3 ..."
     logger.info(msg)
     numFailedSubmissions = 0
     migrationsInProgress = []
     for block in list(blocksToMigrate):
         # Submit migration request for this block.
-        ok = requestBlockMigration(taskname, migrateApi, sourceApi, block)
+        ok = requestBlockMigration(taskname, migrateApi, sourceApi, block, migrationAccounter)
         if ok:
             migrationsInProgress.append(block)
         else:
@@ -392,7 +407,7 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, blocks,  # 
         ):  # make a copy to allow manipulating original list
             try:
                 inProgress, atDestination, failed = checkBlockMigration(
-                    taskname, migrateApi, block, migLogDir)
+                    taskname, migrateApi, block, migLogDir, migrationAccounter)
             except Exception as ex:
                 msg = f"Could not get migration status for {block}:\n{ex}"
                 logger.error(msg)
@@ -448,7 +463,7 @@ def migrateByBlockDBS3(taskname, migrateApi, destReadApi, sourceApi, blocks,  # 
     return 0, ""
 
 
-def requestBlockMigration(taskname, migrateApi, sourceApi, block):
+def requestBlockMigration(taskname, migrateApi, sourceApi, block, migrationAccounter):
     """
     Submit migration request for one block, checking the request output.
     returns False if request could not be submitted, True otherwise
@@ -503,8 +518,9 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
                 status = migrateApi.statusMigration(migration_rqst_id=migId)
                 if status[0].get("migration_status") == 9:
                     msg = f"Existing migration id={migId} is terminally failed (status=9)"
-                    msg += "Delete it and try again at next iteration"
+                    msg += " Delete it and try again at next iteration"
                     logger.info(msg)
+                    migrationAccounter.addOrUpdateFailedMigration(block)
                     migrateApi.removeMigration({'migration_rqst_id': migId})
                     return False
                 msg = f"Existing migration id={migId} is still in progress."
@@ -549,7 +565,7 @@ def requestBlockMigration(taskname, migrateApi, sourceApi, block):
     return True
 
 
-def checkBlockMigration(taskname, migrateApi, block, migLogDir):
+def checkBlockMigration(taskname, migrateApi, block, migLogDir, migrationAccounter):
     """
     returns a 3plet of booleans: (inProgress, atDestination, failed)
     WHen something goes wrong, reports all false
@@ -591,8 +607,8 @@ def checkBlockMigration(taskname, migrateApi, block, migLogDir):
     #   9 = Terminally FAILED
     inProgress = status in (0, 1, 5)
     atDestination = status in (2, 4)
-    beingRetried = (status == 3)
-    failed = (status == 9)
+    beingRetried = status == 3
+    failed = status == 9
     if beingRetried:  # sanity check
         nRetries = result[0]['retry_count']
         if nRetries > 10:
@@ -609,6 +625,7 @@ def checkBlockMigration(taskname, migrateApi, block, migLogDir):
         logger.debug(
             "Migration terminally failed, log to %s",
             failedMigrationsLog)
+        migrationAccounter.addOrUpdateFailedMigration(block)
         creationDate = result[0]['creation_date']
         # convert to human format
         migCreation = datetime.fromtimestamp(
