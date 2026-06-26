@@ -97,7 +97,7 @@ def publishInDBS3(config, taskname, verbose, console):
     migrateApi = DBSApis['migrate']
 
     # instantiate an accounter for failed migrations
-    migrationAccounter = FailedMigrationAccounter(directory=migrationLogDir, logger=logger)
+    migrationAccounter = FailedMigrationAccounter(config=config, logger=logger)
 
 
     logger.info("inputDataset: %s", inputDataset)

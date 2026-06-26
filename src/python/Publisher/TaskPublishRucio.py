@@ -235,7 +235,7 @@ def publishInDBS3(config, taskname, verbose, console):  # pylint: disable=too-ma
         return summaryFileName
 
     # instantiate an accounter for failed migrations
-    migrationAccounter = FailedMigrationAccounter(directory=log['migrationLogDir'], logger=logger)
+    migrationAccounter = FailedMigrationAccounter(config=config, logger=logger)
 
     # pick a few params which are common to all blocks and files to be published
     aBlock = blocksToPublish[0]

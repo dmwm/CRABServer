@@ -338,10 +338,12 @@ class FailedMigrationAccounter():
     CSV format: blockname, numFailures, timeOfFirstFail, timeOfLastFail
                   times in seconds from epoch
     """
-    def __init__(self, directory=None, logger=None):
+    def __init__(self, config=None, logger=None):
         self.logger = logger
-        self.dir = directory  # the directory where the account file is located
-        self.accountFile = os.path.join(os.path.abspath(self.dir), "failedMigrationAccount.txt")
+        accDir = os.path.join(config.General.logsDir, 'migrations')
+        self.accountFile = os.path.join(os.path.abspath(accDir), 'failedMigrationAccount.txt')
+        self.maxFails = config.TaskPublisher.doomedMigrationsMaxFail
+        self.minDays = config.TaskPublisher.doomedMigrationsMinDays
 
     def checkForDoomedBlocks(self, blocks=None):
         """
@@ -350,10 +352,10 @@ class FailedMigrationAccounter():
         input:
              blocks (list of strings) : a list of block names to test
         returns:
-             badBlocks (list of strings) : a list of block names which have no hope to migrate
+             doomedBlocks (list of strings) : a list of block names which have no hope to migrate
         """
 
-        badBlocks = []
+        doomedBlocks = []
         for block in blocks:
             ret = subprocess.run(f"grep {block} {self.accountFile}", capture_output=True, shell=True, check=False)
             if not ret.returncode == 0:
@@ -362,10 +364,11 @@ class FailedMigrationAccounter():
             nFail = int(info[1])
             firstFail = int(info[2])
             lastFail = int(info[3])
-            if nFail > 10 and ((lastFail - firstFail)/86400) > 2:
-                # more than 10 failures over at least 2 days
-                badBlocks.append(block)
-        return badBlocks
+            daysWithFailures = (lastFail - firstFail) / 86400
+            if nFail > self.maxFails and daysWithFailures > self.minDays:
+                # too many failures over too many days ... we call it hopeless
+                doomedBlocks.append(block)
+        return doomedBlocks
 
     def addOrUpdateFailedMigration(self, block=None):
         """
