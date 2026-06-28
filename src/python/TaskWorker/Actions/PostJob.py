@@ -2427,7 +2427,10 @@ class PostJob():
                 try:
                     Lexicon.lfn(lfn)  # will raise if testLfn is not a valid lfn
                 except AssertionError:
-                    lfn = '/store/user/dummy/DummyLFN'
+                    # need to preserve distinct identities of input files in LFN format
+                    # so that crab report can count correctly the number of processed files
+                    uniqueID = hashlib.sha1(lfn.encode()).hexdigest()
+                    lfn = f'/store/user/dummy/InvalidLFN/{uniqueID}'
 
             lfn = lfn + "_" + str(self.job_id) # jobs can analyze the same input
             configreq = {"taskname"        : self.job_ad['CRAB_ReqName'],
