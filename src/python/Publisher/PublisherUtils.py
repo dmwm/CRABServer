@@ -17,7 +17,7 @@ import json
 
 
 from MultiProcessingLog import MultiProcessingLog
-from ServerUtilities import getHashLfn, encodeRequest
+from ServerUtilities import getHashLfn, encodeRequest, getLock
 from TaskWorker import __version__
 
 
@@ -389,7 +389,8 @@ class FailedMigrationAccounter():
         if not ret.returncode == 0:
             # new block, just add
             info = f"{block},1,{now},{now}"
-            subprocess.run(f"echo '{info}' >> {self.accountFile}", shell=True, check=True)
+            with getLock(self.accountFile):
+                subprocess.run(f"echo '{info}' >> {self.accountFile}", shell=True, check=True)
         else:
             # block already failed
             info = ret.stdout.decode("utf-8").split(',')
@@ -399,6 +400,7 @@ class FailedMigrationAccounter():
             info = ','.join(info)  # convert back to CSV format
             # editing a possibly long file is a pain, just filter out old record and add new one at the end
             tmpFile = mkstemp()[1]
-            subprocess.run(f"cat {self.accountFile} | grep -v {block} > {tmpFile};\
-                echo '{info}' >> {tmpFile}", shell=True, check=True)
-            subprocess.run(f"mv {tmpFile} {self.accountFile}", shell=True, check=True)
+            cmd = f"cat {self.accountFile} | grep -v {block} > {tmpFile} \
+                && echo '{info}' >> {tmpFile} && mv {tmpFile} {self.accountFile}"
+            with getLock(self.accountFile):
+                subprocess.run(cmd, shell=True, check=True)
