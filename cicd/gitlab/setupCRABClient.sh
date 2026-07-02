@@ -19,7 +19,9 @@ set -euo pipefail
 scramv1 project ${CMSSW_release}
 pushd ${CMSSW_release}/src
 eval "$(scramv1 runtime -sh)"
-scram build > /dev/null
+# at times this fails in the gitlab-runner, in that case run again with full output
+scram build > /dev/null || scram build
+
 
 mkdir -p ../venv
 
