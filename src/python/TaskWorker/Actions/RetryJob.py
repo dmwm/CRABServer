@@ -19,37 +19,43 @@ JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERRO
 # ----------------------------------------------------------------------
 # Exit-code dependent retry policy
 # ----------------------------------------------------------------------
-# ToDo: Reduce Redundance across short and long exit codes
 
 EXIT_RETRY_POLICY = {
-    1: {"type": "recoverable", "delay": 900, "msg": "Job failed to bootstrap CMSSW; likely a worker node issue."},
+    1: {"type": "recoverable", "delay": 900, "msg": "Job failed w/o messages; likely a worker node issue."},
     50513: {"type": "recoverable", "delay": 900, "msg": "Job did not find functioning CMSSW on worker node."},
-    81: {"type": "recoverable", "delay": 900, "msg": "Job did not find functioning CMSSW on worker node."},
     50115: {"type": "recoverable", "delay": 900, "msg": "Job did not produce a FJR; will retry.", "increase_memory": True, "memory_factor": 1.3},
-    195: {"type": "recoverable", "delay": 900, "msg": "Job did not produce a FJR; will retry.", "increase_memory": True, "memory_factor": 1.3},
     137: {"type": "recoverable", "delay": 900, "msg": "SIGKILL; likely an unrelated batch system kill."},
     10034: {"type": "recoverable", "delay": 900, "msg": "Required application version not found at the site."},
-    50: {"type": "recoverable", "delay": 900, "msg": "Required application version not found at the site."},
     10040: {"type": "recoverable", "delay": 900, "msg": "Site Error: failed to generate cmsRun cfg file at runtime."},
     60403: {"type": "recoverable", "delay": 900, "msg": "Timeout during attempted file stageout.", "increase_runtime": True, "runtime_factor": 1.3},
-    243: {"type": "recoverable", "delay": 900, "msg": "Timeout during attempted file stageout.", "increase_runtime": True, "runtime_factor": 1.3},
     60307: {"type": "recoverable", "delay": 900, "msg": "Error during attempted file stageout."},
-    147: {"type": "recoverable", "delay": 900, "msg": "Error during attempted file stageout."},
     60311: {"type": "recoverable", "delay": 900, "msg": "Error during attempted file stageout."},
-    151: {"type": "recoverable", "delay": 900, "msg": "Error during attempted file stageout."},
     8028: {"type": "recoverable", "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
     8021: {"type": "recoverable", "delay": 900, "msg": "FileReadError (May be a site error).", "change_site": True, "handler": "handle_file_open_or_root_error"},
     8020: {"type": "recoverable", "delay": 900, "msg": "FileOpenError (Likely a site error).", "change_site": True, "handler": "handle_file_open_or_root_error"},
     8022: {"type": "recoverable", "delay": 900, "msg": "FatalRootError.", "handler": "handle_file_open_or_root_error"},
-    84: {"type": "recoverable", "delay": 900, "msg": "Some required file not found; check logs for name of missing file.", "handler": "handle_file_open_or_root_error"},
-    85: {"type": "recoverable", "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
-    86: {"type": "recoverable", "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
-    92: {"type": "recoverable", "delay": 900, "msg": "Job failed to open local and fallback files.", "handler": "handle_file_open_or_root_error"},
-    134: {"type": "recoverable", "delay": 900, "msg": "Abort (ANSI) or IOT trap (4.2 BSD) (most likely user application crashed).", "handler": "handle_sigabrt"},
+    134: {"type": "recoverable", "delay": 900, "msg": "SIGABRT Abort (ANSI) or IOT trap (4.2 BSD) (most likely user application crashed).", "handler": "handle_sigabrt"},
     8001: {"type": "recoverable", "delay": 900, "msg": "Other CMS Exception.", "handler": "handle_cvmfs_or_cms_exception"},
-    65: {"type": "recoverable", "delay": 900, "msg": "End of job from user application (CMSSW).", "handler": "handle_cvmfs_or_cms_exception"},
     "default": {"type": "neutral", "delay": 900, "msg": "Taking default exit code retry policy route."}
 }
+
+# sometimes we only get a short exit code from the 8 rightmost bits (like when bash filters it)
+# so let's add them
+newERP = {}  # new temp dict. to avoid changing dict. while iterating
+for code, policy in EXIT_RETRY_POLICY.items():
+    newERP[code] = policy
+    if code == "default":
+        continue
+    shortCode = int(code) & 0xff
+    if shortCode == int(code):
+        # the list may intentionally contain short exit codes, e.g. 128+SIG* (bash adds 128 !)
+        continue
+    if shortCode in EXIT_RETRY_POLICY:
+        # duplicate.. this should never happen other than for the "intentional"
+        # exit code 81 (see https://github.com/dmwm/CRABServer/issues/9340 )
+        pass
+    newERP[code & 0xff] = policy
+EXIT_RETRY_POLICY = newERP
 
 # strings in fatal root exception text which indicate code problem, not corrupted file
 # a small "knowledge data base"
@@ -234,7 +240,8 @@ class RetryJob():
     def apply_retry_policy(self, exitCode):
         """
         Enforce exit-code dependent retry limits and delay.
-        Raises FatalError if retry limit exceeded.
+        Raises ReoverableError or FatalError according to retry policy handler decision
+        exitCodes w/o a handler are treated as Recoverable
         """
         policy = EXIT_RETRY_POLICY.get(exitCode, EXIT_RETRY_POLICY["default"])
         self.logger.info(f"Applying retry policy for exit code {exitCode}")
@@ -456,7 +463,8 @@ class RetryJob():
     def check_exit_code(self):
         """
         Using the exit code saved in the json job report, decide whether it corresponds
-        to a recoverable or a fatal error.
+        to a recoverable or a fatal error. apply_retry_policy can raise RecoverableError
+        or FatalError. Otherwise (e.g. if it returns) any exit code other than 0 is called Fatal.
         """
         if 'exitCode' not in self.report:
             msg = "'exitCode' key not found in job report."
