@@ -55,8 +55,13 @@ echo "======== Auxiliary Functions - STARTING ========"
 # we can consider making some of these fuctions less CRAB-oriented and moving them to ./submit_env.sh
 
 function finish {
+  if [ -n "$EXIT_STATUS" ]; then
+    EXIT_STATUS=$?
+  fi
+  echo "Application exit status: $EXIT_STATUS"
   chirp_exit_code
-  check_application_execution
+  check_application_execution  # this may set an exit code if it detects that application did not complete
+  chirp_exit_code
   END_TIME=$(date +%s)
   DIFF_TIME=$((END_TIME-START_TIME))
   echo "Job started:  " $START_TIME ", " $(TZ=GMT date -d @$START_TIME)
@@ -71,9 +76,18 @@ function finish {
       sleep $SLEEP_TIME
     fi
   fi
+  exit
 }
-# Trap all exits and execute finish function
+# Trap all exits and execute finish function, while
+# making sure that we detect signals meant to stop the job
+# in practice HTCondor always uses SIGTERM, but if we try to
+# trap it, stdout is not returned https://github.com/dmwm/CRABServer/issues/9350
+# so we can only use the general/generic "trap EXIT". The problem with that is that
+# it gets executed both after a signal and at normal exit and I have not found
+# a way to know which one. The only telling difference is that if we get a signal
+# cose exit immediately via finish function, so some parts are skipped
 trap finish EXIT
+
 
 function chirp_exit_code {
     # Get the long exit code and set a classad using condor_chirp
@@ -118,8 +132,19 @@ function check_application_execution {
     # We check the files that contain information about the execution of
     # a generic user application. Then we focus on the execution of cmsRun
 
-    echo "======== Checking execution of user application (cmsRun and scriptExe) $(TZ=GMT date)========"
+    echo "======== Checking execution of user application (cmsRun or scriptExe) $(TZ=GMT date)========"
 
+    if [[ -e cmsRun-stdout.log.tmp ]]; then
+      echo "========================================================================"
+      echo "======== User application did not complete due to an external signal ==="
+      echo "======== Most likely we got a SIGTERM from HTCondor             ========"
+      echo "======== Job execution stops here, and ExitCode is set to 50666 ========"
+      echo "======== available application log (if any) will be printed below ======"
+      echo "========================================================================"
+      echo "payload application did not complete. Must have got a SIGTERM"
+      # set a generic "terminated by HTCondor". PostJob may better qualify things and change it.
+      EXIT_STATUS=50666
+    fi
     check_file_exist cmsRun-stdout.log.tmp printfile
     check_file_exist cmsRun-stdout.log
 
@@ -167,12 +192,14 @@ print_file() {
     numLines=$(cat $FILEPATH | wc -l)
 
     if [[ $numLines -gt $maxLines ]]; then
+        echo "=== Print only first $keepAtStart and last $keepAtEnd lines"
         head -n $keepAtStart $FILEPATH
-        echo "[...]"
+        echo "=== [...]"
         tail -n $keepAtEnd $FILEPATH
     else
         cat $FILEPATH
     fi
+    echo "===== END OF FILE ==== "
     echo
 }
 
