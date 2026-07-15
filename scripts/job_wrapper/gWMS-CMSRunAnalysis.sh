@@ -101,7 +101,7 @@ function chirp_exit_code {
         # we want to execute this code block if jobReport.exitCode.txt does not exist
         echo "==== Failed to load the long exit code from jobReport.exitCode.txt. Falling back to short exit code ===="
         if [ -z "$EXIT_STATUS" ]; then
-            echo "======== Short exit code also missing. Settint exit code to 80001 ========"
+            echo "======== Short exit code also missing. Setting exit code to 80001 ========"
             condor_chirp set_job_attr_delayed Chirp_CRAB3_Job_ExitCode 80001
             CHIRP_EC=$?
         else
