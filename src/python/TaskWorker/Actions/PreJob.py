@@ -502,7 +502,7 @@ class PreJob:
             job_retry = "%s.%s" % (self.job_id, crab_retry)
             fname = os.path.join(logpath, "job_out.%s.txt" % job_retry)
             with open(fname, 'w', encoding='utf-8') as fd:
-                fd.write("Job output has not been processed by post-job.\n")
+                fd.write("Job has not run yet or output has not been processed by post-job.\n")
             fname = "postjob.%s.txt" % job_retry
             with open(fname, 'w', encoding='utf-8') as fd:
                 fd.write("Post-job is currently queued.\n")

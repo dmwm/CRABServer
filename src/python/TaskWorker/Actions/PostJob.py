@@ -1490,14 +1490,21 @@ class PostJob():
         stdout_tmp = "job_out.tmp.%s" % (self.job_id)
         if os.path.exists(stdout):
             os.rename(stdout, stdout_tmp)
-            fname = "job_out.%s.%d.txt" % (self.job_id, self.crab_retry)
-            fname = os.path.join(self.logpath, fname)
-            msg = "Copying job stdout from %s to %s." % (stdout, fname)
+        else:
+            msg = "No Out from HTCondor, create dummy one"
             self.logger.debug(msg)
-            shutil.copy(stdout_tmp, fname)
-            with open(stdout_tmp, 'w') as fd_stdout:
-                fd_stdout.truncate(0)
-            os.chmod(fname, 0o644)
+            noOutMsg = "HTCondor did not retrieve any output for this job"
+            with open(stdout_tmp, 'w', encoding='utf-8') as fd:
+                print(noOutMsg, file=fd)
+        fname = "job_out.%s.%d.txt" % (self.job_id, self.crab_retry)
+        fname = os.path.join(self.logpath, fname)
+        msg = "Copying job stdout from %s to %s." % (stdout, fname)
+        self.logger.debug(msg)
+        shutil.copy(stdout_tmp, fname)
+        # make stdout_tmp 0 bytes to note that it was copied over
+        with open(stdout_tmp, 'w') as fd_stdout:
+            fd_stdout.truncate(0)
+        os.chmod(fname, 0o644)
         # Copy the json job report file jobReport.json.<job_id> to
         # job_fjr.<job_id>.<crab_retry>.json and create a symbolic link in the task web
         # directory to the new job report file.
