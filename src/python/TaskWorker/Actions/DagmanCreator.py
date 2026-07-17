@@ -432,11 +432,12 @@ class DagmanCreator(TaskAction):
         jobSubmit['job_ad_information_attrs'] = "MATCH_EXP_JOBGLIDEIN_CMSSite, JOBGLIDEIN_CMSSite, RemoteSysCpu, RemoteUserCpu"
 
         # Recover job output and logs on eviction events; make sure they aren't spooled
-        # This allows us to return stdout to users when they hit memory limits (which triggers PeriodicRemove).
-        jobSubmit['WhenToTransferOutput'] = "ON_EXIT_OR_EVICT"
-        # old code had this line in Job.submit, but I can't find it used nor documented anywhere
-        # +SpoolOnEvict = false
-
+        # This allows us to return stdout to users when they trigger PeriodicRemove
+        jobSubmit['when_to_transfer_output'] = "ON_EXIT_OR_EVICT"
+        # This ensures that sandbox is not spooled back and sent again to new job after eviction,
+        # i.e. that new job starts with only the files we indicate in the JDL. Anyhow this should
+        # be the default value
+        jobSubmit['MY.SpoolOnEvict'] = "False"
         # Keep job in the queue upon completion long enough for the postJob to run,
         # allowing the monitoring script to fetch the postJob status and job exit-code updated by the postJob
         jobSubmit['LeaveJobInQueue'] = "ifThenElse((JobStatus=?=4 || JobStatus=?=3) " + \
