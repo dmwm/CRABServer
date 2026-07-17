@@ -427,7 +427,7 @@ class ASOServerJob():
             self.logger.info("Error getting the status of the transfers. Deferring PJ. Got: %s" % e)
             return 4
         msg = "Got statuses: %s; %.1f hours since transfer submit."
-        msg = msg % (", ".join(transfers_statuses), (time.time()-starttime)/3600.0)
+        msg = msg % (", ".join(transfers_statuses), (time.time() - starttime)/3600.0)
         self.logger.info(msg)
         all_transfers_finished = True
         doc_ids = [doc_info['doc_id'] for doc_info in self.docs_in_transfer]
@@ -996,7 +996,7 @@ class ASOServerJob():
                 transfers_file.write(transfer_dump+"\n")
             if not os.path.exists('task_process/RestInfoForFileTransfers.json'):
             #if not os.path.exists('task_process/rest_filetransfers.txt'):
-                restInfo = {'host':self.rest_host,
+                restInfo = {'host': self.rest_host,
                             'dbInstance': self.db_instance,
                             'proxyfile': os.path.basename(self.proxy)}
                 with open('task_process/RestInfoForFileTransfers.json', 'w') as fp:
@@ -1015,10 +1015,10 @@ class ASOServerJob():
                 transfers_file.write(transfer_dump+"\n")
             if not os.path.exists('task_process/RestInfoForFileTransfers.json'):
             #if not os.path.exists('task_process/rest_filetransfers.txt'):
-                restInfo = {'host':self.rest_host,
+                restInfo = {'host': self.rest_host,
                             'dbInstance': self.db_instance,
                             'proxyfile': os.path.basename(self.proxy)}
-                with open('task_process/RestInfoForFileTransfers.json','w') as fp:
+                with open('task_process/RestInfoForFileTransfers.json', 'w') as fp:
                     json.dump(restInfo, fp)
         return returnMsg
 
@@ -1190,7 +1190,7 @@ class ASOServerJob():
             self.logger.info(msg)
         for retry in range(max_retries + 1):
             if retry > 0:
-                time.sleep(3*60)
+                time.sleep(3 * 60)
                 msg = "This is cancellation retry number %d." % (retry)
                 self.logger.info(msg)
             for doc_id, reason in doc_ids_reasons.items():
@@ -1215,7 +1215,7 @@ class ASOServerJob():
             # Now this means that we have a list of ids which needs to be killed
             # First try to kill ALL in one API call
             newDoc = {'listOfIds': transfersToKill,
-                      'publish' : 0,
+                      'publish': 0,
                       'username': username,
                       'subresource': 'killTransfersById'}
             try:
@@ -1597,7 +1597,7 @@ class PostJob():
         self.source_dir          = args[6]
         self.dest_dir            = args[7]
         self.logs_arch_file_name = args[8]
-        self.stage = args[9]
+        self.stage               = args[9]
         # TODO: We can get the output files from the job ad where we have
         # CRAB_EDMOutputFiles, CRAB_TFileOutputFiles and CRAB_AdditionalOutputFiles.
         # (We only need to add the job_id in the file names).
@@ -2375,7 +2375,7 @@ class PostJob():
             self.logger.warning(msg)
             temp_storage_site = self.executed_site
         configreq = {'taskname'        : self.reqname,
-                     'jobid'      : self.job_id,
+                     'jobid'           : self.job_id,
                      'outsize'         : self.job_report.get('log_size', 0),
                      'publishdataname' : self.publish_name,
                      'appver'          : self.job_sw,
@@ -2507,7 +2507,7 @@ class PostJob():
             if 'pset_hash' in file_info:
                 publishname = "%s-%s" % (publishname.rsplit('-', 1)[0], file_info['pset_hash'])
             configreq = {'taskname'        : self.reqname,
-                         'jobid'      : self.job_id,
+                         'jobid'           : self.job_id,
                          'outsize'         : file_info['outsize'],
                          'publishdataname' : publishname,
                          'appver'          : self.job_sw,
@@ -2924,9 +2924,9 @@ class PostJob():
 
             if counter != limit:
                 self.logger.warning("       -----> Failed to set job ClassAd attributes -----")
-                maxSleep = 2*counter -1
+                maxSleep = 2 * counter - 1
                 self.logger.warning("Sleeping for %d minute at most...", maxSleep)
-                time.sleep(60 * random.randint(2*(counter//3), maxSleep+1))
+                time.sleep(60 * random.randint(2 * (counter // 3), maxSleep + 1))
             else:
                 self.logger.error("Failed to set job ClassAd attributes for %d times, will not retry. Dashboard may report stale job status/exit-code.", limit)
 
@@ -3043,7 +3043,7 @@ class PostJob():
         """
         Read RRN from the individual job's classAd where PreJob stamped it after crab resubmit.
         This is completely independent of dag_retry, crab_retry, and max_retries.
-        Falls back to rrn_info file if classAd not available (happens in all the 
+        Falls back to rrn_info file if classAd not available (happens in all the
         retries of first submission, when user has not done crab resubmit).
         """
         # Primary: read from job classAd stamped by PreJob.alter_submit()
@@ -3158,10 +3158,10 @@ def get_file_index(file_name, output_files):
 
 class testServer(unittest.TestCase):
     def generateJobJson(self, sourceSite='srm.unl.edu'):
-        return {"steps" : {
-            "cmsRun" : { "input" : {},
+        return {"steps": {
+            "cmsRun": { "input": {},
               "output":
-                {"outmod1" :
+                {"outmod1":
                      [ {"output_module_class": "PoolOutputModule",
                         "input": ["/test/input2", "/test/input2"],
                         "events": 200,
