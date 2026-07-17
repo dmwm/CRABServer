@@ -69,7 +69,7 @@ class PreJob:
         retmsg += "\n\tLoaded retry_info = %s" % (retry_info)
 
         ## Simple validation of the retry_info.
-        for key in ['pre',  'post']:
+        for key in ['pre', 'post']:
             if key not in retry_info:
                 retmsg += "\n\tKey '%s' not found in retry_info (%s)" % (key, retry_info)
                 retmsg += "\n\tWill use DAGMan retry number (%s)" % (self.dag_retry)
@@ -103,7 +103,8 @@ class PreJob:
                 retmsg += "\n\tSetting the pre-job exit code to 1."
                 self.prejob_exit_code = 1
             else:
-                retmsg += "\n\tPre-job was interrupted before job completed. pre=%d > post=%d, no job_out. Reusing existing RRN." % (retry_info['pre'], retry_info['post'])
+                retmsg += "\n\tPre-job was interrupted before job completed."
+                retmsg +=" pre=%d > post=%d, no job_out. Reusing existing RRN." % (retry_info['pre'], retry_info['post'])
                 self.reuse_rrn = True
         ## ... or not.
         else:
@@ -330,7 +331,7 @@ class PreJob:
             ## SB most likely much (all) of this string/int conversions can be simplified
             inkey = str(crab_retry) if crab_retry == 0 else str(crab_retry - 1)
             while inkey not in self.resubmit_info and int(inkey) > 0:
-                inkey = str(int(inkey) -  1)
+                inkey = str(int(inkey) - 1)
             maxjobruntime = self.resubmit_info[inkey].get('maxjobruntime')
             maxmemory     = self.resubmit_info[inkey].get('maxmemory')
             numcores      = self.resubmit_info[inkey].get('numcores')
@@ -407,7 +408,7 @@ class PreJob:
         ## and turn it into a submit object
         jobSubmit = htcondor.Submit(jobSubmitFileContent)
         # add modifications and additions
-        for k,v in newJobSubmit.items():
+        for k, v in newJobSubmit.items():
             jobSubmit[k] = v
         ## Write the Job.<job_id>.submit file. the htcondor.Submit streaming method will take
         ## care of putting 'queue' statement at the enbd
@@ -430,7 +431,7 @@ class PreJob:
         siteWhiteSet = set()
         inkey = str(crab_retry) if crab_retry == 0 else str(crab_retry - 1)
         while inkey not in self.resubmit_info and int(inkey) > 0:
-            inkey = str(int(inkey) -  1)
+            inkey = str(int(inkey) - 1)
         if not use_resubmit_info:
             if 'CRAB_SiteBlacklist' in self.task_ad:
                 if self.task_ad['CRAB_SiteBlacklist']:  # skip ad=''
@@ -634,7 +635,7 @@ class PreJob:
         ## Note the cooloff time is based on the DAGMan retry number (i.e. the number of
         ## times the full cycle pre-job + job + post-job finished). This way, we don't
         ## punish users for condor re-starts.
-        sleep_time = int(self.dag_retry)*60
+        sleep_time = int(self.dag_retry) * 60
         if old_time:
             sleep_time = int(max(1, sleep_time - old_time))
         self.update_dashboard(crab_retry)
