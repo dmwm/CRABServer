@@ -172,7 +172,9 @@ check_file_exist() {
             if [[ $2 == "printfile" ]]; then
                 # used when the job terminates unexpectedly and we want to make sure that the
                 # content of a file is written to stdout.
+                echo "===== PRINT CONTENT OF FILE $FILEPATH ==== "
                 print_file $FILEPATH
+                echo "===== END OF FILE ==== "
             fi
         fi
     else 
@@ -199,7 +201,6 @@ print_file() {
     else
         cat $FILEPATH
     fi
-    echo "===== END OF FILE ==== "
     echo
 }
 
