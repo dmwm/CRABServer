@@ -21,6 +21,8 @@ JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERRO
 # ----------------------------------------------------------------------
 
 EXIT_RETRY_POLICY = {
+    # NOTE: Dictionary key is either a number (the exit code) or the "default" string
+    # if a new string is added as key, code which uses this muzt be changed or will raise ValueError
     1: {"type": "recoverable", "delay": 900, "msg": "Job failed w/o messages; likely a worker node issue."},
     50513: {"type": "recoverable", "delay": 900, "msg": "Job did not find functioning CMSSW on worker node."},
     50115: {"type": "recoverable", "delay": 900, "msg": "Job did not produce a FJR; will retry.", "increase_memory": True, "memory_factor": 1.3},
@@ -54,7 +56,7 @@ for code, policy in EXIT_RETRY_POLICY.items():
         # duplicate.. this should never happen other than for the "intentional"
         # exit code 81 (see https://github.com/dmwm/CRABServer/issues/9340 )
         pass
-    newERP[code & 0xff] = policy
+    newERP[shortCode] = policy
 EXIT_RETRY_POLICY = newERP
 
 # strings in fatal root exception text which indicate code problem, not corrupted file
