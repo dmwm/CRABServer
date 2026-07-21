@@ -52,7 +52,7 @@ for code, policy in EXIT_RETRY_POLICY.items():
     if shortCode == int(code):
         # the list may intentionally contain short exit codes, e.g. 128+SIG* (bash adds 128 !)
         continue
-    if shortCode in EXIT_RETRY_POLICY:
+    if shortCode in newERP:
         # duplicate.. this should never happen other than for the "intentional"
         # exit code 81 (see https://github.com/dmwm/CRABServer/issues/9340 )
         pass
