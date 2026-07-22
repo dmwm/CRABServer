@@ -465,6 +465,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
                             doc["User"] = username
                             doc["Destination"] = file_["value"][0]
                             doc["SourceLFN"] = file_["value"][1]
+                            doc["parents"] = []  # do not publish parents anymore
                             toPublish.append(doc)
                             metadataFound = True
                             break
