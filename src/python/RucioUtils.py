@@ -1,4 +1,5 @@
 """ a small set of utilities to work with Rucio used in various places """
+import re
 import logging
 import time
 import traceback
@@ -7,12 +8,15 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 from rucio.client import Client as NativeClient
 from rucio.common.exception import RSENotFound, RuleNotFound, RucioException
 
-RETRIABLE_RUCIO_HTTP_STATUSES = [503]
-
-def _is_rucio_retriable_http_error(exc):
-    """True if this RucioException wraps a transient HTTP error we should retry."""
-    msg = str(exc).lower()
-    return any(f"http status code: {code}" in msg for code in RETRIABLE_RUCIO_HTTP_STATUSES)
+def is_rucio_http_error(exc):
+    """Return True if the exception message contains any HTTP status code."""
+    return bool(
+        re.search(
+            r"\bhttp status code:\s*[1-5]\d{2}\b",
+            str(exc),
+            re.IGNORECASE,
+        )
+    )
 
 def withExponentialBackOffRetry(retryAttempts=5, fatalExceptions=(), retryExceptions=(Exception,), retryPredicate=None):
     """
@@ -87,7 +91,7 @@ class Client:
         if not callable(attr):
             return attr
 
-        @withExponentialBackOffRetry(retryAttempts=10, fatalExceptions=(RucioException,), retryPredicate=_is_rucio_retriable_http_error)
+        @withExponentialBackOffRetry(retryAttempts=10, fatalExceptions=(RucioException,), retryPredicate=is_rucio_http_error)
         @wraps(attr)
         def call(*args, **kwargs):
             return attr(*args, **kwargs)
