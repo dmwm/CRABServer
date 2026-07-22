@@ -1,4 +1,5 @@
 """ a small set of utilities to work with Rucio used in various places """
+import re
 import logging
 import time
 import traceback
@@ -7,16 +8,38 @@ from TaskWorker.WorkerExceptions import TaskWorkerException
 from rucio.client import Client as NativeClient
 from rucio.common.exception import RSENotFound, RuleNotFound, RucioException
 
-def withExponentialBackOffRetry(retryAttempts=5, fatalExceptions=(), retryExceptions=(Exception,)):
+def is_rucio_http_error(exc):
+    """Return True if the exception message contains any HTTP status code."""
+    return bool(
+        re.search(
+            r"\bhttp status code:\s*[1-5]\d{2}\b",
+            str(exc),
+            re.IGNORECASE,
+        )
+    )
+
+def withExponentialBackOffRetry(retryAttempts=5, fatalExceptions=(), retryExceptions=(Exception,), retryPredicate=None):
     """
-    Generic Exponential Back-off Retry
-    - retryAttempts: The number of retry attempts to perform before giving up.
-        Guidances:
-            5 attempts -- Industrial Standard for HTTP API calls — (≈ 30 seconds tolerance, default).
-            8 attempts -- Standard HTTP around Rucio API calls — (≈ 8.5 mins tolerance).
-            9/10 attempts -- Long-running or critical operations such as job submission, task management, and tape recall (≈ 17/34 minutes tolerance).
-    - fatalExceptions: A tuple of exception types that should not be retried, raise immediately.
-    - retryExceptions: A tuple of exception types that are eligible for retry. Otherwise will be raise right away as well. (But our default is built-in Exception, so all exception will be catch and retry anyhow.
+    Decorator implementing exponential backoff retries.
+
+    Semantics:
+      - ``retryAttempts`` is the max number of retries after the initial failure.
+        Example: ``retryAttempts=5`` means up to 1 initial call + 5 retries.
+      - Normal retry delay is ``2**attempt`` seconds, where attempt starts at 0.
+      - For exceptions in ``fatalExceptions``, retries happen only if
+        ``retryPredicate(exc)`` returns True; in that case delay is
+        ``20 + 2**attempt`` seconds.
+
+    Guidance:
+      - 5 retries: common HTTP retry profile (~30s total wait).
+      - 8 retries: medium tolerance profile (~8.5m total wait).
+      - 9-10 retries: long tolerance profile (~17-34m total wait).
+
+    Args:
+      - retryAttempts: int, maximum retries.
+      - fatalExceptions: tuple of exception classes, normally not retried.
+      - retryExceptions: tuple of exception classes, retried by default.
+      - retryPredicate: optional callable(exc) -> bool to override fatal behavior.
     """
     fatalExceptions = tuple(fatalExceptions)
     retryExceptions = tuple(retryExceptions)
@@ -38,7 +61,18 @@ def withExponentialBackOffRetry(retryAttempts=5, fatalExceptions=(), retryExcept
                 try:
                     return func(*args, **kwargs)
                 except fatalExceptions as e:
-                    # Fatal Exception will not be retry, raise immediately.
+                    if retryPredicate and retryPredicate(e):
+                        if attempt >= retryAttempts:
+                            logger.error(f"Operation '{name}' failed after {attempt} retries (retryPredicate matched): {e}")
+                            raise
+                        sleepTime = 20 + (2 ** attempt)
+                        logger.warning(
+                            f"Retriable exception in '{name}' (attempt {attempt+1}/{retryAttempts}): "
+                            f"{e}, waiting for {sleepTime} seconds..."
+                        )
+                        time.sleep(sleepTime)
+                        attempt += 1
+                        continue
                     logger.exception(f"Fatal exception in '{name}' : {e}")
                     logger.exception(f"Type of Exception: {type(e)}")
                     logger.exception(f"repr(): {repr(e)}")
@@ -67,7 +101,7 @@ class Client:
         if not callable(attr):
             return attr
 
-        @withExponentialBackOffRetry(retryAttempts=8, fatalExceptions=(RucioException,))
+        @withExponentialBackOffRetry(retryAttempts=10, fatalExceptions=(RucioException,), retryPredicate=is_rucio_http_error)
         @wraps(attr)
         def call(*args, **kwargs):
             return attr(*args, **kwargs)
@@ -173,7 +207,7 @@ def getWritePFN(rucioClient=None, siteName='', lfn='',  # pylint: disable=danger
 
     return pfn
 
-@withExponentialBackOffRetry(retryAttempts=8, fatalExceptions=(RucioException,))
+@withExponentialBackOffRetry(retryAttempts=10, fatalExceptions=(RucioException,))
 def getRuleQuota(rucioClient=None, ruleId=None):
     """ return quota needed by this rule in Bytes """
     size = 0
@@ -185,7 +219,7 @@ def getRuleQuota(rucioClient=None, ruleId=None):
     size = sum(file['bytes'] for file in files)
     return size
 
-@withExponentialBackOffRetry(retryAttempts=8, fatalExceptions=(RucioException,))
+@withExponentialBackOffRetry(retryAttempts=10, fatalExceptions=(RucioException,))
 def getRucioUsage(rucioClient=None, account=None, activity =None):
     """ size of Rucio usage for this account (if provided) or by activity """
     if activity is None:
