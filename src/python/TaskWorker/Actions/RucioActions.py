@@ -293,7 +293,7 @@ class RucioAction():
             rule_kwargs.update({
                 'grouping': 'ALL',
                 'rseExpression': 'keep_miniaod=True',
-                'lifetime': 3600 * 24 * 365,
+                'lifetime': 3600 * 24 * 30 * 6,
                 'copies': 2,
             })
 
