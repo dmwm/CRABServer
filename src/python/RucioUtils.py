@@ -20,16 +20,26 @@ def is_rucio_http_error(exc):
 
 def withExponentialBackOffRetry(retryAttempts=5, fatalExceptions=(), retryExceptions=(Exception,), retryPredicate=None):
     """
-    Generic Exponential Back-off Retry
-    - retryAttempts: The number of retry attempts to perform before giving up.
-        Guidances:
-            5 attempts -- Industrial Standard for HTTP API calls — (≈ 30 seconds tolerance, default).
-            8 attempts -- Standard HTTP around Rucio API calls — (≈ 8.5 mins tolerance).
-            9/10 attempts -- Long-running or critical operations such as job submission, task management, and tape recall (≈ 17/34 minutes tolerance).
-    - fatalExceptions: A tuple of exception types that should not be retried, raise immediately.
-    - retryExceptions: A tuple of exception types that are eligible for retry. Otherwise will be raise right away as well. (But our default is built-in Exception, so all exception will be catch and retry anyhow.
-    - retryPredicate: Optional callable(exception) -> bool. When a fatalException is caught,
-        if retryPredicate returns True, it is retried instead of raised. Extra sleep tolerance is applied.
+    Decorator implementing exponential backoff retries.
+
+    Semantics:
+      - ``retryAttempts`` is the max number of retries after the initial failure.
+        Example: ``retryAttempts=5`` means up to 1 initial call + 5 retries.
+      - Normal retry delay is ``2**attempt`` seconds, where attempt starts at 0.
+      - For exceptions in ``fatalExceptions``, retries happen only if
+        ``retryPredicate(exc)`` returns True; in that case delay is
+        ``20 + 2**attempt`` seconds.
+
+    Guidance:
+      - 5 retries: common HTTP retry profile (~30s total wait).
+      - 8 retries: medium tolerance profile (~8.5m total wait).
+      - 9-10 retries: long tolerance profile (~17-34m total wait).
+
+    Args:
+      - retryAttempts: int, maximum retries.
+      - fatalExceptions: tuple of exception classes, normally not retried.
+      - retryExceptions: tuple of exception classes, retried by default.
+      - retryPredicate: optional callable(exc) -> bool to override fatal behavior.
     """
     fatalExceptions = tuple(fatalExceptions)
     retryExceptions = tuple(retryExceptions)
@@ -52,7 +62,7 @@ def withExponentialBackOffRetry(retryAttempts=5, fatalExceptions=(), retryExcept
                     return func(*args, **kwargs)
                 except fatalExceptions as e:
                     if retryPredicate and retryPredicate(e):
-                        if attempt > retryAttempts:
+                        if attempt >= retryAttempts:
                             logger.error(f"Operation '{name}' failed after {attempt} retries (retryPredicate matched): {e}")
                             raise
                         sleepTime = 20 + (2 ** attempt)
