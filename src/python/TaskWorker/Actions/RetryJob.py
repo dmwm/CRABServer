@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import socket
 import time
+import datetime
 from collections import namedtuple
 from ast import literal_eval
 from ServerUtilities import executeCommand, getLock
@@ -370,33 +371,20 @@ class RetryJob():
         Need a doc string here.
         """
         # If job was killed on the worker node, we probably don't have a FJR.
+        wallSeconds = self.ad.get("LastRemoteWallClockTime")
+        cpuSeconds =  self.ad.get("RemoteUserCpu") + self.ad.get("RemoteSysCpu")
+        maxSeconds = self.ad.get("MaxWallTimeMinsRun") * 60
         if self.ad.get("RemoveReason", "").startswith("Removed due to wall clock limit"):
+            wallTime = datetime.timedelta(seconds=wallSeconds)  # from seconds to human format days HH:MM:SS
+            wallMax = datetime.timedelta(seconds=maxSeconds) 
             exitMsg = "Not retrying job due to wall clock limit (job automatically killed on the worker node)"
+            exitMsg += f"\nJobs lasted {wallSeconds} seconds ({wallTime}) vs. {maxSeconds} ({wallMax}) MAX"
             self.create_fake_fjr(exitMsg, 50664, 50664)  # this raises FatalError
         if "CPU usage over limit" in self.ad.get("RemoveReason", ""):
-            exitMsg = "Not retrying job due CPU limit (using more CPU than Wall Clock)"
+            # NOTE: currently PeriodicRemoval does not enforce this !!!
+            exitMsg = "Not retrying job due to CPU limit (using more CPU than Wall Clock)"
+            exitMsg += f"\nJob used {cpuSeconds} CPU seconds in {wallSeconds} seconds of wall time"
             self.create_fake_fjr(exitMsg, 50663, 50663)  # this raises FatalError
-        subreport = self.report
-        for attr in ['steps', 'cmsRun', 'performance', 'cpu', 'TotalJobTime']:
-            subreport = subreport.get(attr, None)
-            if subreport is None:
-                return
-        total_job_time = self.report['steps']['cmsRun']['performance']['cpu']['TotalJobTime']
-        try:
-            total_job_time = float(total_job_time)
-        except ValueError:
-            return
-        integrated_job_time = 0
-        for ad in self.ads:
-            if 'RemoteWallClockTime' in ad:
-                integrated_job_time += ad['RemoteWallClockTime']
-        self.integrated_job_time = integrated_job_time
-        if total_job_time > self.MAX_WALLTIME:
-            exitMsg = "Not retrying a long running job (job ran for %d hours)" % (total_job_time / 3600)
-            self.create_fake_fjr(exitMsg, 50664)  # this raises FatalError
-        if integrated_job_time > (1.5 * self.MAX_WALLTIME):
-            exitMsg = "Not retrying a job because the integrated time (across all retries) is %d hours." % (integrated_job_time / 3600)
-            self.create_fake_fjr(exitMsg, 50664)  # this raises FatalError
 
     # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
