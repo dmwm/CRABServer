@@ -353,6 +353,7 @@ class Master():  # pylint: disable=too-many-instance-attributes
                             for key in ['inevents', 'filetype', 'publishname', 'lfn', 'jobid', 'swversion',
                                         'runlumi', 'adler32', 'cksum', 'filesize', 'parents', 'state', 'created']:
                                 fileDict[key] = fmd[key]
+                            fileDict['parents'] = []  # do not publish parents anymore
                             # following three vars. only need to be saved once, they are the same for all FMD
                             # but let's stay simple even if a bit redundant
                             acquisitionEra = fmd['acquisitionera']
