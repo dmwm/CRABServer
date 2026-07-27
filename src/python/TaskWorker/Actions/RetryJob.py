@@ -45,19 +45,19 @@ EXIT_RETRY_POLICY = {
 # sometimes we only get a short exit code from the 8 rightmost bits (like when bash filters it)
 # so let's add them
 newERP = {}  # new temp dict. to avoid changing dict. while iterating
-for code, policy in EXIT_RETRY_POLICY.items():
-    newERP[code] = policy
-    if code == "default":
+for exCode, retryPolicy in EXIT_RETRY_POLICY.items():
+    newERP[exCode] = retryPolicy
+    if exCode == "default":
         continue
-    shortCode = int(code) & 0xff
-    if shortCode == int(code):
+    shortCode = int(exCode) & 0xff
+    if shortCode == int(exCode):
         # the list may intentionally contain short exit codes, e.g. 128+SIG* (bash adds 128 !)
         continue
     if shortCode in newERP:
         # duplicate.. this should never happen other than for the "intentional"
         # exit code 81 (see https://github.com/dmwm/CRABServer/issues/9340 )
         pass
-    newERP[shortCode] = policy
+    newERP[shortCode] = retryPolicy
 EXIT_RETRY_POLICY = newERP
 
 # strings in fatal root exception text which indicate code problem, not corrupted file
