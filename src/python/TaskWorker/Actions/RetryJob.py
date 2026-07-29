@@ -292,7 +292,7 @@ class RetryJob():
 
     # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    def get_report(self):
+    def get_site_from_report(self):
         """
         Need a doc string here.
         """
@@ -657,12 +657,12 @@ class RetryJob():
             self.logger.debug(msg)
             self.get_job_ad_from_condor_q()
 
-        # Do we still need identification of site in self.get_report()?
-        # We can always get it from job ad.
-        if 'JOBGLIDEIN_CMSSite' in self.ad:
-            self.site = self.ad['JOBGLIDEIN_CMSSite']
+        # Site name is usually in job report (FJR from cmsRun)
+        # but if job was killed (by PeriodicRemove e.g.) there will be no FJR
+        # so we initialize using the gWms classAd
+        self.site = self.ad.get('MATCH_GLIDEIN_CMSSite', None)
 
-        self.get_report()
+        self.get_site_from_report()
 
         if self.ad.get("RemoveReason", "").startswith("Removed due to job being held"):
             hold_reason = self.ad.get("HoldReason", self.ad.get("LastHoldReason", "Unknown"))
