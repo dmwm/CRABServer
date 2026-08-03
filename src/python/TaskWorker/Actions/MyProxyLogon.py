@@ -46,8 +46,9 @@ class MyProxyLogon(TaskAction):
         errmsg = ''
         if timeleft is None or timeleft <= 0:
             errmsg = f"Impossible to retrieve proxy from {proxycfg['myProxySvr']} for {proxycfg['userDN']}."
-        if timeleft < (5*24*3600):
+        if 0 < timeleft < (5*24*3600):
             errmsg = f"Could not get a proxy valid for at least 5-days from {proxycfg['myProxySvr']} for {proxycfg['userDN']}."
+            errmsg += f"Call to myproxy returns a proxy valid only for {timeleft} seconds"
         if errmsg:
             self.logger.error(errmsg)
             self.logger.error("Will try again in verbose mode")
@@ -55,8 +56,18 @@ class MyProxyLogon(TaskAction):
             with tempSetLogLevel(logger=self.logger, level=logging.DEBUG):
                 proxy.logonRenewMyProxy()
             self.logger.error("===========PROXY ERROR END   ==========================")
-            raise TaskWorkerException(errmsg)
-
+            # did it work ?
+            usergroups = set(proxy.getAllUserGroups(userproxy))
+            timeleft = proxy.getTimeLeft(userproxy)
+            if timeleft is None or timeleft <= 0:
+                errmsg = "Proxy retrieval from myproxy failed"
+                raise TaskWorkerException(errmsg)
+            if 0< timeleft < (5 * 24 * 3600):
+                errmsg = f"Could not get a proxy valid for at least 5-days from {proxycfg['myProxySvr']} for {proxycfg['userDN']}."
+                errmsg += f"Call to myproxy returns a proxy valid only for {timeleft} seconds"
+                raise TaskWorkerException(errmsg)
+            if timeleft > (5*24*3600):
+                self.logger.error("========== Oh well.2nd attempt was successful =============")
         hoursleft = timeleft // 3600
         minutesleft = (timeleft % 3600) // 60
         self.logger.info('retrieved proxy lifetime in h:m: %d:%d', hoursleft, minutesleft)
