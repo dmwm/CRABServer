@@ -169,7 +169,7 @@ def logCMSSW():
     # check size of outfile
     keepAtStart = 1000
     keepAtEnd = 3000
-    maxLineLen = 3000
+    maxLineLen = 1000
     maxLines = keepAtStart + keepAtEnd
     with open(outfile, encoding='utf-8') as fh:
         numLines = sum(1 for line in fh)
