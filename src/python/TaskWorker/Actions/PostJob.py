@@ -1625,7 +1625,7 @@ class PostJob():
             # see https://github.com/dmwm/CRABServer/issues/9378
             # this makes first_pj_execution() to return false, but going on is impossible
             # becasue job has left the queue, best is to force a new submission
-            if not self.schedd.query(constraint=f"clusterid=={self.dag_clusterid}"):
+            if not self.schedd.query(constraint=f"clusterid=={self.dag_clusterid}", projection=["ClusterId"]):
                 msg = f"PostJob was called for HTCondor job {self.dag_jobid}. But it is not in condor queue"
                 msg += "\n Something went wrong inside Dagmam, this is a fatal error. Force a new submission"
                 self.logger.error(msg)
