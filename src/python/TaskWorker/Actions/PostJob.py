@@ -1621,6 +1621,15 @@ class PostJob():
             self.logger.info("======== Starting execution on %s. Task Worker Version %s", os.uname()[1], __version__)
         else:
             self.logger.info("\n======== Starting execution again after deferral")
+            # in rare cases PostJob is started twice by Dagman for same job
+            # see https://github.com/dmwm/CRABServer/issues/9378
+            # this makes first_pj_execution() to return false, but going on is impossible
+            # becasue job has left the queue, best is to force a new submission
+            if not self.schedd.query(constraint=f"clusterid=={self.dag_clusterid}", projection=["ClusterId"]):
+                msg = f"PostJob was called for HTCondor job {self.dag_jobid}. But it is not in condor queue"
+                msg += "\n Something went wrong inside Dagmam, this is a fatal error. Force a new submission"
+                self.logger.error(msg)
+                return JOB_RETURN_CODES.RECOVERABLE_ERROR
 
         # Create the task web directory in the schedd. Ignore if it exists already.
         self.create_taskwebdir()
