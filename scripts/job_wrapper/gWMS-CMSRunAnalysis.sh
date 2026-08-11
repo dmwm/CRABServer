@@ -187,19 +187,20 @@ print_file() {
 
     keepAtStart=1000
     keepAtEnd=3000
-    maxLineLen=3000
+    maxLineLen=1000
 
     FILEPATH=$1
     maxLines=$(expr $keepAtStart + $keepAtEnd)
     numLines=$(cat $FILEPATH | wc -l)
+    echo "=== NOTICE: lines longer than $maxLineLen characters will be truncated"
 
     if [[ $numLines -gt $maxLines ]]; then
         echo "=== Print only first $keepAtStart and last $keepAtEnd lines"
-        head -n $keepAtStart $FILEPATH
+        head -n $keepAtStart $FILEPATH | cut -c 1-$maxLineLen
         echo "=== [...]"
-        tail -n $keepAtEnd $FILEPATH
+        tail -n $keepAtEnd $FILEPATH | cut -c 1-$maxLineLen
     else
-        cat $FILEPATH
+        cat $FILEPATH | cut -c 1-$maxLineLen
     fi
     echo
 }
