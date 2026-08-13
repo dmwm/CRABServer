@@ -1637,7 +1637,6 @@ class PostJob():
         else:
             self.logger.info("\n======== Starting execution again after deferral")
             # in rare cases PostJob is started twice by Dagman for same job
-            # see https://github.com/dmwm/CRABServer/issues/9378
             # this makes first_pj_execution() to return false, but going on is impossible
             # becasue job has left the queue, best is to force a new submission
             if not self.schedd.query(constraint=f"clusterid=={self.dag_clusterid}", projection=["ClusterId"]):
@@ -1719,9 +1718,11 @@ class PostJob():
         global G_FAKE_OUTDATASET
         G_FAKE_OUTDATASET = f'/FakeDataset/fakefile-FakePublish-{taskhash}/USER'
 
-        # Call execute_internal().
+        # Call execute_internal(). Since we continue to do a proper closing after exception
+        # need to make sure that its return arguments are always defined
         retval = JOB_RETURN_CODES.RECOVERABLE_ERROR
         retmsg = "Failure during post-job execution."
+        ASOExitCode = None
         try:
             retval, retmsg, ASOExitCode = self.execute_internal()
             if retval == JOB_RETURN_CODES.DEFER:
@@ -1739,7 +1740,9 @@ class PostJob():
                 job_report = json.load(fd)
         except (IOError, ValueError):
             pass
-        job_report['postjob'] = {'exitCode': retval, 'exitMsg': retmsg, 'ASOExitCode': ASOExitCode}
+        job_report['postjob'] = {'exitCode': retval, 'exitMsg': retmsg}
+        if ASOExitCode:
+            job_report['postjob']['ASOExitCode'] = ASOExitCode
         with open(G_JOB_REPORT_NAME_NEW, 'w') as fd:
             json.dump(job_report, fd)
 
@@ -2197,7 +2200,11 @@ class PostJob():
                 msg = "There was at least one permanent stageout error; user will need to resubmit."
                 self.logger.error(msg)
                 self.set_dashboard_state('FAILED', exitCode=ASOExitCode)
-                self.set_state_ClassAds('FAILED', exitCode=ASOExitCode)
+                ## OUCH this removes job from queue !! so the following tagAllJobsInTask will not work
+                #self.set_state_ClassAds('FAILED', exitCode=ASOExitCode)
+                # let's do the pedantic and safe way instead
+                self.schedd.edit([self.dag_jobid], 'JobExitCode', str(ASOExitCode))
+                self.schedd.edit([self.dag_jobid], 'CRAB_PostJobStatus', "FAILED")
                 self.recordPermanentStageoutError(exitCode=ASOExitCode)
                 self.logger.info("====== Finished to check for ASO transfers.")
                 if self.tooManyPermanentStageoutErrors():
@@ -2207,16 +2214,21 @@ class PostJob():
                         # send msg to operators (only once per task) and go on normally
                         if self.maxFatalAsoNotificationMail and not self.maxFatalAsoMailAlreadySent():
                             self.sendMaxFatalAsoMailToOperators()
+                        self.logger.info("Tag Jobs as ForcefullyTerminated")
+                        self.tagAllJobsInTask(ad='CRAB_ForcefullyTerminated', value='DryASO')
                         return JOB_RETURN_CODES.FATAL_ERROR, retmsg, ASOExitCode
-                    # abort DA and kill task
+                    # abort DAG, kill task and tag jobs
                     self.logger.error("**** Too Many Fatal ASO errors. Abort DAG and kill task ****")
                     killMsg = "Killed by CRAB because output can't be placed at destination site."
                     killMsg += "\nMake sure that your destination site is healthy and"
                     killMsg += "\nthat you have enough free disk space there"
                     killMsg += " before submitting again"
                     self.killThisTask(killMsg)
+                    self.logger.info("Tag Jobs as ForcefullyTerminated")
+                    self.tagAllJobsInTask(ad='CRAB_ForcefullyTerminated', value='ASO')
                     retmsg += '\ntoo Many Fatal ASO errors. Abort task DAG'
-                    self.sendMaxFatalAsoMailToOperators()  # will remove once
+                    if self.maxFatalAsoNotificationMail:
+                        self.sendMaxFatalAsoMailToOperators()
                     return JOB_RETURN_CODES.DAG_ABORT, retmsg, ASOExitCode
                 return JOB_RETURN_CODES.FATAL_ERROR, retmsg, ASOExitCode
             except RecoverableStageoutError as rse:
@@ -3206,6 +3218,13 @@ class PostJob():
         self.logger.debug("Killing task %s", self.reqname)
         data = {'workflow': self.reqname, 'killwarning': msg}
         self.crabserver.delete(api='workflow', data=encodeRequest(data))
+
+    def tagAllJobsInTask(self, ad, value):
+        """
+        sets one classAd for all (grid) jobs in this tasl
+        """
+        jobsInTask = f"(jobuniverse==5||jobuniverse==7)&&CRAB_Reqname=={classad.quote(self.reqname)}"
+        self.schedd.edit(jobsInTask, ad, classad.quote(value))
 
     def sendMaxFatalAsoMailToOperators(self):
         """
