@@ -1384,6 +1384,8 @@ class PostJob():
         self.maxFatalAsoNumber = getattr(config.TaskWorker, 'maxFatalAsoNumber', 10000)
         self.maxFatalAsoRelativeFraction = getattr(config.TaskWorker, 'maxFatalAsoRelativeFraction', 1.0)
         self.maxFatalAsoAbsoluteFraction = getattr(config.TaskWorker, 'maxFatalAsoAbsoluteFraction', 1.0)
+        # If next is not None, will notivy {self.maxFatalAsoNotificationMail}@cern.ch
+        self.maxFatalAsoNotificationMail = getattr(config.TaskWorker, 'maxFatalAsoNotificationMail', None)
         self.asoSummaryFile = "aso_summary.json"
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -2203,7 +2205,7 @@ class PostJob():
                         self.logger.error("**** Too Many Fatal ASO errors. ****")
                         self.logger.error("**** If dry run were False, I would abort DAG and kill task ****")
                         # send msg to operators (only once per task) and go on normally
-                        if not self.maxFatalAsoMailAlreadySent():
+                        if self.maxFatalAsoNotificationMail and not self.maxFatalAsoMailAlreadySent():
                             self.sendMaxFatalAsoMailToOperators()
                         return JOB_RETURN_CODES.FATAL_ERROR, retmsg, ASOExitCode
                     # abort DA and kill task
@@ -3209,22 +3211,28 @@ class PostJob():
         """
         tell operators that we would kill Task now
         """
+        if not self.maxFatalAsoNotificationMail:
+            return
         dry = "DryRun mode !" if self.maxFatalAsoDryRun else "REAL KILL !"
         subject = f"{dry} Killing task due to maxFatalAso"
-        recipient = "cms-service-crab-operators@cern.ch"
+        recipient = f"{self.maxFatalAsoNotificationMail}@cern.ch"
         recipient = "stefano.belforte@cern.ch"
         body = f"Killing {self.reqname} in PostJob for crabId {self.job_id}.{self.crab_retry} on {os.uname()[1]}"
-        body += "\nASO summary:"
         # build summary
         fName = self.asoSummaryFile
         with getLock(fName):
             with open(fName, 'r') as fd:
                 asoStats = json.load(fd)
+        body += f"\nJobs in task : {asoStats['nJobs']}"
+        body += f"\nKill Thresholds: nErrors {self.maxFatalAsoNumber}  "
+        body += f"relFraction {self.maxFatalAsoRelativeFraction}  "
+        body += f"absFraction {self.maxFatalAsoAbsoluteFraction}"
         totAso = asoStats['nOK'] + asoStats['nErrors']
         relativeOkPct = f"{asoStats['nOK']*100//totAso}"
         relativeFailPct =f"{asoStats['nErrors']*100//totAso}"
         absoluteOkPct =f"{asoStats['nOK']*100//asoStats['nJobs']}"
         absoluteFailPct = f"{asoStats['nErrors']*100//asoStats['nJobs']}"
+        body += "\nASO summary:"
         body += "\n Relative"
         body += f"\n   OK    {asoStats['nOK']}/{totAso} = {relativeOkPct}%"
         body += f"\n   FAIL  {asoStats['nErrors']}/{totAso} = {relativeFailPct}%"
