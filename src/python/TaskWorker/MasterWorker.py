@@ -424,13 +424,13 @@ class MasterWorker(object):
 
 
     def getWork(self, limit, getstatus, ignoreTWName=False):
-        configreq = {'limit': limit, 'workername': self.config.TaskWorker.name, 'getstatus': getstatus}
+        configreq = {'limit': limit, 'workername': self.config.TaskWorker.name,
+                     'getstatus': getstatus, 'months': 2}
         if ignoreTWName:
             configreq['workername'] = '%'
 
         pendingwork = []
         try:
-            #pendingwork = self.server.get(self.restURInoAPI + '/workflowdb', data=configreq)[0]['result']
             pendingwork = self.crabserver.get(api='workflowdb', data=configreq)[0]['result']
         except HTTPException as hte:
             msg = "HTTP Error during getWork: %s\n" % str(hte)
