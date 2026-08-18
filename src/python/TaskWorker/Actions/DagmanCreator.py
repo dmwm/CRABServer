@@ -1183,8 +1183,25 @@ class DagmanCreator(TaskAction):
             jobSubmit['My.CRAB_FailedNodeLimit'] = "-1"
 
         # last thing, update number of jobs in this task in Task table
+        # and in job classAds (only when running in the AP, where Job.submit is on disk)
         # using the numer of jobs in this (sub)DAGta
         self.reportNumJobToDB(len(dagSpecs))
+        if not self.runningInTW:
+            # change JobSubmit templace
+            # read file
+            with open("Job.submit", 'r', encoding='utf-8') as fd:
+                jobSubmitFileContent = fd.read()
+            # convert to HTC Submit object
+            jobSubmitObject = htcondor.Submit(jobSubmitFileContent)
+            # edit (beware, everything is a string in a Submit object)
+            oldCount = int(jobSubmitObject['My.CRAB_JobCount'])
+            newCount = oldCount + len(dagSpecs)
+            jobSubmitObject['My.CRAB_JobCount'] = str(newCount)
+            # save in tmp file (beware being killed now and leaving a corrupted file !)
+            with open("Job.submit.tmp", 'w', encoding='utf-8') as fd:
+                print(jobSubmitObject, file=fd)
+            # atomic replace
+            os.rename("Job.submit.tmp", "Job.submit")
 
         return jobSubmit, splitterResult, subdags
 
