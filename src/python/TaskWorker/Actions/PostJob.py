@@ -250,14 +250,19 @@ def prepareErrorSummary(logger, fsummary, job_id, crab_retry):
                     postjob_exit_code = rep.get('postjob', {}).get('exitCode', -1)
                     postjob_exit_msg = rep.get('postjob', {}).get('exitMsg', "No post-job error message available.")
                     if postjob_exit_code != 0:
-                        # Use exit code 90000 as a general exit code for failures in the post-processing step.
-                        # The 'crab status' error summary should not show this error code,
-                        # but replace it with the generic message "failed in post-processing".
                         msg = "Updating error summary for jobid %s retry %s with following information:" % (job_id, crab_retry)
-                        msg += "\n'exit code' = 90000 ('Post-processing failed')"
+                        ASOExitCode = rep.get('postjob', {}).get('ASOExitCode', 0)
+                        if ASOExitCode != 0:
+                            msg +=  f"\n'exit code' = {ASOExitCode}"
+                            error_summary = [ASOExitCode, postjob_exit_msg, {}]
+                        else:
+                            # Use exit code 90000 as a general exit code for failures in the post-processing step.
+                            # The 'crab status' error summary should not show this error code,
+                            # but replace it with the generic message "failed in post-processing".
+                            msg += "\n'exit code' = 90000 ('Post-processing failed')"
+                            error_summary = [90000, postjob_exit_msg, {}]
                         msg += "\n'exit message' = %s" % (postjob_exit_msg)
                         logger.info(msg)
-                        error_summary = [90000, postjob_exit_msg, {}]
                     else:
                         msg = "Updating error summary for jobid %s retry %s with following information:" % (job_id, crab_retry)
                         msg += "\n'exit code' = %s" % (exit_code)
@@ -1373,6 +1378,16 @@ class PostJob():
         self.postjob_log_file_name = None
         self.useAsoRucio = False
 
+        with open('taskworkerconfig.pkl','rb') as fd:
+            config = pickle.load(fd) #Task worker configuration
+        self.maxFatalAsoDryRun = getattr(config.TaskWorker, 'maxFatalAsoDryRun', True)
+        self.maxFatalAsoNumber = getattr(config.TaskWorker, 'maxFatalAsoNumber', 10000)
+        self.maxFatalAsoRelativeFraction = getattr(config.TaskWorker, 'maxFatalAsoRelativeFraction', 1.0)
+        self.maxFatalAsoAbsoluteFraction = getattr(config.TaskWorker, 'maxFatalAsoAbsoluteFraction', 1.0)
+        # If next is not None, will notivy {self.maxFatalAsoNotificationMail}@cern.ch
+        self.maxFatalAsoNotificationMail = getattr(config.TaskWorker, 'maxFatalAsoNotificationMail', None)
+        self.asoSummaryFile = "aso_summary.json"
+
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
     def get_defer_num(self):
@@ -1622,7 +1637,6 @@ class PostJob():
         else:
             self.logger.info("\n======== Starting execution again after deferral")
             # in rare cases PostJob is started twice by Dagman for same job
-            # see https://github.com/dmwm/CRABServer/issues/9378
             # this makes first_pj_execution() to return false, but going on is impossible
             # becasue job has left the queue, best is to force a new submission
             if not self.schedd.query(constraint=f"clusterid=={self.dag_clusterid}", projection=["ClusterId"]):
@@ -1704,12 +1718,14 @@ class PostJob():
         global G_FAKE_OUTDATASET
         G_FAKE_OUTDATASET = f'/FakeDataset/fakefile-FakePublish-{taskhash}/USER'
 
-        # Call execute_internal().
+        # Call execute_internal(). Since we continue to do a proper closing after exception
+        # need to make sure that its return arguments are always defined
         retval = JOB_RETURN_CODES.RECOVERABLE_ERROR
         retmsg = "Failure during post-job execution."
+        ASOExitCode = None
         try:
-            retval, retmsg = self.execute_internal()
-            if retval == 4:
+            retval, retmsg, ASOExitCode = self.execute_internal()
+            if retval == JOB_RETURN_CODES.DEFER:
                 msg = "Deferring the execution of the post-job."
                 self.logger.info(msg)
                 self.log_finish_msg(retval)
@@ -1725,16 +1741,16 @@ class PostJob():
         except (IOError, ValueError):
             pass
         job_report['postjob'] = {'exitCode': retval, 'exitMsg': retmsg}
+        if ASOExitCode:
+            job_report['postjob']['ASOExitCode'] = ASOExitCode
         with open(G_JOB_REPORT_NAME_NEW, 'w') as fd:
             json.dump(job_report, fd)
 
         # Prepare the error report. Enclosing it in a try except as we don't want to
         # fail jobs because this fails.
         self.logger.info("====== Starting to prepare error report.")
-        self.logger.debug("Acquiring lock on error summary file.")
         try:
             with getLock(G_ERROR_SUMMARY_FILE_NAME):
-                self.logger.debug("Acquired lock on error summary file.")
                 with open(G_ERROR_SUMMARY_FILE_NAME, "a+") as fsummary:
                     prepareErrorSummary(self.logger, fsummary, self.job_id, self.crab_retry)
         except Exception:
@@ -1745,6 +1761,12 @@ class PostJob():
         # Decide if the whole task should be aborted (in case a significant fraction of
         # the jobs has failed).
         retval = self.check_abort_dag(retval)
+
+        if retval == JOB_RETURN_CODES.DAG_ABORT:
+            msg = "Aborting DAG"
+            self.logger.info(msg)
+            self.log_finish_msg(retval)
+            return retval
 
         # If return value is not 0 (success) write env variables to a file if it is not
         # present and print job ads in PostJob log file.
@@ -1918,12 +1940,12 @@ class PostJob():
         (injections to ASO database, monitoring transfers, file metadata upload)
         are done from here.
         """
-
+        ASOExitCode = None  # will be set if PostJob detects ASO error
         # Make sure the location of the user's proxy file is set in the environment.
         if 'X509_USER_PROXY' not in os.environ:
             retmsg = "X509_USER_PROXY is not present in environment."
             self.logger.error(retmsg)
-            return 10, retmsg
+            return JOB_RETURN_CODES.FATAL_ERROR, retmsg, ASOExitCode
 
         # If this is a deferred post-job execution, reduce the log level to WARNING.
         if not first_pj_execution():
@@ -2030,7 +2052,7 @@ class PostJob():
         if first_pj_execution():
             pj_error, msg = self.check_exit_code(used_job_ad)
             if pj_error:
-                return pj_error, msg
+                return pj_error, msg, ASOExitCode
 
         # If this is a deferred post-job execution, reduce the log level to ERROR.
         if not first_pj_execution():
@@ -2042,7 +2064,7 @@ class PostJob():
             self.set_state_ClassAds('FAILED', exitCode=89999)
             self.logger.info("====== Finished to parse job report.")
             retmsg = "Failure parsing the job report."
-            return JOB_RETURN_CODES.FATAL_ERROR, retmsg
+            return JOB_RETURN_CODES.FATAL_ERROR, retmsg, ASOExitCode
         self.logger.info("====== Finished to parse job report.")
 
         self.logger.info("====== Starting saving data for automatic splitting.")
@@ -2065,7 +2087,7 @@ class PostJob():
             self.logger.info(msg)
             self.set_dashboard_state('FINISHED')
             self.set_state_ClassAds('FINISHED')
-            return 0, ""
+            return JOB_RETURN_CODES.OK, "", ASOExitCode
 
         # Give a message about the transfer flags.
         if first_pj_execution():
@@ -2168,41 +2190,76 @@ class PostJob():
                     # need to do this after the first call to self.perform_transfers() so that
                     # ASO_JOB.docs_in_transfer and delayed_publicationflag are filled
                     self.upload_output_files_metadata()
-                if ret_code == 4:
+                if ret_code == JOB_RETURN_CODES.DEFER:
                     #if we need to defer the postjob execution stop here!
-                    return ret_code, ""
+                    return ret_code, "", ASOExitCode
             except PermanentStageoutError as pse:
                 retmsg = "Got fatal stageout exception:\n%s" % (str(pse))
                 self.logger.error(retmsg)
+                ASOExitCode = mostCommon(self.stageout_exit_codes, 60324)
                 msg = "There was at least one permanent stageout error; user will need to resubmit."
                 self.logger.error(msg)
-                self.set_dashboard_state('FAILED', exitCode=mostCommon(self.stageout_exit_codes, 60324))
-                self.set_state_ClassAds('FAILED', exitCode=mostCommon(self.stageout_exit_codes, 60324))
+                self.set_dashboard_state('FAILED', exitCode=ASOExitCode)
+                ## OUCH this removes job from queue !! so the following tagAllJobsInTask will not work
+                #self.set_state_ClassAds('FAILED', exitCode=ASOExitCode)
+                # let's do the pedantic and safe way instead
+                self.schedd.edit([self.dag_jobid], 'JobExitCode', str(ASOExitCode))
+                self.schedd.edit([self.dag_jobid], 'CRAB_PostJobStatus', "FAILED")
+                self.recordPermanentStageoutError(exitCode=ASOExitCode)
                 self.logger.info("====== Finished to check for ASO transfers.")
-                return JOB_RETURN_CODES.FATAL_ERROR, retmsg
+                if self.tooManyPermanentStageoutErrors():
+                    if self.maxFatalAsoDryRun:
+                        self.logger.error("**** Too Many Fatal ASO errors. ****")
+                        self.logger.error("**** If dry run were False, I would abort DAG and kill task ****")
+                        # send msg to operators (only once per task) and go on normally
+                        if self.maxFatalAsoNotificationMail and not self.maxFatalAsoMailAlreadySent():
+                            self.sendMaxFatalAsoMailToOperators()
+                        self.logger.info("Tag Jobs as ForcefullyTerminated")
+                        self.tagAllJobsInTask(ad='CRAB_ForcefullyTerminated', value='DryASO')
+                        return JOB_RETURN_CODES.FATAL_ERROR, retmsg, ASOExitCode
+                    # abort DAG, kill task and tag jobs
+                    self.logger.error("**** Too Many Fatal ASO errors. Abort DAG and kill task ****")
+                    killMsg = "Killed by CRAB because output can't be placed at destination site."
+                    killMsg += "\nMake sure that your destination site is healthy and"
+                    killMsg += "\nthat you have enough free disk space there"
+                    killMsg += " before submitting again"
+                    self.killThisTask(killMsg)
+                    self.logger.info("Tag Jobs as ForcefullyTerminated")
+                    self.tagAllJobsInTask(ad='CRAB_ForcefullyTerminated', value='ASO')
+                    retmsg += '\ntoo Many Fatal ASO errors. Abort task DAG'
+                    if self.maxFatalAsoNotificationMail:
+                        self.sendMaxFatalAsoMailToOperators()
+                    return JOB_RETURN_CODES.DAG_ABORT, retmsg, ASOExitCode
+                return JOB_RETURN_CODES.FATAL_ERROR, retmsg, ASOExitCode
             except RecoverableStageoutError as rse:
                 retmsg = "Got recoverable stageout exception:\n%s" % (str(rse))
                 self.logger.error(retmsg)
                 msg = "These are all recoverable stageout errors; automatic resubmit is possible."
+                exitCode = mostCommon(self.stageout_exit_codes, 60324)
                 self.logger.error(msg)
                 self.logger.info("====== Finished to check for ASO transfers.")
-                return self.check_retry_count(mostCommon(self.stageout_exit_codes, 60324)), retmsg
+                return self.check_retry_count(exitCode=exitCode), retmsg, ASOExitCode
             except Exception as ex:
                 retmsg = "Fatal PostJob error during ASO checking: %s" % (str(ex))
                 self.logger.exception(retmsg)
                 raise
+            finally:
+                # update job exit code to represent ASO error
+                ASOExitCode = mostCommon(self.stageout_exit_codes, 60324)
+
             self.logger.info("====== Finished to check for ASO transfers.")
 
         # will reach here if ret_code fom self.perform_transfers() is not 4
         # Upload the output files metadata and mark file as "publisheable"
         if (not self.useAsoRucio) and self.transfer_outputs:
+            self.recordSuccessfulStageout()
             self.upload_output_files_metadata()
             self.setPublicationFlag()
 
         self.set_dashboard_state('FINISHED')
         self.set_state_ClassAds('FINISHED')
 
-        return 0, ""
+        return 0, "", ASOExitCode
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -3086,6 +3143,137 @@ class PostJob():
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+    def recordSuccessfulStageout(self):
+        """
+        record a successful stage out
+        """
+        fName = self.asoSummaryFile
+        with getLock(fName):
+            if not os.path.exists(fName):
+                with open(fName, 'w') as fd:
+                    asoStats = {'nJobs': self.job_ad['CRAB_JobCount'], 'nOK': 0, 'nErrors': 0}
+                    json.dump(asoStats, fd)
+            with open(fName, 'r') as fd:
+                asoStats = json.load(fd)
+            asoStats['nOK'] += 1
+            with open(fName, 'w') as fd:
+                json.dump(asoStats, fd)
+
+    def recordPermanentStageoutError(self, exitCode):
+        """
+        record a permanent stage out error
+        """
+        fName = self.asoSummaryFile
+        with getLock(fName):
+            if not os.path.exists(fName):
+                with open(fName, 'w') as fd:
+                    asoStats = {'nJobs': self.job_ad['CRAB_JobCount'], 'nOK': 0, 'nErrors': 0}
+                    json.dump(asoStats, fd)
+            with open(fName, 'r') as fd:
+                asoStats = json.load(fd)
+            asoStats['nErrors'] += 1
+            asoStats[f"{self.job_id}.{self.crab_retry}"] = exitCode
+            with open(fName, 'w') as fd:
+                json.dump(asoStats, fd)
+
+    def recordMaxFatalAsoMailSent(self):
+        """ note down that mail was sent, do not send more than once ! """
+        fName = self.asoSummaryFile
+        with getLock(fName):
+            with open(fName, 'r') as fd:
+                asoStats = json.load(fd)
+            asoStats['mailSent'] = True
+            with open(fName, 'w') as fd:
+                json.dump(asoStats, fd)
+
+    def maxFatalAsoMailAlreadySent(self):
+        fName = self.asoSummaryFile
+        with getLock(fName):
+            with open(fName, 'r') as fd:
+                asoStats = json.load(fd)
+            return asoStats.get('mailSent', False)
+
+    def tooManyPermanentStageoutErrors(self):
+        """
+        decide whether to kill and abort
+        """
+        fName = self.asoSummaryFile
+        with getLock(fName):
+            with open(fName, 'r') as fd:
+                asoStats = json.load(fd)
+        totalErrors = asoStats['nErrors']
+        totalOK = asoStats['nOK']
+        totalJobs = asoStats['nJobs']
+        completedJobs = totalOK + totalErrors
+        if totalErrors > self.maxFatalAsoNumber and \
+            totalErrors/completedJobs > self.maxFatalAsoRelativeFraction and \
+            totalErrors/totalJobs > self.maxFatalAsoAbsoluteFraction :
+            return True
+        return False
+
+    def killThisTask(self, msg=None):
+        """
+        kill current task with a message
+        """
+        self.logger.debug("Killing task %s", self.reqname)
+        data = {'workflow': self.reqname, 'killwarning': msg}
+        self.crabserver.delete(api='workflow', data=encodeRequest(data))
+
+    def tagAllJobsInTask(self, ad, value):
+        """
+        sets one classAd for all (grid) jobs in this tasl
+        """
+        jobsInTask = f"(jobuniverse==5||jobuniverse==7)&&CRAB_Reqname=={classad.quote(self.reqname)}"
+        self.schedd.edit(jobsInTask, ad, classad.quote(value))
+
+    def sendMaxFatalAsoMailToOperators(self):
+        """
+        tell operators that we would kill Task now
+        """
+        if not self.maxFatalAsoNotificationMail:
+            return
+        dry = "DryRun mode !" if self.maxFatalAsoDryRun else "REAL KILL !"
+        subject = f"{dry} Killing task due to maxFatalAso"
+        recipient = f"{self.maxFatalAsoNotificationMail}@cern.ch"
+        recipient = "stefano.belforte@cern.ch"
+        body = f"Killing {self.reqname} in PostJob for crabId {self.job_id}.{self.crab_retry} on {os.uname()[1]}"
+        # build summary
+        fName = self.asoSummaryFile
+        with getLock(fName):
+            with open(fName, 'r') as fd:
+                asoStats = json.load(fd)
+        body += f"\nJobs in task : {asoStats['nJobs']}"
+        body += f"\nKill Thresholds: nErrors {self.maxFatalAsoNumber}  "
+        body += f"relFraction {self.maxFatalAsoRelativeFraction}  "
+        body += f"absFraction {self.maxFatalAsoAbsoluteFraction}"
+        totAso = asoStats['nOK'] + asoStats['nErrors']
+        relativeOkPct = f"{asoStats['nOK']*100//totAso}"
+        relativeFailPct =f"{asoStats['nErrors']*100//totAso}"
+        absoluteOkPct =f"{asoStats['nOK']*100//asoStats['nJobs']}"
+        absoluteFailPct = f"{asoStats['nErrors']*100//asoStats['nJobs']}"
+        body += "\nASO summary:"
+        body += "\n Relative"
+        body += f"\n   OK    {asoStats['nOK']}/{totAso} = {relativeOkPct}%"
+        body += f"\n   FAIL  {asoStats['nErrors']}/{totAso} = {relativeFailPct}%"
+        body += "\n Absolute"
+        body += f"\n   OK    {asoStats['nOK']}/{asoStats['nJobs']} = {absoluteOkPct}%"
+        body += f"\n   FAIL  {asoStats['nErrors']}/{asoStats['nJobs']} = {absoluteFailPct}%"
+        ret = subprocess.run(["/usr/bin/mail", "-s", subject, recipient],
+                             input=body, text=True, check=False )
+        if ret.returncode:
+            self.logger.error("Failed to send mail to operators")
+            self.logger.error("stdout: %s", ret.stdout)
+            self.logger.error("stderr: %s", ret.stderr)
+        else:
+            self.logger.info("Mail sent to operators about task killing")
+            self.recordMaxFatalAsoMailSent()
+
+
+
+
+
+    # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
     def check_abort_dag(self, rval):
         """
         For each job that failed with a fatal error, its id is written into the file
@@ -3096,13 +3284,13 @@ class PostJob():
         """
         file_name_jobs_fatal = "task_statistics.FATAL_ERROR"
         file_name_jobs_ok = "task_statistics.OK"
-        # Return code 3 is reserved to abort the entire DAG. Don't let the code
-        # otherwise use it.
-        if rval == 3:
-            rval = 1
+
+        if rval == JOB_RETURN_CODES.DAG_ABORT:
+            # PostJob already decided to abort
+            return rval
         if 'CRAB_FailedNodeLimit' not in self.job_ad or self.job_ad['CRAB_FailedNodeLimit'] == -1:
             return rval
-        try:
+        try:  # Stefano can't understand why there is a try: here !!
             limit = int(self.job_ad['CRAB_FailedNodeLimit'])
             fatal_failed_jobs = []
             with open(file_name_jobs_fatal, 'r') as fd:
@@ -3125,9 +3313,10 @@ class PostJob():
                     msg = msg % (num_fatal_failed_jobs, num_successful_jobs, \
                                  num_successful_jobs + num_fatal_failed_jobs, limit)
                     self.logger.error(msg)
-                    rval = 3
-        finally:
-            return rval  # pylint: disable=lost-exception
+                    rval = JOB_RETURN_CODES.DAG_ABORT
+        except:  # pylint: disable=bare-except
+            pass
+        return rval
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 

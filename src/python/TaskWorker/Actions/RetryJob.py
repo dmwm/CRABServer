@@ -15,7 +15,7 @@ from ServerUtilities import MAX_DISK_SPACE, MAX_WALLTIME, MAX_MEMORY
 import classad2 as classad
 
 
-JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERROR')(0, 1, 2)
+JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERROR DAG_ABORT DEFER')(0, 1, 2, 3, 4)
 
 # ----------------------------------------------------------------------
 # Exit-code dependent retry policy
