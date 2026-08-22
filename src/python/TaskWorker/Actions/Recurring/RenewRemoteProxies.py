@@ -156,7 +156,7 @@ class CRAB3ProxyRenewer():
                 lifetime = ad['x509userproxyexpiration'] - now
                 if lifetime > MINPROXYLENGTH:
                     msg = f"Skipping refresh of proxy for task {ad['CRAB_ReqName']} because "
-                    msg += "it still has a lifetime of {int(lifetime/3600)} hours."
+                    msg += f"it still has a lifetime of {int(lifetime/3600)} hours."
                     self.logger.info(msg)
                     continue
             user = ad['CRAB_UserDN']
