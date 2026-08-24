@@ -133,7 +133,7 @@ class CRAB3ProxyRenewer():
         if not hasattr(schedd, 'refreshGSIProxy'):
             raise NotImplementedError()
         try:
-            schedd.refreshGSIProxy(ad['ClusterId'], ad['ProcID'], proxy, -1)
+            schedd.refreshGSIProxy(ad['ClusterId'], ad['ProcID'], proxy, 0)
         except Exception as e:
             raise Exception(f"Failure when renewing HTCondor task proxy: {e}") from e
 
