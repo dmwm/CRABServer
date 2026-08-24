@@ -334,7 +334,8 @@ class DagmanCreator(TaskAction):
 
         jobSubmit['My.CRAB_Reqname'] = classad.quote(task['tm_taskname'])
         jobSubmit['My.CRAB_Workflow'] = classad.quote(task['tm_taskname'])
-        jobSubmit['My.CMS_JobType'] = classad.quote('Analysis')
+        #SBSB jobSubmit['My.CMS_JobType'] = classad.quote('Analysis')
+        jobSubmit['My.CMS_JobType'] = classad.quote(task['tm_job_type'])
         jobSubmit['My.CRAB_JobSW'] = classad.quote(task['tm_job_sw'])
         jobSubmit['My.CRAB_JobArch'] = classad.quote(task['tm_job_arch'])
         # Note: next ad must always be 0 for probe jobs, this is taken care of in PreJob.py
@@ -346,6 +347,7 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_Publish'] =  "1" if task['tm_publication'] == 'T' else "0"
         jobSubmit['My.CRAB_PublishDBSURL'] = classad.quote(task['tm_publish_dbs_url'])
         jobSubmit['My.CRAB_ISB'] = classad.quote(task['tm_cache_url'])
+        jobSubmit['My.CRAB_IgnoreLocality'] = "true" if task['tm_ignore_locality'] == 'T' else "false"
 
 
         # note about Lists
