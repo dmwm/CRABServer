@@ -347,7 +347,7 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_Publish'] =  "1" if task['tm_publication'] == 'T' else "0"
         jobSubmit['My.CRAB_PublishDBSURL'] = classad.quote(task['tm_publish_dbs_url'])
         jobSubmit['My.CRAB_ISB'] = classad.quote(task['tm_cache_url'])
-        jobSubmit['My.CRAB_IgnoreLocality'] = classad.quote(task['tm_ignore_locality'])
+        jobSubmit['My.CRAB_IgnoreLocality'] = "true" if task['tm_ignore_locality'] == 'T' else "false"
 
 
         # note about Lists
