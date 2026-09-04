@@ -23,7 +23,6 @@ variables:
       - "preprod"
       - "test1"
       - "test2"
-      - "test11"
       - "test12"
       - "test14"
     value: ""
