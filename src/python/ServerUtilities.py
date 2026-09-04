@@ -48,7 +48,6 @@ FILE_MEMORY_LIMIT = 512 * 1024
 SERVICE_INSTANCES = {'prod': {'restHost': 'cmsweb.cern.ch', 'dbInstance': 'prod'},
                      'preprod': {'restHost': 'cmsweb-testbed.cern.ch', 'dbInstance': 'preprod'},
                      'test2': {'restHost': 'cmsweb-test2.cern.ch', 'dbInstance': 'dev'},
-                     'test11': {'restHost': 'cmsweb-test11.cern.ch', 'dbInstance': 'devtwo'},
                      'test12': {'restHost': 'cmsweb-test12.cern.ch', 'dbInstance': 'devthree'},
                      'test14': {'restHost': 'cmsweb-test14.cern.ch', 'dbInstance': 'devfour'},
                      'other': {'restHost': None, 'dbInstance': None},
