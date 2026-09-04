@@ -1,33 +1,34 @@
-$(document).ready(function() {
+$(document).ready(function () {
     var transferInfo_loaded = false;
     // initialize tooltips
     $(function () {
         $('[data-toggle="tooltip"]').tooltip()
     })
     // initialize table for transfers
-    $('#transfer-table tfoot th').each( function () {
+    $('#transfer-table tfoot th').each(function () {
         var title = $(this).text();
-        $(this).html( '<input type="text" placeholder="'+title+'" />' );
-    } );
+        $(this).html('<input type="text" placeholder="' + title + '" />');
+    });
 
-    var transtable= $("#transfer-table").DataTable({
+    var transtable = $("#transfer-table").DataTable({
         colReorder: true,
         fixedHeader: true,
         autoWidth: false,
-        });
+    });
 
     // initialize table for document
-    var doctable= $("#doc-table").DataTable({"dom": '<"top"i>rt<"bottom"flp><"clear">',
-                                             "paging":   false,
-                                             "ordering": false,
-                                             "info":     false
-                                            });
+    var doctable = $("#doc-table").DataTable({
+        "dom": '<"top"i>rt<"bottom"flp><"clear">',
+        "paging": false,
+        "ordering": false,
+        "info": false
+    });
 
     // load transfer tab only on tab click
     // to avoid slowing down the response
     // for other tabs
-    $('.nav-tabs a').click(function(){
-        if(this.id=='transferTab' && !transferInfo_loaded){
+    $('.nav-tabs a').click(function () {
+        if (this.id == 'transferTab' && !transferInfo_loaded) {
             setupLoading();
             displayTransferInfo(handleTransferInfoErr);
             transferInfo_loaded = true;
@@ -63,7 +64,7 @@ $(document).ready(function() {
         mySpinner = new Spinner(opts).spin(target);
     };
 
-    function removeLoading(){
+    function removeLoading() {
         mySpinner.stop();
     }
 
@@ -102,7 +103,7 @@ $(document).ready(function() {
     /**
      * Task search form listener - the starting point of control flow.
      */
-    $("#task-search-form").submit(function(e) {
+    $("#task-search-form").submit(function (e) {
         e.preventDefault();
 
         //Trimming whitespaces from the search field
@@ -133,7 +134,7 @@ $(document).ready(function() {
      * Task search form clear button listener - clears the field when the button
      * is pressed.
      */
-    $("#clear-button").click(function() {
+    $("#clear-button").click(function () {
         $("#task-search-form-input").val("");
     })
 
@@ -143,7 +144,7 @@ $(document).ready(function() {
      */
     function loadGlobalDataFromTaskInfo() {
         userWebDir = "", username = "", cacheUrl = "", scriptExe = "", inputDataset = "",
-        outputDataset = "";
+            outputDataset = "";
 
         if (taskInfo != undefined && taskInfo != "") {
             for (var i = 0; i < taskInfo.desc.columns.length; i++) {
@@ -179,7 +180,7 @@ $(document).ready(function() {
                         // ['/A/B/C']
                         re = /\['(.+)'\]/;
                         if (taskInfo.result[i] !== "None") {
-                           outputDataset = taskInfo.result[i].replace('b\'','\'').match(re)[1];
+                            outputDataset = taskInfo.result[i].replace('b\'', '\'').match(re)[1];
                         }
                         break;
                     default:
@@ -200,7 +201,7 @@ $(document).ready(function() {
 
         function queryApi(url) {
             $.ajax(url)
-                .done(function(data) {
+                .done(function (data) {
                     // Storing the data for the use of other display functions
                     taskInfo = data;
 
@@ -212,7 +213,7 @@ $(document).ready(function() {
                     loadOtherData();
 
                 })
-                .fail(function(xhr) {
+                .fail(function (xhr) {
                     var headers = xhr.getAllResponseHeaders().toLowerCase();
                     errHandler(new ServerError(headers));
                     loadOtherData();
@@ -246,12 +247,12 @@ $(document).ready(function() {
         }
 
         $.ajax(proxiedWebDirUrl + "/debug/crabConfig.py")
-            .done(function(data) {
+            .done(function (data) {
                 $("#task-config-paragraph").text(data);
             });
 
         $.ajax(proxiedWebDirUrl + "/debug/originalPSet.py")
-            .done(function(data) {
+            .done(function (data) {
                 $("#task-pset-paragraph").text(data);
             });
 
@@ -261,17 +262,17 @@ $(document).ready(function() {
 
     function queryWebDirProxyApi() {
         $.ajax(webDirProxyApiUrl + inputTaskName)
-            .done(function(data) {
+            .done(function (data) {
                 proxiedWebDirUrl = data.result[0];
 
                 if (proxiedWebDirUrl === undefined || proxiedWebDirUrl == "None") {
                     proxiedWebDirUrl = "";
                 }
             })
-            .fail(function(xhr) {
+            .fail(function (xhr) {
                 proxiedWebDirUrl = "";
             })
-            .complete(function(xhr) {
+            .complete(function (xhr) {
                 displayConfigAndPSet(handleConfigPSetErr);
                 displayScriptExe(handleScriptExeErr);
                 displayMainPage(handleMainErr);
@@ -288,22 +289,21 @@ $(document).ready(function() {
             errHandler(new TaskInfoUndefinedError());
             return;
         }
-        var S3,url;
-        if(cacheUrl.indexOf("S3")!=-1)
-            S3=true;
+        var S3, url;
+        if (cacheUrl.indexOf("S3") != -1)
+            S3 = true;
         else
-            S3=false;
+            S3 = false;
 
-        if(S3==true)
-            url= window.location.origin + "/crabserver/" + dbVersion + "/cache?subresource=download&objecttype=twlog&taskname="+inputTaskName;
+        if (S3 == true)
+            url = window.location.origin + "/crabserver/" + dbVersion + "/cache?subresource=download&objecttype=twlog&taskname=" + inputTaskName;
         else
             url = cacheUrl + "/logfile?name=" + inputTaskName + "_TaskWorker.log&username=" + username;
 
         function queryApi(url) {
             $.ajax(url)
-                .done(function(data) {
-                    if(S3==true)
-                    {
+                .done(function (data) {
+                    if (S3 == true) {
                         $("#taskworker-log-error-box").css("display", "inherit").text("Please click on below(TaskWorker log) link");
                         $("#taskworker-log-link").attr("href", data.result);
                     }
@@ -311,7 +311,7 @@ $(document).ready(function() {
                         $("#taskworker-log-paragraph").text(data);
 
                 })
-                .fail(function(xhr) {
+                .fail(function (xhr) {
                     var headers = xhr.getAllResponseHeaders().toLowerCase();
                     errHandler(new ServerError(headers));
                 });
@@ -330,29 +330,28 @@ $(document).ready(function() {
             errHandler(new TaskInfoUndefinedError());
             return;
         }
-        var S3,url;
-        if(cacheUrl.indexOf("S3")!=-1)
-             S3=true;
+        var S3, url;
+        if (cacheUrl.indexOf("S3") != -1)
+            S3 = true;
         else
-            S3=false;
-        if(S3==true)
-            url= window.location.origin  + "/crabserver/" + dbVersion + "/cache?subresource=download&objecttype=clientlog&taskname="+inputTaskName;
+            S3 = false;
+        if (S3 == true)
+            url = window.location.origin + "/crabserver/" + dbVersion + "/cache?subresource=download&objecttype=clientlog&taskname=" + inputTaskName;
         else
             url = cacheUrl + "/logfile?name=" + inputTaskName + ".log&username=" + username;
 
         function queryApi(url) {
             $.ajax(url)
-                .done(function(data) {
-                if(S3==true)
-                {
-                    $("#upload-log-error-box").css("display", "inherit").text("Please click on below(Upload log) link");
-                    $("#upload-log-link").attr("href", data.result);
-                }
-                else
-                    $("#upload-log-paragraph").text(data);
+                .done(function (data) {
+                    if (S3 == true) {
+                        $("#upload-log-error-box").css("display", "inherit").text("Please click on below(Upload log) link");
+                        $("#upload-log-link").attr("href", data.result);
+                    }
+                    else
+                        $("#upload-log-paragraph").text(data);
 
                 })
-                .fail(function(xhr) {
+                .fail(function (xhr) {
                     var headers = xhr.getAllResponseHeaders().toLowerCase();
                     errHandler(new ServerError(headers));
                 });
@@ -385,7 +384,7 @@ $(document).ready(function() {
         }
 
         $.ajax(proxiedWebDirUrl + "/debug/" + scriptExe)
-            .done(function(data) {
+            .done(function (data) {
                 $("#script-exe-paragraph").text(data);
             });
 
@@ -404,32 +403,32 @@ $(document).ready(function() {
         var tr_state = ["NEW", "ACQUIRED", "FAILED", "DONE", "RETRY", "SUBMITTED", "KILL", "KILLED"]
 
         function label(state) {
-           switch (state) {
-               case "NEW":
-               case "ACQUIRED":
-                   return "<span class='label label-info'>" + state + "</span>"
-               case "SUBMITTED":
-                   return "<span class='label label-warning'>" + state + "</span>"
-               case "FAILED":
-               case "RETRY":
-                   return "<span class='label label-danger'>" + state + "</span>"
-               case "DONE":
-                   return "<span class='label label-success'>" + state + "</span>"
-               case "KILL":
-               case "KILLED":
-                   return "<span class='label label-default'>" + state + "</span>"
+            switch (state) {
+                case "NEW":
+                case "ACQUIRED":
+                    return "<span class='label label-info'>" + state + "</span>"
+                case "SUBMITTED":
+                    return "<span class='label label-warning'>" + state + "</span>"
+                case "FAILED":
+                case "RETRY":
+                    return "<span class='label label-danger'>" + state + "</span>"
+                case "DONE":
+                    return "<span class='label label-success'>" + state + "</span>"
+                case "KILL":
+                case "KILLED":
+                    return "<span class='label label-default'>" + state + "</span>"
 
-           }
+            }
         };
 
         function queryApi(url) {
             $.ajax(url)
-                .done(function(data) {
+                .done(function (data) {
                     // Storing the data for the use of other display functions
                     taskInfo = data;
                     // Creating table contents
                     var index = {}
-                    var content =[]
+                    var content = []
 
                     for (i = 0; i < data.desc.columns.length; i++) {
                         index[data.desc.columns[i]] = i
@@ -440,31 +439,32 @@ $(document).ready(function() {
                     var doc_url = ''
                     var doc_href = ''
 
-                    var state = {DONE:0,
-                                 NEW:0,
-                                 ACQUIRED:0,
-                                 SUBMITTED:0,
-                                 RETRY:0,
-                                 FAILED:0,
-                                 KILL:0,
-                                 KILLED:0,
-                        }
+                    var state = {
+                        DONE: 0,
+                        NEW: 0,
+                        ACQUIRED: 0,
+                        SUBMITTED: 0,
+                        RETRY: 0,
+                        FAILED: 0,
+                        KILL: 0,
+                        KILLED: 0,
+                    }
                     transtable.clear();
                     transtable.colReorder.reset();
                     for (k = 0; k < data.result.length; k++) {
                         doc_url = get_doc_url + data.result[k][index["tm_id"]]
                         doc_href = "<a href=" + doc_url + "> " + data.result[k][index["tm_id"]] + " </a>"
                         fts_href = null
-                        if (data.result[k][index["tm_fts_instance"]]){
+                        if (data.result[k][index["tm_fts_instance"]]) {
                             if (data.result[k][index["tm_aso_worker"]] === "rucio") {
                                 fts_href = "<a href=" +
                                     "https://cms-rucio-webui.cern.ch/rule?rule_id=" +
                                     data.result[k][index["tm_fts_id"]] + "> " +
                                     data.result[k][index["tm_fts_id"]] +
                                     " </a>"
-                            }  else {
+                            } else {
                                 fts_href = "<a href=" +
-                                    data.result[k][index["tm_fts_instance"]].replace("8446","8449") +
+                                    data.result[k][index["tm_fts_instance"]].replace("8446", "8449") +
                                     "/fts3/ftsmon/#/job/" +
                                     data.result[k][index["tm_fts_id"]] + "> " +
                                     data.result[k][index["tm_fts_id"]] +
@@ -479,40 +479,40 @@ $(document).ready(function() {
                         ]
                         state[tr_state[data.result[k][index["tm_transfer_state"]]]] += 1
                         duration = null
-                        if(data.result[k][index["tm_transfer_state"]] == 3){
-                           var duration = (data.result[k][index["tm_last_update"]] - data.result[k][index["tm_start_time"]])/60
+                        if (data.result[k][index["tm_transfer_state"]] == 3) {
+                            var duration = (data.result[k][index["tm_last_update"]] - data.result[k][index["tm_start_time"]]) / 60
                         }
 
                         if (duration) content.push(duration.toFixed(0))
                         content.push(duration)
 
-                        transtable.row.add( content )//.draw()
+                        transtable.row.add(content)//.draw()
 
                     }
 
                     transtable.columns.adjust().draw();
 
                     // update progress bar
-                    if(data.result.length > 0){
-                        var percentage = 100*state["DONE"]/parseFloat(data.result.length)
-                        $('#completed').width(percentage+"%")
-                        percentage = 100*state["NEW"]/parseFloat(data.result.length)
-                        percentage += 100*state["ACQUIRED"]/parseFloat(data.result.length)
-                        $('#new').width(percentage+"%")
-                        percentage = 100*state["SUBMITTED"]/parseFloat(data.result.length)
-                        $('#submitted').width(percentage+"%")
-                        percentage = 100*state["RETRY"]/parseFloat(data.result.length)
-                        percentage += 100*state["FAILED"]/parseFloat(data.result.length)
-                        $('#failed').width(percentage+"%")
-                        percentage = 100*state["KILL"]/parseFloat(data.result.length)
-                        percentage += 100*state["KILLED"]/parseFloat(data.result.length)
-                        $('#killed').width(percentage+"%")
+                    if (data.result.length > 0) {
+                        var percentage = 100 * state["DONE"] / parseFloat(data.result.length)
+                        $('#completed').width(percentage + "%")
+                        percentage = 100 * state["NEW"] / parseFloat(data.result.length)
+                        percentage += 100 * state["ACQUIRED"] / parseFloat(data.result.length)
+                        $('#new').width(percentage + "%")
+                        percentage = 100 * state["SUBMITTED"] / parseFloat(data.result.length)
+                        $('#submitted').width(percentage + "%")
+                        percentage = 100 * state["RETRY"] / parseFloat(data.result.length)
+                        percentage += 100 * state["FAILED"] / parseFloat(data.result.length)
+                        $('#failed').width(percentage + "%")
+                        percentage = 100 * state["KILL"] / parseFloat(data.result.length)
+                        percentage += 100 * state["KILLED"] / parseFloat(data.result.length)
+                        $('#killed').width(percentage + "%")
                     }
 
-                removeLoading();
+                    removeLoading();
 
                 })
-                .fail(function(xhr) {
+                .fail(function (xhr) {
                     var headers = xhr.getAllResponseHeaders().toLowerCase();
                     errHandler(new ServerError(headers));
                     removeLoading();
@@ -523,22 +523,22 @@ $(document).ready(function() {
     }
 
     $('#transfer-table tbody').on('click', 'tr', function () {
-        var data = transtable.row( this ).data();
+        var data = transtable.row(this).data();
         url = docInfo + data[1]
 
         function queryApi(url) {
             $.ajax(url)
-                .done(function(data) {
+                .done(function (data) {
                     // Creating table contents
                     var content = ''
 
                     doctable.clear();
                     for (i = 0; i < data.desc.columns.length; i++) {
-                             doctable.row.add( [data.desc.columns[i],data.result[0][i]] ).draw()
+                        doctable.row.add([data.desc.columns[i], data.result[0][i]]).draw()
                     }
 
                 })
-                .fail(function(xhr) {
+                .fail(function (xhr) {
                     var headers = xhr.getAllResponseHeaders().toLowerCase();
                     errHandler(new ServerError(headers));
                 })
@@ -546,34 +546,34 @@ $(document).ready(function() {
         };
         queryApi(url);
 
-    } );
+    });
 
     /**
      * Add filter for each column
      */
 
-    transtable.columns().every( function () {
+    transtable.columns().every(function () {
         var that = this;
 
-        $( 'input', this.footer() ).on( 'keyup change', function () {
-            if ( that.search() !== this.value ) {
+        $('input', this.footer()).on('keyup change', function () {
+            if (that.search() !== this.value) {
                 that
-                    .search( this.value )
+                    .search(this.value)
                     .draw();
             }
-        } );
+        });
 
         // set searchbox width
-        $( 'input', this.footer() ).each( function () {
-            if(this.placeholder=="File ID") this.style["width"] = "300px";
-            else if(this.placeholder=="Transfer State") this.style["width"] = "120px";
-            else if(this.placeholder=="Duration [min]") this.style["width"] = "120px";
-            else if(this.placeholder=="") this.style["width"] = "120px";
+        $('input', this.footer()).each(function () {
+            if (this.placeholder == "File ID") this.style["width"] = "300px";
+            else if (this.placeholder == "Transfer State") this.style["width"] = "120px";
+            else if (this.placeholder == "Duration [min]") this.style["width"] = "120px";
+            else if (this.placeholder == "") this.style["width"] = "120px";
 
-         }
+        }
         );
 
-    } );
+    });
     /**
      * Displays main page information - sets correct links and loads task status
      */
@@ -581,7 +581,7 @@ $(document).ready(function() {
         if (userWebDir !== "" && inputTaskName !== "" && inputTaskName !== undefined) {
 
             var monitDashboardUrl = "https://monit-grafana.cern.ch/d/cmsTMDetail/cms-task-monitoring-task-view?orgId=11" +
-                "&var-user=" + username + "&var-task=" + inputTaskName + "&from=" + (taskTimestampToEpoch(inputTaskName)-(3600*1000)) +
+                "&var-user=" + username + "&var-task=" + inputTaskName + "&from=" + (taskTimestampToEpoch(inputTaskName) - (3600 * 1000)) +
                 "&to=now";
 
             var dasInputUrl = "https://cmsweb.cern.ch/das/request?view=list&limit=50&instance=" + dbsInstance + "&input=" + inputDataset;
@@ -646,7 +646,7 @@ $(document).ready(function() {
 
             function queryApi(url) {
                 $.ajax(url)
-                    .done(function(data) {
+                    .done(function (data) {
                         var obj = data.result[0];
                         printOutput(obj);
                     })
@@ -783,7 +783,7 @@ $(document).ready(function() {
         }
     }
 
-    function handleScriptExeCallbackErr(err){
+    function handleScriptExeCallbackErr(err) {
         $("#script-exe-error-box").css("display", "inherit").text(err ? err : xhr.status);
     }
 
@@ -874,9 +874,6 @@ $(document).ready(function() {
             case "cmsweb-testbed.cern.ch":
                 $("#db-selector-box").val("preprod");
                 break;
-            case "cmsweb-test11.cern.ch":
-                $("#db-selector-box").val("devtwo");
-                break;
             case "cmsweb-test12.cern.ch":
                 $("#db-selector-box").val("devthree");
                 break;
@@ -898,8 +895,6 @@ $(document).ready(function() {
                 return "prod";
             case "cmsweb-testbed.cern.ch":
                 return "preprod";
-            case "cmsweb-test11.cern.ch":
-                return "devtwo";
             case "cmsweb-test12.cern.ch":
                 return "devthree";
             default:
@@ -919,7 +914,7 @@ $(document).ready(function() {
         var dbVersionIndex = $.inArray("dbver", urlArray);
 
         if (dbVersionIndex != -1 && urlArray.length > dbVersionIndex && urlArray[dbVersionIndex + 1] !== ""
-                && $.inArray(urlArray[dbVersionIndex + 1], DB_VERSIONS) !== -1) {
+            && $.inArray(urlArray[dbVersionIndex + 1], DB_VERSIONS) !== -1) {
             dbVersion = urlArray[dbVersionIndex + 1];
             $("#db-selector-box").val(dbVersion);
         } else {

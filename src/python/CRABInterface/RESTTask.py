@@ -250,7 +250,7 @@ class RESTTask(RESTEntity):
 
     def counttasksbyuserandstatus(self, **kwargs):
         """Count jobs for every user and status in the last :minutes
-           curl -X GET 'https://cmsweb-test11.cern.ch/crabserver/dev/task?subresource=counttasksbyuserandstatus&minutes=100'\
+           curl -X GET 'https://cmsweb-test2.cern.ch/crabserver/dev/task?subresource=counttasksbyuserandstatus&minutes=100'\
                         --cert $X509_USER_PROXY --key $X509_USER_PROXY
         """
         if 'minutes' not in kwargs or not kwargs['minutes']:
