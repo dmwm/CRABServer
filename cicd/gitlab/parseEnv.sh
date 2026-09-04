@@ -2,7 +2,7 @@
 
 # Parse deployment env from tag.
 # - If match regexp `^pypi-(<env1>|<env2>|...)-.*`, set ENV_NAME to the string
-#   in group. Valide env are preprod/test2/test2
+#   in group. Valid env are preprod/test2/test2
 # - If match release tag (e.g., v3.240501), set ENV_NAME to preprod.
 # Also allow override ENV_NAME (from push option or WebUI)
 
