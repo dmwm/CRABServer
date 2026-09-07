@@ -2200,11 +2200,6 @@ class PostJob():
                 msg = "There was at least one permanent stageout error; user will need to resubmit."
                 self.logger.error(msg)
                 self.set_dashboard_state('FAILED', exitCode=ASOExitCode)
-                ## OUCH this removes job from queue !! so the following tagAllJobsInTask will not work
-                #self.set_state_ClassAds('FAILED', exitCode=ASOExitCode)
-                # let's do the pedantic and safe way instead
-                self.schedd.edit([self.dag_jobid], 'JobExitCode', str(ASOExitCode))
-                self.schedd.edit([self.dag_jobid], 'CRAB_PostJobStatus', "FAILED")
                 self.recordPermanentStageoutError(exitCode=ASOExitCode)
                 self.logger.info("====== Finished to check for ASO transfers.")
                 if self.tooManyPermanentStageoutErrors():
@@ -2216,6 +2211,7 @@ class PostJob():
                             self.sendMaxFatalAsoMailToOperators()
                         self.logger.info("Tag Jobs as ForcefullyTerminated")
                         self.tagAllJobsInTask(ad='CRAB_ForcefullyTerminated', value='DryASO')
+                        self.set_state_ClassAds('FAILED', exitCode=ASOExitCode)
                         return JOB_RETURN_CODES.FATAL_ERROR, retmsg, ASOExitCode
                     # abort DAG, kill task and tag jobs
                     self.logger.error("**** Too Many Fatal ASO errors. Abort DAG and kill task ****")
@@ -2229,7 +2225,9 @@ class PostJob():
                     retmsg += '\ntoo Many Fatal ASO errors. Abort task DAG'
                     if self.maxFatalAsoNotificationMail:
                         self.sendMaxFatalAsoMailToOperators()
+                    self.set_state_ClassAds('FAILED', exitCode=ASOExitCode)
                     return JOB_RETURN_CODES.DAG_ABORT, retmsg, ASOExitCode
+                self.set_state_ClassAds('FAILED', exitCode=ASOExitCode)
                 return JOB_RETURN_CODES.FATAL_ERROR, retmsg, ASOExitCode
             except RecoverableStageoutError as rse:
                 retmsg = "Got recoverable stageout exception:\n%s" % (str(rse))
