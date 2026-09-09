@@ -17,6 +17,13 @@ import classad2 as classad
 
 JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERROR DAG_ABORT DEFER')(0, 1, 2, 3, 4)
 
+# below this much CPU a segfault is more likely environment than user code
+SEGFAULT_CPU_THRESHOLD = 300 # Seconds
+SEGFAULT_RES = [
+    re.compile(r"== CMSSW:\s+A fatal system signal has occurred: segmentation violation"),
+    re.compile(r"== CMSSW:\s+\*\*\* Break \*\*\* segmentation violation"),
+]
+
 # ----------------------------------------------------------------------
 # Exit-code dependent retry policy
 # ----------------------------------------------------------------------
@@ -26,7 +33,7 @@ EXIT_RETRY_POLICY = {
     # if a new string is added as key, code which uses this muzt be changed or will raise ValueError
     1: {"type": "recoverable", "delay": 900, "msg": "Job failed w/o messages; likely a worker node issue."},
     50513: {"type": "recoverable", "delay": 900, "msg": "Job did not find functioning CMSSW on worker node."},
-    50115: {"type": "recoverable", "delay": 900, "msg": "Job did not produce a FJR; will retry.", "increase_memory": True, "memory_factor": 1.3},
+    50115: {"type": "recoverable", "delay": 900, "msg": "Job did not produce a FJR; will retry.", "increase_memory": True, "memory_factor": 1.3, "handler": "handle_missing_fjr"},
     137: {"type": "recoverable", "delay": 900, "msg": "SIGKILL; likely an unrelated batch system kill."},
     10034: {"type": "recoverable", "delay": 900, "msg": "Required application version not found at the site."},
     10040: {"type": "recoverable", "delay": 900, "msg": "Site Error: failed to generate cmsRun cfg file at runtime."},
@@ -171,6 +178,35 @@ class RetryJob():
         with open(retry_info_file + ".tmp", "w", encoding="utf-8") as fd:
             fd.write(str(retry_info))
         os.rename(retry_info_file + ".tmp", retry_info_file)
+
+    # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+    def handle_missing_fjr(self, exitCode):
+        """
+        50115: no FJR was produced. If the job segfaulted after doing real work,
+        relabel as 50117 (fatal, application) instead of retrying.
+        Anything else falls through to the normal recoverable route.
+        """
+        segfault = False
+        try:
+            fname = os.path.realpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
+            with open(fname, encoding='utf-8') as fd:
+                for line in fd:
+                    if any(r.search(line) for r in SEGFAULT_RES):
+                        segfault = True
+                        break
+        except Exception:  # pylint: disable=broad-except
+            self.logger.error("Error scanning job stdout for segfault")
+
+        cpuSeconds = int(self.ad.get("RemoteUserCpu", 0)) + int(self.ad.get("RemoteSysCpu", 0))
+        self.logger.info(f"ec {exitCode}: segfault={segfault} cpu={cpuSeconds}s")
+
+        if segfault and cpuSeconds > SEGFAULT_CPU_THRESHOLD:
+            exitMsg = ("Application terminated by itself with a segmentation violation"
+                       f" after {cpuSeconds}s of CPU time."
+                       " This points at the application code or the input data, not at the site."
+                       " Not retrying; please debug and resubmit.")
+            self.create_fake_fjr(exitMsg, 50117, 50117)
 
     # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
