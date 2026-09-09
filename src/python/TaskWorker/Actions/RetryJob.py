@@ -205,7 +205,7 @@ class RetryJob():
             exitMsg = ("Application terminated by itself with a segmentation violation"
                        f" after {cpuSeconds}s of CPU time."
                        " This points at the application code or the input data, not at the site."
-                       " Not retrying; please debug and resubmit.")
+                       " Not retrying; please debug and submit a new task.")
             self.create_fake_fjr(exitMsg, 50117, 50117)
 
     # = = = = = RetryJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
