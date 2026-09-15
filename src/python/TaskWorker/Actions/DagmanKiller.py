@@ -88,6 +88,7 @@ class DagmanKiller(TaskAction):
 
         try:
             self.schedd.act(htcondor.JobAction.Remove, rootConst)
+            self.schedd.edit(jobConst, "JobExitCode", classad.quote(50667))  # 50667 = removed by CRAB
             self.schedd.act(htcondor.JobAction.Remove, jobConst)
         except  Exception as hte:
             msg = "The CRAB server backend was not able to kill the task,"
