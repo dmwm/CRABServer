@@ -3022,7 +3022,7 @@ class PostJob():
                                    Not setting exitcode for dashboard. Continuing normally.", e)
         # If Exit Code is defined we report only it. It is the final exit Code of the job
         elif exitCode:
-            self.logger.debug("Dashboard exit code is defined by Postjob execution.")
+            self.logger.debug("Dashboard exit code %s is defined by Postjob execution.", exitCode)
             params['JobExitCode'] = exitCode
         else:
             self.logger.debug("Dashboard exit code already set on the worker node. Continuing normally.")
