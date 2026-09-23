@@ -590,8 +590,8 @@ def main():
     crabserver = CRABRest(host, localcert=cert, localkey=cert, retry=3, userAgent='CRABSchedd')
     crabserver.setDbInstance(dbInstance)
 
-    printLog("Sleeping 60 seconds to give TW time to update taskDB")
-    time.sleep(60)  # give TW time to update taskDB #8411
+    printLog("Sleeping 30 seconds to give TW time to update taskDB")
+    time.sleep(30)  # give TW time to update taskDB #8411
 
     # get task info
     task = ad['CRAB_ReqName']
