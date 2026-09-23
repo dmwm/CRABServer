@@ -2981,7 +2981,8 @@ class PostJob():
                     self.schedd.edit([self.dag_jobid], param, str(params[param]))
                 self.schedd.edit([self.dag_jobid], 'CRAB_PostJobLastUpdate', str(time.time()))
                 # Once ClassAd state attributes have been updated, let HTCondor remove the job from the queue
-                self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree("false"))
+                leaveTime = int(time.time()) + 30 * 60  # 30 minutes from now
+                self.schedd.edit([self.dag_jobid], "LeaveJobInQueue", classad.ExprTree(f"time() < {leaveTime}"))
                 self.logger.info("       -----> Finished %s -----", msg)
                 self.logger.info("====== Finished to update job ClassAd.")
                 break
