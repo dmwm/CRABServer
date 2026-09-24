@@ -256,6 +256,15 @@ EOF
 
         chmod +x task_process/task_proc_wrapper.sh
         condor_submit task_process/daemon.jdl
+        if [ $? -ne 0 ]; then
+          echo "submission of task process failed, wait 30 sec and try again"
+          sleep 30
+          condor_submit task_process/daemon.jdl
+          if [ $? -ne 0 ]; then
+            echo "too bad. Abort here"
+            exit 1
+          fi
+        fi
     else
         echo "task_process/task_process_running found, not submitting the daemon task"
     fi
