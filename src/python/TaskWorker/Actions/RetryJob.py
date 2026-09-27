@@ -19,10 +19,8 @@ JOB_RETURN_CODES = namedtuple('JobReturnCodes', 'OK RECOVERABLE_ERROR FATAL_ERRO
 
 # below this much CPU a segfault is more likely environment than user code
 SEGFAULT_CPU_THRESHOLD = 300 # Seconds
-SEGFAULT_RES = [
-    re.compile(r"== CMSSW:\s+A fatal system signal has occurred: segmentation violation"),
-    re.compile(r"== CMSSW:\s+\*\*\* Break \*\*\* segmentation violation"),
-]
+# exact message details may change with SW versions/tools, so keep the match loose
+SEGFAULT_RE = re.compile(r"segmentation violation|segfault", re.IGNORECASE)
 
 # ----------------------------------------------------------------------
 # Exit-code dependent retry policy
@@ -192,7 +190,7 @@ class RetryJob():
             fname = os.path.realpath("WEB_DIR/job_out.%s.%d.txt" % (self.job_id, self.crab_retry))
             with open(fname, encoding='utf-8') as fd:
                 for line in fd:
-                    if any(r.search(line) for r in SEGFAULT_RES):
+                    if SEGFAULT_RE.search(line):
                         segfault = True
                         break
         except Exception:  # pylint: disable=broad-except
