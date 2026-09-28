@@ -42,6 +42,7 @@ def addJobSubmitInfoToDagJobJDL(dagJdl, jobSubmit):
         'My.CRAB_Workflow',
         'My.CRAB_UserDN',
         'My.CRAB_UserHN',
+        'My.CRAB_UserEmail',
         # these are used in Pre/Post scripts
         'My.CMS_JobType',
         'My.CRAB_JobSW',

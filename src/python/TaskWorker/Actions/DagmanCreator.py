@@ -216,6 +216,34 @@ class DagmanCreator(TaskAction):
         self.rucioClient = rucioClient
         self.runningInTW = crabserver is not None
         self.task = None  # it will be filled later in execute() or createSubdag() depending who is using it
+        self.resourceCatalog = None  # CRICService, created lazily in getUserEmail() (TaskWorker only)
+
+    def getUserEmail(self, username):
+        """
+        Look up the user's e-mail in CRIC (by CMS username). Used to fill the
+        CRAB_UserEmail classAd, see https://github.com/dmwm/CRABServer/issues/9422
+        Never raises: any failure is logged and an empty string is returned, so
+        that a CRIC glitch can not prevent task submission.
+        returns: a string, possibly empty
+        """
+        if not self.runningInTW:
+            # on the schedd (PreDAG) there is no CMSWEB credential to talk to CRIC, and
+            # Job.submit already exists anyhow, so we never get here. Be safe.
+            return ""
+        try:
+            if self.resourceCatalog is None:
+                # import here to keep the (schedd-side) import chain of this module unchanged
+                from TaskWorker.WorkerUtilities import CRICService  # pylint: disable=import-outside-toplevel
+                with self.config.TaskWorker.envForCMSWEB:
+                    self.resourceCatalog = CRICService(logger=self.logger,
+                                                       configDict={"cacheduration": 1, "pycurl": True, "usestalecache": True})
+            email = self.resourceCatalog.userNameEmail(username)
+        except Exception as ex:  # pylint: disable=broad-except
+            self.logger.warning("Could not retrieve e-mail for user %s from CRIC: %s", username, ex)
+            return ""
+        if not email:
+            self.logger.warning("No e-mail found in CRIC for user %s", username)
+        return email
 
     def populateGlideinMatching(self):
         """ actually simply set the required arch and microarch
@@ -360,6 +388,9 @@ class DagmanCreator(TaskAction):
 
         jobSubmit['My.CRAB_UserDN'] = classad.quote(task['tm_user_dn'])
         jobSubmit['My.CRAB_UserHN'] = classad.quote(task['tm_username'])
+        # user e-mail comes solely from CRIC (x509UserProxyEmail is not always defined, depends on the CA)
+        userEmail = self.getUserEmail(task['tm_username'])
+        jobSubmit['My.CRAB_UserEmail'] = classad.quote(userEmail) if userEmail else 'undefined'
         jobSubmit['My.CRAB_AsyncDest'] = classad.quote(task['tm_asyncdest'])
         jobSubmit['My.CRAB_StageoutPolicy'] = classad.quote(task['stageoutpolicy'])
         # for VOMS role and group, PostJob and RenewRemoteProxies code want the undefined value, not "

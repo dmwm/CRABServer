@@ -142,3 +142,21 @@ class CRICService(CRIC):
     def PNNstoPSNs(self, *args, **kwargs):
         """ maps PhexedNodeNames (i.e. RSE's) to ProcessingSiteNames (i.e. sites) """
         return super().PNNstoPSNs(*args, **kwargs)
+
+    @suppressExternalServiceLogging
+    def userNameEmail(self, username):
+        """
+        Map a CMS (CERN) username to the e-mail address registered in CRIC.
+        Uses the same "people" preset of /api/accounts/user/query/ that
+        WMCore's CRIC.userNameDn() relies on, i.e.
+          https://cms-cric.cern.ch/api/accounts/user/query/?json&preset=people
+        The result is cached by WMCore's Service class (see cacheduration).
+        :param username: string with the CMS username
+        :return: a string with the user's e-mail, or an empty string if
+                 the user is not found or has no e-mail in CRIC
+        """
+        userinfo = self._CRICUserQuery('people')
+        for x in userinfo:
+            if x.get('username') == username:
+                return x.get('email') or ""
+        return ""
