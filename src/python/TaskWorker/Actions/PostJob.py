@@ -1388,7 +1388,7 @@ class PostJob():
         self.maxFatalAsoNotificationMail = getattr(config.TaskWorker, 'maxFatalAsoNotificationMail', None)
         # Safety lock for the user notification (recipient = CRAB_UserEmail classAd, filled from
         # CRIC by DagmanCreator, see #9422). False (default): the mail is only written to the
-        # PostJob log as "Firing email: <address>". True: it is really handed to /usr/bin/mail.
+        # PostJob log as "Sending email to <address>". True: it is really handed to /usr/bin/mail.
         # Flip to False at any time if users turn out to be flooded. See #9419
         self.maxFatalAsoSendUserMail = getattr(config.TaskWorker, 'maxFatalAsoSendUserMail', False)
         self.asoSummaryFile = "aso_summary.json"
@@ -3160,26 +3160,32 @@ class PostJob():
             with open(fName, 'w') as fd:
                 json.dump(asoStats, fd)
 
-    def recordMaxFatalAsoMailSent(self, key='mailSent'):
-        """ note down that mail was sent, do not send more than once !
-            key: 'mailSent' for the operators mail (historical name),
-                 'userMailSent' for the user notification
+    def recordMaxFatalAsoMailsSent(self, operatorMail=False, userMail=False):
+        """ note down which mails were sent, do not send more than once !
+            single read+write of the status file to limit I/O. No lock needed:
+            only called inside handleTooManyFatalAsoErrors which has its own
+            lock against concurrent execution in other PostJobs
+            operatorMail, userMail: True when that mail was sent
         """
+        if not (operatorMail or userMail):
+            return
         fName = self.asoSummaryFile
-        with getLock(fName):
-            with open(fName, 'r') as fd:
-                asoStats = json.load(fd)
-            asoStats[key] = True
-            with open(fName, 'w') as fd:
-                json.dump(asoStats, fd)
+        with open(fName, 'r') as fd:
+            asoStats = json.load(fd)
+        if operatorMail:
+            asoStats['operatorMailSent'] = True
+        if userMail:
+            asoStats['userMailSent'] = True
+        with open(fName, 'w') as fd:
+            json.dump(asoStats, fd)
 
-    def maxFatalAsoMailAlreadySent(self, key='mailSent'):
-        """ see recordMaxFatalAsoMailSent for the meaning of key """
+    def maxFatalAsoMailAlreadySent(self, key='operatorMailSent'):
+        """ see recordMaxFatalAsoMailsSent for the meaning of key. No lock needed:
+            only called inside handleTooManyFatalAsoErrors which has its own lock """
         fName = self.asoSummaryFile
-        with getLock(fName):
-            with open(fName, 'r') as fd:
-                asoStats = json.load(fd)
-            return asoStats.get(key, False)
+        with open(fName, 'r') as fd:
+            asoStats = json.load(fd)
+        return asoStats.get(key, False)
 
     def tooManyPermanentStageoutErrors(self):
         """
@@ -3214,47 +3220,58 @@ class PostJob():
         jobsInTask = f"(jobuniverse==5||jobuniverse==7)&&CRAB_Reqname=={classad.quote(self.reqname)}"
         self.schedd.edit(jobsInTask, ad, classad.quote(value))
 
+    def getAsoSummary(self):
+        """ the ASO transfers summary paragraph, same in operators and user mail """
+        fName = self.asoSummaryFile
+        with getLock(fName):
+            with open(fName, 'r') as fd:
+                asoStats = json.load(fd)
+        nOK, nErr, nJobs = asoStats['nOK'], asoStats['nErrors'], asoStats['nJobs']
+        totAso = nOK + nErr
+        summary = f"\nJobs in task : {nJobs}"
+        summary += "\nASO summary:"
+        summary += "\n Relative"
+        summary += f"\n   OK    {nOK}/{totAso} = {nOK*100//totAso}%"
+        summary += f"\n   FAIL  {nErr}/{totAso} = {nErr*100//totAso}%"
+        summary += "\n Absolute"
+        summary += f"\n   OK    {nOK}/{nJobs} = {nOK*100//nJobs}%"
+        summary += f"\n   FAIL  {nErr}/{nJobs} = {nErr*100//nJobs}%"
+        return summary
+
+    def sendMail(self, recipient, subject, body):
+        """ hand an email to /usr/bin/mail
+            returns: True when the MTA accepted it, False otherwise
+        """
+        ret = subprocess.run(["/usr/bin/mail", "-s", subject, recipient],
+                             input=body, check=False, capture_output=True, encoding='utf-8')
+        if ret.returncode:
+            self.logger.error("Failed to send mail to %s", recipient)
+            self.logger.error("stdout: %s", ret.stdout)
+            self.logger.error("stderr: %s", ret.stderr)
+            return False
+        return True
+
     def sendMaxFatalAsoMailToOperators(self):
         """
         tell operators that we would kill Task now
+        returns: True when the mail was sent, False otherwise
         """
         if not self.maxFatalAsoNotificationMail:
-            return
+            return False
         dry = "DryRun mode !" if self.maxFatalAsoDryRun else "REAL KILL !"
         subject = f"{dry} Killing task due to maxFatalAso"
         recipient = f"{self.maxFatalAsoNotificationMail}@cern.ch"
         recipient = "stefano.belforte@cern.ch"
         body = f"Killing {self.reqname} in PostJob for crabId {self.job_id}.{self.crab_retry} on {os.uname()[1]}"
-        # build summary
-        fName = self.asoSummaryFile
-        with getLock(fName):
-            with open(fName, 'r') as fd:
-                asoStats = json.load(fd)
-        body += f"\nJobs in task : {asoStats['nJobs']}"
         body += f"\nKill Thresholds: nErrors {self.maxFatalAsoNumber}  "
         body += f"relFraction {self.maxFatalAsoRelativeFraction}  "
         body += f"absFraction {self.maxFatalAsoAbsoluteFraction}"
-        totAso = asoStats['nOK'] + asoStats['nErrors']
-        relativeOkPct = f"{asoStats['nOK']*100//totAso}"
-        relativeFailPct =f"{asoStats['nErrors']*100//totAso}"
-        absoluteOkPct =f"{asoStats['nOK']*100//asoStats['nJobs']}"
-        absoluteFailPct = f"{asoStats['nErrors']*100//asoStats['nJobs']}"
-        body += "\nASO summary:"
-        body += "\n Relative"
-        body += f"\n   OK    {asoStats['nOK']}/{totAso} = {relativeOkPct}%"
-        body += f"\n   FAIL  {asoStats['nErrors']}/{totAso} = {relativeFailPct}%"
-        body += "\n Absolute"
-        body += f"\n   OK    {asoStats['nOK']}/{asoStats['nJobs']} = {absoluteOkPct}%"
-        body += f"\n   FAIL  {asoStats['nErrors']}/{asoStats['nJobs']} = {absoluteFailPct}%"
-        ret = subprocess.run(["/usr/bin/mail", "-s", subject, recipient],
-                             input=body, text=True, check=False )
-        if ret.returncode:
-            self.logger.error("Failed to send mail to operators")
-            self.logger.error("stdout: %s", ret.stdout)
-            self.logger.error("stderr: %s", ret.stderr)
-        else:
-            self.logger.info("Mail sent to operators about task killing")
-            self.recordMaxFatalAsoMailSent()
+        body += self.getAsoSummary()
+        self.logger.info("Sending email to %s", recipient)
+        if not self.sendMail(recipient, subject, body):
+            return False
+        self.logger.info("Mail sent to operators about task killing")
+        return True
 
     def handleTooManyFatalAsoErrors(self, retCode, retMsg):
         """
@@ -3267,13 +3284,15 @@ class PostJob():
         """
         self.logger.error("**** Too Many Fatal ASO errors. ****")
         with getLock('actOnTooManyASOErrors'):
+            operatorMailSent = False
+            userMailSent = False
             if self.maxFatalAsoDryRun:
                 self.logger.error("**** If dry run were False, I would abort DAG and kill task ****")
-                # send msg to operators (only once per task) and go on normally
-                if self.maxFatalAsoNotificationMail and not self.maxFatalAsoMailAlreadySent():
-                    self.sendMaxFatalAsoMailToOperators()
+                # send msg to operators and user (each at most once per task) and go on normally
+                if not self.maxFatalAsoMailAlreadySent(key='operatorMailSent'):
+                    operatorMailSent = self.sendMaxFatalAsoMailToOperators()
                 if not self.maxFatalAsoMailAlreadySent(key='userMailSent'):
-                    self.sendMaxFatalAsoMailToUser(killed=False)
+                    userMailSent = self.sendMaxFatalAsoMailToUser(killed=False)
                 self.logger.info("Tag Jobs as ForcefullyTerminated")
                 self.tagAllJobsInTask(ad='CRAB_ForcefullyTerminated', value='DryASO')
             else:
@@ -3288,10 +3307,12 @@ class PostJob():
                 killMsg += "\nthat you have enough free disk space there"
                 killMsg += " before submitting again"
                 self.killThisTask(killMsg)
-                if self.maxFatalAsoNotificationMail:
-                    self.sendMaxFatalAsoMailToOperators()
+                if not self.maxFatalAsoMailAlreadySent(key='operatorMailSent'):
+                    operatorMailSent = self.sendMaxFatalAsoMailToOperators()
                 if not self.maxFatalAsoMailAlreadySent(key='userMailSent'):
-                    self.sendMaxFatalAsoMailToUser(killed=True)
+                    userMailSent = self.sendMaxFatalAsoMailToUser(killed=True)
+            # update the status file only once, after both mails have been sent/not-sent
+            self.recordMaxFatalAsoMailsSent(operatorMail=operatorMailSent, userMail=userMailSent)
         return retCode, retMsg
 
     def getUserEmailFromAd(self):
@@ -3319,11 +3340,12 @@ class PostJob():
         self.maxFatalAsoSendUserMail (default: only logged).
         killed: False when self.maxFatalAsoDryRun is on and the task lives on, so that we
                 do not tell the user their task is gone when it is not.
+        returns: True when the mail was sent (or logged in place of sending), False otherwise
         """
         recipient = self.getUserEmailFromAd()
         if not recipient:
             self.logger.warning("No CRAB_UserEmail in the job ad: can not notify the user")
-            return
+            return False
         if killed:
             subject = f"CRAB task {self.reqname} was killed: too many stageout failures"
             body = f"Dear {self.job_ad['CRAB_UserHN']},"
@@ -3340,37 +3362,19 @@ class PostJob():
         body += "\n\nFor reference, the failure was detected in PostJob for crabId"
         body += f" {self.job_id}.{self.crab_retry}."
         # same ASO summary as in the operators mail
-        fName = self.asoSummaryFile
-        with getLock(fName):
-            with open(fName, 'r') as fd:
-                asoStats = json.load(fd)
-        totAso = asoStats['nOK'] + asoStats['nErrors']
-        body += f"\nJobs in task : {asoStats['nJobs']}"
-        body += "\nASO summary:"
-        body += "\n Relative"
-        body += f"\n   OK    {asoStats['nOK']}/{totAso} = {asoStats['nOK']*100//totAso}%"
-        body += f"\n   FAIL  {asoStats['nErrors']}/{totAso} = {asoStats['nErrors']*100//totAso}%"
-        body += "\n Absolute"
-        body += f"\n   OK    {asoStats['nOK']}/{asoStats['nJobs']} = {asoStats['nOK']*100//asoStats['nJobs']}%"
-        body += f"\n   FAIL  {asoStats['nErrors']}/{asoStats['nJobs']} = {asoStats['nErrors']*100//asoStats['nJobs']}%"
+        body += self.getAsoSummary()
         body += f"\n\nIf you need help, please send an e-mail to {FEEDBACKMAIL}."
 
-        self.logger.info("Firing email: %s", recipient)
+        self.logger.info("Sending email to %s", recipient)
         self.logger.info("  subject: %s", subject)
         self.logger.info("  body:\n%s", body)
         if not self.maxFatalAsoSendUserMail:
             self.logger.info("maxFatalAsoSendUserMail is False: user mail NOT sent, only logged")
-            self.recordMaxFatalAsoMailSent(key='userMailSent')
-            return
-        ret = subprocess.run(["/usr/bin/mail", "-s", subject, recipient],
-                             input=body, text=True, check=False, capture_output=True)
-        if ret.returncode:
-            self.logger.error("Failed to send mail to user %s", recipient)
-            self.logger.error("stdout: %s", ret.stdout)
-            self.logger.error("stderr: %s", ret.stderr)
-        else:
-            self.logger.info("Mail sent to user %s about task killing", recipient)
-            self.recordMaxFatalAsoMailSent(key='userMailSent')
+            return True
+        if not self.sendMail(recipient, subject, body):
+            return False
+        self.logger.info("Mail sent to user %s about task killing", recipient)
+        return True
 
     # = = = = = PostJob = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
