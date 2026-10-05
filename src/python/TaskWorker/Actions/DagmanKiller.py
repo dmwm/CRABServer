@@ -61,8 +61,7 @@ class DagmanKiller(TaskAction):
             msg += f" Message from the scheduler: {exp}"
             self.logger.exception("%s: %s", self.workflow, msg)
             raise TaskWorkerException(msg) from exp
-        taskName = classad.quote(self.workflow)
-        const = f'(CRAB_ReqName =?= {taskName} && CRAB_DAGType=?="Job")'
+        const = f'(CRAB_ReqName =?= "{self.workflow}" && CRAB_DAGType=?="Job")'
 
         # Note that we can not send kills for jobs not in queue at this time; we'll need the
         # DAG FINAL node to be fixed and the node status to include retry number.
@@ -88,7 +87,7 @@ class DagmanKiller(TaskAction):
 
         try:
             self.schedd.act(htcondor.JobAction.Remove, rootConst)
-            self.schedd.edit(jobConst, "JobExitCode", classad.quote(50667))  # 50667 = removed by CRAB
+            self.schedd.edit(jobConst, "JobExitCode", "50667")  # 50667 = removed by CRAB
             self.schedd.act(htcondor.JobAction.Remove, jobConst)
         except  Exception as hte:
             msg = "The CRAB server backend was not able to kill the task,"
