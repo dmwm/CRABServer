@@ -24,7 +24,7 @@ class RenewRemoteProxies(BaseRecurringAction):
         renewer = CRAB3ProxyRenewer(config, self.logger)
         renewer.execute()
 
-MINPROXYLENGTH = 60 * 60 * 24
+MINPROXYLENGTH = 60 * 60 * 48
 QUERY_ATTRS = ['x509userproxyexpiration', 'CRAB_ReqName', 'ClusterId', 'ProcId',
                'CRAB_UserHN', 'CRAB_UserDN', 'CRAB_UserVO', 'CRAB_UserGroup',
                'CRAB_UserRole', 'JobStatus']
