@@ -474,8 +474,8 @@ def AddPsetHashEdmProvDump(report=None, scramTool=None):
                 print(f"== edmProvDump pset hash {pset_hash}")
                 fileInfo['pset_hash'] = pset_hash
             else:
-                print("ERROR: PSet Hash missing from edmProvDump output.  Full dump below.")
-                print(lines)
+                print("ERROR: PSet Hash missing from edmProvDump output.  Dump of first 100 lines below.")
+                print(lines[:100])
                 raise Exception("PSet hash missing from edmProvDump output.")
 
 def AddPsetHashFjr(report=None, fjr_filename=None):
