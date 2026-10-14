@@ -62,7 +62,9 @@ setup_cmsset() {
     else
         echo "Error during job bootstrap: VO_CMS_SW_DIR, OSG_APP, CVMFS or /cvmfs were not found." >&2
         echo "  Because of this, we can't load CMSSW. Not good." >&2
-        exit 11003
+        EXIT_CODE=11003
+        echo $EXIT_CODE > jobReport.exitCode.txt
+        exit $EXIT_CODE
     fi
     echo "CRAB job bootstrap: thinks it found the correct CMSSW setup script"
     echo -e "======== CMS environment load finished at $(TZ=GMT date) ========\n"
@@ -103,7 +105,9 @@ setup_python_comp() {
     else
         echo "Failed to find a COMP python3 installation in the worker node setup." >&2
         echo "  Without a known python3, there is nothing else we can do with this job. Quitting!" >&2
-        exit 11004
+        EXIT_CODE=11004
+        echo $EXIT_CODE > jobReport.exitCode.txt
+        exit $EXIT_CODE
     fi
     compPythonPath=`echo $prefix | sed 's|/python3||'`
     echo "WMAgent bootstrap: COMP Python path is: $compPythonPath"
@@ -121,7 +125,9 @@ setup_python_comp() {
     then
         echo "Error during job bootstrap: python isn't available on the worker node." >&2
         echo "  WMCore/WMAgent REQUIRES at least python2" >&2
-        exit 11005
+        EXIT_CODE=11005
+        echo $EXIT_CODE > jobReport.exitCode.txt
+        exit $EXIT_CODE
     else
         echo "WMAgent bootstrap: found $pythonCommand at.."
         echo `which $pythonCommand`
