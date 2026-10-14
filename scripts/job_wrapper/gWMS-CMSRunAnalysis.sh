@@ -55,8 +55,8 @@ echo "======== Auxiliary Functions - STARTING ========"
 # we can consider making some of these fuctions less CRAB-oriented and moving them to ./submit_env.sh
 
 function finish {
-  if [ -n "$EXIT_STATUS" ]; then
-    EXIT_STATUS=$?
+  if [ -z "$EXIT_STATUS" ]; then
+    EXIT_STATUS="Undefined"
   fi
   echo "Application exit status: $EXIT_STATUS"
   chirp_exit_code
