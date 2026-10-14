@@ -39,6 +39,17 @@ setup_local_env () {
 
 }
 
+report_error_and_exit() {
+  ERROR_CODE=$1
+  ERROR_MSG="${2:-}"
+  # this is for gWMS-CMSRunAnalysis.sh which will chirp it
+  echo $ERROR_CODE > jobReport.exitCode.txt
+  # this is for PostJob.py and hence cache_status.py which will make it appear in crab status output
+  fakeFjr=`echo \{\"exitCode\":$ERROR_CODE,\"exitMsg\":\"$ERROR_MSG\",\"steps\":{\"cmsRun\":{\"errors\":[]}}\}`
+  echo $fakeFjr > jobReport.json
+  exit $ERROR_CODE
+}
+
 setup_cmsset() {
     ### source the CMSSW stuff using either OSG or LCG style entry env. or CVMFS
     echo "======== CMS environment load starting at $(TZ=GMT date) ========"
@@ -60,11 +71,10 @@ setup_cmsset() {
         echo "WN missing VO_CMS_SW_DIR/OSG_APP/CVMFS environment variable, forcing it to CVMFS=$CVMFS"
         . $CVMFS/cmsset_default.sh
     else
+        echo "======== FATAL ERROR  ========"
         echo "Error during job bootstrap: VO_CMS_SW_DIR, OSG_APP, CVMFS or /cvmfs were not found." >&2
         echo "  Because of this, we can't load CMSSW. Not good." >&2
-        EXIT_CODE=11003
-        echo $EXIT_CODE > jobReport.exitCode.txt
-        exit $EXIT_CODE
+        report_error_and_exit 11003 "Could not setup CMS environment"
     fi
     echo "CRAB job bootstrap: thinks it found the correct CMSSW setup script"
     echo -e "======== CMS environment load finished at $(TZ=GMT date) ========\n"
@@ -103,11 +113,10 @@ setup_python_comp() {
     then
         prefix="$CVMFS"/COMP/"$WMA_SCRAM_ARCH"/external/python3
     else
+        echo "======== FATAL ERROR  ========"
         echo "Failed to find a COMP python3 installation in the worker node setup." >&2
         echo "  Without a known python3, there is nothing else we can do with this job. Quitting!" >&2
-        EXIT_CODE=11004
-        echo $EXIT_CODE > jobReport.exitCode.txt
-        exit $EXIT_CODE
+        report_error_and_exit 11004 "could not find COMP python"
     fi
     compPythonPath=`echo $prefix | sed 's|/python3||'`
     echo "WMAgent bootstrap: COMP Python path is: $compPythonPath"
@@ -123,11 +132,10 @@ setup_python_comp() {
     rc=$?
     if [[ $rc != 0 ]]
     then
+        echo "======== FATAL ERROR  ========"
         echo "Error during job bootstrap: python isn't available on the worker node." >&2
         echo "  WMCore/WMAgent REQUIRES at least python2" >&2
-        EXIT_CODE=11005
-        echo $EXIT_CODE > jobReport.exitCode.txt
-        exit $EXIT_CODE
+        report_error_and_exit 11005 "Error in setting up python"
     else
         echo "WMAgent bootstrap: found $pythonCommand at.."
         echo `which $pythonCommand`
