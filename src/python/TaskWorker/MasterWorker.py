@@ -266,6 +266,15 @@ class MasterWorker(object):
                     tasks_by_user[user] = []
                 tasks_by_user[user].append(task)
 
+            # sort list of tasks for each user by userprio and then date FIFO
+
+            # sort users by current # tasks and jobs in the pool
+
+
+            # drop users above limit (50k jobs, 50 tasks)
+
+            # but allow a couple of tasks to slip through even if there are no users left
+
             # Perform round-robin selection among users
             users = list(tasks_by_user.keys())
             random.shuffle(users)  # To ensure fair round-robin each time
@@ -283,30 +292,9 @@ class MasterWorker(object):
                     username = task['tm_username']
                     task_count[status][username] = task_count[status].get(username, 0) + 1
 
-            # Prepare table headers and rows
-            headers = ['Username', 'Waiting', 'Selected']
-            rows = []
 
-            # Collect all usernames to ensure every user appears in the table
-            all_usernames = set(task_count['selected'].keys()).union(task_count['waiting'].keys())
-
-            for username in all_usernames:
-                waiting_count = task_count['waiting'].get(username, 0)
-                selected_count = task_count['selected'].get(username, 0)
-                rows.append([username, waiting_count, selected_count])
-
-            # Determine the width of each column for formatting
-            widths = [max(len(header) for header in headers)] + [max(len(str(row[i])) for row in rows) for i in range(1, len(headers))]
-
-            # Prepare formatted table string
-            table_header = ' | '.join(f'{header:<{width}}' for header, width in zip(headers, widths))
-            table_separator = '-|-'.join('-' * width for width in widths)
-            table_rows = '\n'.join(' | '.join(f'{str(cell):<{width}}' for cell, width in zip(row, widths)) for row in rows)
-
-            # Combine header, separator, and rows into one string
-            table = f"{table_header}\n{table_separator}\n{table_rows}"
-
-            # Log the formatted table
+            # Log a formatted table of the decision
+            table = self.prepareSummaryTable(task_count)
             self.logger.info('\n%s', table)
 
             if getattr(self.config.TaskWorker, 'task_scheduling_dry_run', False):
@@ -322,6 +310,32 @@ class MasterWorker(object):
         except Exception as e: #pylint: disable=broad-except
             self.logger.exception("Unknown Exception occurred during external scheduling: %s", str(e))
             return []
+
+    def prepareSummaryTable(self, task_count):
+        # Prepare table headers and rows
+        headers = ['Username', 'Waiting', 'Selected']
+        rows = []
+        # Collect all usernames to ensure every user appears in the table
+        all_usernames = set(task_count['selected'].keys()).union(task_count['waiting'].keys())
+
+        for username in all_usernames:
+            waiting_count = task_count['waiting'].get(username, 0)
+            selected_count = task_count['selected'].get(username, 0)
+            rows.append([username, waiting_count, selected_count])
+
+        # Determine the width of each column for formatting
+        widths = [max(len(header) for header in headers)] + [max(len(str(row[i])) for row in rows) for i in
+                                                             range(1, len(headers))]
+
+        # Prepare formatted table string
+        table_header = ' | '.join(f'{header:<{width}}' for header, width in zip(headers, widths))
+        table_separator = '-|-'.join('-' * width for width in widths)
+        table_rows = '\n'.join(' | '.join(f'{str(cell):<{width}}' for cell, width in zip(row, widths)) for row in rows)
+
+        # Combine header, separator, and rows into one string
+        table = f"{table_header}\n{table_separator}\n{table_rows}"
+
+        return table
 
     def _pruneTaskQueue(self):
         self.logger.info("Pruning the queue if required...logic tbd")
@@ -567,8 +581,11 @@ class MasterWorker(object):
             else:
                 canary_name = self.config.TaskWorker.canary_name
                 self.logger.info("This is master TW %s running.", self.config.TaskWorker.name)
-                selection_limit = self.config.TaskWorker.task_scheduling_limit
-                if not self._selectWork(limit=selection_limit):
+                # selection_limit = self.config.TaskWorker.task_scheduling_limit
+                # next line moves tasks from WAITING to NEW
+                # limit is not ideal: if queue is full nothing will be selected even if canary is free
+                # but let's see how it goes
+                if not self._selectWork(limit=limit):
                     self.logger.warning("No tasks selected.")
                 else:
                     self.logger.info("Work selected successfully.")
