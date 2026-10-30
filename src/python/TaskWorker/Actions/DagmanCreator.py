@@ -444,7 +444,7 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.MaxWallTimeMinsRun'] = str(task['tm_maxjobruntime'])  # this will be used in PeriodicRemove
         ## Add group information (local groups in SITECONF via CMSGroupMapper, VOMS groups via task info in DB)
         groups = set.union(map_user_to_groups(task['tm_username']), task['user_groups'])
-        groups = ','.join(groups)  # from the set {'g1','g2'...,'gN'} to the string 'g1,g2,..gN'
+        groups = ','.join(sorted(list(groups)))  # from the set {'g1','g2'...,'gN'} to the string 'g1,g2,..gN'
         jobSubmit['My.CMSGroups'] = classad.quote(groups)
 
         # do we really need this ?  i.e. or can replace it with GLIDEIN_CMSSite where it is used in the code ?
