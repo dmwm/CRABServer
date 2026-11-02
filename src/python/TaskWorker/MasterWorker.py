@@ -267,6 +267,12 @@ class MasterWorker(object):
                 tasks_by_user[user].append(task)
 
             # sort list of tasks for each user by userprio and then date FIFO
+            # we want higher priority and smaller start time first, so let sorted() do ASCENDING
+            # but use negative priority as key
+            for user in tasks_by_user:
+                sortedTasks = sorted(tasks_by_user[user],
+                                     key=lambda task: (-int(task['tm_priority']),task['tm_start_time']))
+                tasks_by_user[user] = sortedTasks
 
             # sort users by current # tasks and jobs in the pool
 
