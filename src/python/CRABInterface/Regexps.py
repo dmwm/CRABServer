@@ -88,7 +88,7 @@ RX_SUBRESTAT = re.compile(r"^(errors|report2|logs|data|logs2|data2|resubmit|resu
 
 #subresources of the ServerInfo (/info) and Task (/task) resources
 RX_SUBRES_SI = re.compile(r"^(delegatedn|version|bannedoutdest|scheddaddress|ignlocalityblacklist)$")
-RX_SUBRES_TASK = re.compile(r"^(allinfo|allusers|search|status|taskbystatus|taskbyddmreqid|getpublishurl|addwarning|deletewarnings|addwebdir|addoutputdatasets|addddmreqid|webdir|webdirprx|counttasksbystatus|counttasksbyuserandstatus|lastfailures|lastrefused|updateschedd|updatepublicationtime|addrucioasoinfo|edit)$")
+RX_SUBRES_TASK = re.compile(r"^(allinfo|allusers|search|status|taskbystatus|taskbyddmreqid|getpublishurl|addwarning|deletewarnings|addwebdir|addoutputdatasets|addddmreqid|webdir|webdirprx|counttasksbystatus|counttasksbyuserandstatus|lastfailures|lastrefused|updateschedd|updatepublicationtime|addrucioasoinfo|taskbydagstatus|edit)$")
 RX_TASK_COLUMN = re.compile(r"^[a-z_]{1,50}$")  # ideally could like all table columns.... but how do we maintain it ?
 
 #subresources of Cache resource
@@ -100,6 +100,8 @@ RX_PRESIGNED_CLIENT_METHOD = re.compile(r"^(get_object|head_object)$")
 RX_WORKER_NAME = re.compile(r"^[A-Za-z0-9\-\._%]{1,100}$")
 ## this can be improved by putting a dependency on CAFUtilities task state machine
 RX_STATUS = re.compile(r"^[A-Za-z_]{1,20}$")
+RX_DAGSTATUS = re.compile(r"^[A-Za-z_]{1,20}$")
+RX_DAYS = re.compile(r'^\d+$')
 
 RX_USERNAME = re.compile(r"^[A-Za-z_:0-9]{1,100}$")
 RX_DATE = re.compile(r"^(19|20)\d\d[- /.](0[1-9]|1[012])[- /.](0[1-9]|[12][0-9]|3[01])$")

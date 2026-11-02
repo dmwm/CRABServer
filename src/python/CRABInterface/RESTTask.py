@@ -12,7 +12,7 @@ from CRABInterface.Utilities import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match, authz_operator
 from CRABInterface.Regexps import RX_MANYLINES_SHORT, RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME,\
     RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE, RX_DATASET, RX_ANYTHING_10K, \
-    RX_TASK_COLUMN
+    RX_TASK_COLUMN, RX_DAGSTATUS, RX_DAYS
 from ServerUtilities import getUsernameFromTaskname
 
 
@@ -50,6 +50,8 @@ class RESTTask(RESTEntity):
             validate_str('username', param, safe, RX_USERNAME, optional=True)
             validate_str('minutes', param, safe, RX_RUNS, optional=True)
             validate_str("ddmreqid", param, safe, RX_RUCIORULE, optional=True)
+            validate_str('dagmanstatus', param, safe, RX_DAGSTATUS, optional=True)
+            validate_str('days', param, safe, RX_DAYS, optional=True)
 
     @restcall
     def get(self, subresource, **kwargs):
@@ -172,6 +174,13 @@ class RESTTask(RESTEntity):
     def taskbystatus(self, **kwargs):
         """Retrieves all jobs of the specified user with the specified status"""
         rows = self.api.query(None, None, self.Task.TaskByStatus_sql, username_=kwargs["username"], taskstatus=kwargs["taskstatus"])
+        return rows
+
+    def taskbydagstatus(self, **kwargs):
+        """Retrieves all task of the specified user with the specified Dagman status"""
+        rows = self.api.query(None, None, self.Task.TaskByDagStatus_sql,
+                              username=kwargs["username"], dagmanstatus=kwargs["dagmanstatus"],
+                              days=kwargs["days"])
         return rows
 
     #Get all tasks with a specified ddmreqid
@@ -470,6 +479,7 @@ class RESTTask(RESTEntity):
             tm_multipub_rule=[multipubrulejson],
             tm_taskname=[taskname])
         return []
+
     def edit(self, **kwargs):
         """
         edit one column in tasks table for the given Task Name

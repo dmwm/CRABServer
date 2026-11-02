@@ -32,6 +32,8 @@ class Task(object):
     QuickSearch_sql = "SELECT * FROM tasks WHERE tm_taskname = :taskname"
     #get all jobs with a specified status
     TaskByStatus_sql = "SELECT tm_task_status,tm_taskname FROM tasks WHERE tm_task_status = :taskstatus AND tm_username=:username_"
+    #get all jobs with a specified Dagman status
+    TaskByDagStatus_sql = "SELECT tm_taskname, tm_num_jobs FROM tasks WHERE tm_dagman_status = :dagmanstatus AND tm_username=:username AND tm_start_time > SYSDATE -:days"
     # get all tasks with a specified ddm_reqid
     TaskByDdmReqid_sql = "SELECT tm_taskname FROM tasks WHERE tm_ddm_reqid = :ddmreqid"
     #get all the tasks in a certain state in the last :minutes minutes
