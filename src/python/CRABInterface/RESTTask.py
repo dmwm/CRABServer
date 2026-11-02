@@ -173,11 +173,23 @@ class RESTTask(RESTEntity):
     #Get all jobs with a specified status
     def taskbystatus(self, **kwargs):
         """Retrieves all jobs of the specified user with the specified status"""
+        if 'username' not in kwargs or not kwargs['username']:
+            raise InvalidParameter(
+                "The parameter 'username' is mandatory for the taskbystatus api")
+        if 'taskstatus' not in kwargs or not kwargs['taskstatus']:
+            raise InvalidParameter("The parameter 'taskstatus' is mandatory for the taskbystatus api")
         rows = self.api.query(None, None, self.Task.TaskByStatus_sql, username_=kwargs["username"], taskstatus=kwargs["taskstatus"])
         return rows
 
     def taskbydagstatus(self, **kwargs):
         """Retrieves all task of the specified user with the specified Dagman status"""
+        if 'username' not in kwargs or not kwargs['username']:
+            raise InvalidParameter(
+                "The parameter 'username' is mandatory for the taskbydagstatus api")
+        if 'dagmanstatus' not in kwargs or not kwargs['dagmanstatus']:
+            raise InvalidParameter("The parameter 'dagmanstatus' is mandatory for the taskbydagstatus api")
+        if 'days' not in kwargs or not kwargs['days']:
+            raise InvalidParameter("The parameter 'days' is mandatory for the taskbydagstatus api")
         rows = self.api.query(None, None, self.Task.TaskByDagStatus_sql,
                               username=kwargs["username"], dagmanstatus=kwargs["dagmanstatus"],
                               days=kwargs["days"])
@@ -265,6 +277,24 @@ class RESTTask(RESTEntity):
         if 'minutes' not in kwargs or not kwargs['minutes']:
             raise InvalidParameter("The parameter minutes is mandatory for the tasksbystatus api")
         rows = self.api.query(None, None, self.Task.CountLastTasksByUserAndStatus_sql, minutes=kwargs["minutes"])
+
+        return rows
+
+    def counttasksandjobsbyuseranddagstatus(self, **kwargs):
+        """Count jobs for every user and status in the last :days
+            curl -X GET 'https://cmsweb-test2.cern.ch/crabserver/dev/task?subresource=counttasksandjobsbyuserandstatus&username=belforte&dagmanstatus=COMPLETED&days=30'\
+                        --cert $X509_USER_PROXY --key $X509_USER_PROXY
+        """
+        if 'username' not in kwargs or not kwargs['username']:
+            raise InvalidParameter(
+                "The parameter 'username' is mandatory for the counttasksandjobsbyuseranddagstatus api")
+        if 'dagmanstatus' not in kwargs or not kwargs['dagmanstatus']:
+            raise InvalidParameter("The parameter 'dagmanstatus' is mandatory for the counttasksandjobsbyuseranddagstatus api")
+        if 'days' not in kwargs or not kwargs['days']:
+            raise InvalidParameter("The parameter 'days' is mandatory for the counttasksandjobsbyuseranddagstatus api")
+        rows = self.api.query(None, None, self.Task.CountTasksAndJobsByUserAndDagStatus_sql,
+                              username=kwargs["username"], dagmanstatus=kwargs["dagmanstatus"],
+                              days=kwargs["days"])
 
         return rows
 
