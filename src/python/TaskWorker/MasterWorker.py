@@ -251,8 +251,8 @@ class MasterWorker(object):
         self.logger.info("Starting external scheduling.")
 
         try:
-            # Retrieve tasks with 'WAITING' status
-            waiting_tasks = getTasks(crabserver=self.crabserver, status='WAITING', logger=self.logger, limit=limit)
+            # Retrieve all tasks with 'WAITING' status
+            waiting_tasks = getTasks(crabserver=self.crabserver, status='WAITING', logger=self.logger, limit=10000)
 
             if not waiting_tasks:
                 self.logger.info("No tasks in 'WAITING' status found.")
@@ -274,21 +274,54 @@ class MasterWorker(object):
                                      key=lambda task: (-int(task['tm_priority']),task['tm_start_time']))
                 tasks_by_user[user] = sortedTasks
 
-            # sort users by current # tasks and jobs in the pool
+            # check current as number of tasks and jobs in the pool
+            heavyUsers = []
+            self.logger.debug("Tasks and Jobs already in the pool for users in WAITING")
+            data = {'subresource':'counttasksandjobsbyuseranddagstatus',
+                    'days': 30, 'dagmanstatus': 'RUNNING', 'username':''}
+            for user in tasks_by_user:
+                data['username'] = user
+                counts = self.crabserver.get(api='task', data=urlencode(data))[0]['result']
+                nTasks = counts[0][0]
+                nJobs = counts[0][1]
+                nJobs = nJobs if nJobs else 0  # crabserver API returns nJobs=None if nTasks=0
+                self.logger.debug("user: %s, nTasks: %s, nJobs: %s", user, nTasks, nJobs)
+                if nTasks >= 50 or nJobs >= 50000:
+                    heavyUsers.append(user)
 
+            # drop users above limit
+            tasks_by_allowed_user = {user:tasks_by_user[user] for user in tasks_by_user if user not in heavyUsers}
 
-            # drop users above limit (50k jobs, 50 tasks)
-
-            # but allow a couple of tasks to slip through even if there are no users left
+            # but allow a couple of tasks to slip through if there are no users left
+            if not tasks_by_allowed_user:
+                tasks_by_allowed_user = tasks_by_user
+                limit = 2
 
             # Perform round-robin selection among users
-            users = list(tasks_by_user.keys())
+            # pick one task from each allowed user and iterate until have picked
+            # "limit" tasks, or there are no new ones. Shuffle user list before
+            # each iteration to ensure fair share among all users in WAITING
+            users = list(tasks_by_allowed_user.keys())
             random.shuffle(users)  # To ensure fair round-robin each time
             selected_tasks = []
 
-            for user in users:
-                user_tasks = tasks_by_user[user]
-                selected_tasks.extend(user_tasks[:limit // len(users)])
+            # #for user in users:
+            # #    user_tasks = tasks_by_allowed_user[user]
+            # #    ## next line can't work if users > limit !!
+            # #    selected_tasks.extend(user_tasks[:limit // len(users)])
+            while len(selected_tasks) < limit:
+                random.shuffle(users)  # To ensure fair round-robin each time
+                addedTasks = False
+                for user in users:
+                    if tasks_by_allowed_user[user]:
+                        selected_tasks.append(tasks_by_allowed_user[user].pop(0))
+                        addedTasks = True
+                        if len(selected_tasks) >= limit:
+                            break
+                if not addedTasks:
+                    # there are no more users with tasks in WAITING
+                    break
+
 
             # Create and populate task_count dictionary
             task_count = {'selected': {}, 'waiting': {}}
