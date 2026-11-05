@@ -248,7 +248,7 @@ class MasterWorker(object):
         External scheduling method using round-robin algorithm to get tasks
         in waiting status and consider resource utilization for fair share.
         """
-        self.logger.info("Starting external scheduling.")
+        self.logger.info("Starting external scheduling with limit %d", limit)
 
         try:
             # Retrieve all tasks with 'WAITING' status
@@ -276,7 +276,7 @@ class MasterWorker(object):
 
             # check current as number of tasks and jobs in the pool
             heavyUsers = []
-            self.logger.debug("Tasks and Jobs already in the pool for users in WAITING")
+            self.logger.info("Tasks and Jobs already in the pool for users in WAITING")
             data = {'subresource':'counttasksandjobsbyuseranddagstatus',
                     'days': 30, 'dagmanstatus': 'RUNNING', 'username':''}
             for user in tasks_by_user:
@@ -285,18 +285,21 @@ class MasterWorker(object):
                 nTasks = counts[0][0]
                 nJobs = counts[0][1]
                 nJobs = nJobs if nJobs else 0  # crabserver API returns nJobs=None if nTasks=0
-                self.logger.debug("user: %s, nTasks: %s, nJobs: %s", user, nTasks, nJobs)
+                self.logger.info("USAGE for %15s : Tasks: %3d, Jobs: %6d", user, nTasks, nJobs)
                 if nTasks >= 50 or nJobs >= 50000:
                     heavyUsers.append(user)
 
+            self.logger.info("Heavy users: %s", heavyUsers)
             # drop users above limit
             tasks_by_allowed_user = {user:tasks_by_user[user] for user in tasks_by_user if user not in heavyUsers}
 
             # but allow a couple of tasks to slip through if there are no users left
             if not tasks_by_allowed_user:
+                self.logger.info("Only heavy users have tasks to act on")
                 tasks_by_allowed_user = tasks_by_user
                 limit = 2
 
+            self.logger.info("Pick among %d users with limit=%d", len(tasks_by_user), limit)
             # Perform round-robin selection among users
             # pick one task from each allowed user and iterate until have picked
             # "limit" tasks, or there are no new ones. Shuffle user list before
@@ -334,7 +337,7 @@ class MasterWorker(object):
 
             # Log a formatted table of the decision
             table = self.prepareSummaryTable(task_count)
-            self.logger.info('\n%s', table)
+            self.logger.info('Scheduling Summary:\n%s', table)
 
             if getattr(self.config.TaskWorker, 'task_scheduling_dry_run', False):
                 return waiting_tasks
