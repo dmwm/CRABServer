@@ -248,11 +248,11 @@ class MasterWorker(object):
         External scheduling method using round-robin algorithm to get tasks
         in waiting status and consider resource utilization for fair share.
         """
-        self.logger.info("Starting external scheduling.")
+        self.logger.info("Starting external scheduling with limit %d", limit)
 
         try:
-            # Retrieve tasks with 'WAITING' status
-            waiting_tasks = getTasks(crabserver=self.crabserver, status='WAITING', logger=self.logger, limit=limit)
+            # Retrieve all tasks with 'WAITING' status
+            waiting_tasks = getTasks(crabserver=self.crabserver, status='WAITING', logger=self.logger, limit=10000)
 
             if not waiting_tasks:
                 self.logger.info("No tasks in 'WAITING' status found.")
@@ -266,14 +266,65 @@ class MasterWorker(object):
                     tasks_by_user[user] = []
                 tasks_by_user[user].append(task)
 
+            # sort list of tasks for each user by userprio and then date FIFO
+            # we want higher priority and smaller start time first, so let sorted() do ASCENDING
+            # but use negative priority as key
+            for user in tasks_by_user:
+                sortedTasks = sorted(tasks_by_user[user],
+                                     key=lambda task: (-int(task['tm_priority']),task['tm_start_time']))
+                tasks_by_user[user] = sortedTasks
+
+            # check current as number of tasks and jobs in the pool
+            heavyUsers = []
+            self.logger.info("Tasks and Jobs already in the pool for users in WAITING")
+            data = {'subresource':'counttasksandjobsbyuseranddagstatus',
+                    'days': 30, 'dagmanstatus': 'RUNNING', 'username':''}
+            for user in tasks_by_user:
+                data['username'] = user
+                counts = self.crabserver.get(api='task', data=urlencode(data))[0]['result']
+                nTasks = counts[0][0]
+                nJobs = counts[0][1]
+                nJobs = nJobs if nJobs else 0  # crabserver API returns nJobs=None if nTasks=0
+                self.logger.info("USAGE for %15s : Tasks: %3d, Jobs: %6d", user, nTasks, nJobs)
+                if nTasks >= 50 or nJobs >= 50000:
+                    heavyUsers.append(user)
+
+            self.logger.info("Heavy users: %s", heavyUsers)
+            # drop users above limit
+            tasks_by_allowed_user = {user:tasks_by_user[user] for user in tasks_by_user if user not in heavyUsers}
+
+            # but allow a couple of tasks to slip through if there are no users left
+            if not tasks_by_allowed_user:
+                self.logger.info("Only heavy users have tasks to act on")
+                tasks_by_allowed_user = tasks_by_user
+                limit = 2
+
+            self.logger.info("Pick among %d users with limit=%d", len(tasks_by_user), limit)
             # Perform round-robin selection among users
-            users = list(tasks_by_user.keys())
+            # pick one task from each allowed user and iterate until have picked
+            # "limit" tasks, or there are no new ones. Shuffle user list before
+            # each iteration to ensure fair share among all users in WAITING
+            users = list(tasks_by_allowed_user.keys())
             random.shuffle(users)  # To ensure fair round-robin each time
             selected_tasks = []
 
-            for user in users:
-                user_tasks = tasks_by_user[user]
-                selected_tasks.extend(user_tasks[:limit // len(users)])
+            # #for user in users:
+            # #    user_tasks = tasks_by_allowed_user[user]
+            # #    ## next line can't work if users > limit !!
+            # #    selected_tasks.extend(user_tasks[:limit // len(users)])
+            while len(selected_tasks) < limit:
+                random.shuffle(users)  # To ensure fair round-robin each time
+                addedTasks = False
+                for user in users:
+                    if tasks_by_allowed_user[user]:
+                        selected_tasks.append(tasks_by_allowed_user[user].pop(0))
+                        addedTasks = True
+                        if len(selected_tasks) >= limit:
+                            break
+                if not addedTasks:
+                    # there are no more users with tasks in WAITING
+                    break
+
 
             # Create and populate task_count dictionary
             task_count = {'selected': {}, 'waiting': {}}
@@ -283,31 +334,10 @@ class MasterWorker(object):
                     username = task['tm_username']
                     task_count[status][username] = task_count[status].get(username, 0) + 1
 
-            # Prepare table headers and rows
-            headers = ['Username', 'Waiting', 'Selected']
-            rows = []
 
-            # Collect all usernames to ensure every user appears in the table
-            all_usernames = set(task_count['selected'].keys()).union(task_count['waiting'].keys())
-
-            for username in all_usernames:
-                waiting_count = task_count['waiting'].get(username, 0)
-                selected_count = task_count['selected'].get(username, 0)
-                rows.append([username, waiting_count, selected_count])
-
-            # Determine the width of each column for formatting
-            widths = [max(len(header) for header in headers)] + [max(len(str(row[i])) for row in rows) for i in range(1, len(headers))]
-
-            # Prepare formatted table string
-            table_header = ' | '.join(f'{header:<{width}}' for header, width in zip(headers, widths))
-            table_separator = '-|-'.join('-' * width for width in widths)
-            table_rows = '\n'.join(' | '.join(f'{str(cell):<{width}}' for cell, width in zip(row, widths)) for row in rows)
-
-            # Combine header, separator, and rows into one string
-            table = f"{table_header}\n{table_separator}\n{table_rows}"
-
-            # Log the formatted table
-            self.logger.info('\n%s', table)
+            # Log a formatted table of the decision
+            table = self.prepareSummaryTable(task_count)
+            self.logger.info('Scheduling Summary:\n%s', table)
 
             if getattr(self.config.TaskWorker, 'task_scheduling_dry_run', False):
                 return waiting_tasks
@@ -322,6 +352,32 @@ class MasterWorker(object):
         except Exception as e: #pylint: disable=broad-except
             self.logger.exception("Unknown Exception occurred during external scheduling: %s", str(e))
             return []
+
+    def prepareSummaryTable(self, task_count):
+        # Prepare table headers and rows
+        headers = ['Username', 'Waiting', 'Selected']
+        rows = []
+        # Collect all usernames to ensure every user appears in the table
+        all_usernames = set(task_count['selected'].keys()).union(task_count['waiting'].keys())
+
+        for username in all_usernames:
+            waiting_count = task_count['waiting'].get(username, 0)
+            selected_count = task_count['selected'].get(username, 0)
+            rows.append([username, waiting_count, selected_count])
+
+        # Determine the width of each column for formatting
+        widths = [max(len(header) for header in headers)] + [max(len(str(row[i])) for row in rows) for i in
+                                                             range(1, len(headers))]
+
+        # Prepare formatted table string
+        table_header = ' | '.join(f'{header:<{width}}' for header, width in zip(headers, widths))
+        table_separator = '-|-'.join('-' * width for width in widths)
+        table_rows = '\n'.join(' | '.join(f'{str(cell):<{width}}' for cell, width in zip(row, widths)) for row in rows)
+
+        # Combine header, separator, and rows into one string
+        table = f"{table_header}\n{table_separator}\n{table_rows}"
+
+        return table
 
     def _pruneTaskQueue(self):
         self.logger.info("Pruning the queue if required...logic tbd")
@@ -567,8 +623,11 @@ class MasterWorker(object):
             else:
                 canary_name = self.config.TaskWorker.canary_name
                 self.logger.info("This is master TW %s running.", self.config.TaskWorker.name)
-                selection_limit = self.config.TaskWorker.task_scheduling_limit
-                if not self._selectWork(limit=selection_limit):
+                # selection_limit = self.config.TaskWorker.task_scheduling_limit
+                # next line moves tasks from WAITING to NEW
+                # limit is not ideal: if queue is full nothing will be selected even if canary is free
+                # but let's see how it goes
+                if not self._selectWork(limit=limit):
                     self.logger.warning("No tasks selected.")
                 else:
                     self.logger.info("Work selected successfully.")

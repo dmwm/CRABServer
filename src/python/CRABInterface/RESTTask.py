@@ -12,7 +12,7 @@ from CRABInterface.Utilities import getDBinstance
 from CRABInterface.RESTExtensions import authz_login_valid, authz_owner_match, authz_operator
 from CRABInterface.Regexps import RX_MANYLINES_SHORT, RX_SUBRES_TASK, RX_TASKNAME, RX_STATUS, RX_USERNAME,\
     RX_RUNS, RX_OUT_DATASET, RX_URL, RX_SCHEDD_NAME, RX_RUCIORULE, RX_DATASET, RX_ANYTHING_10K, \
-    RX_TASK_COLUMN
+    RX_TASK_COLUMN, RX_DAGSTATUS, RX_DAYS
 from ServerUtilities import getUsernameFromTaskname
 
 
@@ -50,6 +50,8 @@ class RESTTask(RESTEntity):
             validate_str('username', param, safe, RX_USERNAME, optional=True)
             validate_str('minutes', param, safe, RX_RUNS, optional=True)
             validate_str("ddmreqid", param, safe, RX_RUCIORULE, optional=True)
+            validate_str('dagmanstatus', param, safe, RX_DAGSTATUS, optional=True)
+            validate_str('days', param, safe, RX_DAYS, optional=True)
 
     @restcall
     def get(self, subresource, **kwargs):
@@ -171,7 +173,26 @@ class RESTTask(RESTEntity):
     #Get all jobs with a specified status
     def taskbystatus(self, **kwargs):
         """Retrieves all jobs of the specified user with the specified status"""
+        if 'username' not in kwargs or not kwargs['username']:
+            raise InvalidParameter(
+                "The parameter 'username' is mandatory for the taskbystatus api")
+        if 'taskstatus' not in kwargs or not kwargs['taskstatus']:
+            raise InvalidParameter("The parameter 'taskstatus' is mandatory for the taskbystatus api")
         rows = self.api.query(None, None, self.Task.TaskByStatus_sql, username_=kwargs["username"], taskstatus=kwargs["taskstatus"])
+        return rows
+
+    def taskbydagstatus(self, **kwargs):
+        """Retrieves all task of the specified user with the specified Dagman status"""
+        if 'username' not in kwargs or not kwargs['username']:
+            raise InvalidParameter(
+                "The parameter 'username' is mandatory for the taskbydagstatus api")
+        if 'dagmanstatus' not in kwargs or not kwargs['dagmanstatus']:
+            raise InvalidParameter("The parameter 'dagmanstatus' is mandatory for the taskbydagstatus api")
+        if 'days' not in kwargs or not kwargs['days']:
+            raise InvalidParameter("The parameter 'days' is mandatory for the taskbydagstatus api")
+        rows = self.api.query(None, None, self.Task.TaskByDagStatus_sql,
+                              username=kwargs["username"], dagmanstatus=kwargs["dagmanstatus"],
+                              days=kwargs["days"])
         return rows
 
     #Get all tasks with a specified ddmreqid
@@ -256,6 +277,24 @@ class RESTTask(RESTEntity):
         if 'minutes' not in kwargs or not kwargs['minutes']:
             raise InvalidParameter("The parameter minutes is mandatory for the tasksbystatus api")
         rows = self.api.query(None, None, self.Task.CountLastTasksByUserAndStatus_sql, minutes=kwargs["minutes"])
+
+        return rows
+
+    def counttasksandjobsbyuseranddagstatus(self, **kwargs):
+        """Count jobs for every user and status in the last :days
+            curl -X GET 'https://cmsweb-test2.cern.ch/crabserver/dev/task?subresource=counttasksandjobsbyuserandstatus&username=belforte&dagmanstatus=COMPLETED&days=30'\
+                        --cert $X509_USER_PROXY --key $X509_USER_PROXY
+        """
+        if 'username' not in kwargs or not kwargs['username']:
+            raise InvalidParameter(
+                "The parameter 'username' is mandatory for the counttasksandjobsbyuseranddagstatus api")
+        if 'dagmanstatus' not in kwargs or not kwargs['dagmanstatus']:
+            raise InvalidParameter("The parameter 'dagmanstatus' is mandatory for the counttasksandjobsbyuseranddagstatus api")
+        if 'days' not in kwargs or not kwargs['days']:
+            raise InvalidParameter("The parameter 'days' is mandatory for the counttasksandjobsbyuseranddagstatus api")
+        rows = self.api.query(None, None, self.Task.CountTasksAndJobsByUserAndDagStatus_sql,
+                              username=kwargs["username"], dagmanstatus=kwargs["dagmanstatus"],
+                              days=kwargs["days"])
 
         return rows
 
@@ -470,6 +509,7 @@ class RESTTask(RESTEntity):
             tm_multipub_rule=[multipubrulejson],
             tm_taskname=[taskname])
         return []
+
     def edit(self, **kwargs):
         """
         edit one column in tasks table for the given Task Name
