@@ -87,7 +87,10 @@ MAX_TB_TO_RECALL_AT_A_SINGLE_SITE = 1000  # effectively no limit. See https://gi
 # These are all possible statuses of a task in the TaskDB.
 TASKDBSTATUSES_TMP = ['WAITING', 'NEW', 'HOLDING', 'QUEUED', 'TAPERECALL', 'KILLRECALL']
 TASKDBSTATUSES_FAILURES = ['SUBMITFAILED', 'KILLFAILED', 'RESUBMITFAILED', 'FAILED']
-TASKDBSTATUSES_FINAL = ['UPLOADED', 'SUBMITTED', 'KILLED'] + TASKDBSTATUSES_FAILURES
+# SUBMITREFUSED: CRAB could not submit the task because of a problem in the user request,
+# see https://github.com/dmwm/CRABServer/issues/7989 . Not a failure of CRAB or its
+# dependencies, hence not in TASKDBSTATUSES_FAILURES.
+TASKDBSTATUSES_FINAL = ['UPLOADED', 'SUBMITTED', 'KILLED', 'SUBMITREFUSED'] + TASKDBSTATUSES_FAILURES
 TASKDBSTATUSES = TASKDBSTATUSES_TMP + TASKDBSTATUSES_FINAL
 
 # These are all possible statuses of a task as returned by the `status' API.
