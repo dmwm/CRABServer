@@ -17,7 +17,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 
 from RESTInteractions import CRABRest
-from ServerUtilities import TASKDBSTATUSES, TASKDBSTATUSES_TMP, TASKDBSTATUSES_FINAL
+from ServerUtilities import TASKDBSTATUSES
 
 ## no need to check the hostname, we control where this scripts run on
 ## via puppet
@@ -255,10 +255,10 @@ class CRAB3CreateJson:
         # get the absolut number of tasks per status (tasks created in the last 100 days)
         twStatus = self.getCountTasksByStatusAbs()
         if len(twStatus) > 0:
-            # abs_task_states: backlog of tasks ("stock"): temporary and final TaskDB statuses.
+            # abs_task_states: backlog of tasks ("stock"): temporary and final TaskDB statuses (every TaskDB status)
             # A growing count in a temporary state means stuck tasks, final states are ever-growing totals.
             self.jsonDoc['abs_task_states'].update(
-                countsForStates(twStatus, TASKDBSTATUSES_TMP + TASKDBSTATUSES_FINAL))
+                countsForStates(twStatus, TASKDBSTATUSES))
 
         # get the number of condor_shadow processes per schedd
         listOfSchedds = self.getScheddsInfo()
