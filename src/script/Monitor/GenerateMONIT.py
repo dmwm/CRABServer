@@ -257,10 +257,8 @@ class CRAB3CreateJson:
         if len(twStatus) > 0:
             # abs_task_states: backlog of tasks ("stock"): temporary and final TaskDB statuses.
             # A growing count in a temporary state means stuck tasks, final states are ever-growing totals.
-            # 'KILL' and 'RESUBMIT' are tm_task_command values, not statuses, so they are always 0.
-            # They are kept only so that existing Grafana panels do not turn into "No data".
             self.jsonDoc['abs_task_states'].update(
-                countsForStates(twStatus, TASKDBSTATUSES_TMP + TASKDBSTATUSES_FINAL + ['KILL', 'RESUBMIT']))
+                countsForStates(twStatus, TASKDBSTATUSES_TMP + TASKDBSTATUSES_FINAL))
 
         # get the number of condor_shadow processes per schedd
         listOfSchedds = self.getScheddsInfo()
