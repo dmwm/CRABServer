@@ -17,7 +17,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 
 from RESTInteractions import CRABRest
-from ServerUtilities import TASKDBSTATUSES, TASKDBSTATUSES_TMP, TASKDBSTATUSES_FAILURES
+from ServerUtilities import TASKDBSTATUSES, TASKDBSTATUSES_TMP, TASKDBSTATUSES_FINAL
 
 ## no need to check the hostname, we control where this scripts run on
 ## via puppet
@@ -255,13 +255,12 @@ class CRAB3CreateJson:
         # get the absolut number of tasks per status (tasks created in the last 100 days)
         twStatus = self.getCountTasksByStatusAbs()
         if len(twStatus) > 0:
-            # abs_task_states: tasks which need attention ("stock"): the temporary states, where a growing
-            # count means stuck tasks, plus failed and refused tasks. SUBMITTED and KILLED are left out,
-            # over 100 days they would only be ever-growing totals.
+            # abs_task_states: backlog of tasks ("stock"): temporary and final TaskDB statuses.
+            # A growing count in a temporary state means stuck tasks, final states are ever-growing totals.
             # 'KILL' and 'RESUBMIT' are tm_task_command values, not statuses, so they are always 0.
             # They are kept only so that existing Grafana panels do not turn into "No data".
             self.jsonDoc['abs_task_states'].update(
-                countsForStates(twStatus, TASKDBSTATUSES_TMP + TASKDBSTATUSES_FAILURES + ['SUBMITREFUSED', 'UPLOADED', 'KILL', 'RESUBMIT']))
+                countsForStates(twStatus, TASKDBSTATUSES_TMP + TASKDBSTATUSES_FINAL + ['KILL', 'RESUBMIT']))
 
         # get the number of condor_shadow processes per schedd
         listOfSchedds = self.getScheddsInfo()
