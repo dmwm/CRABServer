@@ -17,6 +17,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 
 from RESTInteractions import CRABRest
+from ServerUtilities import TASKDBSTATUSES
 
 ## no need to check the hostname, we control where this scripts run on
 ## via puppet
@@ -46,6 +47,24 @@ def readpwd():
         credentials = json.load(f)
     return credentials["url"], credentials["username"], credentials["password"]
 MONITURL, MONITUSER, MONITPWD = readpwd()
+
+
+def countsForStates(countsFromDB, states, passThrough=False):
+    """
+    Build a {status: count} dict with an entry for every status in `states`
+    (0 if there are no tasks in that status, see https://github.com/dmwm/CRABServer/issues/6343)
+    :param countsFromDB: dict {status: count} as returned by the counttasksbystatus API
+    :param states: list of statuses to report
+    :param passThrough: if True also report statuses returned by the DB which are not in
+                        `states`, so that a status new to the TaskDB shows up even before
+                        it is added to ServerUtilities.TASKDBSTATUSES
+    :return: dict {str(status): int(count)}
+    """
+    counts = {str(state): 0 for state in states}
+    for state, count in dict(countsFromDB).items():
+        if passThrough or state in states:
+            counts[str(state)] = int(count)
+    return counts
 
 #======================================================================================================================================
 
@@ -225,26 +244,21 @@ class CRAB3CreateJson:
         # else:
         #     self.jsonDoc['status'] = "degraded"
 
-        # Get the number of tasks per status
+        # Get the number of tasks per status (tasks created in the last 2 hours)
+        # If an API call fails it returns [] and the field is left empty rather than sending fake zeros.
         twStatus = self.getCountTasksByStatus()
-
-        statesFilter = ['SUBMITTED', 'FAILED', 'QUEUED', 'NEW', 'KILLED', 'KILLFAILED', 'RESUBMITFAILED',
-                         'SUBMITFAILED', 'SUBMITREFUSED', 'TAPERECALL', 'WAITING']
         if len(twStatus) > 0:
-            for state in twStatus.keys():
-                if state in statesFilter:
-                    self.jsonDoc['current_task_states'].update({str(state): int(twStatus[state])})
+            # current_task_states: what happens to new tasks ("flow"): every TaskDB status.
+            self.jsonDoc['current_task_states'].update(
+                countsForStates(twStatus, TASKDBSTATUSES, passThrough=True))
 
-        # get the absolut number of tasks per status
+        # get the absolut number of tasks per status (tasks created in the last 100 days)
         twStatus = self.getCountTasksByStatusAbs()
-
-        statesFilter = ['KILL', 'RESUBMIT', 'NEW', 'QUEUED', 'KILLFAILED', 'RESUBMITFAILED', 'SUBMITFAILED',
-                         'SUBMITREFUSED', 'UPLOADED', 'TAPERECALL', 'WAITING']
         if len(twStatus) > 0:
-            for state in statesFilter:
-                self.jsonDoc['abs_task_states'].update({str(state): 0})
-                if state in twStatus.keys():
-                    self.jsonDoc['abs_task_states'].update({str(state): int(twStatus[state])})
+            # abs_task_states: backlog of tasks ("stock"): temporary and final TaskDB statuses (every TaskDB status)
+            # A growing count in a temporary state means stuck tasks, final states are ever-growing totals.
+            self.jsonDoc['abs_task_states'].update(
+                countsForStates(twStatus, TASKDBSTATUSES))
 
         # get the number of condor_shadow processes per schedd
         listOfSchedds = self.getScheddsInfo()
