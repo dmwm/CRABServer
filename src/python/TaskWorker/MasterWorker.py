@@ -307,8 +307,21 @@ class MasterWorker(object):
                                      key=lambda task: (-int(task['tm_priority']),task['tm_start_time']))
                 tasks_by_user[user] = sortedTasks
 
-            # check current as number of tasks and jobs in the pool
+            # check current as number of tasks and jobs in the pool and classify waiting users
+            # Defintions:
+            #   Abusers: have so much stuff in that we make them wait until enough tasks completed
+            #            to bring them into reasonable usage
+            #   HeavyUsers: have so much stuff that we lest other users submit before them
+            #   abusersWhiteList: in case the algorithm overshoot, we have a way to move
+            #                     users from abuser to heavy user to let them push more work in
+            taskLimitForAbusers = getattr(self.config.TaskWorker, 'taskLimitForAbusers', 100)
+            jobLimitForAbusers = getattr(self.config.TaskWorker, 'jobLimitForAbusers', 50*1000)
+            taskLimitForHeavyUsers = getattr(self.config.TaskWorker, 'taskLimitForHeavyUsers', 50)
+            jobLimitForHeavyUsers = getattr(self.config.TaskWorker, 'jobLimitForHeavyUsers', 10*1000)
+            abusersWhiteList =  getattr(self.config.TaskWorker, 'abusersWhiteList', [])
+            abusers = []
             heavyUsers = []
+            okUsers = []
             self.logger.info("Tasks and Jobs already in the pool for users in WAITING")
             data = {'subresource':'counttasksandjobsbyuseranddagstatus',
                     'days': 30, 'dagmanstatus': 'RUNNING', 'username':''}
@@ -319,18 +332,33 @@ class MasterWorker(object):
                 nJobs = counts[0][1]
                 nJobs = nJobs if nJobs else 0  # crabserver API returns nJobs=None if nTasks=0
                 self.logger.info("USAGE for %15s : Tasks: %3d, Jobs: %6d", user, nTasks, nJobs)
-                if nTasks >= 50 or nJobs >= 50000:
+                if nTasks >= taskLimitForAbusers or nJobs >= jobLimitForAbusers:
+                    abusers.append(user)
+                else:
+                    if nTasks >= taskLimitForHeavyUsers or nJobs >= jobLimitForHeavyUsers:
+                        heavyUsers.append(user)
+                    else:
+                        okUsers.append(user)
+
+            for user in abusersWhiteList:
+                if user in abusers:
+                    abusers.remove(user)
                     heavyUsers.append(user)
 
+            self.logger.info("Abusers: %s", abusers)
             self.logger.info("Heavy users: %s", heavyUsers)
             # drop users above limit
-            tasks_by_allowed_user = {user:tasks_by_user[user] for user in tasks_by_user if user not in heavyUsers}
+            tasks_by_allowed_user = {user:tasks_by_user[user] for user in okUsers}
 
             # but allow a couple of tasks to slip through if there are no users left
-            if not tasks_by_allowed_user:
-                self.logger.info("Only heavy users have tasks to act on")
-                tasks_by_allowed_user = tasks_by_user
-                limit = 2
+            if not okUsers:
+                if not heavyUsers:
+                    self.logger.info("Only abusers have tasks to act on. Ignore them and wait")
+                    return []
+                else:
+                    self.logger.info("Only heavy users have tasks to act on")
+                    tasks_by_allowed_user = {user:tasks_by_user[user] for user in heavyUsers}
+                    limit = 2
 
             self.logger.info("Pick among %d users with limit=%d", len(tasks_by_user), limit)
             # Perform round-robin selection among users
