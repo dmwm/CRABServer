@@ -250,6 +250,8 @@ class MasterWorker(object):
         """
         self.logger.info("Starting external scheduling with limit %d", limit)
 
+        selected_tasks = []
+
         try:
             # Retrieve all tasks with 'WAITING' status
             waiting_tasks = getTasks(crabserver=self.crabserver, status='WAITING', logger=self.logger, limit=10000)
@@ -257,6 +259,37 @@ class MasterWorker(object):
             if not waiting_tasks:
                 self.logger.info("No tasks in 'WAITING' status found.")
                 return []
+
+            # no need to schedule KILL commands, just move them all to NEW
+            # since kills are fast, queue even more than there are free slos in
+            # the queue (i.e. current limit) to ensure slaves stay busy
+            for task in waiting_tasks:
+                if task['tm_task_command'] == 'KILL':
+                    selected_tasks.append(task)
+                    if len(selected_tasks) == 8*limit:
+                        return(selected_tasks)
+            for task in selected_tasks:
+                waiting_tasks.remove(task)
+
+            # RESUBMIT is more tricky. But since we want to privilege
+            # completion of running tasks vs. new work, let's try to make
+            # them go through as well. Those are also fast.
+
+            for task in waiting_tasks:
+                if task['tm_task_command'] == 'RESUBMIT':
+                    selected_tasks.append(task)
+                    if len(selected_tasks) == 8*limit:
+                        return(selected_tasks)
+            for task in selected_tasks:
+                waiting_tasks.remove(task)
+
+            if len(selected_tasks) >= 8*limit:
+                # should never get here, just a safety
+                return selected_tasks
+
+            # adjust the number of queable tasks (limit) to accound for
+            # possibly already selected KILL and/or RESUBMIT
+            limit = limit - len(selected_tasks)//8
 
             # Organize tasks by user
             tasks_by_user = {}
@@ -306,8 +339,6 @@ class MasterWorker(object):
             # each iteration to ensure fair share among all users in WAITING
             users = list(tasks_by_allowed_user.keys())
             random.shuffle(users)  # To ensure fair round-robin each time
-            selected_tasks = []
-
             # #for user in users:
             # #    user_tasks = tasks_by_allowed_user[user]
             # #    ## next line can't work if users > limit !!
