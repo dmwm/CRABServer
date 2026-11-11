@@ -360,7 +360,7 @@ class MasterWorker(object):
                     tasks_by_allowed_user = {user:tasks_by_user[user] for user in heavyUsers}
                     limit = 2
 
-            self.logger.info("Pick among %d users with limit=%d", len(tasks_by_user), limit)
+            self.logger.info("Pick among %d users with limit=%d", len(tasks_by_allowed_user), limit)
             # Perform round-robin selection among users
             # pick one task from each allowed user and iterate until have picked
             # "limit" tasks, or there are no new ones. Shuffle user list before
