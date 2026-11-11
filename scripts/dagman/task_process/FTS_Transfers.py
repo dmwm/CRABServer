@@ -670,6 +670,15 @@ def algorithm():
     # but if need to check delegation arise, it can be done with a query like
     # curl --cert proxy --key proxy https://fts3-cms.cern.ch:8446/delegation/<delegatinId>
     # see: https://fts3-docs.web.cern.ch/fts3-docs/fts-rest/docs/api.html#get-delegationdlgid
+    cmd = cmd=f"curl --cert {proxy} --key {proxy} https://fts3-cms.cern.ch:8446/delegation/{delegationId}"
+    result = subprocess.run(cmd, shell=True, capture_output=True)
+    delegationStatus = json.loads(result.stdout.decode("utf-8"))
+    delegationExpiration = delegationStatus['termination_time']
+    delegationHours = (datetime.fromisoformat(delegationExpiration) - datetime.now()).total_seconds()//3600
+    logging.info("Delegated proxy is valid until %s i.e. %d hours from now",
+                 delegationExpiration, int(delegationHours))
+    if not int(delegationHours) > 12:
+        logging.error("FTS DELEGATION TIME TOO SHORT: %s", int(delegationHours))
 
     # instantiate an object to talk with CRAB REST server
     try:
