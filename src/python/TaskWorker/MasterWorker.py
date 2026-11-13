@@ -358,9 +358,11 @@ class MasterWorker(object):
                 else:
                     self.logger.info("Only heavy users have tasks to act on")
                     tasks_by_allowed_user = {user:tasks_by_user[user] for user in heavyUsers}
-                    limit = 2
+                    # only use half of available queue slots for them, ensure there are free slots
+                    # for KILL/RESUBMI/new ok users (if any) in next poll cycle
+                    limit = limit//2  # if limit is 1, i.e. only one slot in the queue, we skip
 
-            self.logger.info("Pick among %d users with limit=%d", len(tasks_by_user), limit)
+            self.logger.info("Pick among %d users with limit=%d", len(tasks_by_allowed_user), limit)
             # Perform round-robin selection among users
             # pick one task from each allowed user and iterate until have picked
             # "limit" tasks, or there are no new ones. Shuffle user list before
