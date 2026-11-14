@@ -331,7 +331,8 @@ class MasterWorker(object):
                 nTasks = counts[0][0]
                 nJobs = counts[0][1]
                 nJobs = nJobs if nJobs else 0  # crabserver API returns nJobs=None if nTasks=0
-                self.logger.info("USAGE for %15s : Tasks: %3d, Jobs: %6d", user, nTasks, nJobs)
+                self.logger.info("USAGE for %10s : WAITING: %3d - RUNNING Tasks: %3d with Jobs: %6d",
+                                 user, len(tasks_by_user[user]), nTasks, nJobs)
                 if nTasks >= taskLimitForAbusers or nJobs >= jobLimitForAbusers:
                     abusers.append(user)
                 else:
