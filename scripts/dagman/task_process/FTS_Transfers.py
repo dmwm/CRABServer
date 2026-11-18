@@ -549,7 +549,7 @@ def perform_transfers(inputFile, lastLine, _lastFile, ftsContext, rucioClient, c
             jobids = submit(rucioClient, ftsContext, transfers, crabserver)
 
             for jobid in jobids:
-                logging.info("Monitor link: " + FTS_MONITORING + "/fts/webui/#/job/%s", jobid)  # pylint: disable=logging-not-lazy
+                logging.info("Monitor link: " + FTS_MONITORING + "fts/webui/#/job/%s", jobid)  # pylint: disable=logging-not-lazy
 
             # TODO: send to dashboard
 
@@ -668,7 +668,7 @@ def algorithm():
     # we never had problems with delegation since we put proper delegate_when in the above line
     # but if need to check delegation arise, it can be done with a query like
     # curl --cert proxy --key proxy https://fts3-cms.cern.ch:8446/delegation/<delegatinId>
-    # see: https://fts4-docs.web.cern.ch/fts3-docs/fts-rest/docs/api.html#get-delegationdlgid
+    # see: https://fts3-docs.web.cern.ch/fts3-docs/fts-rest/docs/api.html#get-delegationdlgid
     cmd = cmd=f"curl --cert {proxy} --key {proxy} https://fts4-cms.cern.ch:8446/delegation/{delegationId}"
     result = subprocess.run(cmd, shell=True, capture_output=True, check=True)
     delegationStatus = json.loads(result.stdout.decode("utf-8"))
