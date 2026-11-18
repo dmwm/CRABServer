@@ -462,10 +462,17 @@ $(document).ready(function () {
                                     data.result[k][index["tm_fts_id"]] + "> " +
                                     data.result[k][index["tm_fts_id"]] +
                                     " </a>"
-                            } else {
+                            } else if (data.result[k][index["tm_fts_instance"]] == "https://fts3-cms.cern.ch:8446/") {
                                 fts_href = "<a href=" +
                                     data.result[k][index["tm_fts_instance"]].replace("8446", "8449") +
                                     "/fts3/ftsmon/#/job/" +
+                                    data.result[k][index["tm_fts_id"]] + "> " +
+                                    data.result[k][index["tm_fts_id"]] +
+                                    " </a>"
+                            } else {
+                                fts_href = "<a href=" +
+                                    data.result[k][index["tm_fts_instance"]].replace("8446", "8449") +
+                                    "/fts/webui/#/job/" +
                                     data.result[k][index["tm_fts_id"]] + "> " +
                                     data.result[k][index["tm_fts_id"]] +
                                     " </a>"
