@@ -1,4 +1,4 @@
-# pylint: disable=C0103, W0703, R0912, R0914, R0915
+# pylint: disable=broad-exception-raised, broad-exception-caught, invalid-name
 """ Renew user proxies on schedulers """
 import os
 import sys
@@ -133,6 +133,7 @@ class CRAB3ProxyRenewer():
         if not hasattr(schedd, 'refreshGSIProxy'):
             raise NotImplementedError()
         try:
+            htcondor.param['DELEGATE_FULL_JOB_GSI_CREDENTIALS'] = 'true'
             schedd.refreshGSIProxy(ad['ClusterId'], ad['ProcID'], proxy, 0)
         except Exception as e:
             raise Exception(f"Failure when renewing HTCondor task proxy: {e}") from e
