@@ -1,3 +1,6 @@
-# This file is intentionally empty
+# This file is intentionally almost empty
 # We do not need a condor_config in the TaskWorker, but
 # having it avoid complaints and/or error from HTC bindings
+
+# extra-safety ensure that we never use limited proxies
+DELEGATE_FULL_JOB_GSI_CREDENTIALS = True
