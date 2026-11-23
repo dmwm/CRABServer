@@ -14,6 +14,7 @@ echo "======== Stageout at $(TZ=GMT date) STARTING ========"
 # Note we prevent buffering of stdout/err -- this is due to observed issues in mixing of out/err for stageout plugins
 
 PYTHONUNBUFFERED=1 $pythonCommand cmscp.py > StageOut.log.tmp 2>&1
+CMSCP_EXIT_CODE=$?
 
 # remove possible gfal performance marker (there can many thousands !)
 cat StageOut.log.tmp | grep -v "monitor: " > StageOut.log
@@ -23,3 +24,4 @@ rm StageOut.log.tmp
 cat StageOut.log
 rm StageOut.log
 
+exit $CMSCP_EXIT_CODE
