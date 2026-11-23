@@ -17,7 +17,7 @@ PYTHONUNBUFFERED=1 $pythonCommand cmscp.py > StageOut.log.tmp 2>&1
 
 # remove possible gfal performance marker (there can many thousands !)
 cat StageOut.log.tmp | grep -v "monitor: " > StageOut.log
-rm Stageout.log.tmp
+rm StageOut.log.tmp
 
 # make stageout log part of job stdout
 cat StageOut.log
