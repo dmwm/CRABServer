@@ -3261,7 +3261,6 @@ class PostJob():
         dry = "DryRun mode !" if self.maxFatalAsoDryRun else "REAL KILL !"
         subject = f"{dry} Killing task due to maxFatalAso"
         recipient = f"{self.maxFatalAsoNotificationMail}@cern.ch"
-        recipient = "stefano.belforte@cern.ch"
         body = f"Killing {self.reqname} in PostJob for crabId {self.job_id}.{self.crab_retry} on {os.uname()[1]}"
         body += f"\nKill Thresholds: nErrors {self.maxFatalAsoNumber}  "
         body += f"relFraction {self.maxFatalAsoRelativeFraction}  "
