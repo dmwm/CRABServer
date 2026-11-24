@@ -423,7 +423,10 @@ class DagmanCreator(TaskAction):
         jobSubmit['My.CRAB_TaskLifetimeDays'] = str(TASKLIFETIME // 24 // 60 // 60)
         jobSubmit['My.CRAB_TaskEndTime'] = str(int(task["tm_start_time"]) + TASKLIFETIME)
         jobSubmit['My.CRAB_SplitAlgo'] = classad.quote(task['tm_split_algo'])
-        jobSubmit['My.CRAB_AlgoArgs'] = classad.quote(str(task['tm_split_args']))  # from dict to str before quoting
+        splitArgsForClassAd = task['tm_split_args']
+        splitArgsForClassAd.pop('runs', None)
+        splitArgsForClassAd.pop('lumis', None)
+        jobSubmit['My.CRAB_AlgoArgs'] = classad.quote(str(splitArgsForClassAd))  # from dict to str before quoting
         jobSubmit['My.CMS_WMTool'] =  classad.quote(self.setCMS_WMTool(task))
         jobSubmit['My.CMS_TaskType'] = classad.quote(self.setCMS_TaskType(task))
         jobSubmit['My.CMS_SubmissionTool'] = classad.quote("CRAB")
