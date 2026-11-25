@@ -36,9 +36,7 @@ echo "==== Make sure \$HOME is defined ===="
 export HOME=${HOME:-$PWD}
 
 echo "======== Current environment dump STARTING ========"
-for i in `env`; do
-  echo "== ENV: $i"
-done
+env | sed -e "s/^/== ENV:/" 
 echo "======== Current environment dump COMPLETED ========"
 
 echo "======== Tarball initialization STARTING at $(TZ=GMT date) ========"
