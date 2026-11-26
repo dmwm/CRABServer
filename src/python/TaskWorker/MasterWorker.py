@@ -251,6 +251,7 @@ class MasterWorker(object):
         self.logger.info("Starting external scheduling with limit %d", limit)
 
         selected_tasks = []
+        queueSlots = limit  # for the SCHEDSTATS line, limit is changed below
 
         try:
             # Retrieve all tasks with 'WAITING' status
@@ -258,7 +259,7 @@ class MasterWorker(object):
 
             if not waiting_tasks:
                 self.logger.info("No tasks in 'WAITING' status found.")
-                return []
+                return self.logSchedStats(limit=queueSlots, selectedTasks=[], waitingUsers={})
 
             # no need to schedule KILL commands, just move them all to NEW
             # since kills are fast, queue even more than there are free slos in
@@ -267,7 +268,8 @@ class MasterWorker(object):
                 if task['tm_task_command'] == 'KILL':
                     selected_tasks.append(task)
                     if len(selected_tasks) == 8*limit:
-                        return(selected_tasks)
+                        return self.logSchedStats(limit=queueSlots, selectedTasks=selected_tasks,
+                                                  waitingUsers=None)
             for task in selected_tasks:
                 waiting_tasks.remove(task)
 
@@ -279,13 +281,15 @@ class MasterWorker(object):
                 if task['tm_task_command'] == 'RESUBMIT':
                     selected_tasks.append(task)
                     if len(selected_tasks) == 8*limit:
-                        return(selected_tasks)
+                        return self.logSchedStats(limit=queueSlots, selectedTasks=selected_tasks,
+                                                  waitingUsers=None)
             for task in selected_tasks:
                 waiting_tasks.remove(task)
 
             if len(selected_tasks) >= 8*limit:
                 # should never get here, just a safety
-                return selected_tasks
+                return self.logSchedStats(limit=queueSlots, selectedTasks=selected_tasks,
+                                          waitingUsers=None)
 
             # adjust the number of queable tasks (limit) to accound for
             # possibly already selected KILL and/or RESUBMIT
@@ -348,6 +352,10 @@ class MasterWorker(object):
 
             self.logger.info("Abusers: %s", abusers)
             self.logger.info("Heavy users: %s", heavyUsers)
+            # for the SCHEDSTATS line: {username: (user class, number of WAITING tasks)}
+            usersByClass = [('ok', okUsers), ('heavy', heavyUsers), ('abuser', abusers)]
+            waitingUsers = {user: (userClass, len(tasks_by_user[user]))
+                            for userClass, users in usersByClass for user in users}
             # drop users above limit
             tasks_by_allowed_user = {user:tasks_by_user[user] for user in okUsers}
 
@@ -355,7 +363,8 @@ class MasterWorker(object):
             if not okUsers:
                 if not heavyUsers:
                     self.logger.info("Only abusers have tasks to act on. Ignore them and wait")
-                    return []
+                    return self.logSchedStats(limit=queueSlots, selectedTasks=[],
+                                              waitingUsers=waitingUsers)
                 else:
                     self.logger.info("Only heavy users have tasks to act on")
                     tasks_by_allowed_user = {user:tasks_by_user[user] for user in heavyUsers}
@@ -402,8 +411,10 @@ class MasterWorker(object):
             self.logger.info('Scheduling Summary:\n%s', table)
 
             if getattr(self.config.TaskWorker, 'task_scheduling_dry_run', False):
-                return waiting_tasks
-            return selected_tasks
+                return self.logSchedStats(limit=queueSlots, selectedTasks=waiting_tasks,
+                                          waitingUsers=waitingUsers)
+            return self.logSchedStats(limit=queueSlots, selectedTasks=selected_tasks,
+                                      waitingUsers=waitingUsers)
 
         except HTTPException as hte:
             msg = "HTTP Error during external scheduling: %s\n" % str(hte)
@@ -414,6 +425,59 @@ class MasterWorker(object):
         except Exception as e: #pylint: disable=broad-except
             self.logger.exception("Unknown Exception occurred during external scheduling: %s", str(e))
             return []
+
+    def logSchedStats(self, limit, selectedTasks, waitingUsers):
+        """
+        Log one line per scheduling cycle with what the scheduler decided, e.g.
+          SCHEDSTATS: {"version": 1, "limit": 6, "dry_run": false,
+                       "waiting_tasks": {"ok": 12, "heavy": 40, "abuser": 310},
+                       "waiting_users": {"ok": 4, "heavy": 2, "abuser": 3},
+                       "selected": {"ok": 5, "heavy": 0, "abuser": 0, "kill": 0, "resubmit": 1}}
+        "SCHEDSTATS: " followed by JSON on one line, so that filebeat + logstash can pick it up
+        from twlog.txt with a single grok pattern and send it to MONIT.
+        See https://github.com/dmwm/CRABServer/issues/9460 . Keep the prefix and bump "version" if
+        the meaning of a key changes. Adding keys is fine.
+          limit:         free slots in the queue at the start of the cycle
+          waiting_tasks: WAITING tasks to submit (not KILL/RESUBMIT), by class of their owner, after
+                         abusersWhiteList. null if the cycle ended before users were classified
+          waiting_users: users with such tasks, by class. null as waiting_tasks
+          selected:      tasks returned to _selectWork, which moves them to NEW (in dry run
+                         mode all WAITING tasks to submit): SUBMIT by class of their owner,
+                         KILL, RESUBMIT
+        Logging problems are logged and ignored, they must not affect scheduling.
+        :param limit: free slots in the queue at the start of the cycle
+        :param selectedTasks: the tasks _externalScheduling returns
+        :param waitingUsers: {username: (user class, number of WAITING tasks to submit)}
+                             {} if nothing is WAITING: waiting_* are logged as zeros
+                             None if users were not classified in this cycle: waiting_* are
+                             logged as null, not as zeros which would mean "nobody is waiting"
+        :return: selectedTasks, so that "return self.logSchedStats(...)" leaves the return
+                 value unchanged
+        """
+        try:
+            classes = ['ok', 'heavy', 'abuser']
+            waiting = {'waiting_tasks': None, 'waiting_users': None}
+            if waitingUsers is not None:  # {} is not None: nothing WAITING gives zeros, not null
+                tasksByClass = dict.fromkeys(classes, 0)
+                usersByClass = dict.fromkeys(classes, 0)
+                for userClass, nWaiting in waitingUsers.values():
+                    tasksByClass[userClass] += nWaiting
+                    usersByClass[userClass] += 1
+                waiting = {'waiting_tasks': tasksByClass, 'waiting_users': usersByClass}
+            selected = dict.fromkeys(classes + ['kill', 'resubmit'], 0)
+            for task in selectedTasks:
+                if task['tm_task_command'] in ('KILL', 'RESUBMIT'):
+                    key = task['tm_task_command'].lower()
+                else:
+                    key = (waitingUsers or {}).get(task['tm_username'], ('unknown', 0))[0]
+                selected[key] = selected.get(key, 0) + 1
+            dryRun = bool(getattr(self.config.TaskWorker, 'task_scheduling_dry_run', False))
+            stats = {'version': 1, 'limit': limit, 'dry_run': dryRun,
+                     **waiting, 'selected': selected}
+            self.logger.info("SCHEDSTATS: %s", json.dumps(stats))
+        except Exception as ex:  # pylint: disable=broad-except
+            self.logger.error("Cannot log SCHEDSTATS: %s", ex)
+        return selectedTasks
 
     def prepareSummaryTable(self, task_count):
         # Prepare table headers and rows
