@@ -343,11 +343,40 @@ def extractUserSandbox(sandbox):
     print(f"==== Sandbox untarring FINISHED at {UTCNow()} ====")
 
 
+def getScramDiagnostic(scramTool=None, maxChars=1000, keepChars=300):
+    """
+    get scram diagnostics with length limit. Use this instead of scramTool.diagnostic() from
+    WMCore, which returns the full output of the command: that can be many MBs, even in
+    a single line, see https://github.com/dmwm/CRABServer/issues/9474
+    stdout/stderr longer than maxChars are cut to their first and last keepChars characters.
+    Beware: the type of scramTool.stdout/.stderr depends on which Scram method ran last:
+      scramTool.project()  : bytes, bytes
+      scramTool.runtime()  : str, str
+      scramTool(command)   : str, None  (stderr of the command is redirected to stdout)
+    """
+    def shorten(text):
+        if text is None:
+            return ''
+        if isinstance(text, bytes):
+            text = text.decode('utf-8', errors='replace')
+        if len(text) > maxChars:
+            nCut = len(text) - 2 * keepChars
+            text = text[:keepChars] + f"\n [...snip {nCut} chars...]\n" + text[-keepChars:]
+        return text
+
+    diagnostic = "Scram Command Diagnostic Info:"
+    diagnostic += f"\n Executed: {scramTool.lastExecuted}"
+    diagnostic += f"\n ExitCode: {scramTool.code}"
+    diagnostic += f"\n Stdout: {shorten(scramTool.stdout)}"
+    diagnostic += f"\n Stderr: {shorten(scramTool.stderr)}"
+    return diagnostic
+
+
 def getProv(filename='', scramTool=None):
     with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
         retCode = scramTool(f"edmProvDump {filename}", runtimeDir=os.getcwd())
     if retCode > 0:
-        scramMsg = scramTool.diagnostic()
+        scramMsg = getScramDiagnostic(scramTool)
         mesg = f"FAILED ({EC_CMSRunWrapper})\n"
         mesg += f"Error getting pset hash from file.\n\tCommand:edmProvDump {filename}\n\tScram Diagnostic {scramMsg}"
         print(mesg)
@@ -375,7 +404,7 @@ def executeUserApplication(cmd=None, scramTool=None, cleanEnv=True):
         logging.debug("cmssw stdout moved to cmsRun-stdout.log: %s", dest)
     if retCode > 0:
         with open('cmsRun-stdout.log', 'a', encoding='utf-8') as fh:
-            fh.write(scramTool.diagnostic())
+            fh.write(f"\n{getScramDiagnostic(scramTool)}\n")
         print("Error executing application in CMSSW environment.\n\tSee stdout log")
     # restore WM PYTHONPATH
     envOverride['PYTHONPATH'] = pythonPath
@@ -674,7 +703,7 @@ if __name__ == "__main__":
 
         print(f"==== SCRAM Obj CREATED at {UTCNow()} ====")
         if scram.project():  # if scram project fails...
-            dgn = scram.diagnostic()
+            dgn = getScramDiagnostic(scram)
             handleException("FAILED", EC_CMSMissingSoftware, f"Error creating CMSSW project area: {dgn}")
             mintime()
             sys.exit(EC_CMSMissingSoftware)
@@ -687,7 +716,7 @@ if __name__ == "__main__":
         #Multi-microarch env: Setting cmssw env after extracting the sandbox
         print(f"==== SCRAM runtime environment CREATED at {UTCNow()} ====")
         if scram.runtime(): # if scram runtime fails...
-            dgn = scram.diagnostic()
+            dgn = getScramDiagnostic(scram)
             handleException("FAILED", EC_CMSMissingSoftware, f"Error setting CMSSW environment: {dgn}")
             mintime()
             sys.exit(EC_CMSMissingSoftware)
@@ -701,12 +730,13 @@ if __name__ == "__main__":
         with tempSetLogLevel(logger=logging.getLogger(), level=logging.ERROR):
             ret = scram(command, runtimeDir=os.getcwd())
         if ret > 0:
-            msg = f"Error executing {tweakingScriptName}\n\tScram Diagnostic {scram.diagnostic()}"
+            dgn = getScramDiagnostic(scram)
+            msg = f"Error executing {tweakingScriptName}\n\tScram Diagnostic {dgn}"
             handleException("FAILED", EC_CMSRunWrapper, msg)
             mintime()
             sys.exit(EC_CMSRunWrapper)
         # debugging help in initial development: print command output in any case
-        print(f"{tweakingScriptName} output:\n{scram.diagnostic()}")
+        print(f"{tweakingScriptName} output:\n{getScramDiagnostic(scram)}")
 
         print(f"==== Tweak PSet Done at {UTCNow()} ====")
 
@@ -819,17 +849,15 @@ if __name__ == "__main__":
             #   it leaves behind an invalid FWJR.xml.
             # - For any CMSSW version 12_6 and higher, cmsRun always creates a syntactically correct
             #   FWJR.xml (possibly with empty content) also when it exits with non-zero exit code.
+            # - when running user scripts it is not unusual that user provide a FJR with 0 exit code
+            #   as a standard template to avoid our parsing to fail, but do not update it when their
+            #   application fails
+            # So we always trust Unix application exit code more !
             jobExitCode = applicationExitCode
             print(f"The application failed with exit code {applicationExitCode}")
             print("but WMCore.FwkJobReport.Report:getExitCode() returned 0 from FWJR.xml")
-            print("This job will be marked as failed.")
-            print("In order to help with debugging, we print the content of FrameworkJobReport.xml")
-            print("== Start FrameworkJobReport.xml ==")
-            with open('FrameworkJobReport.xml', 'r', encoding='utf-8') as fwjr:
-                for line in fwjr.readlines():
-                    print(f"== FWJR: {line}", end="")
-            print("== End FrameworkJobReport.xml ==")
-            # we do not need the else statement:
+            print("Application exit code wins. This job will be marked as failed.")
+            # we do not need an else statement:
             # if jobExitCode != 0: then the FWJR.xml has better info than the unix exit code,
             #                    : we can simply ignore applicationExitCode
             # if jobExitCode == 0 and applicationExitCode == 0: then just keep jobExitCode
